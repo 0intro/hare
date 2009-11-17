@@ -1,0 +1,19 @@
+
+anl-lib.sh is the core library of all functions for interacting
+with Argonne's surveyor machine.  It uses a configuration
+file (/usr/$user/lib/anl.cfg) to personalize the scripts to
+your particular setup.
+
+Key enduser commands are:
+
+anl-uplink - setup ssh tunnel to ANL and start remote inferno
+		(this is necessary for all subsequent commands)
+anl-cleanup - stop all threads on login node to cleanup
+anl-run - execute Plan 9 on BG/P in development configuration
+anl-debug - access JTAG debug console for running job
+anl-del - cleanup running job
+bgpio - get a CPU session on first IO Node
+bgpcpu - get a CPU session on specified CPU node
+
+There are helper scripts included which call them directly from
+normal shells without using the library.

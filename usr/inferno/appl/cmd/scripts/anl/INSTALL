@@ -1,0 +1,9 @@
+#!/dis/sh.dis
+
+SCRIPTS = ( anl-lib.sh uplink cpu io del cleanup run regress stat )
+
+mkdir -p /dis/anl
+for s in $SCRIPTS {
+	chmod ugo+x $s
+	cp $s /dis/anl
+}

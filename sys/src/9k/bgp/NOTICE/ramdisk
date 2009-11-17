@@ -1,0 +1,43 @@
+archbgp.c:
+
+/* This will move when the kmap stuff is finished */
+/* For now load custom boot script from ramdisk location */
+#define RAMDISK_LOC 0x01000000
+#define RAMDISK_MAGIC 0xb00f43ad
+#define RAMDISK_MAX 8192
+char arch_ramdisk[8192];
+void
+ramdisk(void)
+{
+	void *addr = (void *)(KSEG0|RAMDISK_LOC);
+	ulong magic = *((ulong *) addr);
+	ulong size = *((ulong *) addr + 1);
+	
+	if(magic != RAMDISK_MAGIC)
+		snprint(arch_ramdisk, RAMDISK_MAX, "# bad ramdisk magic: %8.8lux size: %lud\n\0", magic, size);
+	else {
+		if(size > RAMDISK_MAX)
+			size = RAMDISK_MAX;
+		memmove(arch_ramdisk, (uchar *)addr+8, size);
+	}
+}
+
+devarch.c:
+
+static long
+scriptread(Chan*, void* a, long n, vlong offset)
+{	
+	extern char arch_ramdisk[];
+
+	if(offset+n > 8192)
+		n = 8192-offset;
+
+	if(n<0)
+		return 0;
+
+	return readstr(offset, a, n, arch_ramdisk);
+}
+
+...
+
+	addarchfile("script", 0555, scriptread, nil);

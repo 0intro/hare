@@ -1,0 +1,171 @@
+#!/bin/rc
+echo Memory bandwidth partial read
+lmbench/bw_mem 512 rd
+lmbench/bw_mem 1024 rd
+lmbench/bw_mem 2048 rd
+lmbench/bw_mem 4096 rd
+lmbench/bw_mem 8192 rd
+lmbench/bw_mem 16384 rd
+lmbench/bw_mem 32768 rd
+lmbench/bw_mem 65536 rd
+lmbench/bw_mem 131072 rd
+lmbench/bw_mem 262144 rd
+lmbench/bw_mem 524288 rd
+lmbench/bw_mem 1050000 rd
+lmbench/bw_mem 2100000 rd
+lmbench/bw_mem 4190000 rd
+lmbench/bw_mem 8390000 rd
+lmbench/bw_mem 16780000 rd
+lmbench/bw_mem 33550000 rd
+
+echo Memory bandwidth partial write
+lmbench/bw_mem 512 wr
+lmbench/bw_mem 1024 wr
+lmbench/bw_mem 2048 wr
+lmbench/bw_mem 4096 wr
+lmbench/bw_mem 8192 wr
+lmbench/bw_mem 16384 wr
+lmbench/bw_mem 32768 wr
+lmbench/bw_mem 65536 wr
+lmbench/bw_mem 131072 wr
+lmbench/bw_mem 262144 wr
+lmbench/bw_mem 524288 wr
+lmbench/bw_mem 1050000 wr
+lmbench/bw_mem 2100000 wr
+lmbench/bw_mem 4190000 wr
+lmbench/bw_mem 8390000 wr
+lmbench/bw_mem 16780000 wr
+lmbench/bw_mem 33550000 wr
+
+echo Memory bandwidth partial read-write
+lmbench/bw_mem 512 rdwr
+lmbench/bw_mem 1024 rdwr
+lmbench/bw_mem 2048 rdwr
+lmbench/bw_mem 4096 rdwr
+lmbench/bw_mem 8192 rdwr
+lmbench/bw_mem 16384 rdwr
+lmbench/bw_mem 32768 rdwr
+lmbench/bw_mem 65536 rdwr
+lmbench/bw_mem 131072 rdwr
+lmbench/bw_mem 262144 rdwr
+lmbench/bw_mem 524288 rdwr
+lmbench/bw_mem 1050000 rdwr
+lmbench/bw_mem 2100000 rdwr
+lmbench/bw_mem 4190000 rdwr
+lmbench/bw_mem 8390000 rdwr
+lmbench/bw_mem 16780000 rdwr
+lmbench/bw_mem 33550000 rdwr
+
+echo Memory bandwidth partial copy
+lmbench/bw_mem 512 cp
+lmbench/bw_mem 1024 cp
+lmbench/bw_mem 2048 cp
+lmbench/bw_mem 4096 cp
+lmbench/bw_mem 8192 cp
+lmbench/bw_mem 16384 cp
+lmbench/bw_mem 32768 cp
+lmbench/bw_mem 65536 cp
+lmbench/bw_mem 131072 cp
+lmbench/bw_mem 262144 cp
+lmbench/bw_mem 524288 cp
+lmbench/bw_mem 1050000 cp
+lmbench/bw_mem 2100000 cp
+lmbench/bw_mem 4190000 cp
+lmbench/bw_mem 8390000 cp
+lmbench/bw_mem 16780000 cp
+lmbench/bw_mem 33550000 cp
+
+echo Memory bandwidth full write
+lmbench/bw_mem 512 fwr
+lmbench/bw_mem 1024 fwr
+lmbench/bw_mem 2048 fwr
+lmbench/bw_mem 4096 fwr
+lmbench/bw_mem 8192 fwr
+lmbench/bw_mem 16384 fwr
+lmbench/bw_mem 32768 fwr
+lmbench/bw_mem 65536 fwr
+lmbench/bw_mem 131072 fwr
+lmbench/bw_mem 262144 fwr
+lmbench/bw_mem 524288 fwr
+lmbench/bw_mem 1050000 fwr
+lmbench/bw_mem 2100000 fwr
+lmbench/bw_mem 4190000 fwr
+lmbench/bw_mem 8390000 fwr
+lmbench/bw_mem 16780000 fwr
+lmbench/bw_mem 33550000 fwr
+
+echo Memory bandwidth full read
+lmbench/bw_mem 512 frd
+lmbench/bw_mem 1024 frd
+lmbench/bw_mem 2048 frd
+lmbench/bw_mem 4096 frd
+lmbench/bw_mem 8192 frd
+lmbench/bw_mem 16384 frd
+lmbench/bw_mem 32768 frd
+lmbench/bw_mem 65536 frd
+lmbench/bw_mem 131072 frd
+lmbench/bw_mem 262144 frd
+lmbench/bw_mem 524288 frd
+lmbench/bw_mem 1050000 frd
+lmbench/bw_mem 2100000 frd
+lmbench/bw_mem 4190000 frd
+lmbench/bw_mem 8390000 frd
+lmbench/bw_mem 16780000 frd
+lmbench/bw_mem 33550000 frd
+
+echo Memory bandwidth full copy
+lmbench/bw_mem 512 fcp
+lmbench/bw_mem 1024 fcp
+lmbench/bw_mem 2048 fcp
+lmbench/bw_mem 4096 fcp
+lmbench/bw_mem 8192 fcp
+lmbench/bw_mem 16384 fcp
+lmbench/bw_mem 32768 fcp
+lmbench/bw_mem 65536 fcp
+lmbench/bw_mem 131072 fcp
+lmbench/bw_mem 262144 fcp
+lmbench/bw_mem 524288 fcp
+lmbench/bw_mem 1050000 fcp
+lmbench/bw_mem 2100000 fcp
+lmbench/bw_mem 4190000 fcp
+lmbench/bw_mem 8390000 fcp
+lmbench/bw_mem 16780000 fcp
+lmbench/bw_mem 33550000 fcp
+
+echo Memory bandwidth bzero
+lmbench/bw_mem 512 bzero
+lmbench/bw_mem 1024 bzero
+lmbench/bw_mem 2048 bzero
+lmbench/bw_mem 4096 bzero
+lmbench/bw_mem 8192 bzero
+lmbench/bw_mem 16384 bzero
+lmbench/bw_mem 32768 bzero
+lmbench/bw_mem 65536 bzero
+lmbench/bw_mem 131072 bzero
+lmbench/bw_mem 262144 bzero
+lmbench/bw_mem 524288 bzero
+lmbench/bw_mem 1050000 bzero
+lmbench/bw_mem 2100000 bzero
+lmbench/bw_mem 4190000 bzero
+lmbench/bw_mem 8390000 bzero
+lmbench/bw_mem 16780000 bzero
+lmbench/bw_mem 33550000 bzero
+
+echo Memory bandwidth bcopy
+lmbench/bw_mem 512 bcopy
+lmbench/bw_mem 1024 bcopy
+lmbench/bw_mem 2048 bcopy
+lmbench/bw_mem 4096 bcopy
+lmbench/bw_mem 8192 bcopy
+lmbench/bw_mem 16384 bcopy
+lmbench/bw_mem 32768 bcopy
+lmbench/bw_mem 65536 bcopy
+lmbench/bw_mem 131072 bcopy
+lmbench/bw_mem 262144 bcopy
+lmbench/bw_mem 524288 bcopy
+lmbench/bw_mem 1050000 bcopy
+lmbench/bw_mem 2100000 bcopy
+lmbench/bw_mem 4190000 bcopy
+lmbench/bw_mem 8390000 bcopy
+lmbench/bw_mem 16780000 bcopy
+lmbench/bw_mem 33550000 bcopy

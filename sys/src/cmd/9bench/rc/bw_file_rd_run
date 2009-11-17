@@ -1,0 +1,31 @@
+#!/bin/rc
+FILE = /tmp/bw_file.txt
+dd -if /dev/zero -of $FILE -bs 1024 -count 1024
+echo File bandwidth
+echo 'Open and close, 1 MB (2^20 bytes) file'
+lmbench/bw_file_rd 1048576 open2close $FILE
+lmbench/bw_file_rd 1048576 open2close $FILE
+lmbench/bw_file_rd 1048576 open2close $FILE
+lmbench/bw_file_rd 1048576 open2close $FILE
+lmbench/bw_file_rd 1048576 open2close $FILE
+echo 'IO only, 1 MB file'
+lmbench/bw_file_rd 1048576 io_only $FILE
+lmbench/bw_file_rd 1048576 io_only $FILE
+lmbench/bw_file_rd 1048576 io_only $FILE
+lmbench/bw_file_rd 1048576 io_only $FILE
+lmbench/bw_file_rd 1048576 io_only $FILE
+rm $FILE
+dd -if /dev/zero -of $FILE -bs 1024 -count 32768
+echo 'Open and close, 32 MB (32 * 2^20 bytes) file'
+lmbench/bw_file_rd 33554432 open2close $FILE
+lmbench/bw_file_rd 33554432 open2close $FILE
+lmbench/bw_file_rd 33554432 open2close $FILE
+lmbench/bw_file_rd 33554432 open2close $FILE
+lmbench/bw_file_rd 33554432 open2close $FILE
+echo 'IO only, 32 MB file'
+lmbench/bw_file_rd 33554432 io_only $FILE
+lmbench/bw_file_rd 33554432 io_only $FILE
+lmbench/bw_file_rd 33554432 io_only $FILE
+lmbench/bw_file_rd 33554432 io_only $FILE
+lmbench/bw_file_rd 33554432 io_only $FILE
+rm $FILE

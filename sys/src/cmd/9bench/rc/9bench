@@ -1,0 +1,11 @@
+#!/bin/rc
+echo Starting benchmarks
+lat_ctx_run
+lat_syscall_run
+bw_pipe_run
+lat_tcp_run
+lat_udp_run
+bw_tcp_run
+bw_file_rd_run
+bw_mem_run
+

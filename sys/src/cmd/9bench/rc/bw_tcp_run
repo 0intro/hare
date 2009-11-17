@@ -1,0 +1,22 @@
+#!/bin/rc
+echo Local TCP bandwidth
+
+lmbench/bw_tcp -s
+lmbench/bw_tcp 127.0.0.1
+slay bw_tcp | rc
+sleep 1
+lmbench/bw_tcp -s
+lmbench/bw_tcp 127.0.0.1
+slay bw_tcp | rc
+sleep 1
+lmbench/bw_tcp -s
+lmbench/bw_tcp 127.0.0.1
+slay bw_tcp | rc
+sleep 1
+lmbench/bw_tcp -s
+lmbench/bw_tcp 127.0.0.1
+slay bw_tcp | rc
+sleep 1
+lmbench/bw_tcp -s
+lmbench/bw_tcp 127.0.0.1
+slay bw_tcp | rc

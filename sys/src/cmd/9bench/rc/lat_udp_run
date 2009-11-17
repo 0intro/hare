@@ -1,0 +1,22 @@
+#!/bin/rc
+echo Local UDP latency
+lmbench/lat_udp -s
+lmbench/lat_udp 127.0.0.1
+slay lat_udp | rc
+sleep 1
+lmbench/lat_udp -s
+lmbench/lat_udp 127.0.0.1
+slay lat_udp | rc
+sleep 1
+lmbench/lat_udp -s
+lmbench/lat_udp 127.0.0.1
+slay lat_udp | rc
+sleep 1
+lmbench/lat_udp -s
+lmbench/lat_udp 127.0.0.1
+slay lat_udp | rc
+sleep 1
+lmbench/lat_udp -s
+lmbench/lat_udp 127.0.0.1
+slay lat_udp | rc
+sleep 1

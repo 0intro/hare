@@ -1,0 +1,178 @@
+#!/boot/rc -m /boot/rcmain
+#flag x +
+
+cputype=power
+objtype=$cputype
+service=cpu
+authid=glenda
+rootdir=/root
+rootspec=''
+rootsrv=boot
+
+/boot/echo In ericvh boot script
+
+beetroot=bgp.rr
+#authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'	# -a ...
+authentication=''
+fsaddr='tcp!172.17.3.12!6666'
+
+#
+# Post the read-only filesystem in #s/$beetroot
+# and mount it on /boot so the commands in /boot/$cputype/bin
+# are available to create the namespace (namespaces like to
+# mount #s/boot on / and that should not be the read-only
+# filesystem).
+# Must set hostowner to be that of the owner of the nvram file
+# before paqfs starts otherwise factotum will not be able to
+# open it.
+#
+/boot/echo -n sys > '#c/hostowner'
+/boot/paqfs -p -S $beetroot -m /boot -q /boot/$beetroot
+cd /boot/$cputype/bin
+bind '#c' /dev
+bind '#d' /fd
+bind -c '#e' /env
+bind '#p' /proc
+bind -c '#s' /srv
+
+#
+# Configure the networks.
+#
+# what are we? 
+# figure out what kind of node we are and what the tree ip address is
+bind -a '#:' /dev
+bind -a '#P' /dev
+bind -a '#I' /net
+
+xyzip=(`{cat /dev/xyzip})
+if (~ $xyzip(1) '255.255.255'){
+	treeip=$xyzip(4)
+	cpunode=0
+	bind -a '#l0' /net
+}
+if not {
+	treeip=$xyzip(1)
+	cpunode=1
+	bind -a '#!' /dev
+	bind -a '#∞' /dev
+}
+
+#
+# I/O node has Ethernet on the outside.
+# Everyone has Tree on the inside, loopback.
+#
+ip=(`{cat /dev/ioip})
+if(~ $#ip 4 && ! ~ $ip(1) '0.0.0.0'){
+	i=`{cat /net/ipifc/clone}
+	echo bind gbe /net/ether0 > /net/ipifc/$i/ctl
+	echo add $ip(1) $ip(2) $ip(3) > /net/ipifc/$i/ctl
+	echo add 0 0 $ip(4) >>/net/iproute
+	echo Ether: I am $ip(1)^, default route $ip(4)
+}
+
+#
+# Tree
+#
+i=`{cat /net/ipifc/clone}
+echo bind tree /dev/vc1 > /net/ipifc/$i/ctl
+echo add 11.$treeip $xyzip(2) 11.$xyzip(3) > /net/ipifc/$i/ctl
+echo add 12.$treeip $xyzip(2) 12.$xyzip(3) > /net/ipifc/$i/ctl
+echo Tree: I am '1[12]'.$treeip^, pset I/O node 11.$xyzip(4)
+
+i=`{cat /net/ipifc/clone}
+echo bind loopback /dev/null > /net/ipifc/$i/ctl
+echo add 127.0.0.1 255.0.0.0 127.0.0.0 > /net/ipifc/$i/ctl
+
+#
+# Set up authentication if necessary.
+# Factotum has to be allowed to mount on /mnt here because
+# auth_proxy (called by mount) will look for it there.
+# Normally, factotum will set '#c/hostowner'; if not, do it
+# by hand.
+#
+if(! ~ $authentication '')
+	eval `{echo $authentication}
+if(~ `{cat '#c/hostowner'} sys)
+	echo -n $authid > '#c/hostowner'
+
+
+#
+# Attach to the remote filesystem and mount it.
+# If this fails, set $root(dir|srv) and continue,
+# there's enough in the read-only filesystem to run
+# listen and telnet; at least cat /dev/kmesg might
+# then give a clue as to the problem.
+# Must check for the presence of expected files after
+# the mount because srv/mount do not always return
+# proper status.
+# $rootsrv is used in /lib/namespace because the
+# root might not be served from the usual #s/boot.
+#
+
+if(~ $cpunode '0' && ! ~ $fsaddr ''){
+	# wait for ethernet to come up
+	echo Atomic batteries to power
+
+	times=0
+	while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr $rootsrv $rootdir) {
+		echo -n '.'
+		times=`{echo $times}
+		sleep 5
+	}
+	echo done.	
+}
+
+if(~ $cpunode '1'){
+	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
+	times=0
+	while(! ~ $#times 12 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr $rootsrv $rootdir) {
+		echo -n '.'
+		times=`{echo $times}
+		sleep 5
+	}
+	echo done.
+}
+
+if(! test -d $rootdir/$rootspec/$cputype){
+	rootdir=/boot
+	rootspec=''
+	rootsrv=$beetroot
+}
+
+bind -c $rootdir/$rootspec $rootdir
+rootsrv='#s/'$rootsrv
+echo root is on $rootdir, root is served from $rootsrv
+
+#
+# Finish the namespace setup.
+#
+bind -a $rootdir /
+bind -b -c $rootdir/mnt /mnt
+bind $rootdir/$cputype/bin /bin
+bind -a $rootdir/rc/bin /bin
+cd /
+
+#
+# Finish environment setup and start services.
+#
+if(~ $cpunode '1'){
+	sysname=cpu-$treeip
+}
+if not {
+	sysname=io-$ip(1)
+}
+prompt=($sysname'# ' '	') 
+
+if(! ~ $rootdir /boot){
+	ndb/cs
+	ndb/dns -r
+}
+bind /boot/rc/bin/service /bin/service
+
+if(test -d /mnt/factotum)
+	aux/listen -q tcp
+if not
+	aux/listen -t /bin/service tcp
+
+while(echo Hello Squidboy)
+	. -i '#d/0'

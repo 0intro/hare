@@ -1,0 +1,49 @@
+</$objtype/mkfile
+
+CFLAGS=$CFLAGS -p -N
+
+TARG=bw_file_rd\
+	bw_mem\
+	bw_pipe\
+	bw_tcp\
+	lat_ctx\
+	lat_syscall\
+	lat_tcp\
+	lat_udp\
+
+OFILES=\
+	lib_timing.$O\
+#	bw_mem.$O\
+
+HFILES=\
+	bench.h\
+	names.h\
+	stats.h\
+	timing.h\
+	version.h\
+	lib_tcp.h\
+	lib_udp.h\
+	lib_unix.h\
+
+UPDATE=\
+	mkfile\
+	$HFILES\
+	${OFILES:%.$O=%.c}\
+
+</sys/src/cmd/mkmany
+
+install:V:
+	if (! test -e /$objtype/bin/lmbench) @{
+		mkdir /$objtype/bin/lmbench
+	}
+	for (i in $TARG) @{
+		cp $O.$i /$objtype/bin/lmbench/$i
+	}
+
+installlocal:V:
+	if (! test -e $home/bin/$objtype/lmbench) @{
+		mkdir $home/bin/$objtype/lmbench
+	}
+	for (i in $TARG) @{
+		cp $O.$i $home/bin/$objtype/lmbench/$i
+	}

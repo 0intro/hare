@@ -1,0 +1,3 @@
+#!/bin/rc
+echo Pipe bandwidth
+lmbench/bw_pipe

@@ -1,0 +1,7 @@
+#!/bin/rc
+echo Syscall latency
+lmbench/lat_syscall null
+lmbench/lat_syscall read
+lmbench/lat_syscall write
+lmbench/lat_syscall stat
+lmbench/lat_syscall open

@@ -1,0 +1,3 @@
+mpicc -Wall fwq.c  -funroll-loops -DCORE63 -I../common -o ../../emu/fwq63
+mpicc -Wall ftq.c  -funroll-loops -DCORE63 -I../common -o ../../emu/ftq63
+

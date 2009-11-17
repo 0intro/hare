@@ -1,0 +1,2 @@
+#/soft/apps/ZeptoOS/bin/zmpicc  -I../common -o z.ftq  ftq.c
+cqsub  -n 1 -t 59 -k zeptoos-bigmem   ./z.ftq -n 524288

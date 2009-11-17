@@ -1,0 +1,15 @@
+#!/dis/sh.dis -n
+
+(if {ftest -e /dis/anl/anl-lib.sh } {
+	run /dis/anl/anl-lib.sh
+
+	bgpio $*
+}
+{
+	echo Library not found
+	raise failed
+}
+)
+
+
+

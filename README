@@ -1,0 +1,30 @@
+How-To Build and Boot Plan 9 on BG/P
+====================================
+
+This is the source tree for the HARE project.  In order to build
+the Plan 9 kernel for Blue Gene you will need to download a normal
+Plan 9 distribution from http://plan9.bell-labs.com/plan9.  The
+Plan 9 distribution can be run under VMware, Qemu, or on standard
+PC hardware if you have devices which it supports.
+
+In order to build a crossbuild environment to the /sys/src directory 
+within your Plan 9 environment and build the PowerPC version of the
+Plan 9 distribution:
+
+% cd /sys/src
+% objtype=power mk installall
+
+Once this completes, you can go into the hare source tree within the
+Plan 9 environment and build the kernel:
+
+% cd /usr/username/src/hare/sys/src/9k/bgp
+% mk
+
+The resulting 9bgp.elf and can be copied to your BG/P front end and used
+as a kernel for either the IO node or the CNK node.
+
+You can see an example of our Blue Gene/P front end environment that is
+intended to run on top of Inferno (http://code.google.com/p/inferno-os) 
+in hare/usr/inferno/appl/cmd
+
+

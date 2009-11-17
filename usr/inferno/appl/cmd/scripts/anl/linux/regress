@@ -1,0 +1,24 @@
+#!/bin/bash
+
+for i in /bgsys/argonne-utils/profiles/$USER/{CNK,INK,CNS,uloader,ramdisk}
+do
+	out=`objdump -x $i`
+	case "$out" in
+	*"File format not recognized"*)
+		echo $i: invalid executable format 1>2
+		exit -1;;
+	esac
+done
+
+qsub -A BGPPlan9Meas -d -K $USER -v -t 30 -n 128 --kernel $USER --mode script sidestep.sh
+sleep 4
+while true
+do
+	job=`qstat | grep $USER | grep running | awk '{ print $1 }'`
+	if [[ -n $job ]]
+	then 
+		break
+	fi
+	sleep 10
+done
+echo Node Available

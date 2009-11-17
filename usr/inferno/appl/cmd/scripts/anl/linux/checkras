@@ -1,0 +1,2 @@
+#!/bin/bash
+grep RasEvent /bgsys/logs/BGP/sn1-bgdb0-mmcs_db_server-current.log | grep $USER

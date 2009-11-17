@@ -1,0 +1,13 @@
+This is a modification of Larry McVoy's lmbench suite of benchmarks for use on Plan 9. lmbench is distributed under the GPL with the restriction that results from a modified version may not be published. Given that restriction, this benchmark should be used to make private measurements for use in optimization; barring permission from Larry McVoy or Carl Staelin, results obtained with this software should not be distributed.
+
+To install:
+	cd src
+	mk all
+	mk install #if you can write to /$objtype/bin
+		OR
+	mk installlocal #to install to $home/bin/$objtype/
+	cd ..
+	mkdir $home/bin/rc/lmbench
+	cp scripts/* $home/bin/rc/lmbench
+
+The scripts ending in _run will run individual benchmarks with various parameters and/or multiple times. The 9bench script will execute all the _run scripts one after another.

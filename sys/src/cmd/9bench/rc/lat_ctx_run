@@ -1,0 +1,10 @@
+#!/bin/rc
+echo Context switch latency
+lmbench/lat_ctx 1
+lmbench/lat_ctx 2
+lmbench/lat_ctx 3
+lmbench/lat_ctx 4
+lmbench/lat_ctx 5
+lmbench/lat_ctx 6
+lmbench/lat_ctx 10
+lmbench/lat_ctx 15

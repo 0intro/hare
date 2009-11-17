@@ -1,0 +1,25 @@
+#!/bin/rc
+
+# Eventually broaden to capture of kernel version on non-git trees
+# This assumes you haven't screwed up with an improper bind
+
+GITDIR=../../../../.git
+
+fn gitver {
+	GITBRANCH=(`{cat $GITDIR/HEAD})
+	KERNBUILDVER=`{cat $GITDIR^/^$GITBRANCH(2)}
+}
+
+if(test -d $GITDIR)
+	gitver
+if not
+	KERNBUILDVER=Unknown
+	
+KERNBUILDUSER=`{cat /dev/user}
+KERNBUILDHOST=`{cat /dev/sysname}
+
+cat > version.h << EOF
+char *kernbuilduser="$KERNBUILDUSER";
+char *kernbuildhost="$KERNBUILDHOST";
+char *kernbuildver="$KERNBUILDVER";
+EOF
