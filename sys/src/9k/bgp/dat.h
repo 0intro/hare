@@ -102,7 +102,7 @@ struct PMMU
 {
 	int	mmupid[MAXMACH];		/* pidonmach */
 
-	int 	cnk;				/* CNK emulation */
+	int	cnk;				/* CNK emulation */
 	int	cnkexec;
 	void*	cnkenv;
 };

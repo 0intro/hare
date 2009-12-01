@@ -138,11 +138,7 @@ fab(int n)
  * To do:
  *	remove restriction of 1GB physical memory used;
  *	other entries for devices common to both I/O and CPU node
- *	  kernels should probably be in here;
- *	real KMap;
- *	synchronise device TLB mappings added by one processor
- *	  with the other processors;
- *	SMP TLB management - a thing of beauty is a joy forever.
+ *	  kernels should probably be in here.
  */
 Tlb tlbstatic[] = {
 	{	TLBEPN(VIRTDRAM)|TLB16MB|TLBVALID,	/* RAM */
