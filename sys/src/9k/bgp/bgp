@@ -7,15 +7,15 @@ power +dev
 	main
 	arch
 	mmu
-	qmalloc
 	random
 	fpu
 	syscall
 	trap
 	ppcmul64fract
 	bic
+	qmalloc
 
-#	cnksyscall cnksysemu
+	cnksyscall cnksysemu
 
 boot cpu
 	tcp
@@ -44,7 +44,7 @@ dev +dev
 	ssl
 	cap
 	kprof
-	trace	trace
+	trace		trace
 #	probe		probe probepower
 
 	ip		arp chandial ip ipv6 ipaux iproute netif netlog nullmedium pktmedium ptclbsum inferno
@@ -56,9 +56,9 @@ dev +dev
 	arch
 
 	gib
-	torus	frag
+	torus		frag
 	tree		tree
-#	segment
+	segment
 
 uart +dev
 	uartcns		archbgp uartmb
@@ -83,8 +83,10 @@ misc +dev
 	cache
 
 dir
-#	cnk
+	bgl
+	cnk
 	ip
+	ppc440		-.I.
 	port
 
 lib
@@ -94,7 +96,6 @@ lib
 
 port
 	alarm
-#	alloc
 	allocb
 	chan
 	dev
@@ -121,4 +122,3 @@ port
 	sysseg
 	taslock
 	tod
-#	xalloc
