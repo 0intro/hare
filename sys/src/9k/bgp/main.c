@@ -247,7 +247,12 @@ main(u32int r3, u32int r4, u32int r5,u32int r6, u32int r7)
 	print("\nPlan 9 BG/P\n");
 	print("cpu%d: %ux %ludMHz\n", m->machno, m->cputype, m->cpumhz);
 	archprint();
-	handshake();
+	/* 
+	 * EVH: moved this to manual invocation via devarch
+	 * since it triggers service node to try and contact ciod
+	 *
+	 * handshake();
+	 */
 
 	mask = cnstakecpu();
 

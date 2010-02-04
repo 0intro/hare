@@ -260,6 +260,13 @@ cnkread(Chan*, void* a, long n, vlong offset)
 }
 
 static long
+handshakewrite(Chan*, void*, long n, vlong)
+{
+	handshake();
+	return n;
+}
+
+static long
 cnkwrite(Chan*, void* a, long, vlong offset)
 {
 	char *cp;
@@ -326,4 +333,5 @@ archinit(void)
 	addarchfile("cnk", 0644, cnkread, cnkwrite);
 	addarchfile("version",0444, verread, nil);
 	addarchfile("bic", 0444, bicread, nil);
+	addarchfile("handshake",0555, nil, handshakewrite);
 }
