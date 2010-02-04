@@ -766,7 +766,8 @@ enum
 	MAXCRYPT = 	127,
 	NUMSIZE	=	12,		/* size of formatted number */
 	MB =		(1024*1024),
-	READSTR =	1000,		/* temporary buffer size for device reads */
+	/* READSTR was 1000, which is way too small for usb's ctl file */
+	READSTR =	4000,		/* temporary buffer size for device reads */
 	WRITESTR =	256,		/* ctl file write max */
 };
 

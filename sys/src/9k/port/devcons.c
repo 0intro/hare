@@ -33,7 +33,7 @@ static void kmesgputs(char *, int);
 static void kprintputs(char*, int);
 
 static	Lock	consdevslock;
-static	int	nconsdevs = 2;
+static	int	nconsdevs = 3;
 static	Consdev	consdevs[Nconsdevs] =			/* keep this order */
 {
 	{nil, nil,	kmesgputs,	0},			/* kmesg */
@@ -977,24 +977,27 @@ consread(Chan *c, void *buf, long n, vlong off)
 		return n;
 
 	case Qswap:
-		snprint(tmp, sizeof tmp,
+		l = snprint(tmp, sizeof tmp,
 			"%llud memory\n"
 			"%d pagesize\n"
 			"%llud kernel\n"
 			"%lud/%lud user\n"
-			"%lud/%lud swap\n"
-			"%lud/%lud kernel malloc\n"
-			"%lud/%lud kernel draw\n",
+			"%lud/%lud swap\n",
 			(uvlong)conf.npage*BY2PG,
 			BY2PG,
 			(uvlong)conf.npage-conf.upages,
 			palloc.user-palloc.freecount, palloc.user,
-			conf.nswap-swapalloc.free, conf.nswap,
-//			mainmem->cursize, mainmem->maxsize,
-//			imagmem->cursize, imagmem->maxsize);
-0ul, 0ul, 0ul, 0ul);
+			conf.nswap-swapalloc.free, conf.nswap);
+		b = buf;
+		i = readstr(offset, b, n, tmp);
+		b += i;
+		n -= i;
+		if(offset > l)
+			offset -= l;
+		else
+			offset = 0;
 
-		return readstr(offset, buf, n, tmp);
+		return i + mallocreadsummary(c, b, n, offset);
 
 	case Qsysname:
 		if(sysname == nil)

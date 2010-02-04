@@ -6,12 +6,7 @@
 
 enum
 {
-	/*
-	 * This is broken - if Hdrspc == BLOCKALIGN
-	 * it goes pear-shaped. Fix this with some sane
-	 * code, please.
-	 */
-	Hdrspc		= 2*BLOCKALIGN,	/* leave room for high-level headers */
+	Hdrspc		= 64,		/* leave room for high-level headers */
 	Bdead		= 0x51494F42,	/* "QIOB" */
 };
 
@@ -25,32 +20,29 @@ static Block*
 _allocb(int size)
 {
 	Block *b;
-	uintptr addr;
+	uchar *p;
+	int n;
 
-	if((b = mallocz(sizeof(Block)+size+Hdrspc, 0)) == nil)
+	n = BLOCKALIGN + ROUNDUP(size+Hdrspc, BLOCKALIGN) + sizeof(Block);
+	if((p = malloc(n)) == nil)
 		return nil;
 
+	b = (Block*)(p + n - sizeof(Block));	/* block at end of allocated space */
+	b->base = p;
 	b->next = nil;
 	b->list = nil;
 	b->free = 0;
 	b->flag = 0;
 
-	/* align start of data portion by rounding up */
-	addr = PTR2UINT(b);
-	addr = ROUNDUP(addr + sizeof(Block), BLOCKALIGN);
-	b->base = UINT2PTR(addr);
+	/* align base and bounds of data */
+	b->lim = (uchar*)(PTR2UINT(b) & ~(BLOCKALIGN-1));
 
-	/* align end of data portion by rounding down */
-	b->lim = ((uchar*)b) + msize(b);
-	addr = PTR2UINT(b->lim);
-	addr = addr & ~(BLOCKALIGN-1);
-	b->lim = (uchar*)addr;
-
-	/* leave sluff at beginning for added headers */
+	/* align start of writable data, leaving space below for added headers */
 	b->rp = b->lim - ROUNDUP(size, BLOCKALIGN);
-	if(b->rp < b->base)
-		panic("_allocb");
 	b->wp = b->rp;
+
+	if(b->rp < b->base || b->lim - b->rp < size)
+		panic("_allocb");
 
 	return b;
 }
@@ -70,7 +62,6 @@ allocb(int size)
 		mallocsummary();
 		panic("allocb: no memory for %d bytes\n", size);
 	}
-	setmalloctag(b, getcallerpc(&size));
 
 	return b;
 }
@@ -104,7 +95,6 @@ iallocb(int size)
 		}
 		return nil;
 	}
-	setmalloctag(b, getcallerpc(&size));
 	b->flag = BINTR;
 
 	ilock(&ialloc);
@@ -118,6 +108,7 @@ void
 freeb(Block *b)
 {
 	void *dead = (void*)Bdead;
+	uchar *p;
 
 	if(b == nil)
 		return;
@@ -136,6 +127,8 @@ freeb(Block *b)
 		iunlock(&ialloc);
 	}
 
+	p = b->base;
+
 	/* poison the block in case someone is still holding onto it */
 	b->next = dead;
 	b->rp = dead;
@@ -143,7 +136,7 @@ freeb(Block *b)
 	b->lim = dead;
 	b->base = dead;
 
-	free(b);
+	free(p);
 }
 
 void

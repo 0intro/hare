@@ -5,6 +5,10 @@
 #include	"fns.h"
 #include	<pool.h>
 
+extern void* xalloc(ulong);
+extern void xinit(void);
+extern int xmerge(void*, void*);
+
 static void poolprint(Pool*, char*, ...);
 static void ppanic(Pool*, char*, ...);
 static void plock(Pool*);
@@ -53,27 +57,8 @@ static Pool pimagmem = {
 	.private=	&pimagpriv,
 };
 
-static Private pcnkpriv;
-static Pool pcnkmem = {
-	.name=		"cnk",
-	.maxsize=	16*1024*1024,
-	.minarena=	2*1024*1024,
-	.quantum=	32,
-	.alloc=		xalloc,
-	.merge=		xmerge,
-	.flags=		0,
-
-	.lock=		plock,
-	.unlock=	punlock,
-	.print=		poolprint,
-	.panic=		ppanic,
-
-	.private=	&pcnkpriv,
-};
-
 Pool*	mainmem = &pmainmem;
 Pool*	imagmem = &pimagmem;
-Pool*	cnkmem = &pcnkmem;
 
 /*
  * because we can't print while we're holding the locks,
@@ -136,18 +121,39 @@ punlock(Pool *p)
 	iprint("%.*s", sizeof pv->msg, msg);
 }
 
-void
-poolsummary(Pool *p)
+static char*
+poolsummary(Pool* p, char* s, char* e)
 {
-	print("%s max %lud cur %lud free %lud alloc %lud\n", p->name,
-		p->maxsize, p->cursize, p->curfree, p->curalloc);
+	return seprint(s, e, "%s max %lud cur %lud free %lud alloc %lud\n",
+		p->name, p->maxsize, p->cursize, p->curfree, p->curalloc);
 }
 
 void
 mallocsummary(void)
 {
-	poolsummary(mainmem);
-	poolsummary(imagmem);
+	char buf[256], *p;
+
+	p = poolsummary(mainmem, buf, buf+sizeof(buf));
+	poolsummary(imagmem, p, buf+sizeof(buf));
+
+	print(buf);
+}
+
+long
+mallocreadsummary(Chan*, void *a, long n, long offset)
+{
+	char buf[256], *p;
+
+	p = poolsummary(mainmem, buf, buf+sizeof(buf));
+	poolsummary(imagmem, p, buf+sizeof(buf));
+
+	return readstr(offset, a, n, buf);
+}
+
+void
+mallocinit(void)
+{
+	xinit();
 }
 
 /* everything from here down should be the same in libc, libdebugmalloc, and the kernel */

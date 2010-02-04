@@ -100,7 +100,8 @@ cnkgetpersonality(Ar0*ar, va_list list)
 	ar->i = 0;
 }
 
-/* this was in port/sysseg.c and was moved here. */
+/* this was in port/sysseg.c and was copied here. */
+/* There are a few special bits for CNK needs. */
 void
 cnksbrk(Ar0* ar0, va_list list)
 {
@@ -317,6 +318,7 @@ returnok(Ar0*, va_list)
 
 /* void  *  mmap(void *start, size_t length, int prot , int flags, int fd,
        off_t offset); */
+/* They are using this as a poor man's malloc. */
 
 void cnkmmap(Ar0 *ar0, va_list list)
 {
@@ -807,8 +809,12 @@ void cnkclone(Ar0 *ar0, va_list list)
 
 /* get app segment mapping. Not the gasm you think, you dirty-minded person. 
  */
-void gasm(Ar0 *ar0, va_list list)
+/* we are going to deprecate this call. It was only there for libraries (dcmf, MPI) that needed
+ * the huge physical segment. I think nowadays that is a bad idea. 
+ */
+void gasm(Ar0 *, va_list)
 {
+#ifdef NOMORE
 	void seginfo(int seg, u32int *va, u64int *pa, u32int *len);
 	u64int *pa;
 	int whichseg;
@@ -831,6 +837,7 @@ void gasm(Ar0 *ar0, va_list list)
 	seginfo(whichseg, va, pa, slen);
 	if (up->cnk & 128) print("%d:gasm: %#x %#llx %#x\n", up->pid, *va, *pa, *slen);
 	ar0->i = 0;
+#endif
 }
 
 u32int counters[1024];
