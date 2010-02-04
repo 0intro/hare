@@ -18,12 +18,6 @@ enum
 	Cwrite,
 	Cstart,
 	Cdie,
-	/* minimum address for VA=PA */
-	VAPA=512*1024*1024,
-	/* total number of NON-VA=PA pages == try 16M*/
-	NNV=16 * 1024 * 1024 / BY2PG,
-	/* you must be this tall to attack the city */
-	MINVA=16*1024*1024
 };
 
 #define TYPE(x) 	(int)( (c)->qid.path & 0x7 )
@@ -55,38 +49,15 @@ struct Globalseg
 };
 
 static Globalseg *globalseg[100];
-
 static Lock globalseglock;
-static struct Page *pend, *cnkpages;
-static int numcnkpages = 0;
+
 
 	Segment* (*_globalsegattach)(Proc*, char*);
 static	Segment* globalsegattach(Proc *p, char *name);
 static	int	cmddone(void*);
 static	void	segmentkproc(void*);
 static	void	docmd(Globalseg *g, int cmd);
-static	struct Page **parray;
 
-void
-seginfo(int seg, u32int *va, u64int *pa, u32int *len)
-{
-	Pte **pte;
-	Page *pg;
-	Segment *s;
-
-	if (seg > 100)
-		error("seg > 100");
-	if (! globalseg[seg])
-		error("no seg");
-	s = globalseg[seg]->s;
-	*va = s->base;
-	*len = s->size*BY2PG;
-
-	pte = &s->map[0];
-
-	pg = (*pte)->pages[0];
-	*pa = pg->pa;
-}
 /*
  *  returns with globalseg incref'd
  */
@@ -201,61 +172,7 @@ segmentgen(Chan *c, char*, Dirtab*, int, int s, Dir *dp)
 static void
 segmentinit(void)
 {
-	struct Page *p, *pnext;
-	extern struct Palloc palloc;
-	int i = 0;
 	_globalsegattach = globalsegattach;
-	/* steal a *lot* of pages */
-	/* let's think about what we could steal for a cnk proc. Walk the palloc array until we hit VAPA or greater. 
-	 * At that point. 
-	 * scan and make sure we have a large contiguous space. Then take them all. 
-	 */
-
-	/* we are going to assume that different pools of pages are discontiguous. That may be stupid */
-	p = palloc.head;
-
-	iprint("segmentinit: p %p\n", p);
-	while (p->pa < VAPA)
-		p = p->next;
-
-	/* we're here. Now scan as large a contiguous space as you can. It should be all of mem at this point. */
-	iprint("segmentinit: first page %p\n", p);
-	cnkpages = p;
-	pend = p; 
-	pnext = p->next;
-	while (pnext) {
-		/* if there is a > 1 page gap we are done */
-		if (pnext->pa > (pend->pa + BY2PG))
-			break;
-		pend = pnext;
-		pnext = pend->next;
-		i++;
-	}
-
-	iprint("segmentinit: last page %p, i %d\n", pend, i);
-
-	if (i) {
-		/* we actually have a page or two. 
-		 * this is very early in the game. There's no real need to worry 
-		* about trivia. 
-		 */
-		if (p->prev)
-			p->prev->next = pend->next;
-		if(pend->next)
-			pend->next->prev = p->prev;
-		else
-			palloc.tail = p->prev;
-		p->prev = pend->next = nil;
-		p->ref = 0;
-		palloc.freecount -= i;
-	}
-	numcnkpages = i;
-
-	/* now alloc the array. */
-	parray = malloc(numcnkpages * sizeof(*parray));
-	for(i = 0, p = cnkpages; i < numcnkpages; i++, p = p->next)
-		parray[i] = p;
-
 }
 
 static Chan*
@@ -407,7 +324,7 @@ segmentread(Chan *c, void *a, long n, vlong voff)
 		g = c->aux;
 		if(g->s == nil)
 			error("segment not yet allocated");
-		sprint(buf, "va 0x%lux 0x%lux\n", g->s->base, g->s->top-g->s->base);
+		sprint(buf, "va %#lux %#lux\n", g->s->base, g->s->top-g->s->base);
 		return readstr(voff, a, n, buf);
 	case Qdata:
 		g = c->aux;
@@ -436,53 +353,6 @@ segmentread(Chan *c, void *a, long n, vlong voff)
 	return 0;	/* not reached */
 }
 
-/* it would be ideal if all memory could run p==v. But we can't shrink plan 9 down to < 16 M and all my attempts to get 
- * mpicc to link apps at 128M have failed -- man I hate the gnu tools. 
- * So for addresses < VAPA, we use the END of the pages array -- for addresses > VAPA, we use the start. 
- * so addresses can NOT be > TOM - VAPA -- how do we get TOM? 
- * I could just do a direct map and swizzle the pages in the array but let's keep it simple for now. 
- */
-static void pages(Segment *s, ulong va, ulong len)
-{
-	struct Page *p;
-	int i;
-	int pv = 0;
-	/* len is always a multiple of 1M so no need to round stuff etc. */
-	/* the base va is the base of the segment, just FYI */
-	int totpages = len;
-	int firstpage;
-	/* forall pages in va .. va + len preload. */
-
-	if (va >= VAPA)
-		pv = 1;
-print("pages: va %p pv %d len %ld\n", (void *)va, pv, len);
-	if (pv) {
-		/* easy. Offset by VAPA and away we go */
-		/* this works because we started grabbing pages at VAPA from the pages array */
-		firstpage = (va - VAPA) / BY2PG;
-	} else {
-		/* else we have to start at the end. We know that va is ALWAYS at least MINVA */
-		firstpage = numcnkpages - NNV;
-		firstpage += (va - MINVA)/BY2PG;
-	}
-	/* offset va by MINVA and yank them out of parray */
-p = parray[firstpage];
-print("cnkpages %p firstpage %d pa %p total %d\n", cnkpages, firstpage, (void *)(p->pa), totpages);
-	for(i = 0; i < totpages; i++, firstpage++){
-		/* physically contiguous. Start with the first page, and work our way up */
-		/* simpler logic than newpage since we know they are free. */
-		/* xxx do we need pageunchain here? Not clear that we do. */
-		p = parray[firstpage];
-		lock(p);
-		p->va = va + i*BY2PG;
-/*later		if(p->ref != 0)
-			panic("segments");*/
-		p->ref++;
-		p->modref = 0;
-		unlock(p);
-		segpage(s, p);
-	}
-}
 static long
 segmentwrite(Chan *c, void *a, long n, vlong voff)
 {
@@ -509,12 +379,7 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 			len = (top - va) / BY2PG;
 			if(len == 0)
 				error("len is zero");
-			if (va < MINVA)
-				error("va too small");
-/* try physical; were using SG_SHARED but that's really not correct oops phys is getting panics*/
-			g->s = newseg(SG_SHARED /*SG_PHYSICAL*/, va, len);
-			/* pre-allocate pages */
-			pages(g->s, va, len);
+			g->s = newseg(SG_SHARED, va, len);
 		} else 
 		if(strcmp(cb->f[0], "heap") == 0){
 			if (!g)

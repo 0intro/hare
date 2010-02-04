@@ -39,6 +39,11 @@ struct Xalloc
 
 static Xalloc	xlists;
 
+extern void* xalloc(ulong);
+extern int xmerge(void*, void*);
+extern void xhole(uintptr, ulong);
+extern void xsummary(void);
+
 void
 xinit(void)
 {
