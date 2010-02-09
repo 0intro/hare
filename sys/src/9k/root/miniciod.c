@@ -1,19 +1,16 @@
-#include <assert.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <u.h>
+#include <libc.h>
 
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <grp.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
-#include <asm/bluegene_ras.h>
-#include <common/bgp_personality.h>
-#include <common/bgp_personality_inlines.h>
+typedef u8int uint8_t;
+typedef u16int uint16_t;
+typedef u32int uint32_t;
+typedef u64int uint64_t;
+typedef uchar int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef vlong int64_t;
+typedef long size_t;
+typedef long ssize_t;
 
 #define CIO_VERSION_LATEST 22
 
@@ -113,52 +110,38 @@ struct MessagePrefix
 #define VERSION_MSG_ENC_LEN 64
 
 #define DEBUG_INITFINI 1
+#define fprintf fprint
 
 static int debug_flags = DEBUG_INITFINI;
 
 static int cio_protocol_version;
-static int cio_stream_socket/*, data_stream_socket*/;
 static int current_job_id, current_job_mode;
+static int cio_stream_socket = 0;
+int stderr = 2;
 
-static int
-send_ras(int code, int narg, ...)
+unsigned long
+ntohl(int x)
 {
-    static int ras_fd = -1;
-    bg_ras event = {0};
-    va_list args;
-    int i;
-    int* datap;
+	unsigned long n;
+	unsigned char *p;
 
-    if (ras_fd < 0)
-	if ((ras_fd = open(BG_RAS_FILE, O_WRONLY)) < 0)
-	{
-	    perror("open " BG_RAS_FILE);
-	    return 1;
-	}
+	n = x;
+	p = (unsigned char*)&n;
+	return (p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3];
+}
 
-    va_start(args, narg);
+unsigned long
+htonl(unsigned long h)
+{
+	unsigned long n;
+	unsigned char *p;
 
-    event.comp = bg_comp_kernel;
-    event.subcomp = bg_subcomp_ciod;
-    event.code = code;
-    event.length = narg * sizeof(int);
-
-    datap = (int*)event.data;
-    for (i = 0; i < narg; i++)
-    {
-	int arg = va_arg(args, int);
-	memcpy(datap++, &arg, sizeof(arg));
-    }
-
-    va_end(args);
-
-    if (write(ras_fd, &event, sizeof(event)) != sizeof(event))
-    {
-	perror("send ras event");
-	return 1;
-    }
-
-    return 0;
+	p = (unsigned char*)&n;
+	p[0] = h>>24;
+	p[1] = h>>16;
+	p[2] = h>>8;
+	p[3] = h;
+	return n;
 }
 
 /*
@@ -167,27 +150,7 @@ send_ras(int code, int narg, ...)
 static ssize_t
 socket_read(int fd, void* buf, size_t count)
 {
-    size_t already_read = 0;
-
-    while (already_read < count)
-    {
-	ssize_t n;
-
-	n = read(fd, buf + already_read, count - already_read);
-
-	if (n == -1)
-	{
-	    if (errno == EINTR || errno == EAGAIN)
-		continue;
-	    return -1;
-	}
-	else if (n == 0)
-	    return already_read;
-	else
-	    already_read += n;
-    }
-
-    return already_read;
+	return readn(fd, buf, count);
 }
 
 /*
@@ -196,32 +159,14 @@ socket_read(int fd, void* buf, size_t count)
 static ssize_t
 socket_write(int fd, const void* buf, size_t count)
 {
-    size_t already_written = 0;
-
-    while (already_written < count)
-    {
-	ssize_t n;
-
-	n = write(fd, buf + already_written, count - already_written);
-
-	if (n == -1)
-	{
-	    if (errno == EINTR || errno == EAGAIN)
-		continue;
-	    return -1;
-	}
-	else
-	    already_written += n;
-    }
-
-    return already_written;
+	return write(fd, buf, count);
 }
 
 static int
 stream_read_prefix(int fd, struct MessagePrefix* prefix)
 {
     if (socket_read(fd, prefix, sizeof(*prefix)) != sizeof(*prefix))
-	return 1;
+		return 1;
 
     return 0;
 }
@@ -232,7 +177,7 @@ stream_read_int(int fd, int* result)
     int res;
 
     if (socket_read(fd, &res, sizeof(res)) != sizeof(res))
-	return 1;
+		return 1;
 
     *result = ntohl(res);
 
@@ -243,18 +188,17 @@ static int
 stream_read_arr(int fd, void** arr, int* size)
 {
     if (stream_read_int(fd, size))
-	return 1;
+		return 1;
 
     if (*size < 0)
-	return 2;
+		return 2;
 
     if (!(*arr = malloc(*size)))
-	return 3;
+		return 3;
 
-    if (socket_read(fd, *arr, *size) != *size)
-    {
-	free(*arr);
-	return 1;
+    if (socket_read(fd, *arr, *size) != *size) {
+		free(*arr);
+		return 1;
     }
 
     return 0;
@@ -274,7 +218,7 @@ stream_write_int(int fd, int data)
     data = htonl(data);
 
     if (socket_write(fd, &data, sizeof(data)) != sizeof(data))
-	return 1;
+		return 1;
 
     return 0;
 }
@@ -283,10 +227,10 @@ static int
 stream_write_arr(int fd, const void* arr, int size)
 {
     if (stream_write_int(fd, size))
-	return 1;
+		return 1;
 
     if (socket_write(fd, arr, size) != size)
-	return 1;
+		return 1;
 
     return 0;
 }
@@ -303,9 +247,8 @@ cio_write_prefix(int type, int length)
     prefix.jobid = current_job_id;
 
     if (socket_write(cio_stream_socket, &prefix, sizeof(prefix)) !=
-	sizeof(prefix))
-    {
-	return 1;
+			sizeof(prefix)) {
+		return 1;
     }
 
     return 0;
@@ -315,13 +258,11 @@ static int
 cio_write_result(enum CioMessageType message, int result, int value)
 {
     if (cio_write_prefix(RESULT_MESSAGE, sizeof(uint32_t) * 3) ||
-	stream_write_int(cio_stream_socket, message) ||
-	stream_write_int(cio_stream_socket, result) ||
-	stream_write_int(cio_stream_socket, value))
-    {
-	send_ras(CiodControlWriteFailed, 3, errno, RESULT_MESSAGE, 0);
-	fprintf(stderr, "Error writing message on CIO stream!\n");
-	return 1;
+			stream_write_int(cio_stream_socket, message) ||
+			stream_write_int(cio_stream_socket, result) ||
+			stream_write_int(cio_stream_socket, value)) {
+		fprintf(stderr, "Error writing message on CIO stream!\n");
+		return 1;
     }
 
     return 0;
@@ -331,110 +272,46 @@ static int
 cio_write_node_status(int cpu, int p2p, enum CioNodeStatusType type, int value)
 {
     if (cio_write_prefix(NODE_STATUS_MESSAGE, sizeof(uint32_t) * 4) ||
-	stream_write_int(cio_stream_socket, cpu) ||
-	stream_write_int(cio_stream_socket, p2p) ||
-	stream_write_int(cio_stream_socket, type) ||
-	stream_write_int(cio_stream_socket, value))
-    {
-	send_ras(CiodControlWriteFailed, 3, errno, NODE_STATUS_MESSAGE, 0);
+			stream_write_int(cio_stream_socket, cpu) ||
+			stream_write_int(cio_stream_socket, p2p) ||
+			stream_write_int(cio_stream_socket, type) ||
+			stream_write_int(cio_stream_socket, value)){
 
-	fprintf(stderr, "Error writing message on CIO stream!\n");
-	return 1;
+		fprintf(stderr, "Error writing message on CIO stream!\n");
+		return 1;
     }
 
     return 0;
 }
 
-
+int putenvint(char *key, int value)
+{
+	char envbuf[255];
+	
+	sprint(envbuf, "%d\0", value);
+	return putenv(key, envbuf);
+}
 
 int main(void)
 {
     struct sockaddr_in addr;
     int one = 1;
-    int cio_listen_socket, data_listen_socket;
+    int cio_stream_socket, data_listen_socket;
+    
+    /* TODO: open logfile as stderr */
+    stderr = create("/tmp/ciod.log", OWRITE, 0666|DMAPPEND);
 
-    /* Create a listening CIO stream socket.  */
-
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-
-    cio_listen_socket = socket(PF_INET, SOCK_STREAM, 0);
-    assert(cio_listen_socket != -1);
-
-    setsockopt(cio_listen_socket, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
-
-    addr.sin_port = htons(7000);
-    if (bind(cio_listen_socket, (struct sockaddr*)&addr, sizeof(addr)))
-    {
-	perror("bind port 7000");
-	return 1;
-    }
-    if (listen(cio_listen_socket, 1))
-    {
-	perror("listen");
-	return 1;
-    }
-
-    /* Create a listening DATA stream socket.  */
-
-    data_listen_socket = socket(PF_INET, SOCK_STREAM, 0);
-    assert(data_listen_socket != -1);
-
-    setsockopt(data_listen_socket, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
-
-    addr.sin_port = htons(8000);
-    if (bind(data_listen_socket, (struct sockaddr*)&addr, sizeof(addr)))
-    {
-	perror("bind port 8000");
-	return 1;
-    }
-    if (listen(data_listen_socket, 1))
-    {
-	perror("listen");
-	return 1;
-    }
-
-    /* Notify MMCS that the sockets are ready.  */
-
-    send_ras(CiodInitialized, 0);
-
-    /* Accept the connections for the service node, close the no longer
-       needed listening sockets.  */
-
-    if ((cio_stream_socket = accept(cio_listen_socket, NULL, NULL)) < 0)
-    {
-	perror("accept cio connection");
-	return 1;
-    }
-
-    close(cio_listen_socket);
-#if 0
-    if ((data_stream_socket = accept(data_listen_socket, NULL, NULL)) < 0)
-    {
-	perror("accept data connection");
-	return 1;
-    }
-
-    close(data_listen_socket);
-#endif
-    /* Handle the initial messages on the CIO socket.  We ignore the DATA
-       socket completely; nothing terribly interesting there.  */
-
-    for (;;)
-    {
+    for (;;) {
 	struct MessagePrefix prefix;
 
-	if (stream_read_prefix(cio_stream_socket, &prefix))
-	{
+	if (stream_read_prefix(cio_stream_socket, &prefix)) {
 	    /* We don't know what the message type was supposed to be... */
-	    send_ras(CiodControlReadFailed, 2, errno, CIO_LAST_MESSAGE);
 
 	    fprintf(stderr, "Error reading command prefix on CIO stream!\n");
 	    return 1;
 	}
 
-	switch (prefix.type)
-	{
+	switch (prefix.type) {
 	    case CIO_VERSION_MESSAGE:
 	    {
 		int timeout;
@@ -443,41 +320,30 @@ int main(void)
 
 		current_job_id = prefix.jobid;
 
-		if (stream_read_int(cio_stream_socket, &cio_protocol_version))
-		{
-		    send_ras(CiodControlReadFailed, 2, errno, prefix.type);
+		if (stream_read_int(cio_stream_socket, &cio_protocol_version)){
 
 		    fprintf(stderr, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 
-		if (cio_protocol_version != CIO_VERSION_LATEST)
-		{
-		    send_ras(CiodInvalidProtocol, 2, cio_protocol_version,
-			     CIO_VERSION_LATEST);
-
+		if (cio_protocol_version != CIO_VERSION_LATEST) {
 		    fprintf(stderr, "Version mismatch on CIO stream!\n");
 		    return 1;
 		}
 
 		if (stream_read_int(cio_stream_socket, &timeout) ||
 		    stream_read_arr(cio_stream_socket, (void**)enc_msg_p,
-				    &enc_len))
-		{
-		    send_ras(CiodControlReadFailed, 2, errno, prefix.type);
-
+				    &enc_len)) {
 		    fprintf(stderr, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 
-		if (enc_len != VERSION_MSG_ENC_LEN)
-		{
+		if (enc_len != VERSION_MSG_ENC_LEN) {
 		    fprintf(stderr, "Invalid data on CIO stream!\n");
 		    return 1;
 		}
 
-		if (debug_flags & DEBUG_INITFINI)
-		{
+		if (debug_flags & DEBUG_INITFINI) {
 		    fprintf(stderr, "CIO VERSION\n");
 		    fprintf(stderr, "received version %d, timeout %d\n",
 			    cio_protocol_version, timeout);
@@ -493,10 +359,7 @@ int main(void)
 		    stream_write_int(cio_stream_socket, cio_protocol_version) || 
 		    stream_write_int(cio_stream_socket, timeout) || 
 		    stream_write_arr(cio_stream_socket, enc_msg,
-				     VERSION_MSG_ENC_LEN))
-		{
-		    send_ras(CiodControlWriteFailed, 3, errno,
-			     CIO_VERSION_MESSAGE, 0);
+				     VERSION_MSG_ENC_LEN)) {
 		    fprintf(stderr, "Error writing message on CIO stream!\n");
 		    return 1;
 		}
@@ -512,48 +375,59 @@ int main(void)
 		int current_job_uid, current_job_gid, current_job_umask;
 		char* current_job_homedir;
 		int current_job_ngroups;
-		gid_t current_job_groups[GROUPS_MAX];
+		int current_job_groups[GROUPS_MAX];
 		int current_job_id;
-
+	
 		if (stream_read_int(cio_stream_socket, &current_job_uid) ||
 		    stream_read_int(cio_stream_socket, &current_job_gid) ||
 		    stream_read_int(cio_stream_socket, &current_job_umask) ||
 		    stream_read_str(cio_stream_socket, &current_job_homedir) ||
-		    stream_read_int(cio_stream_socket, &current_job_ngroups))
-		{
-		    send_ras(CiodControlReadFailed, 2, errno, prefix.type);
-
+		    stream_read_int(cio_stream_socket, &current_job_ngroups)) {
 		    fprintf(stderr, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
-
+		
 		if (current_job_ngroups > sizeof(current_job_groups) /
-		    sizeof(current_job_groups[0]))
-		{
+		    sizeof(current_job_groups[0])) {
 		    fprintf(stderr, "Invalid data on CIO stream!\n");
 		    return 1;
 		}
+		
 		for (i = 0; i < current_job_ngroups; i++)
 		    if (stream_read_int(cio_stream_socket,
-					(int*)&current_job_groups[i]))
-		    {
-			send_ras(CiodControlReadFailed, 2, errno, prefix.type);
-
-			fprintf(stderr, "Error reading message on CIO "
+					(int*)&current_job_groups[i])) {
+				fprintf(stderr, "Error reading message on CIO "
 				"stream!\n");
-			return 1;
+				return 1;
 		    }
 		if (stream_read_int(cio_stream_socket, &current_job_id) ||
-		    stream_read_int(cio_stream_socket, &current_job_mode))
-		{
-		    send_ras(CiodControlReadFailed, 2, errno, prefix.type);
-
+		    stream_read_int(cio_stream_socket, &current_job_mode)) {
 		    fprintf(stderr, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
-
-		if (debug_flags & DEBUG_INITFINI)
-		{
+		
+		putenvint("job_id", current_job_id);
+		switch(current_job_mode) {
+			case M_SMP_MODE:
+				putenv("job_mode", "smp");
+				break;
+			case M_VIRTUAL_NODE_MODE:
+				putenv("job_mode", "virtual node");
+				break;
+			case M_DUAL_MODE:
+				putenv("job_mode", "dual mode");
+				break;
+			default:
+				putenvint("job_mode", current_job_mode);
+		};  
+		putenvint("job_uid", current_job_uid);
+		putenvint("job_gid", current_job_gid);
+		putenvint("job_umask", current_job_umask);
+		putenvint("job_homedir", current_job_homedir);
+		
+		/* TODO: do we need groups? probably not */
+		
+		if (debug_flags & DEBUG_INITFINI) {
 		    fprintf(stderr, "LOGIN\n");
 		    fprintf(stderr,  "received uid %d, gid %d, umask 0%o, "
 			    "homedir %s\n", current_job_uid, current_job_gid,
@@ -581,10 +455,12 @@ int main(void)
 		char* rankmap;
 		int i;
 		char* argptr;
-		char* current_job_argenv = NULL;
+		char* current_job_argenv = nil;
 		char** current_job_argenv_p = &current_job_argenv;
 		int current_job_nargenv;
-
+		char argbuf[255]; /* TODO: hope that's enough */
+		char *argbufptr;
+		
 		if (stream_read_int(cio_stream_socket, &current_job_argc) ||
 		    stream_read_int(cio_stream_socket, &current_job_envc) ||
 		    stream_read_int(cio_stream_socket, &strace) ||
@@ -594,16 +470,46 @@ int main(void)
 		    stream_read_str(cio_stream_socket, &rankmap) ||
 		    stream_read_arr(cio_stream_socket,
 				    (void**)current_job_argenv_p,
-				    &current_job_nargenv))
-		{
-		    send_ras(CiodControlReadFailed, 2, errno, prefix.type);
-
+				    &current_job_nargenv)) {
+				    
 		    fprintf(stderr, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
-
-		if (debug_flags & DEBUG_INITFINI)
-		{
+		
+		putenvint("job_strace", strace);
+		putenvint("job_proc_count", current_job_proc_count);
+		putenvint("job_flags", flags);
+		putenvint("job_rankmap", rankmap);
+		putenv("job_argenv", current_job_argenv);
+		
+		/* TODO: Parse this shit out */
+		argptr = current_job_argenv;
+		argbufptr = argbuf;
+		for (i = 0; i < current_job_argc; i++){
+			if(((argbufptr-argbuf) + strlen(argptr)) > 255) {
+				fprintf(stderr, "WARNING: Argument list truncated due to buffer overflow!\n");
+			} else {
+				sprint(argbufptr, "%s%c", argptr,
+			       	i == current_job_argc - 1 ? '\n' : ' ');
+				argbufptr += strlen(argptr) + 1;			  
+			}
+			argptr += strlen(argptr) + 1;
+		}
+		putenv("job_args", argbuf);
+		argbufptr = argbuf;
+		/* environment variables */
+		for (i = 0; i < current_job_envc; i++) {
+			int ret;
+			char envkey[255], char envval[255];
+			ret = sscanf(argbuf, "%s=%s", envkey, envval)
+			if(ret == 2)
+				putenv(envkey, envval);
+			else
+				fprintf(stderr, "WARNING: Problem parsing environment!\n");
+			argptr += strlen(argptr) + 1;
+		}	
+			
+		if (debug_flags & DEBUG_INITFINI) {
 		    fprintf(stderr, "LOAD\n");
 		    fprintf(stderr, "received strace %d, nproc %d\n",
 			    strace, current_job_proc_count);
@@ -650,56 +556,36 @@ int main(void)
 		int signo;
 		int node;
 		int fd_pers;
-		_BGP_Personality_t personality;
 		int pset_num, pset_size;
 
-		if (stream_read_int(cio_stream_socket, &signo))
-		{
-		    send_ras(CiodControlReadFailed, 2, errno, prefix.type);
-
+		if (stream_read_int(cio_stream_socket, &signo)) {
 		    fprintf(stderr, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 
-		if (debug_flags & DEBUG_INITFINI)
-		{
+		if (debug_flags & DEBUG_INITFINI){
 		    fprintf(stderr, "KILL\n");
 		    fprintf(stderr, "signo: %d\n", signo);
 		}
 
-		/* Send bogus exit messages from compute node.  To do that,
+		/* TODO: Send bogus exit messages from compute node.  To do that,
 		   we need to know how many compute nodes we have.  We will
 		   also have to fake the p2p ranks.  */
-		if ((fd_pers = open("/proc/personality", O_RDONLY)) < 0)
-		{
-		    perror("open /proc/personality");
-		    fprintf(stderr, "Please run me on an I/O node!\n");
-		    return 1;
-		}
-		if (read(fd_pers, &personality, sizeof(personality)) !=
-		    sizeof(personality))
-		{
-		    perror("read personality");
-		    return 1;
-		}
-		close(fd_pers);
-
-		pset_num = BGP_Personality_psetNum(&personality);
-		pset_size = BGP_Personality_psetSize(&personality);
-
-		for (node = 0; node < pset_size; node++)
-		{
+		   
+		/* TODO: we'll need to set this in a different way */
+		pset_size=64; /* HACK */
+		
+		for (node = 0; node < pset_size; node++){
 		    int cpu;
 		    for (cpu = 0;
 			 cpu < (current_job_mode == M_SMP_MODE ? 1 :
 				(current_job_mode == M_VIRTUAL_NODE_MODE ?
 				 4 : 2));
-			 cpu++)
-		    {
-			if (cio_write_node_status(cpu,
+			 cpu++) {
+				if (cio_write_node_status(cpu,
 						  node + pset_num * pset_size,
-						  CIO_NODE_STATUS_EXITED, 0))
-			    return 1;
+						  CIO_NODE_STATUS_KILLED, 0))
+			    	return 1;
 		    }
 		}
 
@@ -719,8 +605,6 @@ int main(void)
 	    }
 
 	    default:
-		send_ras(CiodInvalidControlMsg, 1, prefix.type);
-
 		fprintf(stderr, "Unknown message type %d on CIO stream!\n",
 			prefix.type);
 	} /* switch (prefix.type) */
