@@ -41,6 +41,8 @@ rc d775 sys sys /tmp/empty
 	bin d775 sys sys /tmp/empty
 		service d775 sys sys /tmp/empty
 			tcp23 775 sys sys ../root/tcp23
+			tcp7000 775 sys sys ../root/tcp7000
+			tcp8000 775 sys sys ../root/tcp8000
 			tcp17007 775 sys sys /bin/service/tcp17007
 			tcp17010 775 sys sys /bin/service/tcp17010
 			tcp564 775 sys sys ../root/tcp564
@@ -62,6 +64,7 @@ power d775 sys sys /tmp/empty
 		cat 775 sys sys
 		echo 775 sys sys
 		iostats 775 sys sys
+		miniciod 775 sys sys ../root/q.miniciod
 		ramfs 775 sys sys
 		rc 775 sys sys
 		rm 775 sys sys 
@@ -71,7 +74,9 @@ power d775 sys sys /tmp/empty
 		telnet 775 sys sys
 		test 775 sys sys
 		seq 775 sys sys
-
+		
+		brasil 775 sys sys /usr/ericvh/src/ericvh-brasil/Plan9/power/bin/brasil
+		
 		# used to provide standalone service
 		auth d775 sys sys /tmp/empty
 			factotum 775 sys sys
@@ -87,8 +92,8 @@ power d775 sys sys /tmp/empty
 		exportfs 775 sys sys
 
 		# benchmarks
-		suck 775 sys sys		
-		blow 775 sys sys
+		suck 775 sys sys ../root/q.suck		
+		blow 775 sys sys ../root/q.blow
 		pp 775 sys sys
 		fcp 775 sys sys
 		ps 775 sys sys

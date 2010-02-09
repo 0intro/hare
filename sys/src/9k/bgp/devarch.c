@@ -333,5 +333,5 @@ archinit(void)
 	addarchfile("cnk", 0644, cnkread, cnkwrite);
 	addarchfile("version",0444, verread, nil);
 	addarchfile("bic", 0444, bicread, nil);
-	addarchfile("handshake",0555, nil, handshakewrite);
+	addarchfile("handshake",0222, nil, handshakewrite);
 }

@@ -1,5 +1,6 @@
 #include <u.h>
 #include <libc.h>
+#include <stdio.h>
 
 typedef u8int uint8_t;
 typedef u16int uint16_t;
@@ -110,14 +111,12 @@ struct MessagePrefix
 #define VERSION_MSG_ENC_LEN 64
 
 #define DEBUG_INITFINI 1
-#define fprintf fprint
-
+static int logfd;
 static int debug_flags = DEBUG_INITFINI;
 
 static int cio_protocol_version;
 static int current_job_id, current_job_mode;
-static int cio_stream_socket = 0;
-int stderr = 2;
+static int stdiofd = 0;
 
 unsigned long
 ntohl(int x)
@@ -246,7 +245,7 @@ cio_write_prefix(int type, int length)
     prefix.length = htonl(length);
     prefix.jobid = current_job_id;
 
-    if (socket_write(cio_stream_socket, &prefix, sizeof(prefix)) !=
+    if (socket_write(stdiofd, &prefix, sizeof(prefix)) !=
 			sizeof(prefix)) {
 		return 1;
     }
@@ -258,10 +257,10 @@ static int
 cio_write_result(enum CioMessageType message, int result, int value)
 {
     if (cio_write_prefix(RESULT_MESSAGE, sizeof(uint32_t) * 3) ||
-			stream_write_int(cio_stream_socket, message) ||
-			stream_write_int(cio_stream_socket, result) ||
-			stream_write_int(cio_stream_socket, value)) {
-		fprintf(stderr, "Error writing message on CIO stream!\n");
+			stream_write_int(stdiofd, message) ||
+			stream_write_int(stdiofd, result) ||
+			stream_write_int(stdiofd, value)) {
+		fprint(logfd, "Error writing message on CIO stream!\n");
 		return 1;
     }
 
@@ -272,12 +271,12 @@ static int
 cio_write_node_status(int cpu, int p2p, enum CioNodeStatusType type, int value)
 {
     if (cio_write_prefix(NODE_STATUS_MESSAGE, sizeof(uint32_t) * 4) ||
-			stream_write_int(cio_stream_socket, cpu) ||
-			stream_write_int(cio_stream_socket, p2p) ||
-			stream_write_int(cio_stream_socket, type) ||
-			stream_write_int(cio_stream_socket, value)){
+			stream_write_int(stdiofd, cpu) ||
+			stream_write_int(stdiofd, p2p) ||
+			stream_write_int(stdiofd, type) ||
+			stream_write_int(stdiofd, value)){
 
-		fprintf(stderr, "Error writing message on CIO stream!\n");
+		fprint(logfd, "Error writing message on CIO stream!\n");
 		return 1;
     }
 
@@ -292,22 +291,42 @@ int putenvint(char *key, int value)
 	return putenv(key, envbuf);
 }
 
+void process_env(char *envpair)
+{
+	char *value;
+	int count;
+	
+	for(count=0; count < strlen(envpair); count++) {
+		if(envpair[count] == '=')
+			break;
+	}
+		
+	if(count == strlen(envpair)) {
+		fprint(logfd, "WARNING: Problem parsing environment! (%s)\n", envpair);
+		return;
+	}
+ 
+ 	envpair[count] = '\0';
+ 	value = &envpair[count+1];
+ 	
+	putenv(envpair, value);
+	envpair[count] = '=';	
+}
+
 int main(void)
 {
-    struct sockaddr_in addr;
-    int one = 1;
-    int cio_stream_socket, data_listen_socket;
-    
-    /* TODO: open logfile as stderr */
-    stderr = create("/tmp/ciod.log", OWRITE, 0666|DMAPPEND);
+    logfd = create("/tmp/ciod.log", OWRITE, 0666|DMAPPEND);
+
+    /* Bind system environment first */
+    bind("#ec", "/env", MCREATE);
 
     for (;;) {
 	struct MessagePrefix prefix;
 
-	if (stream_read_prefix(cio_stream_socket, &prefix)) {
+	if (stream_read_prefix(stdiofd, &prefix)) {
 	    /* We don't know what the message type was supposed to be... */
 
-	    fprintf(stderr, "Error reading command prefix on CIO stream!\n");
+	    fprint(logfd, "Error reading command prefix on CIO stream!\n");
 	    return 1;
 	}
 
@@ -320,32 +339,32 @@ int main(void)
 
 		current_job_id = prefix.jobid;
 
-		if (stream_read_int(cio_stream_socket, &cio_protocol_version)){
+		if (stream_read_int(stdiofd, &cio_protocol_version)){
 
-		    fprintf(stderr, "Error reading message on CIO stream!\n");
+		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 
 		if (cio_protocol_version != CIO_VERSION_LATEST) {
-		    fprintf(stderr, "Version mismatch on CIO stream!\n");
+		    fprint(logfd, "Version mismatch on CIO stream!\n");
 		    return 1;
 		}
 
-		if (stream_read_int(cio_stream_socket, &timeout) ||
-		    stream_read_arr(cio_stream_socket, (void**)enc_msg_p,
+		if (stream_read_int(stdiofd, &timeout) ||
+		    stream_read_arr(stdiofd, (void**)enc_msg_p,
 				    &enc_len)) {
-		    fprintf(stderr, "Error reading message on CIO stream!\n");
+		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 
 		if (enc_len != VERSION_MSG_ENC_LEN) {
-		    fprintf(stderr, "Invalid data on CIO stream!\n");
+		    fprint(logfd, "Invalid data on CIO stream!\n");
 		    return 1;
 		}
 
 		if (debug_flags & DEBUG_INITFINI) {
-		    fprintf(stderr, "CIO VERSION\n");
-		    fprintf(stderr, "received version %d, timeout %d\n",
+		    fprint(logfd, "CIO VERSION\n");
+		    fprint(logfd, "received version %d, timeout %d\n",
 			    cio_protocol_version, timeout);
 		}
 
@@ -356,11 +375,11 @@ int main(void)
 
 		if (cio_write_prefix(CIO_VERSION_MESSAGE, sizeof(uint32_t) * 3
 				      + VERSION_MSG_ENC_LEN) ||
-		    stream_write_int(cio_stream_socket, cio_protocol_version) || 
-		    stream_write_int(cio_stream_socket, timeout) || 
-		    stream_write_arr(cio_stream_socket, enc_msg,
+		    stream_write_int(stdiofd, cio_protocol_version) || 
+		    stream_write_int(stdiofd, timeout) || 
+		    stream_write_arr(stdiofd, enc_msg,
 				     VERSION_MSG_ENC_LEN)) {
-		    fprintf(stderr, "Error writing message on CIO stream!\n");
+		    fprint(logfd, "Error writing message on CIO stream!\n");
 		    return 1;
 		}
 
@@ -378,31 +397,31 @@ int main(void)
 		int current_job_groups[GROUPS_MAX];
 		int current_job_id;
 	
-		if (stream_read_int(cio_stream_socket, &current_job_uid) ||
-		    stream_read_int(cio_stream_socket, &current_job_gid) ||
-		    stream_read_int(cio_stream_socket, &current_job_umask) ||
-		    stream_read_str(cio_stream_socket, &current_job_homedir) ||
-		    stream_read_int(cio_stream_socket, &current_job_ngroups)) {
-		    fprintf(stderr, "Error reading message on CIO stream!\n");
+		if (stream_read_int(stdiofd, &current_job_uid) ||
+		    stream_read_int(stdiofd, &current_job_gid) ||
+		    stream_read_int(stdiofd, &current_job_umask) ||
+		    stream_read_str(stdiofd, &current_job_homedir) ||
+		    stream_read_int(stdiofd, &current_job_ngroups)) {
+		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 		
 		if (current_job_ngroups > sizeof(current_job_groups) /
 		    sizeof(current_job_groups[0])) {
-		    fprintf(stderr, "Invalid data on CIO stream!\n");
+		    fprint(logfd, "Invalid data on CIO stream!\n");
 		    return 1;
 		}
 		
 		for (i = 0; i < current_job_ngroups; i++)
-		    if (stream_read_int(cio_stream_socket,
+		    if (stream_read_int(stdiofd,
 					(int*)&current_job_groups[i])) {
-				fprintf(stderr, "Error reading message on CIO "
+				fprint(logfd, "Error reading message on CIO "
 				"stream!\n");
 				return 1;
 		    }
-		if (stream_read_int(cio_stream_socket, &current_job_id) ||
-		    stream_read_int(cio_stream_socket, &current_job_mode)) {
-		    fprintf(stderr, "Error reading message on CIO stream!\n");
+		if (stream_read_int(stdiofd, &current_job_id) ||
+		    stream_read_int(stdiofd, &current_job_mode)) {
+		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 		
@@ -423,20 +442,20 @@ int main(void)
 		putenvint("job_uid", current_job_uid);
 		putenvint("job_gid", current_job_gid);
 		putenvint("job_umask", current_job_umask);
-		putenvint("job_homedir", current_job_homedir);
+		putenv("job_homedir", current_job_homedir);
 		
 		/* TODO: do we need groups? probably not */
 		
 		if (debug_flags & DEBUG_INITFINI) {
-		    fprintf(stderr, "LOGIN\n");
-		    fprintf(stderr,  "received uid %d, gid %d, umask 0%o, "
+		    fprint(logfd, "LOGIN\n");
+		    fprint(logfd,  "received uid %d, gid %d, umask 0%o, "
 			    "homedir %s\n", current_job_uid, current_job_gid,
 			    current_job_umask, current_job_homedir);
-		    fprintf(stderr, "groups: ");
+		    fprint(logfd, "groups: ");
 		    for (i = 0; i < current_job_ngroups; i++)
-			fprintf(stderr, "%d%c", current_job_groups[i],
+			fprint(logfd, "%d%c", current_job_groups[i],
 				i == current_job_ngroups - 1 ? '\n' : ' ');
-		    fprintf(stderr, "jobid: %d, jobmode: %d\n",
+		    fprint(logfd, "jobid: %d, jobmode: %d\n",
 			    current_job_id, current_job_mode);
 		}
 
@@ -461,33 +480,34 @@ int main(void)
 		char argbuf[255]; /* TODO: hope that's enough */
 		char *argbufptr;
 		
-		if (stream_read_int(cio_stream_socket, &current_job_argc) ||
-		    stream_read_int(cio_stream_socket, &current_job_envc) ||
-		    stream_read_int(cio_stream_socket, &strace) ||
-		    stream_read_int(cio_stream_socket,
+		if (stream_read_int(stdiofd, &current_job_argc) ||
+		    stream_read_int(stdiofd, &current_job_envc) ||
+		    stream_read_int(stdiofd, &strace) ||
+		    stream_read_int(stdiofd,
 				    &current_job_proc_count) ||
-		    stream_read_int(cio_stream_socket, &flags) ||
-		    stream_read_str(cio_stream_socket, &rankmap) ||
-		    stream_read_arr(cio_stream_socket,
+		    stream_read_int(stdiofd, &flags) ||
+		    stream_read_str(stdiofd, &rankmap) ||
+		    stream_read_arr(stdiofd,
 				    (void**)current_job_argenv_p,
 				    &current_job_nargenv)) {
 				    
-		    fprintf(stderr, "Error reading message on CIO stream!\n");
+		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 		
 		putenvint("job_strace", strace);
 		putenvint("job_proc_count", current_job_proc_count);
 		putenvint("job_flags", flags);
-		putenvint("job_rankmap", rankmap);
+		putenv("job_rankmap", rankmap);
 		putenv("job_argenv", current_job_argenv);
 		
 		/* TODO: Parse this shit out */
 		argptr = current_job_argenv;
 		argbufptr = argbuf;
+		USED(argbufptr);
 		for (i = 0; i < current_job_argc; i++){
 			if(((argbufptr-argbuf) + strlen(argptr)) > 255) {
-				fprintf(stderr, "WARNING: Argument list truncated due to buffer overflow!\n");
+				fprint(logfd, "WARNING: Argument list truncated due to buffer overflow!\n");
 			} else {
 				sprint(argbufptr, "%s%c", argptr,
 			       	i == current_job_argc - 1 ? '\n' : ' ');
@@ -496,37 +516,32 @@ int main(void)
 			argptr += strlen(argptr) + 1;
 		}
 		putenv("job_args", argbuf);
-		argbufptr = argbuf;
 		/* environment variables */
 		for (i = 0; i < current_job_envc; i++) {
-			int ret;
-			char envkey[255], char envval[255];
-			ret = sscanf(argbuf, "%s=%s", envkey, envval)
-			if(ret == 2)
-				putenv(envkey, envval);
-			else
-				fprintf(stderr, "WARNING: Problem parsing environment!\n");
+			process_env(argptr);
+			
+
 			argptr += strlen(argptr) + 1;
 		}	
 			
 		if (debug_flags & DEBUG_INITFINI) {
-		    fprintf(stderr, "LOAD\n");
-		    fprintf(stderr, "received strace %d, nproc %d\n",
+		    fprint(logfd, "LOAD\n");
+		    fprint(logfd, "received strace %d, nproc %d\n",
 			    strace, current_job_proc_count);
-		    fprintf(stderr, "flags 0x%x, rankmap %s\n",
+		    fprint(logfd, "flags 0x%x, rankmap %s\n",
 			    flags, rankmap);
-		    fprintf(stderr, "argv: ");
+		    fprint(logfd, "argv: ");
 		    argptr = current_job_argenv;
 		    for (i = 0; i < current_job_argc; i++)
 		    {
-			fprintf(stderr, "%s%c", argptr,
+			fprint(logfd, "%s%c", argptr,
 			       i == current_job_argc - 1 ? '\n' : ' ');
 			argptr += strlen(argptr) + 1;
 		    }
-		    fprintf(stderr, "env: ");
+		    fprint(logfd, "env: ");
 		    for (i = 0; i < current_job_envc; i++)
 		    {
-			fprintf(stderr, "%s%c", argptr,
+			fprint(logfd, "%s%c", argptr,
 			       i == current_job_envc - 1 ? '\n' : ' ');
 			argptr += strlen(argptr) + 1;
 		    }
@@ -543,7 +558,7 @@ int main(void)
 	    case START_MESSAGE:
 	    {
 		if (debug_flags & DEBUG_INITFINI)
-		    fprintf(stderr, "START\n");
+		    fprint(logfd, "START\n");
 
 		if (cio_write_result(START_MESSAGE, 0, 0))
 		    return 1;
@@ -555,23 +570,28 @@ int main(void)
 	    {
 		int signo;
 		int node;
-		int fd_pers;
-		int pset_num, pset_size;
+		int pset_num = 0;
+		int pset_size = 64;
+		int sendwhat = CIO_NODE_STATUS_KILLED;
 
-		if (stream_read_int(cio_stream_socket, &signo)) {
-		    fprintf(stderr, "Error reading message on CIO stream!\n");
+		USED(pset_size);
+		USED(pset_num);
+		if (stream_read_int(stdiofd, &signo)) {
+		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
 
 		if (debug_flags & DEBUG_INITFINI){
-		    fprintf(stderr, "KILL\n");
-		    fprintf(stderr, "signo: %d\n", signo);
+		    fprint(logfd, "KILL\n");
+		    fprint(logfd, "signo: %d\n", signo);
 		}
+		
+		/* TODO: for signo 9, send killing, for signo 15 send exited */
+		if(signo == 9) 
+			sendwhat = CIO_NODE_STATUS_KILLED;
+		if(signo == 15)
+			sendwhat = CIO_NODE_STATUS_EXITED;
 
-		/* TODO: Send bogus exit messages from compute node.  To do that,
-		   we need to know how many compute nodes we have.  We will
-		   also have to fake the p2p ranks.  */
-		   
 		/* TODO: we'll need to set this in a different way */
 		pset_size=64; /* HACK */
 		
@@ -584,7 +604,8 @@ int main(void)
 			 cpu++) {
 				if (cio_write_node_status(cpu,
 						  node + pset_num * pset_size,
-						  CIO_NODE_STATUS_KILLED, 0))
+						  sendwhat, 0))
+
 			    	return 1;
 		    }
 		}
@@ -596,19 +617,18 @@ int main(void)
 	    case END_MESSAGE:
 	    {
 		if (debug_flags & DEBUG_INITFINI)
-		    fprintf(stderr, "END\n");
+		    fprint(logfd, "END\n");
 
 		if (cio_write_result(END_MESSAGE, 0, 0))
 		    return 1;
-
-		break;
+		/* TODO: should we close the connection?) */
+		close(0);
+		return 0;
 	    }
 
 	    default:
-		fprintf(stderr, "Unknown message type %d on CIO stream!\n",
+		fprint(logfd, "Unknown message type %d on CIO stream!\n",
 			prefix.type);
 	} /* switch (prefix.type) */
     } /* for (;;) */
-
-    return 0;
 }

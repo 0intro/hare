@@ -248,11 +248,16 @@ archprint(void)
 void
 handshake(void)
 {
+	Mreg s;
 	if(!sys->ionode)
 		return;
 
+	
 	DBG("Sending RAS handshake\n");
+	s = splhi();
  	CNS(writeRASEvent, int, 0x01, 0x1E, 0x00, 0, 0, 0);
+ 	splx(s);
+ 	DBG("Done Sending RAS handshake\n");
 }
 
 void

@@ -34,7 +34,8 @@ fsaddr=''
 cd /boot/$cputype/bin
 bind '#c' /dev
 bind '#d' /fd
-bind -c '#e' /env
+bind '#ec' /env
+bind -cb '#e' /env
 bind '#p' /proc
 bind -c '#s' /srv
 
@@ -132,12 +133,12 @@ if(~ `{cat '#c/hostowner'} sys)
 #	echo done.	
 #}
 #
-#if(~ $cpunode '0' &&  ~ $fsaddr ''){
-#	# wait for ethernet to come up
-#	echo Waiting for turbines to come up to speed
-#
-#	sleep 30
-#}
+if(~ $cpunode '0'){
+	# wait for ethernet to come up
+	echo Waiting for turbines to come up to speed
+
+	sleep 30
+}
 #
 #if(~ $cpunode '1'){
 #	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
@@ -189,10 +190,18 @@ if(! ~ $rootdir /boot){
 ramfs /tmp
 bind /boot/rc/bin/service /bin/service
 
+echo starting services
+
 if(test -d /mnt/factotum)
 	aux/listen -i -q tcp
 if not
 	aux/listen -i -t /bin/service tcp
+
+# do we only want to send this from one IO node?
+if (~$cpunode '0') {
+	echo Initiating Handshake
+	echo hello squidboy > /dev/handshake
+}
 
 # use vc0net again in future but not yet. 
 #if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
