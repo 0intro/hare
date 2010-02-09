@@ -156,6 +156,7 @@ Cmdtab*		lookupcmd(Cmdbuf*, Cmdtab*, int);
 Page*		lookpage(Image*, ulong);
 #define		MS2NS(n) (((vlong)(n))*1000000LL)
 void		mallocinit(void);
+long		mallocreadsummary(Chan*, void*, long, long);
 void		mallocsummary(void);
 Block*		mem2bl(uchar*, int);
 void		(*mfcinit)(void);
@@ -363,3 +364,4 @@ ulong		µs(void);
 
 #pragma varargck	argpos	iprint		1
 #pragma varargck	argpos	panic		1
+#pragma varargck	argpos	pprint		1
