@@ -260,10 +260,38 @@ cnkread(Chan*, void* a, long n, vlong offset)
 }
 
 static long
-handshakewrite(Chan*, void*, long n, vlong)
+raswrite(Chan*, void*v, long n, vlong)
 {
-	handshake();
-	return n;
+	char *args = v;
+	int ret = n;
+	int a[6];
+	int count = 0;
+	
+	USED(ret);
+	USED(count);
+	
+	Cmdbuf *cb = parsecmd(args, n);
+	
+	print("Hello Squidboy: %d\n", cb->nf);
+
+	if(cb->nf != 6) {
+		ret = -1;
+		goto free_and_ret;
+	}
+	
+	for(count = 0; count < cb->nf; count++)
+		print("   %s\n", cb->f[count]);
+	
+	for(count = 0; count < cb->nf; count++) 
+		a[count] = atoi(cb->f[count]);
+	
+	print("%x %x %x %x %x %x\n", a[0], a[1], a[2], a[3], a[4], a[5]);
+	
+	sendRAS(a[0], a[1], a[2], a[3], a[4], a[5]);
+	
+free_and_ret:
+	free(cb);
+	return ret;
 }
 
 static long
@@ -333,5 +361,5 @@ archinit(void)
 	addarchfile("cnk", 0644, cnkread, cnkwrite);
 	addarchfile("version",0444, verread, nil);
 	addarchfile("bic", 0444, bicread, nil);
-	addarchfile("handshake",0222, nil, handshakewrite);
+	addarchfile("ras",0222, nil, raswrite);
 }

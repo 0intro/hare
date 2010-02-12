@@ -245,19 +245,21 @@ archprint(void)
 	}
 }
 
+/*
+	handshake is 0x01, 0x1e, 0x0, 0,0,0
+	node exit is 0x01, 0x1e, 0x15, 0,0,0
+*/
+
 void
-handshake(void)
+sendRAS(int a1, int a2, int a3, int x1, int x2, int x3)
 {
 	Mreg s;
 	if(!sys->ionode)
 		return;
 
-	
-	DBG("Sending RAS handshake\n");
 	s = splhi();
- 	CNS(writeRASEvent, int, 0x01, 0x1E, 0x00, 0, 0, 0);
+ 	CNS(writeRASEvent, int, a1, a2, a3, x1, x2, x3);
  	splx(s);
- 	DBG("Done Sending RAS handshake\n");
 }
 
 void

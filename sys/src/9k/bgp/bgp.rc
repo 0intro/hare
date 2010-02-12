@@ -34,7 +34,7 @@ fsaddr=''
 cd /boot/$cputype/bin
 bind '#c' /dev
 bind '#d' /fd
-bind '#ec' /env
+bind -c '#ec' /env
 bind -cb '#e' /env
 bind '#p' /proc
 bind -c '#s' /srv
@@ -200,7 +200,7 @@ if not
 # do we only want to send this from one IO node?
 if (~$cpunode '0') {
 	echo Initiating Handshake
-	echo hello squidboy > /dev/handshake
+	echo 0x01 0x1e 0x0 0 0 0 > /dev/ras
 }
 
 # use vc0net again in future but not yet. 
