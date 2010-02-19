@@ -50,6 +50,9 @@ dev +dev
 	ip		arp chandial ip ipv6 ipaux iproute netif netlog nullmedium pktmedium ptclbsum inferno
 
 	ether		netif
+	
+	sd
+	aoe
 
 	uart
 
@@ -59,6 +62,9 @@ dev +dev
 	torus		frag
 	tree		tree
 	segment
+	
+sd +dev
+	sdaoe	sdscsi
 
 uart +dev
 	uartcns		archbgp uartmb
@@ -83,10 +89,8 @@ misc +dev
 	cache
 
 dir
-	bgl
 	cnk
 	ip
-	ppc440		-.I.
 	port
 
 lib
