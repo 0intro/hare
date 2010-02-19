@@ -2,6 +2,9 @@ enum
 {
 	Eaddrlen	= 6,
 	ETHERHDRSIZE	= 14,		/* size of an ethernet header */
+	
+	ETHERMINTU	= 60,		/* minimum transmit size */
+	ETHERMAXTU	= 1514,		/* maximum transmit size */	
 
 	MaxEther	= 1,
 	Ntypes		= 8,

@@ -28,8 +28,8 @@ enum {
 	Nea		= 6,
 	Nnetlink	= 6,
 
-	ETHERMINTU	= 60,		/* minimum transmit size */
-	ETHERMAXTU	= 1514,		/* maximum transmit size */
+//	ETHERMINTU	= 60,		/* minimum transmit size */
+//	ETHERMAXTU	= 1514,		/* maximum transmit size */
 };
 
 #define TYPE(q)		((ulong)(q).path & 0xf)
@@ -76,7 +76,7 @@ enum {
 	/* round trip bounds, timeouts, in ticks */
 	Rtmax		= Ms2tk(320),
 	Rtmin		= Ms2tk(20),
-	Srbtimeout	= 45*HZ,
+	Srbtimeout	= 4*60*HZ,
 
 	Dbcnt		= 1024,
 
@@ -282,7 +282,8 @@ srberror(Srb *srb, char *s)
 {
 	srb->error = s;
 	srb->nout--;
-	wakeup(srb);
+	if (srb->nout == 0)
+		wakeup(srb);
 }
 
 static void
@@ -1214,8 +1215,8 @@ pstat(Aoedev *d, char *db, int len, int off)
 	int i;
 	char *state, *s, *p, *e;
 
-	s = p = malloc(1024);
-	e = p + 1024;
+	s = p = malloc(READSTR);
+	e = p + READSTR;
 
 	state = "down";
 	if(UP(d))
@@ -1280,8 +1281,8 @@ devlinkread(Chan *c, void *db, int len, int off)
 		return 0;
 	l = d->dl + i;
 
-	s = p = malloc(1024);
-	e = s + 1024;
+	s = p = malloc(READSTR);
+	e = s + READSTR;
 
 	p = seprint(p, e, "addr: ");
 	for(i = 0; i < l->nea; i++)
@@ -1313,8 +1314,8 @@ topctlread(Chan *, void *db, int len, int off)
 	char *s, *p, *e;
 	Netlink *n;
 
-	s = p = malloc(1024);
-	e = s + 1024;
+	s = p = malloc(READSTR);
+	e = s + READSTR;
 
 	p = seprint(p, e, "debug: %d\n", debug);
 	p = seprint(p, e, "autodiscover: %d\n", autodiscover);
@@ -1948,16 +1949,22 @@ qcfgrsp(Block *b, Netlink *nl)
 	qunlock(d);
 }
 
-static void
-idmove(char *p, ushort *a, unsigned n)
+void
+aoeidmove(char *p, ushort *u, unsigned n)
 {
 	int i;
-	char *op, *e;
+	char *op, *e, *s;
 
 	op = p;
-	for(i = 0; i < n / 2; i++){
-		*p++ = a[i] >> 8;
-		*p++ = a[i];
+	/*
+	 * the ushort `a' is sometimes not aligned on a short boundary,
+	 * so dereferencing a[i] would cause an alignment exception on
+	 * some machines.
+	 */
+	s = (char *)u;
+	for(i = 0; i < n; i += 2){
+		*p++ = s[i + 1];
+		*p++ = s[i];
 	}
 	*p = 0;
 	while(p > op && *--p == ' ')
@@ -2020,9 +2027,9 @@ identify(Aoedev *d, ushort *id)
 	osectors = d->realbsize;
 	memmove(oserial, d->serial, sizeof d->serial);
 
-	idmove(d->serial, id+10, 20);
-	idmove(d->firmware, id+23, 8);
-	idmove(d->model, id+27, 40);
+	aoeidmove(d->serial, id+10, 20);
+	aoeidmove(d->firmware, id+23, 8);
+	aoeidmove(d->model, id+27, 40);
 
 	s *= Aoesectsz;
 	if((osectors == 0 || osectors != s) &&
