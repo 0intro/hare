@@ -33,6 +33,7 @@ fsaddr=''
 /boot/paqfs -p -S $beetroot -m /boot -q /boot/$beetroot
 cd /boot/$cputype/bin
 bind '#c' /dev
+bind -b '#æ' /dev
 bind '#d' /fd
 bind -c '#ec' /env
 bind -cb '#e' /env
