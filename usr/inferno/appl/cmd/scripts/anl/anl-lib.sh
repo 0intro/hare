@@ -441,6 +441,33 @@ fn anl-uplink {
 }
 
 #
+# New Model
+#
+
+fn anl-uplink-new {
+	#anl-cleanup
+	
+	# TODO: Make sure csrv is running (?)
+	ANLBRASIL=/home/ericvh-laptop/src/ericvh-brasil
+	#ANLNEWLOGIN=9.3.45.4
+	ANLNEWLOGIN=192.168.51.129
+	
+	load std expr string
+	args := $*
+	s := sh -c ${quote $"args}
+	bind '#U*' /n/local
+	mkdir -p /tmp/lpipe
+	bind '#|' /tmp/lpipe
+	os ssh $ANLNEWLOGIN $ANLBRASIL/Linux/386/bin/brasil -I gateway  </tmp/lpipe/data1 >/tmp/lpipe/data1 &
+	# for now use mntgen
+	mount -c {mntgen} /csrv
+	/dis/27b-6.dis /tmp/lpipe/data /tmp/lpipe/data /csrv /n/local
+	# hoping the polling on the tail keeps the mount open
+	#echo Argonne Uplink Established > $ANLMNT/README.survmount
+	#tail -f $ANLMNT/README.survmount	
+}
+
+#
 # Kick off execution
 # specify number of nodes as the only argument
 #
