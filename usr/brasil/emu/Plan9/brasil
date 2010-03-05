@@ -1,0 +1,141 @@
+dev
+	root
+	cons
+	env
+	mnt
+	pipe
+	prog
+#	prof
+	srv
+	dup
+#	ssl
+#	cap
+	fs
+#	cmd		cmd
+	cmd2	cmd
+	indir
+#	sign
+
+#	draw	win
+#	pointer
+
+	dynld
+	mem
+	srv9
+
+#	ip and eia are simply bound in from Plan 9
+
+lib
+	interp
+#	tk
+#	freetype
+	math
+#	draw
+	keyring
+#	memlayer
+#	memdraw
+	sec
+	mp
+	dynld
+	9
+
+link
+
+mod
+	sys
+#	draw
+
+#	tk
+	math
+#	srv		not used on Plan 9
+	keyring
+	loader
+#	freetype
+
+port
+	alloc
+	cache
+	chan
+	dev
+	devtab
+
+	dial
+	dis
+	discall
+	env
+	error
+	errstr
+	exception
+	exportfs
+	exptab
+	inferno
+	latin1
+	main
+	parse
+	pgrp
+	print
+	proc
+	qio
+	random
+	sysfile
+	uqid
+
+code
+	void setpointer(int x, int y){USED(x); USED(y);}
+	ulong strtochan(char *s){USED(s); return ~0;}
+	void killrefresh(void) {}
+
+init
+	emuinit
+
+root
+	/chan	/
+	/dev	/
+	/fd	/
+	/prog	/
+	/prof	/
+	/net	/
+	/net.alt	/
+	/nvfs	/
+	/env	/
+	/root	/
+	/srv	/
+	/csrv /
+	/dis/sh.dis
+	/dis/styxlisten.dis
+	/dis/export.dis
+	/dis/brasil.sh
+	/dis/mount.dis
+	/dis/csrv.dis
+	/dis/duct.dis
+	/dis/csrv.sh
+	/dis/emuinit.dis /dis/brasil.dis
+	/dis/lib/auth.dis
+	/dis/lib/ssl.dis
+	/dis/lib/styx.dis
+	/dis/lib/styxservers.dis
+	/dis/lib/nametree.dis
+	/dis/lib/filepat.dis
+	/dis/lib/readdir.dis
+	/dis/lib/string.dis
+	/dis/lib/bufio.dis
+	/dis/lib/arg.dis
+	/dis/ndb/cs.dis
+	/lib/ndb/common
+	/lib/ndb/services
+	/lib/ndb/inferno
+	/n
+	/n/local	/
+#	/tmp	/
+#	/dis
+#	/env
+#	/n
+#	/net
+#	/nvfs /
+#	/prog
+#	/icons
+#	/osinit.dis
+#	/dis/emuinit.dis
+#	/dis/lib/auth.dis
+#	/dis/lib/ssl.dis
+#	/n/local /

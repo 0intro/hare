@@ -1,0 +1,51 @@
+Noah suggests has the suggestion of spawning a clone, and then you'd be able
+to setup streaming with a ctl message.
+
+Pip requested clarification of the real problem.
+He had to do splicing together of many systems for sunflower, and ended up
+using a centralized points (and signifigantly slowed things down).
+
+Pip didn't get the organizational views, need better descriptions and
+
+Noah expresses that Pascal is interested in this for networks on a chip,
+requiring mechanisms general purpose communication between the cores that
+can then be distributed on the network for free.  This may be important
+for fixed-function accelerator models.  Pascal says that Intel did the same
+thing and had lots of difficultly cooridinating computation across the 64
+way accelerators.
+
+Pip desires a consistency of mechansim for accessing multiple resources --
+
+Noah wants the simplest most naive approach without specification.
+ie. you need to be able to operate with a reasonable default when the
+user doesn't specify attributes.
+
+Pip is most concerned with differences between the different control files
+and resources.  We should have a section in the design document with the
+core design specification that all backends must implement (certain files
+and certain operations).
+
+Splicing may not be a good common resource, particularly if we want to be
+able to support fixed function accelerator.  It may very be tiers of
+specification where there is a key core specification, and then then there
+are classes of specifications -- and now I sound like the USB guy.
+
+Clone applicability -- pip doesn't necessarily think that the clone approach
+is necessarily a given.  We could also imagine a clone directory which you
+instantiate resources through path traversal, you could allow walking the 
+clone fd or through the clone directory without a clone at the end of the
+rainbow.  Of course you might be able to specify the difference in operations
+(querying the available resources matching a specification versus actually 
+allocating those resources) with the open mode (open for read, open for write,
+open for create).
+
+It may not be clear how to aggregate all the backend specific files.
+
+For the LADIS paper we need a single motivating use case that highlights
+the unique advantages of the unified execution model.
+
+Action Items:
+* write up chaining methodology and use case example
+* for the paper we need to decide on a illustrative application use case that
+really hihglights the unique benefits of the UEM
+

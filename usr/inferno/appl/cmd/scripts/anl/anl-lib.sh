@@ -3,6 +3,8 @@
 # Argonne National Labs BGP Script Liibraries
 # Copyright 2009 Eric Van Hensbergen <ericvh@gmail.com>
 #
+# Version 2.0 (CSRV model)
+#
 
 #
 # Read in private configuration if it exists, otherwise set defaults
@@ -447,20 +449,21 @@ fn anl-uplink {
 fn anl-uplink-new {
 	#anl-cleanup
 	
+	# These are test settings
 	# TODO: Make sure csrv is running (?)
 	ANLBRASIL=/home/ericvh-laptop/src/ericvh-brasil
-	#ANLNEWLOGIN=9.3.45.4
-	ANLNEWLOGIN=192.168.51.129
+	ANLNEWLOGIN=9.3.45.4
+	#ANLNEWLOGIN=192.168.51.129
 	
 	load std expr string
 	args := $*
 	s := sh -c ${quote $"args}
+	# for now use mntgen
+	mount -c {mntgen} /csrv
 	bind '#U*' /n/local
 	mkdir -p /tmp/lpipe
 	bind '#|' /tmp/lpipe
-	os ssh $ANLNEWLOGIN $ANLBRASIL/Linux/386/bin/brasil -I gateway  </tmp/lpipe/data1 >/tmp/lpipe/data1 &
-	# for now use mntgen
-	mount -c {mntgen} /csrv
+	os ssh -q -y $ANLNEWLOGIN $ANLBRASIL/Linux/386/bin/brasil -I gateway  </tmp/lpipe/data1 >/tmp/lpipe/data1 &
 	/dis/27b-6.dis /tmp/lpipe/data /tmp/lpipe/data /csrv /n/local
 	# hoping the polling on the tail keeps the mount open
 	#echo Argonne Uplink Established > $ANLMNT/README.survmount

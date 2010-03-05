@@ -206,8 +206,11 @@ if (~$cpunode '0') {
 
 # use vc0net again in future but not yet. 
 #if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
-
 #if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
+
+brasil &
+sleep 5
+mount /srv/brasil /csrv
 
 # This is here so at some point we can each have
 # a custom rc.local for our images. 

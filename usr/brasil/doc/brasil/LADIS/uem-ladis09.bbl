@@ -1,0 +1,99 @@
+\begin{thebibliography}{10}
+
+\bibitem{inferno:man}
+{Inferno Man Pages}.
+\newblock {\em Inferno 3rd Edition Programmers Manual}, 2.
+
+\bibitem{Almes:Black:Lazowksa:Noe:ieee:tose:1985}
+G.~T. Almes, A.~P. Black, E.~D. Lazowska, and J.~D. Noe.
+\newblock The eden system: a technical review.
+\newblock {\em IEEE Transactions on Software Engineering}, 11(1):43--59, 1985.
+
+\bibitem{CHERITON88}
+D.~R. Cheriton.
+\newblock The {V} distributed system.
+\newblock {\em Communications of the Association of Computing Machinery},
+  31(3):314--333, Mar. 1988.
+
+\bibitem{Dean:mapreduce}
+J.~Dean and S.~Ghemawat.
+\newblock Mapreduce: simplified data processing on large clusters.
+\newblock {\em Commun. ACM}, 51(1):107--113, 2008.
+
+\bibitem{234000}
+J.~J. Dongarra, S.~W. Otto, M.~Snir, and D.~Walker.
+\newblock A message passing standard for mpp and workstations.
+\newblock {\em Commun. ACM}, 39(7):84--90, 1996.
+
+\bibitem{PODC:Push}
+N.~P. Evans and E.~Van~Hensbergen.
+\newblock Push, a disc shell.
+\newblock In {\em PODC '09: Proceedings of the 28th ACM symposium on Principles
+  of distributed computing}, pages 306--307, New York, NY, USA, 2009. ACM.
+
+\bibitem{lucho-xcpu}
+L.~Ionkov, R.~Minnich, and A.~Mirtchovski.
+\newblock The xcpu cluster management framework.
+\newblock In {\em First International Workshop on Plan9}, 2006.
+
+\bibitem{evh2009ppac}
+D.~Jamsek and E.~Van~Hensbergen.
+\newblock {Experiences with Cluster GPU Acceleration for Circuit Design}.
+\newblock {\em Proc. of Workshop on Parallel Programming on Accelerator
+  Clusters (PPAC)}, 2009.
+
+\bibitem{Cavilla:snowflock}
+H.~A. Lagar-Cavilla, J.~A. Whitney, A.~M. Scannell, P.~Patchin, S.~M. Rumble,
+  E.~de~Lara, M.~Brudno, and M.~Satyanarayanan.
+\newblock Snowflock: rapid virtual machine cloning for cloud computing.
+\newblock In {\em EuroSys '09: Proceedings of the fourth ACM european
+  conference on Computer systems}, pages 1--12, New York, NY, USA, 2009. ACM.
+
+\bibitem{Mullender90}
+S.~J. Mullender, C.~van Rossum, A.~S. Tanenbaum, R.~van Renesse, and H.~van
+  Stavern.
+\newblock Amoeba: a distributed operating system for the 1990s.
+\newblock 23(5):44--53, May 1990.
+
+\bibitem{Needham82}
+R.~M. Needham and A.~J. Herbert.
+\newblock {\em The Cambridge Distributed Computing System}.
+\newblock Addison-Wesley Publishers Limited, London, 1982.
+
+\bibitem{pike95plan}
+R.~Pike, D.~Presotto, S.~Dorward, B.~Flandrena, K.~Thompson, H.~Trickey, and
+  P.~Winterbottom.
+\newblock {Plan 9} from {Bell Labs}.
+\newblock {\em Computing Systems}, 8(3):221--254, Summer 1995.
+
+\bibitem{namespace}
+R.~Pike, D.~Presotto, K.~Thompson, H.~Trickey, and P.~Winterbottom.
+\newblock The use of name spaces in plan 9.
+\newblock {\em SIGOPS Oper. Syst. Rev.}, 27(2):72--76, 1993.
+
+\bibitem{StanleyMarbell:iwp906a}
+P.~Stanley-Marbell.
+\newblock Implementation of a distributed full-system simulation framework as a
+  filesystem server.
+\newblock In {\em Proceedings of the First International Workshop on Plan 9},
+  2006.
+
+\bibitem{StanleyMarbell:hipeac07}
+P.~Stanley-Marbell and D.~Marculescu.
+\newblock {Sunflower: Full-System, Embedded Microarchitecture Evaluation}.
+\newblock {\em 2nd European conference on High Performance Embedded
+  Architectures and Computers (HiPEAC 2007) / Lecture Notes on Computer
+  Science}, 4367:168--182, 2007.
+
+\bibitem{evh08hare}
+E.~Van~Hensbergen, C.~Forsyth, J.~McKie, and R.~Minnich.
+\newblock Holistic aggregate resource environment.
+\newblock {\em SIGOPS Oper. Syst. Rev.}, 42(1):85--91, 2008.
+
+\bibitem{evh2008mtags}
+E.~Van~Hensbergen and R.~Minnich.
+\newblock {System Support for Many Task Computing}.
+\newblock {\em Proc. of Workshop on Many-Task Computing on Grids and
+  Supercomputers}, 2008.
+
+\end{thebibliography}

@@ -1,6 +1,7 @@
 adm d775 sys sys /tmp/empty
 	nvram 400 sys sys ../root/nvram
 	timezone d775 sys sys /tmp/empty
+csrv d775 sys sys /tmp/empty
 lib d775 sys sys /tmp/empty
 	namespace 664 sys sys ./bgp.namespace
 	ndb d775 sys sys /tmp/empty
@@ -62,6 +63,7 @@ power d775 sys sys /tmp/empty
 		acid 775 sys sys
 		bind 775 sys sys
 		cat 775 sys sys
+		cec 775 sys sys
 		echo 775 sys sys
 		iostats 775 sys sys
 		miniciod 775 sys sys ../root/q.miniciod

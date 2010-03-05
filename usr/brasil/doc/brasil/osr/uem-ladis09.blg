@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99c (Web2C 7.5.4)
+The top-level auxiliary file: uem-ladis09.aux
+The style file: abbrv.bst
+Database file #1: ../brasil.bib
+Warning--to sort, need author or key in inferno:man
+Warning--empty author in inferno:man
+Warning--empty year in inferno:man
+Warning--empty journal in Mullender90
+You've used 17 entries,
+            2118 wiz_defined-function locations,
+            612 strings with 6875 characters,
+and the built_in function-call counts, 5922 in all, are:
+= -- 574
+> -- 317
+< -- 2
++ -- 131
+- -- 108
+* -- 451
+:= -- 999
+add.period$ -- 52
+call.type$ -- 17
+change.case$ -- 104
+chr.to.int$ -- 0
+cite$ -- 21
+duplicate$ -- 211
+empty$ -- 436
+format.name$ -- 108
+if$ -- 1203
+int.to.chr$ -- 0
+int.to.str$ -- 17
+missing$ -- 18
+newline$ -- 87
+num.names$ -- 32
+pop$ -- 105
+preamble$ -- 1
+purify$ -- 88
+quote$ -- 0
+skip$ -- 139
+stack$ -- 0
+substring$ -- 337
+swap$ -- 32
+text.length$ -- 2
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 66
+warning$ -- 4
+while$ -- 56
+width$ -- 19
+write$ -- 185
+(There were 4 warnings)
