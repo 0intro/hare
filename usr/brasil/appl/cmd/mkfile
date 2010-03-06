@@ -3,7 +3,7 @@
 DIRS=\
 	auth\
 	auxi\
-	avr\
+#	avr\
 	disk\
 	fs\
 	install\

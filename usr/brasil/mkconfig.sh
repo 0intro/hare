@@ -20,7 +20,7 @@ if [ `uname -m` = x86_64 ]; then
 	OBJTYPE=386
 fi
 
-if [ `uname -m` = i386 ]; then
+if [ `uname -m` = i686 ]; then
 	OBjTYPE=386
 fi
 
