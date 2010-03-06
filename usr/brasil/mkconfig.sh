@@ -21,7 +21,11 @@ if [ `uname -m` = x86_64 ]; then
 fi
 
 if [ `uname -m` = i686 ]; then
-	OBjTYPE=386
+	OBJTYPE=386
+fi
+
+if [ `uname -m` = i386 ]; then
+	OBJTYPE=386
 fi
 
 if [ `uname -m` = ppc ]; then
