@@ -98,7 +98,7 @@ then
 	pflag=5670
 fi
 
-eflag+=":BRASIL_ADDR=\"tcp!$hflag!$pflag\":PLAN9_ROOT=$rflag"
+eflag+=":BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag"
 
 #
 # Make sure the user is trying to execute something, otherwise just 
