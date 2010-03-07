@@ -108,6 +108,39 @@ struct MessagePrefix
     uint32_t jobid; /* New in V1R3M0 */
 };
 
+struct DataPrefixIn
+{
+	uint32_t type;
+	uint32_t eof;
+	uint32_t errno;
+};
+
+struct DataPrefixOut
+{
+	uint32_t type;
+	uint32_t core;
+	uint32_t treeaddr;
+	uint32_t logicalrank;
+};
+
+struct DataPrefixGeneral
+{
+	uint32_t type;
+	uint32_t subtype;
+};
+
+enum DataType
+{
+	VERSION_MESSAGE,
+	STDIN_MESSAGE,
+	STDOUT_MESSAGE,
+	STDERR_MESSAGE,
+	GENERAL_MESSAGE,
+	LAST_MESSAGE
+};
+
+static int DataStreamVersion = 1;
+
 #define VERSION_MSG_ENC_LEN 64
 
 #define DEBUG_INITFINI 1
@@ -313,8 +346,93 @@ void process_env(char *envpair)
 	envpair[count] = '=';	
 }
 
-int main(void)
+static int
+cio_write_data_out(int type, int core, int treeaddr, int rank, char *data, int len)
 {
+
+	stream_write_int(stdiofd, type);
+	stream_write_int(stdiofd, core);
+	stream_write_int(stdiofd, treeaddr);
+	stream_write_int(stdiofd, rank);
+	stream_write_arr(stdiofd, data, len);
+
+    return 0;
+}
+
+static int
+cio_write_data_general(int type, char *data, int len)
+{
+
+	stream_write_int(stdiofd, GENERAL_MESSAGE);
+	stream_write_int(stdiofd, type);
+	stream_write_arr(stdiofd, data, len);
+
+    return 0;
+}
+
+static int
+cio_write_data_vers(void)
+{
+	char *eyecatcher = "<DataStream>";
+	char _encMessage[64]; /* don't know what goes here */
+	
+	stream_write_int(stdiofd, VERSION_MESSAGE);
+	stream_write_arr(stdiofd, eyecatcher, 12);
+	stream_write_int(stdiofd, 1);
+	stream_write_arr(stdiofd,_encMessage, 64);
+	
+	return 0;
+}
+
+/*
+ * Function to handle standard I/O operations
+ * (for now focused on output, but we may want input threads as well)
+ */
+ 
+void iomain(void)
+{
+	char *squidboy = "Hello, Squidboy!\n";
+	
+	/* TODO at some point we'll need an input thread */
+	
+	/* Message Output is BROKEN right now, don't use */
+	for(;;);
+	
+	cio_write_data_out(STDOUT_MESSAGE, 0, 0, 0, squidboy, strlen(squidboy));
+	cio_write_data_out(STDERR_MESSAGE, 0, 0, 0, squidboy, strlen(squidboy));
+
+	for(;;);
+}
+#define ESTR 255
+
+static void
+usage(void)
+{
+	char *e, estr[ESTR], *p;
+
+	e = estr + ESTR;
+	p = seprint(estr, e, "usage: %s"
+		" -[I]: for Data Stream"
+		"\n",
+		argv0);
+	write(2, estr, p-estr);
+	exits("usage");
+}
+
+
+int main(int argc, char *argv[])
+{
+	/* TODO: check args and jump to iomain if appropriate */
+	ARGBEGIN{
+	default:
+		usage();
+		break;
+	case 'I':
+		iomain(); /* should never return */
+		exits("strange");
+		break;
+	} ARGEND;
+	
     logfd = create("/tmp/ciod.log", OWRITE, 0666|DMAPPEND);
 
     /* Bind system environment first */
