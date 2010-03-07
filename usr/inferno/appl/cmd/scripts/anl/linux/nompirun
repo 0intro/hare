@@ -1,4 +1,39 @@
 #!/bin/bash
+#
+# nompirun - start a non-traditional job on BlueGene
+# Copyright 2010 Eric Van Hensbergen
+# 
+# USAGE: nompirun [-A cobalt_account] [-h brasil_host] [-p brasil_port] 
+#				[-e key=value] [-n numnodes] [-t time] [-k kernelprofile] 
+#				[-r rootpath]
+#				cmd args
+# 
+# ARGUMENTS:
+#	-A: Your cobalt account
+#	-h: host running brasil daemon (defaults to current host)
+#	-p: port running brasil daemon (should be unique per user)
+#	-n: number of cpu nodes to provision 
+#	-t: length of time to request
+#	-k: kernel profile (default's to user's name
+#	-e key=value: specify an environment variable to pass (can be repeated)
+#	cmd args: command to run on I/O nodes (eventually compute nodes maybe)
+#			(default to /bin/rc)
+#
+# ENVIRONMENT VARIABLES: (can be used to override defaults in place of cmdline
+#	BRASIL_HOST - host running brasil daemon
+#	BRASIL_PORT - port running brasil daemon (should be unique)
+#	PLAN9_ROOT - local path to Plan 9 root file system
+#	COBALT_ACCOUNT - cobalt account
+#
+# TODO:
+#	- Add namespace control files
+#	- Add centralservices host/port info
+#	- Add user home directory info
+#	- Autostart (and cleanup) brasil if its not running
+#
+# BUGS:
+#	Several I'm sure
+#
 
 # ENVIRONMENTAL DEFAULTS
 
@@ -33,7 +68,7 @@ do
 	k)
 		kflag="$OPTARG"
 		;;
-	?)	printf "Usage: %s: [-A cobalt_account] [-h brasil_host] [-p brasil_port] [-e key=value] [-n numnodes] [-t time] [-k kernelprofile] args\n" $(basename $0) >&2
+	?)	printf "Usage: %s: [-A cobalt_account] [-h brasil_host] [-p brasil_port] [-e key=value] [-n numnodes] [-t time] [-r rootpath][-k kernelprofile] args\n" $(basename $0) >&2
 		exit 2
 		;;
 	esac
@@ -72,32 +107,18 @@ then
 	COMMAND="$rflag/power/bin/rc"
 fi
 
-#for i in /bgsys/argonne-utils/profiles/$kflag/{CNK,INK,CNS,uloader,ramdisk}
-#do
-#	out=`objdump -x $i`
-#	case "$out" in
-#	*"File format not recognized"*)
-#		echo $i: invalid executable format 1>2
-#		exit -1;;
-#	esac
-#done
+# Verify sanity of object files about to be loaded
+for i in /bgsys/argonne-utils/profiles/$kflag/{CNK,INK,CNS,uloader,ramdisk}
+do
+	out=`objdump -x $i`
+	case "$out" in
+	*"File format not recognized"*)
+		echo $i: invalid executable format 1>2
+		exit -1;;
+	esac
+done
 
-#
-# Check for required environment variables (like BRASIL ADDR or INFERNO ADDR)
-#
+JOBID=`qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND`
 
-#qsub -A BGPPlan9Meas -t 30 -n $1 --kernel $USER --mode script /home/$USER/bin/sidestep.sh
+echo $JOBID
 
-echo "qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND"
-
-#sleep 4
-#while true
-#do
-#	job=`qstat | grep $USER | grep running | awk '{ print $1 }'`
-#	if [[ -n $job ]]
-#	then 
-#		break
-#	fi
-#	sleep 10
-#done
-#echo Node Available
