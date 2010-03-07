@@ -10,6 +10,7 @@
 # 
 # ARGUMENTS:
 #	-A: Your cobalt account
+#	-D: debug mode (only print the qsub command, don't run it)
 #	-h: host running brasil daemon (defaults to current host)
 #	-p: port running brasil daemon (should be unique per user)
 #	-n: number of cpu nodes to provision 
@@ -42,16 +43,19 @@ pflag=$BRASIL_PORT
 rflag=$PLAN9_ROOT
 hflag=$BRASIL_HOST
 aflag=$COBALT_ACCOUNT
+Dflag=
 
 # Command line defaults
 nflag=64
 tflag=30
 eflag="MODE=nompirun"
 
-while getopts 'A:e:h:k:n:p:t:r:' OPTION
+while getopts 'DA:e:h:k:n:p:t:r:' OPTION
 do
 	case $OPTION in
 	A)	aflag="$OPTARG"
+		;;
+	D)	Dflag=1
 		;;
 	r)	rflag="$OPTARG"
 		;;
@@ -68,7 +72,7 @@ do
 	k)
 		kflag="$OPTARG"
 		;;
-	?)	printf "Usage: %s: [-A cobalt_account] [-h brasil_host] [-p brasil_port] [-e key=value] [-n numnodes] [-t time] [-r rootpath][-k kernelprofile] args\n" $(basename $0) >&2
+	?)	printf "Usage: %s: [-D][-A cobalt_account] [-h brasil_host] [-p brasil_port] [-e key=value] [-n numnodes] [-t time] [-r rootpath][-k kernelprofile] args\n" $(basename $0) >&2
 		exit 2
 		;;
 	esac
@@ -105,6 +109,12 @@ COMMAND=$@
 if [ -z $COMMAND ]
 then
 	COMMAND="$rflag/power/bin/rc"
+fi
+
+if [ -n "$Dflag" ]
+then
+	echo "qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND"
+	exit
 fi
 
 # Verify sanity of object files about to be loaded
