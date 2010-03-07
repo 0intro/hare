@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# ENVIRONMENTAL DEFAULTS
+
+kflag=$USER
+pflag=$BRASIL_PORT
+rflag=$PLAN9_ROOT
+hflag=$BRASIL_HOST
+aflag=$COBALT_ACCOUNT
+
+# Command line defaults
+nflag=64
+tflag=30
+eflag="MODE=nompirun"
+
+while getopts 'A:e:h:k:n:p:t:r:' OPTION
+do
+	case $OPTION in
+	A)	aflag="$OPTARG"
+		;;
+	r)	rflag="$OPTARG"
+		;;
+	h)	hflag="$OPTARG"
+		;;
+	p)	pflag="$OPTARG"
+		;;
+	n)	nflag=$OPTARG
+		;;
+	t)	tflag=$OPTARG
+		;;
+	e)	eflag+=":$OPTARG"
+		;;
+	k)
+		kflag="$OPTARG"
+		;;
+	?)	printf "Usage: %s: [-A cobalt_account] [-h brasil_host] [-p brasil_port] [-e key=value] [-n numnodes] [-t time] [-k kernelprofile] args\n" $(basename $0) >&2
+		exit 2
+		;;
+	esac
+done
+shift $((OPTIND - 1))
+
+# SET DEFAULTS IF USER DOESNT SPECIFY
+if [ -z $aflag ]
+then
+	aflag=BGPPlan9Meas
+fi
+if [ -z $rflag ]
+then
+	rflag=/home/ericvh/9
+fi
+if [ -z $hflag ]
+then
+	hflag=`hostname`
+fi
+if [ -z $pflag ]
+then
+	printf "\nWARNING: using default port (5670)\nPlease set using BRASIL_PORT environment variable or -p command line argument\n\n"
+	pflag=5670
+fi
+
+eflag+=":BRASIL_ADDR=tcp\!$hflag\!$pflag:PLAN9_ROOT=$rflag"
+
+#
+# Make sure the user is trying to execute something, otherwise just 
+# default to executing rc
+#
+COMMAND=$@
+
+if [ -z $COMMAND ]
+then
+	COMMAND="$rflag/power/bin/rc"
+fi
+
+#for i in /bgsys/argonne-utils/profiles/$kflag/{CNK,INK,CNS,uloader,ramdisk}
+#do
+#	out=`objdump -x $i`
+#	case "$out" in
+#	*"File format not recognized"*)
+#		echo $i: invalid executable format 1>2
+#		exit -1;;
+#	esac
+#done
+
+#
+# Check for required environment variables (like BRASIL ADDR or INFERNO ADDR)
+#
+
+#qsub -A BGPPlan9Meas -t 30 -n $1 --kernel $USER --mode script /home/$USER/bin/sidestep.sh
+
+echo "qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND"
+
+#sleep 4
+#while true
+#do
+#	job=`qstat | grep $USER | grep running | awk '{ print $1 }'`
+#	if [[ -n $job ]]
+#	then 
+#		break
+#	fi
+#	sleep 10
+#done
+#echo Node Available
