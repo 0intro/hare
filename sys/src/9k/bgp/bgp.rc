@@ -1,9 +1,6 @@
 #!/boot/rc -m /boot/rcmain
 #flag x +
 
-if(test -f '#P'/script)
-	. '#P'/script
-
 /boot/echo In default boot script
 
 cputype=power
@@ -152,7 +149,7 @@ if(~ $cpunode '0'){
 #	echo done.
 #}
 
-if(! test -d $rootdir/$rootspec/$cputype){
+if(! /boot/test -d $rootdir/$rootspec/$cputype){
 	rootdir=/boot
 	rootspec=''
 	rootsrv=$beetroot
@@ -193,7 +190,7 @@ bind /boot/rc/bin/service /bin/service
 
 echo starting services
 
-if(test -d /mnt/factotum)
+if(/boot/test -d /mnt/factotum)
 	aux/listen -i -q tcp
 if not
 	aux/listen -i -t /bin/service tcp
@@ -208,13 +205,16 @@ if (~$cpunode '0') {
 #if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
 #if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
 
-brasil &
-sleep 5
-mount /srv/brasil /csrv
+#
+# Brasil Daemon Startup Code
+#
+#brasil &
+#sleep 5
+#mount /srv/brasil /csrv
 
 # This is here so at some point we can each have
 # a custom rc.local for our images. 
-if(test -e /rc.local)
+if(/boot/test -e /rc.local)
 	. /rc.local
 while(echo Hello Squidboy)
 	. -i '#d/0'

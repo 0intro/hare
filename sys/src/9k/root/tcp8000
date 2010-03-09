@@ -1,3 +1,2 @@
 #!/bin/rc
-sleep 10000
-
+exec /bin/miniciod -I

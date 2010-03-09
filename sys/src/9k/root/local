@@ -1,0 +1,32 @@
+database=
+	file=/lib/ndb/local
+	file=/lib/ndb/dns
+	file=/lib/ndb/inferno
+	file=/lib/ndb/common
+
+# Varioud Auth Empires
+auth=sources.cs.bell-labs.com authdom=outside.plan9.bell-labs.com
+auth=9.3.61.71 authdom=austin.ibm.com
+auth=tor.texas.9grid.us authdom=9grid.us
+auth=9grid.net authdom=9grid.net
+auth=out9auth.cs.bell-labs.com authdom=cs.bell-labs.com
+auth=192.168.51.128 authdom=vmware
+auth=terzarima.net authdom=caldo.demon.co.uk
+
+# ANL Addresses for login nodes
+ip=172.17.3.11 sys=login1
+ip=172.17.3.12 sys=login2
+ip=172.17.3.13 sys=login3
+ip=172.17.3.14 sys=login4
+ip=172.17.3.15 sys=login5
+ip=172.17.3.16 sys=login6
+ip=172.17.3.17 sys=login7
+ip=172.17.3.18 sys=login8
+
+# TODO: Tree defintions for io nodes
+# TODO: Definitions for cpu nodes (tree & torus)
+
+# Aliases
+sys=go
+	dom=go.cs.bell-labs.com
+

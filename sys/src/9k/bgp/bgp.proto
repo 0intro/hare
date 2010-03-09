@@ -6,6 +6,7 @@ lib d775 sys sys /tmp/empty
 	namespace 664 sys sys ./bgp.namespace
 	ndb d775 sys sys /tmp/empty
 		common 664 sys sys ../root/common
+		local 664 sys sys ../root/local
 	profile 664 sys sys ../root/profile
 mnt d775 sys sys /tmp/empty
 	cons d775 sys sys /tmp/empty
@@ -77,7 +78,7 @@ power d775 sys sys /tmp/empty
 		test 775 sys sys
 		seq 775 sys sys
 		
-		brasil 775 sys sys /usr/ericvh/src/ericvh-brasil/Plan9/power/bin/brasil
+		#brasil 775 sys sys /usr/ericvh/src/ericvh-brasil/Plan9/power/bin/brasil
 		
 		# used to provide standalone service
 		auth d775 sys sys /tmp/empty

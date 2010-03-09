@@ -23,6 +23,7 @@ boot cpu
 rootdir
 	bgp.rr
 	/power/bin/echo
+	/power/bin/test
 	/power/bin/paqfs
 	/power/bin/rc
 	../root/rcmain

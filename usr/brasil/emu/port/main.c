@@ -126,8 +126,8 @@ option(int argc, char *argv[], void (*badusage)(void))
 		if (geom(EARGF(badusage())) == 0)
 			badusage();
 		break;
-	case 'b':		/* jit array bounds checking (obsolete, now on by default) */
-		break;
+	case 'b':		/* obsolete */
+		break;	
 	case 'B':		/* suppress jit array bounds checks */
 		bflag = 0;
 		break;
