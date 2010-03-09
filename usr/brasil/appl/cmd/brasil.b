@@ -1,3 +1,10 @@
+#
+# brasil - startup code for brasil mode
+# Copyright 2010 Eric Van Hensbergen
+# 
+# NOTE: This code is awful and needs to be cleaned up and/or re-written
+#
+
 implement Emuinit;
 include "sys.m";
 	sys: Sys;
@@ -15,6 +22,9 @@ Emuinit: module
 # isnt this in env.m?
 
 logfd: ref Sys->FD;
+fsaddr: string;		# host file system export
+debugaddr: string;	# brasil debug export
+csrvaddr: string;	# central services export
 
 unquoted(s: string): list of string
 {
@@ -71,36 +81,59 @@ init()
 		sys->fprint(sys->fildes(2), "Couldn't load shell module\n");
 	args := getenv("emuargs");
 	arg = load Arg Arg->PATH;
+	mode: string;
+	
+	fsaddr = "tcp!*!5670";
+	
 	if (arg == nil)
 		sys->fprint(sys->fildes(2), "emuinit: cannot load %s: %r\n", Arg->PATH);
 	else{
 		arg->init(args);
+		# first parse emu options away
 		while((c := arg->opt()) != 0)
 			case c {
 			'g' or 'c' or 'C' or 'm' or 'p' or 'f' or 'r' or 'd' =>
 				arg->arg();
 	                  }
 		args = arg->argv();
+		
+		# pull mode from arguments
+		mode = hd args;
+	
+		# next parse our options
+		arg->init(args);
+		while((c = arg->opt()) != 0)
+			case c {
+			'h' =>			# host export addr
+				fsaddr = arg->arg();
+			'd' =>			# brasil debug addr
+				debugaddr = arg->arg();
+			'c' =>			# central services addr
+				csrvaddr = arg->arg();
+			* =>
+				sys->print("detected option: %c\n", c);
+	                  }		
+		args = arg->argv();
 		if(args == nil) {
 			args = list of {"none"};
 		}
 	}
-	
 	sys->bind("#U*/tmp/", "/tmp", sys->MBEFORE|sys->MCREATE);
 	
 	# bind log file over stdio
-	logfd = sys->create("/tmp/brasil.log", Sys->OWRITE, 8r666);
-	if(logfd == nil)
-		sys->print("couldn't open log file: %r\n");
-	else {
-		sys->dup(logfd.fd, 2);	# override stderr? 
-		sys->dup(logfd.fd, 1);	# override stdout? 
-	}
+	if(mode == "gateway") {
+		logfd = sys->create("/tmp/brasil.log", Sys->OWRITE, 8r666);
+		if(logfd == nil)
+			sys->print("couldn't open log file: %r\n");
+		else {
+			sys->dup(logfd.fd, 2);	# override stderr? 
+			sys->dup(logfd.fd, 1);	# override stdout? 
+		}
+	} else
+		logfd = sys->fildes(2);
 	
 	sys->bind("/tmp/brasil.log", "/dev/cons", sys->MREPL);
-	
-	sh->system(nil, "/dis/echo,dis test\n");
-	
+		
 	sh->system(nil, "mount -c {/dis/mntgen.dis} /n"); # setup tmp for us
 	
 	sys->bind("#e", "/env", sys->MREPL|sys->MCREATE);
@@ -109,7 +142,7 @@ init()
 	if(sys->bind("#I", "/net", sys->MREPL) < 0) {
 		# no net might mean we are on Plan 9
 		if(sys->bind("/n/local/net", "/net", sys->MREPL) < 0) {
-			sys->fprint(sys->fildes(2), "WARNING: brasil: unable to bind network\n");
+			sys->fprint(logfd, "WARNING: brasil: unable to bind network\n");
 		}
 	} else {
 		sh->system(nil, "/dis/ndb/cs.dis");
@@ -120,19 +153,20 @@ init()
 	sys->bind("#U*", "/csrv/local/fs", sys->MREPL|sys->MCREATE);
 	sys->bind("/net", "/csrv/local/net", sys->MREPL);
 	
-	mode := hd args;
 	case mode {
 		#"terminal" =>
 		#	# initiate a remote ssh and 27b-6 over it
 		#	sys->print("terminal");
 		"gateway" =>
+			# TODO: pass csrv port number
 			sh->system(nil, "mount -ca {csrv gw} /csrv");
-			#sh->system(nil, "/dis/27b-6.dis /dev/hoststdin /dev/hoststdout /csrv /csrv >>  /tmp/brasil.log &");
-		* =>
-			sh->system(nil, "mount -ca {csrv} /csrv");
+		* => # server: provide a backmount
+			if(csrvaddr != nil) {
+				# TODO: pass csrv addr to csrv
+				sh->system(nil, "mount -ca {csrv} /csrv");
+			}
 			if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
-				sys->fprint(logfd,"mounting 9srv failed: %r\n");
-				sh->system(nil, "/dis/styxlisten.dis -A tcp!127.0.0.1!6666 export /csrv");
+				sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /csrv");
 			} else {
 				sys->fprint(logfd, "creating srv export\n");
 				fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
@@ -142,9 +176,10 @@ init()
 			}		
 	}	
 	
-	#debug (TODO: This should be optional)
+	# TODO: Get better synchronization
 	sys->sleep(5);
-	sh->system(nil, "/dis/styxlisten.dis -A tcp!*!5670 export /");
+	if(debugaddr != nil)
+		sh->system(nil, "/dis/styxlisten.dis -A "+debugaddr+" export /");
     } exception e { # abuse exceptions
 	"*" =>
     	sys->fprint(logfd, "unexpected exception: %s\n", e);
