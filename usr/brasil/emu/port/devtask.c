@@ -41,7 +41,9 @@ enum
 #define RQID(c, x, y) 	 ( ( ( (c)<< 16) | ( (x) << 8)) | (y))
 
 #define RCHANCOUNT 10
-#define BASE "/task/remote/"
+#define BASE "/csrv/local/"
+#define VALIDATEDIR "local"
+#define REMOTEMOUNTPOINT "/remote"
 
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
@@ -236,7 +238,7 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			break;
 		case Qconvdir:
 			mkqid (&q, QID (0, Qcmd), 0, QTDIR);
-			devdir (c, q, "remote", 0, eve, DMDIR|0555, dp);
+			devdir (c, q, "local", 0, eve, DMDIR|0555, dp);
 			break;
 		case QLconrdir :  /* for remote resource bindings */
 			if (vflag) print ("cmdindex [%ld], rjobi [%ld]\n", 
@@ -260,7 +262,7 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 		if (s >= 1)
 			return -1;
 		mkqid (&q, QID (0, Qcmd), 0, QTDIR);
-		devdir (c, q, "remote", 0, eve, DMDIR|0555, dp);
+		devdir (c, q, "local", 0, eve, DMDIR|0555, dp);
 		return 1;
 	case Qcmd:
 		if (s < cmd.nc) {
@@ -930,8 +932,7 @@ validaterr (char *location, char *os, char *arch)
 	Dir *tmpDr;
 	int hn, pn;
 	long i, count;
-	char localName[] = "remote";
-/*	char localName[] = "local"; */ /* for devcmd2 */
+	char localName[] = VALIDATEDIR; /* for validation */
 	remoteMount *ans;
 	char buff[KNAMELEN*3];
 
@@ -1023,7 +1024,7 @@ static remoteMount **
 findrr (int *validrc, char *os, char *arch) 
 {
 
-	char *path = "/remote";
+	char *path = REMOTEMOUNTPOINT;  /* location where remote nodes will be mounted */
 	char location[KNAMELEN*3];
 	remoteMount *tmp;
 	long count, i;
@@ -1033,8 +1034,11 @@ findrr (int *validrc, char *os, char *arch)
 	long tmprc;
 
 	if (waserror ()){
-		if (vflag) print ("Cant open remote\n");
-		nexterror (); 
+		
+		if (vflag) print ("Cant open %s\n", REMOTEMOUNTPOINT);
+		*validrc = 0;
+		return nil; 
+		nexterror ();  /* not reachable */
 	}
 
 	count = lsdir (path, &dr);
@@ -1074,7 +1078,8 @@ allocatesinglerr (char *localpath, char *selected, int jcount)
 	int len, ret;
 
 	if (waserror ()){
-		if (vflag) print ("Remote resources not present at [/remote]");
+		/* FIXME : following warning msg is incorrect */
+		if (vflag) print ("Remote resources not present at [%s]", REMOTEMOUNTPOINT);
 		nexterror ();
 	}
 
@@ -1234,13 +1239,13 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 
 	validrc = 0;
 	allremotenodes = findrr (&validrc, os, arch);
-	if (validrc == 0) {
+	if (validrc == 0 || allremotenodes == nil ) {
 		if (vflag) print("no remote resources,reserving [%d]locally\n",
 		resNo);
 		/* no remote resources */
 		jcount = 0;
 		for (i = 0; i < resNo; ++ i) {
-			selected = "/task/remote/";
+			selected = BASE;
 			addrr (lpath, selected, c->rjob, jcount);
 		}
 	} else {

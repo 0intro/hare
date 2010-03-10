@@ -97,6 +97,7 @@ root
 	/net.alt	/
 	/chan	/
 	/csrv	/
+	/remote /
 	/nvfs	/
 	/n		/
 	/env	/
