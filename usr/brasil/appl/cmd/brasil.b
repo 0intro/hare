@@ -96,24 +96,28 @@ init()
 				arg->arg();
 	                  }
 		args = arg->argv();
-		
-		# pull mode from arguments
-		mode = hd args;
 	
-		# next parse our options
-		arg->init(args);
-		while((c = arg->opt()) != 0)
-			case c {
-			'h' =>			# host export addr
-				fsaddr = arg->arg();
-			'd' =>			# brasil debug addr
-				debugaddr = arg->arg();
-			'c' =>			# central services addr
-				csrvaddr = arg->arg();
-			* =>
-				sys->print("detected option: %c\n", c);
-	                  }		
-		args = arg->argv();
+		if(args==nil) {
+			mode = "Server";
+		} else {	
+			# pull mode from arguments
+			mode = hd args;
+	
+			# next parse our options
+			arg->init(args);
+			while((c = arg->opt()) != 0)
+				case c {
+				'h' =>			# host export addr
+					fsaddr = arg->arg();
+				'd' =>			# brasil debug addr
+					debugaddr = arg->arg();
+				'c' =>			# central services addr
+					csrvaddr = arg->arg();
+				* =>
+					sys->print("detected option: %c\n", c);
+	                  	}		
+			args = arg->argv();
+		}
 		if(args == nil) {
 			args = list of {"none"};
 		}
