@@ -491,4 +491,5 @@ static __inline Proc *getup(void) {
 typedef sigjmp_buf osjmpbuf;
 #define	ossetjmp(buf)	sigsetjmp(buf, 1)
 
+#define platform "spim"
 #endif
