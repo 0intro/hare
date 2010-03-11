@@ -676,5 +676,6 @@ struct FPU
 
 typedef jmp_buf osjmpbuf;
 #define	ossetjmp(buf)	setjmp(buf)
+#define platform "mips"
 
 #endif

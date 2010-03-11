@@ -494,4 +494,5 @@ typedef union {
 
 typedef sigjmp_buf osjmpbuf;
 #define	ossetjmp(buf)	sigsetjmp(buf, 1)
+#define platform "power"
 #endif

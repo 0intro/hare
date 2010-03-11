@@ -485,4 +485,5 @@ extern	__declspec(thread) Proc*	up;
 typedef jmp_buf osjmpbuf;
 #define	ossetjmp(buf)	setjmp(buf)
 
+#define platform "386"
 #endif

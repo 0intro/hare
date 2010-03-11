@@ -26,7 +26,6 @@ EMUDIRS=\
 	asm\
 	utils/data2c\
 	utils/ndate\
-	emu\
 
 # mkconfig is included at this point to allow it to override
 #the preceding declarations (particularly KERNEL_DIRS) if need be
@@ -36,6 +35,7 @@ EMUDIRS=\
 DIRS=\
 	$EMUDIRS\
 	appl\
+	emu\
 
 foo:QV:
 	echo mk all, clean, install, installall or nuke

@@ -96,24 +96,28 @@ init()
 				arg->arg();
 	                  }
 		args = arg->argv();
-		
-		# pull mode from arguments
-		mode = hd args;
 	
-		# next parse our options
-		arg->init(args);
-		while((c = arg->opt()) != 0)
-			case c {
-			'h' =>			# host export addr
-				fsaddr = arg->arg();
-			'd' =>			# brasil debug addr
-				debugaddr = arg->arg();
-			'c' =>			# central services addr
-				csrvaddr = arg->arg();
-			* =>
-				sys->print("detected option: %c\n", c);
-	                  }		
-		args = arg->argv();
+		if(args==nil) {
+			mode = "Server";
+		} else {	
+			# pull mode from arguments
+			mode = hd args;
+	
+			# next parse our options
+			arg->init(args);
+			while((c = arg->opt()) != 0)
+				case c {
+				'h' =>			# host export addr
+					fsaddr = arg->arg();
+				'd' =>			# brasil debug addr
+					debugaddr = arg->arg();
+				'c' =>			# central services addr
+					csrvaddr = arg->arg();
+				* =>
+					sys->print("detected option: %c\n", c);
+	                  	}		
+			args = arg->argv();
+		}
 		if(args == nil) {
 			args = list of {"none"};
 		}
@@ -137,7 +141,7 @@ init()
 	sh->system(nil, "mount -c {/dis/mntgen.dis} /n"); # setup tmp for us
 	
 	sys->bind("#e", "/env", sys->MREPL|sys->MCREATE);
-	sys->bind("#T", "/task", sys->MREPL|sys->MCREATE);	
+#	sys->bind("#T", "/task", sys->MREPL|sys->MCREATE);	
 	sys->bind("#U*", "/n/local", sys->MREPL|sys->MCREATE);
 	if(sys->bind("#I", "/net", sys->MREPL) < 0) {
 		# no net might mean we are on Plan 9
@@ -149,7 +153,8 @@ init()
 	}
 	
 	sh->system(nil, "mount -c {mntgen} /n/csrv"); # shadow csrv
-	sys->bind("#2", "/csrv", sys->MBEFORE);
+#	sys->bind("#2", "/csrv", sys->MBEFORE);
+	sys->bind("#T", "/csrv", sys->MBEFORE);
 	sys->bind("#U*", "/csrv/local/fs", sys->MREPL|sys->MCREATE);
 	sys->bind("/net", "/csrv/local/net", sys->MREPL);
 	
