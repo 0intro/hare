@@ -9,7 +9,7 @@
 int		rebootargc = 0;
 char**		rebootargv;
 static	char	*imod = "/dis/emuinit.dis";
-char *mntpoint = NULL;
+char *mntpoint = nil;
 extern	char*	hosttype;
 char*	tkfont;	/* for libtk/utils.c */
 int	tkstylus;	/* libinterp/tk.c */
