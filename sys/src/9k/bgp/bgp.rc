@@ -1,7 +1,7 @@
 #!/boot/rc -m /boot/rcmain
 #flag x +
 
-/boot/echo In default boot script
+/boot/echo New Model Boot Script
 
 cputype=power
 objtype=$cputype
@@ -14,7 +14,7 @@ rootsrv=boot
 beetroot=bgp.rr
 #authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'	# -a ...
 authentication=''
-fsaddr=''
+fsaddr='tcp!172.17.3.12!6666'
 
 #
 # Post the read-only filesystem in #s/$beetroot
@@ -104,7 +104,10 @@ if(! ~ $authentication '')
 	eval `{echo $authentication}
 if(~ `{cat '#c/hostowner'} sys)
 	echo -n $authid > '#c/hostowner'
+	
 
+#
+# Old Way
 #
 # Attach to the remote filesystem and mount it.
 # If this fails, set $root(dir|srv) and continue,
@@ -131,12 +134,7 @@ if(~ `{cat '#c/hostowner'} sys)
 #	echo done.	
 #}
 #
-if(~ $cpunode '0'){
-	# wait for ethernet to come up
-	echo Waiting for turbines to come up to speed
 
-	sleep 30
-}
 #
 #if(~ $cpunode '1'){
 #	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
@@ -149,7 +147,7 @@ if(~ $cpunode '0'){
 #	echo done.
 #}
 
-if(! /boot/test -d $rootdir/$rootspec/$cputype){
+if(! test -d $rootdir/$rootspec/$cputype){
 	rootdir=/boot
 	rootspec=''
 	rootsrv=$beetroot
@@ -184,37 +182,64 @@ if(! ~ $rootdir /boot){
 	ndb/dns -r
 }
 
+#
+# start CIOD services
+#
+if(~ $cpunode '0'){
+	# wait for ethernet to come up
+	echo Waiting for turbines to come up to speed
+	sleep 30
+	
+	aux/listen -i -t /bin/service.bgp tcp
+	
+	# do we only want to send this from one IO node?
+	if (~$cpunode '0') {
+		echo Initiating Handshake
+		echo 0x01 0x1e 0x0 0 0 0 > /dev/ras
+	}
+	
+	# wait for miniciod to do its thing, need better sync	
+	sleep 5
+}
+
+#
+# New FS Backmount Model
+#
+if(test -f '/env/BRASIL_ADDR')
+	fsaddr=(`{cat /env/BRASIL_ADDR})
+
+if(~ $cpunode '0'){
+	# wait for ethernet to come up
+	echo fsaddr $fsaddr
+	echo Atomic batteries to power
+
+	times=0
+	while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr frontend /n/frontend) {
+		echo -n '.'
+		times=($times 1)
+		sleep 5
+	}
+	echo done.
+}
+
 #ramfs so we can copy binaries in
 ramfs /tmp
-bind /boot/rc/bin/service /bin/service
 
 echo starting services
+bind /boot/rc/bin/service /bin/service
 
-if(/boot/test -d /mnt/factotum)
+if(test -d /mnt/factotum)
 	aux/listen -i -q tcp
 if not
 	aux/listen -i -t /bin/service tcp
-
-# do we only want to send this from one IO node?
-if (~$cpunode '0') {
-	echo Initiating Handshake
-	echo 0x01 0x1e 0x0 0 0 0 > /dev/ras
-}
 
 # use vc0net again in future but not yet. 
 #if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
 #if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
 
-#
-# Brasil Daemon Startup Code
-#
-#brasil &
-#sleep 5
-#mount /srv/brasil /csrv
-
 # This is here so at some point we can each have
 # a custom rc.local for our images. 
-if(/boot/test -e /rc.local)
+if(test -e /rc.local)
 	. /rc.local
 while(echo Hello Squidboy)
 	. -i '#d/0'
