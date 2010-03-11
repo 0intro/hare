@@ -96,6 +96,9 @@ init()
 				arg->arg();
 	                  }
 		args = arg->argv();
+		if(args == nil) {
+			args = list of {"none"};
+		}
 		
 		# pull mode from arguments
 		mode = hd args;
