@@ -205,37 +205,51 @@ if(~ $cpunode '0'){
 #
 # New FS Backmount Model
 #
-if(test -f '/env/BRASIL_ADDR')
-	fsaddr=(`{cat /env/BRASIL_ADDR})
+if(test -e '/env/MODE') {
+	mode=(`{cat /env/MODE})
+	if(test -e '/env/BRASIL_ADDR')
+		fsaddr=(`{cat /env/BRASIL_ADDR})
 
-if(~ $cpunode '0'){
-	# wait for ethernet to come up
-	echo fsaddr $fsaddr
-	echo Atomic batteries to power
+	if(~ $cpunode '0'){
+		# wait for ethernet to come up
+		echo fsaddr $fsaddr
+		echo Atomic batteries to power
 
-	times=0
-	while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr frontend /n/frontend) {
-		echo -n '.'
-		times=($times 1)
-		sleep 5
+		times=0
+		while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr frontend /n/frontend) {
+			echo -n '.'
+			times=($times 1)
+			sleep 5
+		}
+		echo done.
 	}
-	echo done.
+
+	if(test -e '/env/HOME') {
+		fshome=(`{cat /env/HOME})
+		bind /n/frontend/^$fshome /n/home
+	}
+	
+	if(test -e '/env/PLAN9_ROOT') {
+		plan9root=(`{cat /env/HOME})
+		bind /n/frontend/^$plan9root /n/root
+	}		
+}
+if not {
+	echo starting services
+	bind /boot/rc/bin/service /bin/service
+
+	if(test -d /mnt/factotum)
+		aux/listen -i -q tcp
+	if not
+		aux/listen -i -t /bin/service tcp
+	
+	# use vc0net again in future but not yet. 
+	#if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
+	#if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
 }
 
 #ramfs so we can copy binaries in
 ramfs /tmp
-
-echo starting services
-bind /boot/rc/bin/service /bin/service
-
-if(test -d /mnt/factotum)
-	aux/listen -i -q tcp
-if not
-	aux/listen -i -t /bin/service tcp
-
-# use vc0net again in future but not yet. 
-#if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
-#if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
 
 # This is here so at some point we can each have
 # a custom rc.local for our images. 
