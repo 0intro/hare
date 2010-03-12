@@ -29,7 +29,6 @@
 # TODO:
 #	- Add namespace control files
 #	- Add centralservices host/port info
-#	- Add user home directory info
 #	- Autostart (and cleanup) brasil if its not running
 #
 # BUGS:
@@ -98,7 +97,7 @@ then
 	pflag=5670
 fi
 
-eflag+=":BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag"
+eflag+=":HOME=$HOME:BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag"
 
 #
 # Make sure the user is trying to execute something, otherwise just 
@@ -132,3 +131,6 @@ JOBID=`qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND`
 
 echo $JOBID
 
+# TODO: loop until block is assigned
+# TODO: use block id to tail /bgsys/logs/BGP/R00-*-J00.log
+# TODO: filter log to just my job (or my userid)
