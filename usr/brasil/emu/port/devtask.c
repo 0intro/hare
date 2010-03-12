@@ -52,13 +52,20 @@ static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
+struct RemoteFile
+{
+	RWlock l;
+	Chan *cfile;
+};
+typedef struct RemoteFile RemoteFile;
+
 struct RemoteResource 
 {
 	int x;
 	int inuse;
-	/* path to researved remote resource */
-	Chan *remotechans[RCHANCOUNT];
-	/* counter for accessing each file */
+	/* List of all files in remote resource directory */
+	RemoteFile remotefiles[RCHANCOUNT];
+	/* Next remote resource */
 	struct RemoteResource *next;
 };
 
@@ -573,7 +580,7 @@ cmdopen (Chan *c, int omode)
 					tmpchan = namec (buff,Aopen,omode,0);
 
 					wlock (&cv->rjob->l);
-					tmprr->remotechans[filetype] = tmpchan;
+					tmprr->remotefiles[filetype].cfile = tmpchan;
 					tmprr = tmprr->next; /* this can be RO lock*/
 					wunlock (&cv->rjob->l);
 				} /* end for : */
@@ -605,9 +612,9 @@ freeremoteresource (RemoteResource *rr)
 	if (rr == nil) return;
 
 	for (i = 0; i < RCHANCOUNT ; ++i ) {
-		if (rr->remotechans[i] != nil) {
-			cclose (rr->remotechans[i]);
-			rr->remotechans[i] = nil;
+		if (rr->remotefiles[i].cfile != nil) {
+			cclose (rr->remotefiles[i].cfile);
+			rr->remotefiles[i].cfile = nil;
 			/* unbind ?? 
 			You can't unbind here as rjobcount is already 
 			reset to zero.
@@ -689,12 +696,12 @@ remoteclose (Chan *c, int rjcount)
 		tmprr = cc->rjob->first; /* can be in read lock */
 		wunlock (&cc->rjob->l);
 		for (i = 0 ; i < rjcount; ++i ) {
-			if (tmprr->remotechans[filetype] != nil ) {
-				cclose (tmprr->remotechans[filetype]);
+			if (tmprr->remotefiles[filetype].cfile != nil ) {
+				cclose (tmprr->remotefiles[filetype].cfile);
 				/* I am not freeing remotechan explicitly */
 
 				wlock (&cc->rjob->l);
-				tmprr->remotechans[filetype] = nil;
+				tmprr->remotefiles[filetype].cfile = nil;
 				tmprr = tmprr->next; /* can be in read lock */
 				wunlock (&cc->rjob->l);
 			}
@@ -823,8 +830,8 @@ readfromall (Chan *ch, void *a, long n, vlong offset)
 	runlock (&c->rjob->l);
 
 	for (i = 0 ; i < tmpjc; ++i) {
-		c_ret = devtab[tmprr->remotechans[filetype]->type]->
-				read(tmprr->remotechans[filetype], c_a, c_n,c_offset);
+		c_ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
+				read(tmprr->remotefiles[filetype].cfile, c_a, c_n,c_offset);
 		if (vflag) print ("%ldth read gave [%ld] data\n", i, c_ret);
 		ret = ret + c_ret;
 		c_a = (uchar *)c_a + c_ret;
@@ -1174,7 +1181,7 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	
 	if (tmpjc == -1 ) {
 		wlock (&rjob->l);
-		for (i = 0; i < RCHANCOUNT ; ++i ) {
+		for (i = 0; i < RCHANCOUNT; ++i ) {
 			rjob->rcinuse[i] = 0;
 		}
 		wunlock (&rjob->l);
@@ -1182,8 +1189,8 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 
 	pp = malloc (sizeof (RemoteResource));
 	pp->next = nil;
-	for (i = 0; i < RCHANCOUNT ; ++i ) {
-		pp->remotechans[i] = nil;
+	for (i = 0; i < RCHANCOUNT; ++i ) {
+		pp->remotefiles[i].cfile = nil;
 	}
 
 	wlock (&rjob->l);
@@ -1202,7 +1209,7 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	tmpchan = allocatesinglerr (buff, selected, jcount);
 	
 	wlock (&rjob->l);
-	pp->remotechans[Qctl-Qdata] = tmpchan; 
+	pp->remotefiles[Qctl-Qdata].cfile = tmpchan; 
 	rjob->rcinuse[Qctl-Qdata] = 1; 
 	if (rjob->first == nil) { /* if list is empty */
 		rjob->first = pp;  /* add it at begining */
@@ -1541,8 +1548,8 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 	runlock (&c->rjob->l);
 
 	for (i = 0 ; i < tmpjc; ++i) {
-		ret = devtab[tmprr->remotechans[filetype]->type]->
-				write (tmprr->remotechans[filetype], a, n, offset);	
+		ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
+				write (tmprr->remotefiles[filetype].cfile, a, n, offset);	
 
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
