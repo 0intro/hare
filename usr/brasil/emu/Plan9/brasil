@@ -11,6 +11,7 @@ dev
 #	ssl
 #	cap
 	fs
+	task
 #	cmd		cmd
 	cmd2	cmd
 	indir
@@ -89,53 +90,56 @@ init
 	emuinit
 
 root
-	/chan	/
 	/dev	/
 	/fd	/
 	/prog	/
 	/prof	/
 	/net	/
 	/net.alt	/
+	/chan	/
+	/csrv	/
+	/remote /
 	/nvfs	/
+	/n		/
 	/env	/
-	/root	/
-	/srv	/
-	/csrv /
+	/dis/27b-6.dis
+	/dis/bind.dis
+	/dis/brasil.sh	
+	/dis/cat.dis
+	/dis/csrv.dis
+	/dis/csrv.sh	
+	/dis/duct.dis	
+	/dis/echo.dis
+	/dis/emuinit.dis /dis/brasil.dis
+	/dis/export.dis	
+	/dis/memfs.dis
+	/dis/mntgen.dis
+	/dis/mount.dis	
+	/dis/os.dis	
 	/dis/sh.dis
 	/dis/styxlisten.dis
-	/dis/export.dis
-	/dis/brasil.sh
-	/dis/mount.dis
-	/dis/csrv.dis
-	/dis/duct.dis
-	/dis/csrv.sh
-	/dis/emuinit.dis /dis/brasil.dis
+	/dis/lib/arg.dis	
+	/dis/lib/attrdb.dis
 	/dis/lib/auth.dis
-	/dis/lib/ssl.dis
-	/dis/lib/styx.dis
-	/dis/lib/styxservers.dis
-	/dis/lib/nametree.dis
-	/dis/lib/filepat.dis
-	/dis/lib/readdir.dis
-	/dis/lib/string.dis
 	/dis/lib/bufio.dis
-	/dis/lib/arg.dis
-	/dis/ndb/cs.dis
+	/dis/lib/env.dis
+	/dis/lib/filepat.dis
+	/dis/lib/ip.dis
+	/dis/lib/ipattr.dis
+	/dis/lib/nametree.dis
+	/dis/lib/readdir.dis
+	/dis/lib/ssl.dis
+	/dis/lib/string.dis
+	/dis/lib/styx.dis
+	/dis/lib/styxlib.dis
+	/dis/lib/styxservers.dis
 	/lib/ndb/common
-	/lib/ndb/services
+	/dis/ndb/cs.dis
 	/lib/ndb/inferno
-	/n
-	/n/local	/
-#	/tmp	/
-#	/dis
-#	/env
-#	/n
-#	/net
-#	/nvfs /
-#	/prog
-#	/icons
-#	/osinit.dis
-#	/dis/emuinit.dis
-#	/dis/lib/auth.dis
-#	/dis/lib/ssl.dis
-#	/n/local /
+	/lib/ndb/services
+	/dis/sh/arg.dis
+	/dis/sh/sh.dis
+	/dis/sh/std.dis	
+	/tmp		/
+	/tmp/pipes	/
+
