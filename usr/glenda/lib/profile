@@ -1,0 +1,9 @@
+#!/bin/rc
+
+echo Hello, squidboy
+echo I can do anything I want now
+
+# bind our shit for now
+bind -a /n/root /
+bind -b /n/root/power/bin /bin
+bind -b /n/root/rc/bin /bin
