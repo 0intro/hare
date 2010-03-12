@@ -25,6 +25,7 @@ logfd: ref Sys->FD;
 fsaddr: string;		# host file system export
 debugaddr: string;	# brasil debug export
 csrvaddr: string;	# central services export
+backaddr: string;	# back mount address (for Linux)
 
 unquoted(s: string): list of string
 {
@@ -83,7 +84,8 @@ init()
 	arg = load Arg Arg->PATH;
 	mode: string;
 	
-	fsaddr = "tcp!*!5670";
+	fsaddr = "tcp!*!5670";		# host file system export
+	backaddr = "tcp!127.0.0.1!5640";# csrv backmount export
 	
 	if (arg == nil)
 		sys->fprint(sys->fildes(2), "emuinit: cannot load %s: %r\n", Arg->PATH);
@@ -113,6 +115,8 @@ init()
 					debugaddr = arg->arg();
 				'c' =>			# central services addr
 					csrvaddr = arg->arg();
+				'b' =>			# backmount address
+					backaddr = arg->arg();
 				* =>
 					sys->print("detected option: %c\n", c);
 	                  	}		
@@ -171,7 +175,7 @@ init()
 				sh->system(nil, "mount -ca {csrv} /csrv");
 			}
 			if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
-				sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /csrv");
+				sh->system(nil, "/dis/styxlisten.dis -A "+backaddr+" export /csrv");
 			} else {
 				sys->fprint(logfd, "creating srv export\n");
 				fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
@@ -183,6 +187,7 @@ init()
 	
 	# TODO: Get better synchronization
 	sys->sleep(5);
+	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /n/local");
 	if(debugaddr != nil)
 		sh->system(nil, "/dis/styxlisten.dis -A "+debugaddr+" export /");
     } exception e { # abuse exceptions
