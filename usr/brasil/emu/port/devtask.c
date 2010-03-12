@@ -48,7 +48,7 @@ enum
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
