@@ -284,8 +284,8 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		if (s == 2){
-			mkqid (&q, QID (0, Qarch), 0, QTDIR);
-			devdir (c, q, "arch", 0, eve, 0444, dp);
+			mkqid (&q, QID (0, Qarch), 0, QTFILE);
+			devdir (c, q, "arch", 0, eve, 0666, dp);
 			return 1;
 		}
 		if (s == 3){
@@ -304,6 +304,7 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}				
 		return -1;
+
 	case Qclonus:
 		if (s == 0){
 			mkqid (&q, QID (0, Qclonus), 0, QTFILE);
@@ -326,7 +327,15 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			devdir (c, q, "fs", 0, eve, DMDIR|0555, dp);
 			return 1;
 		}
-		return -1;		
+		return -1;	
+	
+	case Qarch:
+		if (s == 0){
+			mkqid (&q, QID (0, Qarch), 0, QTFILE);
+			devdir (c, q, "arch", 0, eve, 0666, dp);
+			return 1;
+		}
+		return -1;	
 
 	case Qconvdir:
 		myc = cmd.conv[CONV (c->qid)];
@@ -433,12 +442,12 @@ cmdopen (Chan *c, int omode)
 	default:
 		break;
 
+	case Qarch:
 	case Qtopstat:
 		if (omode != OREAD)
 			error (Eperm);
 		break;
 
-	case Qarch:
 	case Qtopns:
 	case Qtopenv:
 	case Qstdin:
@@ -722,8 +731,9 @@ cmdclose (Chan *c)
 
 	if (vflag) print ("trying to close file [%s]\n", c->name->s);
 	switch (TYPE (c->qid)) {
+
+	case Qarch:
 	case Qtopstat :
-		
 		break;
 		
 	case Qctl:
@@ -1425,10 +1435,14 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 	default:
 		error (Eperm);
 
+	case Qarch:
+		sprint (up->genbuf, "%s %s\n", oslist[IHN], 
+						platformlist[IAN]);
+		return readstr (offset, p, n, up->genbuf);
+
 	case Qtopstat:
 		return readstatus (a, n, offset);
 		
-
 	case Qcmd:
 	case Qtopdir:
 	case Qconvdir:
