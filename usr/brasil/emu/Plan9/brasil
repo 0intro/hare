@@ -11,9 +11,10 @@ dev
 #	ssl
 #	cap
 	fs
+	cmd		cmd
+#	cmd2	cmd
+
 	task
-#	cmd		cmd
-	cmd2	cmd
 	indir
 #	sign
 
@@ -100,6 +101,7 @@ root
 	/csrv	/
 	/remote /
 	/nvfs	/
+	/srv /
 	/n		/
 	/env	/
 	/dis/27b-6.dis

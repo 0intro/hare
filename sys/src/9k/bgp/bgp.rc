@@ -238,12 +238,23 @@ if(test -e '/env/MODE') {
 	if(test -e '/env/PLAN9_ROOT') {
 		plan9root=(`{cat /env/PLAN9_ROOT})
 		bind /n/frontend^$plan9root /n/root
-	}		
+	}
+	
+	
 }
 if not {
 	echo No mode detected
 }
 
+#ramfs so we can copy binaries in
+ramfs /tmp
+
+# execute user profile
+if(test -e '/n/home/lib/profile') {
+		. /n/home/lib/profile
+}
+
+# TODO: evaluate whether to do this in profile or based on option
 echo starting services
 bind /boot/rc/bin/service /bin/service
 
@@ -255,13 +266,6 @@ if not
 # use vc0net again in future but not yet. 
 #if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
 #if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
-
-#ramfs so we can copy binaries in
-ramfs /tmp
-
-# This is here so at some point we can each have
-# a custom rc.local for our images. 
-if(test -e /rc.local)
-	. /rc.local
+	
 while(echo Hello Squidboy)
 	. -i '#d/0'
