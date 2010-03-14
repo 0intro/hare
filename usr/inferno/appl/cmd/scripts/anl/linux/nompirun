@@ -130,6 +130,7 @@ done
 JOBID=`qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND`
 
 echo Cobalt JobID: $JOBID
+echo     Waiting for job start....
 
 BLOCK_ID=None
 while [ $BLOCK_ID = "None" ];
@@ -137,13 +138,18 @@ do
 	sleep 5
 	BLOCK_ID=`qstat --header Location $JOBID | tail -n 1`
 done
-echo Block ID: $BLOCK_ID
 
+echo Block ID: $BLOCK_ID
+echo     Waiting for boot....
+echo
+echo NOTE: console output will be IO Node only
+echo ----------------------------------------------------------------
 # TODO: use block id to tail /bgsys/logs/BGP/R00-*-J00.log
 LOG_SUFFIX=${BLOCK_ID#*-}
 LOG_PREFIX=${LOG_SUFFIX%-*}
 LOGFILE=/bgsys/logs/BGP/$LOG_PREFIX-J00.log
-tail -f $LOGFILE
+tail -n 0 -f $LOGFILE
 
-# TODO: We should be able to give IO Node IPs
 # TODO: filter log to just my job (or my userid)
+# TODO: Catch interrupt and cleanup job(?)
+# TODO: We should be able to give IO Node IPs automagically
