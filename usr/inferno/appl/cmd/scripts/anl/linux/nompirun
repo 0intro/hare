@@ -105,7 +105,7 @@ eflag+=":HOME=$HOME:BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag"
 #
 COMMAND=$@
 
-if [ -z $COMMAND ]
+if [ -z "$COMMAND" ]
 then
 	COMMAND="$rflag/power/bin/rc"
 fi
