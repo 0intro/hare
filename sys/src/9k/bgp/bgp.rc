@@ -1,7 +1,8 @@
 #!/boot/rc -m /boot/rcmain
 #flag x +
 
-/boot/echo New Model Boot Script
+# try to keep this up to date to keep things straight
+/boot/echo Boot Script Version 0.2 03142010
 
 cputype=power
 objtype=$cputype
@@ -123,6 +124,7 @@ bind -a $rootdir /
 bind -b -c $rootdir/mnt /mnt
 bind $rootdir/$cputype/bin /bin
 bind -a $rootdir/rc/bin /bin
+mntgen
 cd /
 
 #

@@ -73,6 +73,7 @@ power d775 sys sys /tmp/empty
 		echo 775 sys sys
 		iostats 775 sys sys
 		miniciod 775 sys sys ../root/q.miniciod
+		mntgen 775 sys sys
 		ramfs 775 sys sys
 		rc 775 sys sys
 		rm 775 sys sys 
