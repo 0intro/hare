@@ -15,6 +15,7 @@ beetroot=bgp.rr
 #authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'	# -a ...
 authentication=''
 fsaddr=''
+mode=''
 
 #
 # Post the read-only filesystem in #s/$beetroot
@@ -104,35 +105,6 @@ if(! ~ $authentication '')
 	eval `{echo $authentication}
 if(~ `{cat '#c/hostowner'} sys)
 	echo -n $authid > '#c/hostowner'
-	
-#
-# Old Way
-#
-# Attach to the remote filesystem and mount it.
-# If this fails, set $root(dir|srv) and continue,
-# there's enough in the read-only filesystem to run
-# listen and telnet; at least cat /dev/kmesg might
-# then give a clue as to the problem.
-# Must check for the presence of expected files after
-# the mount because srv/mount do not always return
-# proper status.
-# $rootsrv is used in /lib/namespace because the
-# root might not be served from the usual #s/boot.
-#
-#
-#if(~ $cpunode '0' && ! ~ $fsaddr ''){
-#	# wait for ethernet to come up
-#	echo Atomic batteries to power
-#
-#	times=0
-#	while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr $rootsrv $rootdir) {
-#		echo -n '.'
-#		times=($times 1)
-#		sleep 5
-#	}
-#	echo done.	
-#}
-#
 
 if(! test -d $rootdir/$rootspec/$cputype){
 	rootdir=/boot
@@ -246,7 +218,9 @@ if(~ $cpunode '1'){
 	bind -c /n/io/n/home /n/home
 	bind -c /n/io/n/frontend /n/frontend
 	bind -c /n/io/n/root /n/root
-
+	bind -a /n/io/env /env
+	mode=(`{cat /env/MODE})
+	
 	echo done.
 }	
 
@@ -267,9 +241,40 @@ if(test -d /mnt/factotum)
 if not
 	aux/listen -i -t /bin/service tcp
 	
-# use vc0net again in future but not yet. 
-#if (~$cpunode '1') rc  < /dev/vc0net > /dev/vc0net&
-#if (~$cpunode '0') aux/listen1 -tv tcp!*!4444 /bin/exportfs&
+fn runit {
+	# this can probably be done a better way, but
+	#   first check if its in our namespace, then check if its in the frontend ns
+	if(test -e $job_home)
+		cd $job_home
+	if not
+		cd /n/frontend^$job_home
 	
+	if(test -e $1)
+		eval $task
+	if not
+		cmd = /n/frontend^$1
+		shift 1
+		args = $*
+		eval ($cmd $args)
+}
+
+# TODO: send output someplace nice
+if(~ $cpunode '1'){
+	if(~ $mode nompirun) {
+		if(test -e '/env/job_homedir') 
+			job_home=(`{cat /env/job_homedir})
+		if(test -e '/env/job_args') 
+			job_args=(`{cat /env/job_args})	
+	
+		task=`{echo $job_args}
+		runit $task
+		
+		echo done
+		# TODO: perhaps send a RAS message signaling job completetion?
+		# and then spin - exiting here seems to be bad		
+	}
+}
+	
+# what does this actually do?	
 while(echo Hello Squidboy)
 	. -i '#d/0'
