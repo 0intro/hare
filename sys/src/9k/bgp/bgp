@@ -52,8 +52,8 @@ dev +dev
 
 	ether		netif
 	
-	sd
-	aoe
+#	sd
+#	aoe
 
 	uart
 
@@ -64,8 +64,8 @@ dev +dev
 	tree		tree
 	segment
 	
-sd +dev
-	sdaoe	sdscsi
+#sd +dev
+#	sdaoe	sdscsi
 
 uart +dev
 	uartcns		archbgp uartmb

@@ -14,7 +14,7 @@ rootsrv=boot
 beetroot=bgp.rr
 #authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'	# -a ...
 authentication=''
-fsaddr='tcp!172.17.3.12!6666'
+fsaddr=''
 
 #
 # Post the read-only filesystem in #s/$beetroot
@@ -105,7 +105,6 @@ if(! ~ $authentication '')
 if(~ `{cat '#c/hostowner'} sys)
 	echo -n $authid > '#c/hostowner'
 	
-
 #
 # Old Way
 #
@@ -134,18 +133,6 @@ if(~ `{cat '#c/hostowner'} sys)
 #	echo done.	
 #}
 #
-
-#
-#if(~ $cpunode '1'){
-#	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
-#	times=0
-#	while(! ~ $#times 12 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr $rootsrv $rootdir) {
-#		echo -n '.'
-#		times=($times 1)
-#		sleep 5
-#	}
-#	echo done.
-#}
 
 if(! test -d $rootdir/$rootspec/$cputype){
 	rootdir=/boot
@@ -176,8 +163,6 @@ if not {
 	sysname=io-$ip(1)
 }
 prompt=($sysname'# ' '	') 
-
-
 
 #
 # start CIOD services
@@ -239,12 +224,31 @@ if(test -e '/env/MODE') {
 		plan9root=(`{cat /env/PLAN9_ROOT})
 		bind /n/frontend^$plan9root /n/root
 	}
-	
-	
 }
 if not {
 	echo No mode detected
 }
+
+if(~ $cpunode '1'){
+	# wait at least 40 before proceeding to let I/O Node Setup
+	echo Waiting for turbines to come up to speed
+	sleep 40	
+	echo would have mounted here!
+	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
+	times=0
+	while(! ~ $#times 12 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr ionode /n/io) {
+		echo -n '.'
+		times=($times 1)
+		sleep 5
+	}
+		
+#	Assuming things worked out
+	bind -c /n/io/n/home /n/home
+	bind -c /n/io/n/frontend /n/frontend
+	bind -c /n/io/n/root /n/root
+
+	echo done.
+}	
 
 #ramfs so we can copy binaries in
 ramfs /tmp
