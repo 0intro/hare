@@ -48,14 +48,15 @@ enum
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
 struct RemoteFile
 {
-	RWlock l;
+	int state;
 	Chan *cfile;
+	Queue *buffer;
 };
 typedef struct RemoteFile RemoteFile;
 
@@ -80,6 +81,7 @@ struct RemoteJob
 	RemoteResource *first;
 	RemoteResource *last;
 };
+
 typedef struct RemoteJob RemoteJob;
 
 #define PLATFORMCOUNT 7 
@@ -411,6 +413,46 @@ cmdstat (Chan *c, uchar *db, int n)
 	return devstat (c, db, n, 0, 0, cmdgen);
 }
 
+static void
+procreadremote (void *a)
+{
+	RemoteFile *rf;
+	Block *content = nil;
+
+	rf = a;
+	rf->state = 1; /* thread running */
+
+	if (waserror ()){
+		if (vflag) print ("#### PRR[%s]:No more data to read\n", 
+			rf->cfile->name->s);
+		freeb (content);
+		rf->state = 2; /* thread dead */
+		pexit ("", 0);
+	}
+	while (1) {
+		
+		if (vflag) print ("#### PRR: reading from [%s]\n", 
+				rf->cfile->name->s);
+		content = devbread (rf->cfile, 1024, 0);
+		if (BLEN (content) == 0) {
+			/* check the status of this child, 
+			if it is done, then exit 
+			else read again */
+			break;
+		} /* end if */
+		
+		/* Write data to queue */
+		qbwrite (rf->buffer, content); 
+	} /* end while : infinite */
+
+	if (vflag) print ("#### PRR[%s]:No more data to read\n", 
+			rf->cfile->name->s);
+	freeb (content);
+	rf->state = 2; /* thread dead */
+	pexit ("", 0);
+} /* end function : procreadremote () */
+
+
 /* Opens file/dir 
 	It checks if specified channel is allowed to open,
 	if yes, it marks channel as open and returns it.
@@ -428,6 +470,7 @@ cmdopen (Chan *c, int omode)
 	int i;
 	int tmpfileuse;
 	char *fname;
+	RemoteFile *rf;
 
 
 	if (vflag) print ("trying to open [%s]\n", c->name->s);
@@ -580,7 +623,15 @@ cmdopen (Chan *c, int omode)
 					tmpchan = namec (buff,Aopen,omode,0);
 
 					wlock (&cv->rjob->l);
-					tmprr->remotefiles[filetype].cfile = tmpchan;
+					rf = &tmprr->remotefiles[filetype];
+					rf->cfile = tmpchan;
+
+
+					if (TYPE (c->qid) == Qdata ){
+						/* FIXME: start the reader thread */
+						if (vflag) print ("\n######thread starting" );
+						kproc ("procreadremote", procreadremote, rf, 0 );
+					}
 					tmprr = tmprr->next; /* this can be RO lock*/
 					wunlock (&cv->rjob->l);
 				} /* end for : */
@@ -615,6 +666,7 @@ freeremoteresource (RemoteResource *rr)
 		if (rr->remotefiles[i].cfile != nil) {
 			cclose (rr->remotefiles[i].cfile);
 			rr->remotefiles[i].cfile = nil;
+			qfree (rr->remotefiles[i].buffer);
 			/* unbind ?? 
 			You can't unbind here as rjobcount is already 
 			reset to zero.
@@ -794,6 +846,71 @@ cmdclose (Chan *c)
 	} /* end switch : per file type */
 	if (vflag) print ("close complete\n");
 }
+
+static long 
+readfromallasync (Chan *ch, void *a, long n, vlong offset)
+{
+	void *c_a;
+	vlong c_offset;
+	long ret, c_ret, c_n, i;
+	Conv *c;
+	long tmpjc;
+	int filetype; 
+	RemoteResource *tmprr;
+	RemoteFile *rf;
+
+	USED (offset);
+	c = cmd.conv[CONV (ch->qid)];
+
+	tmpjc = getrjobcount (c->rjob);
+	/* making sure that remote resources are allocated */
+	if (tmpjc < 0) {
+		if (vflag) print ("resources not reserved\n");
+		error (ENOReservation);
+	}
+
+	if (vflag) print ("readfromallasync cname [%s]\n", ch->name->s);
+
+	filetype = TYPE(ch->qid) - Qdata;
+	/* read from multiple remote files */
+	c_a = a;
+	c_n = n;
+	c_offset = offset;
+	ret = 0;
+
+	rlock (&c->rjob->l);
+	tmprr = c->rjob->first ;
+	runlock (&c->rjob->l);
+
+	for (i = 0 ; i < tmpjc; ++i) {
+		rf = &tmprr->remotefiles[filetype];
+/*		if ( qcanread (rf->buffer)) {
+			len = qlen (rf->buffer);
+			if (len <= c_n ) {
+				cc_n = len;
+			} else {
+				cc_n = c_n;
+			}
+*/
+		/* read from queue */
+		c_ret = qconsume (rf->buffer, c_a, c_n);
+		if (vflag) print ("%ldth read gave [%ld] data\n", i, c_ret);
+		if (c_ret > 0 ) {
+			ret = ret + c_ret;
+			c_a = (uchar *)c_a + c_ret;
+			c_n = c_n - c_ret;
+		}
+		if ( c_n <= 0 ) {
+			break;
+		}
+
+		/* FIXME: should I lock following also in read mode ??  */
+		tmprr = tmprr->next;
+	} /* end for : */
+
+	if (vflag) print ("readfromallasync [%ld]\n", ret);
+	return ret;
+} /* end function : readfromallasync */
 
 static long 
 readfromall (Chan *ch, void *a, long n, vlong offset)
@@ -1191,6 +1308,8 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	pp->next = nil;
 	for (i = 0; i < RCHANCOUNT; ++i ) {
 		pp->remotefiles[i].cfile = nil;
+		pp->remotefiles[i].buffer = qopen (1024, 0, nil, 0);
+		pp->remotefiles[i].state = 0;
 	}
 
 	wlock (&rjob->l);
@@ -1480,7 +1599,11 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 		if (tmpjc < 0) error(ENOReservation);
 
 		if (tmpjc > 0 ) {
-			return readfromall (ch, a, n, offset);
+			if (TYPE (ch->qid) == Qdata ) {
+				return readfromallasync (ch, a, n, offset);
+			} else {
+				return readfromall (ch, a, n, offset);
+			}
 		}
 
 		/* getting data locally */
@@ -1672,13 +1795,13 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 			nexterror ();
 		}
 
-		if (vflag) print ("### cmd arg[%d] done [%s]\n", cb->nf, a); 
+		if (vflag) print ("cmd arg[%d] done [%s]\n", cb->nf, a); 
 		ct = lookupcmd (cb, cmdtab, nelem (cmdtab));
 		switch (ct->index){
 		case CMres :
-			if (vflag) print("###reserving resources %s \n",cb->f[1]); 
+			if (vflag) print("reserving resources %s \n",cb->f[1]); 
 			resNo = atol (cb->f[1]);
-			if (vflag) print ("###reserving resources %s [%ld]\n", 
+			if (vflag) print ("reserving resources %s [%ld]\n", 
 				cb->f[1], resNo); 
 
 			if (resNo < 0) {
@@ -1705,8 +1828,8 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				preparelocalexecution (c, os, arch);
 				break;
 			}
-			groupres (ch, resNo, os, arch);
-			if (vflag) print ("####Reservation done\n" );
+			groupres (ch, resNo, os, arch); 
+			if (vflag) print ("Reservation done\n" );
 			break;
 		
 		case CMexec:
