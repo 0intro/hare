@@ -57,7 +57,9 @@ struct RemoteFile
 	int state;
 	Chan *cfile;
 	Queue *buffer;
+	Rendez *handle;
 };
+
 typedef struct RemoteFile RemoteFile;
 
 struct RemoteResource 
@@ -78,6 +80,7 @@ struct RemoteJob
 	RWlock	l;	/* protects state changes */
 	long rjobcount;
 	int rcinuse[RCHANCOUNT];
+	Rendez *handlelist[RCHANCOUNT];
 	RemoteResource *first;
 	RemoteResource *last;
 };
@@ -666,7 +669,9 @@ freeremoteresource (RemoteResource *rr)
 		if (rr->remotefiles[i].cfile != nil) {
 			cclose (rr->remotefiles[i].cfile);
 			rr->remotefiles[i].cfile = nil;
-			qfree (rr->remotefiles[i].buffer);
+			rr->remotefiles[i].handle = nil;
+			qfree(rr->remotefiles[i].buffer);
+
 			/* unbind ?? 
 			You can't unbind here as rjobcount is already 
 			reset to zero.
@@ -678,6 +683,7 @@ freeremoteresource (RemoteResource *rr)
 static void 
 freeremotejobs (RemoteJob *rjob) 
 {
+	long i;
 	RemoteResource *ppr, *tmp;
 	if (rjob == nil) return;
 
@@ -687,6 +693,9 @@ freeremotejobs (RemoteJob *rjob)
 	rjob->first = nil;
 	rjob->last = nil;
 	rjob->rjobcount = 0;
+	for (i = 0; i < RCHANCOUNT; ++i) {
+		free (rjob->handlelist[i]);
+	}
 	wunlock (&rjob->l);
 
 	while (ppr != nil) {
@@ -855,6 +864,7 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 	long ret, c_ret, c_n, i;
 	Conv *c;
 	long tmpjc;
+	long ccount, bcount;
 	int filetype; 
 	RemoteResource *tmprr;
 	RemoteFile *rf;
@@ -878,35 +888,54 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 	c_offset = offset;
 	ret = 0;
 
-	rlock (&c->rjob->l);
-	tmprr = c->rjob->first ;
-	runlock (&c->rjob->l);
+	while (1) {
 
-	for (i = 0 ; i < tmpjc; ++i) {
-		rf = &tmprr->remotefiles[filetype];
-/*		if ( qcanread (rf->buffer)) {
-			len = qlen (rf->buffer);
-			if (len <= c_n ) {
-				cc_n = len;
-			} else {
-				cc_n = c_n;
+		rlock (&c->rjob->l);
+		tmprr = c->rjob->first;
+		runlock (&c->rjob->l);
+
+		ccount = 0;
+		for (i = 0 ; i < tmpjc; ++i) {
+			rf = &tmprr->remotefiles[filetype];
+
+			/* read from queue */
+			c_ret = qconsume (rf->buffer, c_a, c_n);
+			if (vflag) print ("%ldth read gave [%ld] data\n", i, c_ret);
+			if (c_ret >= 0 ) {
+				ret = ret + c_ret;
+				c_a = (uchar *)c_a + c_ret;
+				c_n = c_n - c_ret;
 			}
-*/
-		/* read from queue */
-		c_ret = qconsume (rf->buffer, c_a, c_n);
-		if (vflag) print ("%ldth read gave [%ld] data\n", i, c_ret);
-		if (c_ret > 0 ) {
-			ret = ret + c_ret;
-			c_a = (uchar *)c_a + c_ret;
-			c_n = c_n - c_ret;
-		}
-		if ( c_n <= 0 ) {
+			else {
+				if (rf->state == 2 ) {
+					/* This thread is done */
+					++ccount;
+				} else {
+					++bcount;
+				}
+
+			}
+			if ( c_n <= 0 ) {
+				break;
+			}
+		
+			/* FIXME: should I lock following also in read mode ??  */
+			tmprr = tmprr->next;
+		} /* end for : */
+
+		if (ret > 0 ) {
 			break;
 		}
 
-		/* FIXME: should I lock following also in read mode ??  */
-		tmprr = tmprr->next;
-	} /* end for : */
+		if (ccount >= tmpjc) {
+			if (vflag) print ("----readfromallasync fileclose [%ld]\n", 
+				ccount );
+			/* as all nodes are close, return NOW */
+			break;
+		}
+		if (vflag) print ("---###readfromallasync repeating with [%ld][%ld]\n", ccount, bcount);
+
+	} /* end while : infinite */
 
 	if (vflag) print ("readfromallasync [%ld]\n", ret);
 	return ret;
@@ -1300,6 +1329,7 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 		wlock (&rjob->l);
 		for (i = 0; i < RCHANCOUNT; ++i ) {
 			rjob->rcinuse[i] = 0;
+			rjob->handlelist[i] = (Rendez *) malloc (sizeof (Rendez)); 
 		}
 		wunlock (&rjob->l);
 	}
@@ -1308,8 +1338,9 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	pp->next = nil;
 	for (i = 0; i < RCHANCOUNT; ++i ) {
 		pp->remotefiles[i].cfile = nil;
-		pp->remotefiles[i].buffer = qopen (1024, 0, nil, 0);
+		pp->remotefiles[i].buffer =  qopen (1024, 0, nil, 0); 
 		pp->remotefiles[i].state = 0;
+		pp->remotefiles[i].handle = rjob->handlelist[i];
 	}
 
 	wlock (&rjob->l);
