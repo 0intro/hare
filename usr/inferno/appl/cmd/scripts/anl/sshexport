@@ -2,10 +2,8 @@
 load std
 or {ftest -e /net/cs} {ndb/cs}
 bind -c '#U*' /n/local
-bind -c '#U*'/tmp /n/local/home/ericvh/9/tmp
-bind -c /n/local /n/local/home/ericvh/9/n/local
 bind -a '#C' /
-/dis/styxlisten -A tcp!*!6666 {export '#U*'/home/ericvh/9} > /dev/null 2> /dev/null
+/dis/styxlisten -A tcp!*!5670 {export '#U*'} > /dev/null 2> /dev/null
 bind  '#|' /tmp/pipes
 cat /tmp/pipes/data > /dev/hoststdout&
 cat /dev/hoststdin > /tmp/pipes/data&
