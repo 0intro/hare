@@ -13,7 +13,9 @@ sys.path.append ('./py9p/py9p')
 import py9p
 
 remoteURL = ""
-
+#baseURL = "/cmd2/local/"
+#baseURL = "/task/remote/"
+baseURL = "/csrv/local/"
 class XCPU3Client():
     
     sessionID = None
@@ -58,14 +60,14 @@ class XCPU3Client():
         obj.close()
 
     def topStat (self, out=None):
-        name = "/csrv/local/status"
+        name =  baseURL + "status"
         self.cat(name, None, out)
         
     def getSessionStatus (self, out =  None) :
         if self.sessionID is None :
             print "Error: Session is not started yet"
         
-        name = "/csrv/local/" + str(self.sessionID) + "/status"
+        name = baseURL + str(self.sessionID) + "/status"
         self.cat (name, self.extraLink, out)
 
     def startSession (self):
@@ -73,7 +75,7 @@ class XCPU3Client():
             print "Session already running"
             return self.sessionID
         
-        name = "/csrv/local/clone"
+        name = baseURL + "clone"
         if self.ctlLink.open (name, py9p.ORDWR) is None :
             raise Exception("XCPU3: Could not open " + name)
         
@@ -103,7 +105,7 @@ class XCPU3Client():
             return
         inf = open(input, "r", 0)
         
-        name = "/csrv/local/" + str(self.sessionID) + "/stdio"
+        name = baseURL + str(self.sessionID) + "/stdio"
         if self.IOLink.open(name, py9p.OWRITE) is None:
             raise Exception("XCPU3: Could not open stdio file " + name)
         
@@ -120,7 +122,7 @@ class XCPU3Client():
         if self.sessionID is None :
             raise Exception("XCPU3: Session not created")
         
-        name = "/csrv/local/" + str(self.sessionID) + "/stdio"
+        name = baseURL + str(self.sessionID) + "/stdio"
         self.cat (name, self.IOLink )
     
     def endSession (self) :
