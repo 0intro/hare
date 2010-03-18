@@ -48,6 +48,7 @@ rc d775 sys sys /tmp/empty
 			tcp17007 775 sys sys /bin/service/tcp17007
 			tcp17010 775 sys sys /bin/service/tcp17010
 			tcp564 775 sys sys ../root/tcp564
+			tcp23 775 sys sys ../root/tcp23			
 		service.bgp d775 sys sys /tmp/empty
 			tcp23 775 sys sys ../root/tcp23
 			tcp7000 775 sys sys ../root/tcp7000
@@ -72,6 +73,7 @@ power d775 sys sys /tmp/empty
 		echo 775 sys sys
 		iostats 775 sys sys
 		miniciod 775 sys sys ../root/q.miniciod
+		mntgen 775 sys sys
 		ramfs 775 sys sys
 		rc 775 sys sys
 		rm 775 sys sys 
