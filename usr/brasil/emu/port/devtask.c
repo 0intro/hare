@@ -31,7 +31,7 @@ enum
 	Qwait,
 	QLconrdir,
 
-	Debug=0	/* to help debug os.c */
+	Debug=1	/* to help debug os.c */
 };
      
 #define TYPE(x) 	 ( (ulong) (x).path & 0xff)
@@ -80,7 +80,7 @@ struct RemoteJob
 	RWlock	l;	/* protects state changes */
 	long rjobcount;
 	int rcinuse[RCHANCOUNT];
-	Rendez *handlelist[RCHANCOUNT];
+	Queue *bufferlist[RCHANCOUNT];
 	RemoteResource *first;
 	RemoteResource *last;
 };
@@ -147,7 +147,7 @@ char *fetchparentpathch	 (Chan *ch);
 static void cmdproc(void *a);
 static long lookup(char *word, char **wordlist, int len);
 static void initinfo (long info[OSCOUNT][PLATFORMCOUNT]);
-
+static long readstatus (char *a, long n, vlong offset);
 /* function prototypes from other files */
 long dirpackage (uchar *buff, long ts, Dir **d);
 
@@ -426,11 +426,11 @@ procreadremote (void *a)
 	rf->state = 1; /* thread running */
 
 	if (waserror ()){
-		if (vflag) print ("#### PRR[%s]:No more data to read\n", 
-			rf->cfile->name->s);
+		if (vflag) print ("#### PRR:No more data to read\n" );
 		freeb (content);
 		rf->state = 2; /* thread dead */
 		pexit ("", 0);
+		return;
 	}
 	while (1) {
 		
@@ -452,7 +452,9 @@ procreadremote (void *a)
 			rf->cfile->name->s);
 	freeb (content);
 	rf->state = 2; /* thread dead */
+	poperror();
 	pexit ("", 0);
+	return;
 } /* end function : procreadremote () */
 
 
@@ -537,6 +539,7 @@ cmdopen (Chan *c, int omode)
 		if (cv == 0)
 			error (Enodev);
 		mkqid (&c->qid, QID (cv->x, Qctl), 0, QTFILE);
+		if (vflag) print ("clone open successful [%s]\n", c->name->s);
 		break;
 			
 	case Qstatus:
@@ -630,10 +633,11 @@ cmdopen (Chan *c, int omode)
 					rf->cfile = tmpchan;
 
 
-					if (TYPE (c->qid) == Qdata ){
+					if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
 						/* FIXME: start the reader thread */
 						if (vflag) print ("\n######thread starting" );
-						kproc ("procreadremote", procreadremote, rf, 0 );
+//						sprint (buff, "PRR[%s]", c->name->s);
+						kproc (buff, procreadremote, rf, 0 );
 					}
 					tmprr = tmprr->next; /* this can be RO lock*/
 					wunlock (&cv->rjob->l);
@@ -670,7 +674,7 @@ freeremoteresource (RemoteResource *rr)
 			cclose (rr->remotefiles[i].cfile);
 			rr->remotefiles[i].cfile = nil;
 			rr->remotefiles[i].handle = nil;
-			qfree(rr->remotefiles[i].buffer);
+			rr->remotefiles[i].buffer =  nil;
 
 			/* unbind ?? 
 			You can't unbind here as rjobcount is already 
@@ -694,7 +698,7 @@ freeremotejobs (RemoteJob *rjob)
 	rjob->last = nil;
 	rjob->rjobcount = 0;
 	for (i = 0; i < RCHANCOUNT; ++i) {
-		free (rjob->handlelist[i]);
+		qfree (rjob->bufferlist[i]);
 	}
 	wunlock (&rjob->l);
 
@@ -718,15 +722,23 @@ closeconv (Conv *c)
 	c->killed = 0;
 	c->nice = 0;
 	freeremotejobs (c->rjob);
+	free (c->rjob);
 	if (vflag) print ("remote resources released\n");
-	if (c->cmd != nil) free (c->cmd);
-	else if (vflag) print ("was freeing the null\n");
+	if (c->cmd != nil) {
+		if (vflag) print ("freeing cmd\n");
+		free (c->cmd);
+	}
 	c->cmd = nil;
 	if (c->waitq != nil){
 		qfree (c->waitq);
 		c->waitq = nil;
 	}
-	free (c->error);
+	if (vflag) print ("free waitq crossed\n");
+	if ( c->error != nil ) {
+		if (vflag) print ("freeing error\n");
+		free (c->error);
+	}
+	if (vflag) print ("free error crossed\n");
 	c->error = nil;
 	if (vflag) print ("Conv freed\n");
 	--ccount;
@@ -879,9 +891,72 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 		error (ENOReservation);
 	}
 
-	if (vflag) print ("readfromallasync cname [%s]\n", ch->name->s);
+	if (vflag) print ("*****readfromallasync cname [%s]\n", ch->name->s);
 
 	filetype = TYPE(ch->qid) - Qdata;
+
+	while (1) {
+		rlock (&c->rjob->l);
+		tmprr = c->rjob->first;
+		runlock (&c->rjob->l);
+
+		ccount = 0;
+		bcount = 0;
+		for (i = 0 ; i < tmpjc; ++i) {
+			rf = &tmprr->remotefiles[filetype];
+			if (rf->state == 2 ) {
+				/* This thread is done */
+				++ccount;
+			} else {
+				++bcount;
+			}
+			/* FIXME: should I lock following also in read mode ??  */
+			tmprr = tmprr->next;
+		}
+
+		ret = qconsume (c->rjob->bufferlist[filetype], a, n);
+		if (ret >= 0) {
+			return ret ;
+		}
+
+		if (ccount >= tmpjc) {
+			if (vflag) print ("----readfromallasync fileclose [%ld]\n", 
+				ccount );
+			/* as all nodes are close, return NOW */
+			return 0;
+		}
+	} /* end while : infinite */
+} /* end function : readfromallasync */
+
+
+static long 
+readfromallasyncold (Chan *ch, void *a, long n, vlong offset)
+{
+	void *c_a;
+	vlong c_offset;
+	long ret, c_ret, c_n, i;
+	Conv *c;
+	long tmpjc;
+	long ccount, bcount;
+	int filetype; 
+	RemoteResource *tmprr;
+	RemoteFile *rf;
+
+	USED (offset);
+	c = cmd.conv[CONV (ch->qid)];
+
+	tmpjc = getrjobcount (c->rjob);
+	/* making sure that remote resources are allocated */
+	if (tmpjc < 0) {
+		if (vflag) print ("resources not reserved\n");
+		error (ENOReservation);
+	}
+
+	if (vflag) print ("*****readfromallasync cname [%s]\n", ch->name->s);
+
+	filetype = TYPE(ch->qid) - Qdata;
+
+
 	/* read from multiple remote files */
 	c_a = a;
 	c_n = n;
@@ -895,12 +970,13 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 		runlock (&c->rjob->l);
 
 		ccount = 0;
+		bcount = 0;
 		for (i = 0 ; i < tmpjc; ++i) {
 			rf = &tmprr->remotefiles[filetype];
 
 			/* read from queue */
 			c_ret = qconsume (rf->buffer, c_a, c_n);
-			if (vflag) print ("%ldth read gave [%ld] data\n", i, c_ret);
+			if (vflag) print ("******%ldth read gave [%ld] data, state[%d]\n", i, c_ret, rf->state);
 			if (c_ret >= 0 ) {
 				ret = ret + c_ret;
 				c_a = (uchar *)c_a + c_ret;
@@ -937,7 +1013,7 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 
 	} /* end while : infinite */
 
-	if (vflag) print ("readfromallasync [%ld]\n", ret);
+	if (vflag) print ("******readfromallasync [%ld]\n", ret);
 	return ret;
 } /* end function : readfromallasync */
 
@@ -993,6 +1069,103 @@ readfromall (Chan *ch, void *a, long n, vlong offset)
 	return ret;
 }
 
+static long
+cmdread (Chan *ch, void *a, long n, vlong offset)
+{
+	Conv *c;
+	char *p, *cmds;
+	long tmpjc;
+	int fd;
+
+	if (vflag) print ("reading from [%s]\n", ch->name->s);
+	USED (offset);
+	c = cmd.conv[CONV (ch->qid)];
+	p = a;
+
+	switch (TYPE (ch->qid)) {
+	default:
+		error (Eperm);
+
+	case Qarch:
+		sprint (up->genbuf, "%s %s\n", oslist[IHN], 
+						platformlist[IAN]);
+		return readstr (offset, p, n, up->genbuf);
+
+	case Qtopstat:
+		return readstatus (a, n, offset);
+		
+	case Qcmd:
+	case Qtopdir:
+	case Qconvdir:
+	case QLconrdir:
+		return devdirread (ch, a, n, 0, 0, cmdgen);
+
+	case Qctl:
+		sprint (up->genbuf, "%ld", CONV (ch->qid));
+		return readstr (offset, p, n, up->genbuf);
+
+	case Qstatus:
+		tmpjc = getrjobcount (c->rjob);
+		if (tmpjc > 0 ) {
+			return readfromall (ch, a, n, offset);
+		}
+
+		/* getting status locally */
+		cmds = "";
+		if(c->cmd != nil)
+			cmds = c->cmd->f[1];
+		snprint(up->genbuf, sizeof(up->genbuf), "cmd/%d %d %s %q %q\n",
+			c->x, c->inuse, c->state, c->dir, cmds);
+		return readstr(offset, p, n, up->genbuf);
+
+	case Qdata:
+	case Qstderr:
+		tmpjc = getrjobcount (c->rjob);
+		if (tmpjc < 0) error(ENOReservation);
+
+		if (tmpjc > 0 ) {
+			if (TYPE (ch->qid) == Qdata ) {
+				return readfromallasync (ch, a, n, offset);
+			} else {
+				return readfromall (ch, a, n, offset);
+			}
+		}
+
+		/* getting data locally */
+		if (vflag) print ("reading data locally\n");
+		fd = 1;
+		if(TYPE(ch->qid) == Qstderr)
+			fd = 2;
+		c = cmd.conv[CONV(ch->qid)];
+		qlock(&c->l);
+		if(c->fd[fd] == -1){
+			qunlock(&c->l);
+			if (vflag) print ("file descriptor is closed\n");
+			return 0;
+		}
+		qunlock(&c->l);
+		osenter();
+		n = read(c->fd[fd], a, n);
+		osleave();
+		if(n < 0)
+			oserror();
+		if (vflag) print ("reading %ld locally done\n", n);
+		return n;
+
+	case Qwait:
+		tmpjc = getrjobcount (c->rjob);
+		if (tmpjc < 0) error(ENOReservation);
+
+		if (tmpjc > 0 ) {
+			/* FIXME: decide how exactly you want to implement this */
+			/* return readfromall (ch, a, n, offset); */
+		}
+
+		/* Doing it locally */
+		c = cmd.conv[CONV (ch->qid)];
+		return qread (c->waitq, a, n);
+	} /* end switch : file-type */
+}
 
 
 static int
@@ -1101,6 +1274,7 @@ validaterr (char *location, char *os, char *arch)
 
 	if (waserror ()){
 		if (vflag) print ("Cant verify Dir [%s] \n", location);
+		free (dr);
 		nexterror ();
 	}
 	count = lsdir (location, &dr);
@@ -1114,6 +1288,7 @@ validaterr (char *location, char *os, char *arch)
 			}
 		}
 	}
+	free (dr);
 	
 	ans = (remoteMount *) malloc (sizeof (remoteMount));
 	ans->path = (char *)malloc (strlen (location) + strlen (localName) + 2);
@@ -1123,11 +1298,11 @@ validaterr (char *location, char *os, char *arch)
 	if (i == count) {
 		free (ans->path);
 		free(ans);
+		free (dr);
 		poperror ();
 		return nil;
 	}
 
-	/* should I free dr here ?? */
 	count = lsdir (ans->path, &dr);
 	poperror ();
 
@@ -1145,8 +1320,14 @@ validaterr (char *location, char *os, char *arch)
 			analyseremotenode (ans);
 
 			/* give priority to OS */
-			if ( os == nil ) return ans; /* wildcard match */
-			if ( os[0] == '*' ) return ans; /* wildcard match */
+			if ( os == nil ) {
+				free (dr);
+				return ans; /* wildcard match */
+			}
+			if ( os[0] == '*' ) {
+				free (dr);
+				return ans; /* wildcard match */
+			}
 
 			hn = lookup (os, oslist, OSCOUNT);
 			if (hn == 0 ) break; /* unknown os */
@@ -1156,6 +1337,7 @@ validaterr (char *location, char *os, char *arch)
 				for ( i = 1; i < PLATFORMCOUNT; ++i) {
 					if (ans->info[hn][i] > 0 ) {
 						/* needed OS is present for some architecture*/
+						free (dr);
 						return ans ;
 					}
 				}
@@ -1166,6 +1348,7 @@ validaterr (char *location, char *os, char *arch)
 
 			if (ans->info[hn][pn] > 0 ) {
 				/* needed OS and arch type are present */
+				free (dr);
 				return ans ;
 			}
 
@@ -1178,6 +1361,7 @@ validaterr (char *location, char *os, char *arch)
 	/* cleanup */
 	free (ans->path);
 	free(ans);
+	free (dr);
 	return nil;
 }
 
@@ -1200,6 +1384,7 @@ findrr (int *validrc, char *os, char *arch)
 		
 		if (vflag) print ("Cant open %s\n", REMOTEMOUNTPOINT);
 		*validrc = 0;
+		free (dr);
 		return nil; 
 		nexterror ();  /* not reachable */
 	}
@@ -1227,6 +1412,7 @@ findrr (int *validrc, char *os, char *arch)
 	} /* end for */
 	allremotenodes[tmprc] = nil;
 	*validrc = tmprc;
+	free (dr);
 	return allremotenodes; 
 }
 
@@ -1242,14 +1428,22 @@ allocatesinglerr (char *localpath, char *selected, int jcount)
 
 	if (waserror ()){
 		/* FIXME : following warning msg is incorrect */
-		if (vflag) print ("Remote resources not present at [%s]", REMOTEMOUNTPOINT);
+		if (vflag) print ("Remote resources not present at [%s]\n", REMOTEMOUNTPOINT);
 		nexterror ();
 	}
 
 	snprint (location, KNAMELEN*3, "%s/%s", selected, "clone");
 
-	if (vflag) print (" opening [%s]", location);
+	if (vflag) print (" opening [%s]\n", location);
+
+	if (waserror ()){
+		/* FIXME : following warning msg is incorrect */
+		if (vflag) print ("namec failed\n");
+		nexterror ();
+	}
 	rock.cc = namec (location, Aopen, ORDWR, 0); 
+	poperror();
+	if (vflag) print (" namec successful\n", location);
 	poperror ();
 
 	if (waserror ()){
@@ -1329,7 +1523,7 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 		wlock (&rjob->l);
 		for (i = 0; i < RCHANCOUNT; ++i ) {
 			rjob->rcinuse[i] = 0;
-			rjob->handlelist[i] = (Rendez *) malloc (sizeof (Rendez)); 
+			rjob->bufferlist[i] = qopen (1024, 0, nil, 0);
 		}
 		wunlock (&rjob->l);
 	}
@@ -1338,9 +1532,8 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	pp->next = nil;
 	for (i = 0; i < RCHANCOUNT; ++i ) {
 		pp->remotefiles[i].cfile = nil;
-		pp->remotefiles[i].buffer =  qopen (1024, 0, nil, 0); 
+		pp->remotefiles[i].buffer =  rjob->bufferlist[i];
 		pp->remotefiles[i].state = 0;
-		pp->remotefiles[i].handle = rjob->handlelist[i];
 	}
 
 	wlock (&rjob->l);
@@ -1543,9 +1736,9 @@ readstatus (char *a, long n, vlong offset)
 	if (validrc == 0 ) { /* Leaf node */
 		/* free up the memory allocated by findrr call */
 		freermounts (allremotenodes, validrc);
-		sprint (up->genbuf, "%s %s %d\n", oslist[IHN], 
+		sprint (buff2, "%s %s %d\n", oslist[IHN], 
 						platformlist[IAN], 1);
-		return readstr (offset, a, n, up->genbuf);
+		return readstr (offset, a, n, buff2);
 	}
 	
 	initinfo (info);
@@ -1575,103 +1768,6 @@ readstatus (char *a, long n, vlong offset)
 	return readstr (offset, a, n, buff);
 } /* end function : readstatus */
 
-static long
-cmdread (Chan *ch, void *a, long n, vlong offset)
-{
-	Conv *c;
-	char *p, *cmds;
-	long tmpjc;
-	int fd;
-
-	if (vflag) print ("reading from [%s]\n", ch->name->s);
-	USED (offset);
-	c = cmd.conv[CONV (ch->qid)];
-	p = a;
-
-	switch (TYPE (ch->qid)) {
-	default:
-		error (Eperm);
-
-	case Qarch:
-		sprint (up->genbuf, "%s %s\n", oslist[IHN], 
-						platformlist[IAN]);
-		return readstr (offset, p, n, up->genbuf);
-
-	case Qtopstat:
-		return readstatus (a, n, offset);
-		
-	case Qcmd:
-	case Qtopdir:
-	case Qconvdir:
-	case QLconrdir:
-		return devdirread (ch, a, n, 0, 0, cmdgen);
-
-	case Qctl:
-		sprint (up->genbuf, "%ld", CONV (ch->qid));
-		return readstr (offset, p, n, up->genbuf);
-
-	case Qstatus:
-		tmpjc = getrjobcount (c->rjob);
-		if (tmpjc > 0 ) {
-			return readfromall (ch, a, n, offset);
-		}
-
-		/* getting status locally */
-		cmds = "";
-		if(c->cmd != nil)
-			cmds = c->cmd->f[1];
-		snprint(up->genbuf, sizeof(up->genbuf), "cmd/%d %d %s %q %q\n",
-			c->x, c->inuse, c->state, c->dir, cmds);
-		return readstr(offset, p, n, up->genbuf);
-
-	case Qdata:
-	case Qstderr:
-		tmpjc = getrjobcount (c->rjob);
-		if (tmpjc < 0) error(ENOReservation);
-
-		if (tmpjc > 0 ) {
-			if (TYPE (ch->qid) == Qdata ) {
-				return readfromallasync (ch, a, n, offset);
-			} else {
-				return readfromall (ch, a, n, offset);
-			}
-		}
-
-		/* getting data locally */
-		if (vflag) print ("reading data locally\n");
-		fd = 1;
-		if(TYPE(ch->qid) == Qstderr)
-			fd = 2;
-		c = cmd.conv[CONV(ch->qid)];
-		qlock(&c->l);
-		if(c->fd[fd] == -1){
-			qunlock(&c->l);
-			if (vflag) print ("file descriptor is closed\n");
-			return 0;
-		}
-		qunlock(&c->l);
-		osenter();
-		n = read(c->fd[fd], a, n);
-		osleave();
-		if(n < 0)
-			oserror();
-		if (vflag) print ("reading %ld locally done\n", n);
-		return n;
-
-	case Qwait:
-		tmpjc = getrjobcount (c->rjob);
-		if (tmpjc < 0) error(ENOReservation);
-
-		if (tmpjc > 0 ) {
-			/* FIXME: decide how exactly you want to implement this */
-			/* return readfromall (ch, a, n, offset); */
-		}
-
-		/* Doing it locally */
-		c = cmd.conv[CONV (ch->qid)];
-		return qread (c->waitq, a, n);
-	} /* end switch : file-type */
-}
 
 
 static long 
@@ -1784,8 +1880,11 @@ dolocalexecution (Conv *c, Cmdbuf *cb)
 	if(cb->nf < 1)
 		error(Etoosmall);
 	kproc("cmdproc", cmdproc, c, 0); /* cmdproc held back until unlock below */
-	free(c->cmd);
+	if (c->cmd != nil) {
+		free(c->cmd);
+	}
 	c->cmd = cb;	/* don't free cb */
+	/* c->cmd  will be freed in closeconv call */
 	c->state = "Execute";
 	poperror();
 	qunlock(&c->l);
@@ -1883,6 +1982,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				/* local execution request */
 				if (vflag) print ("executing cmd locally\n");
 				dolocalexecution (c, cb);
+				poperror ();
 				return ret;
 			}
 
@@ -2095,6 +2195,7 @@ cmdclone (char *user)
 	++ccount;
 	wunlock (&c->rjob->l);
 	qunlock (&c->l);
+	if (vflag) print ("cmdclone successful \n");
 	return c;
 }
 
@@ -2264,6 +2365,9 @@ lsdir (char *name, Dir **d)
 	}
 
 	count = readchandir (rock.cc, d);
+	if (vflag) print ("done readchandir\n");
+	cclose (rock.cc);
+	if (vflag) print ("freed cc\n");
 	poperror ();
 	return count;
 }
