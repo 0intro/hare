@@ -20,11 +20,13 @@ output="output$sid.txt"
 if [ -f $goodoutput ]
 then
 	echo "run number $sid already running, give another one"
+	echo "or file $goodoutput is present from previous crashed run, delete it and re-run"
 	exit 1
 fi
 if [ -f $output ]
 then
 	echo "run number $sid already running, give another one"
+	echo "or file $output is present from previous crashed run, delete it and re-run"
 	exit 1
 fi
 
