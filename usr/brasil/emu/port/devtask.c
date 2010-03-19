@@ -426,7 +426,7 @@ procreadremote (void *a)
 	rf->state = 1; /* thread running */
 
 	if (waserror ()){
-		if (vflag) print ("#### PRR:No more data to read\n" );
+		if (vflag) print ("PRR:No more data to read\n" );
 		freeb (content);
 		rf->state = 2; /* thread dead */
 		pexit ("", 0);
@@ -434,7 +434,7 @@ procreadremote (void *a)
 	}
 	while (1) {
 		
-		if (vflag) print ("#### PRR: reading from [%s]\n", 
+		if (vflag) print ("PRR: reading from [%s]\n", 
 				rf->cfile->name->s);
 		content = devbread (rf->cfile, 1024, 0);
 		if (BLEN (content) == 0) {
@@ -448,7 +448,7 @@ procreadremote (void *a)
 		qbwrite (rf->buffer, content); 
 	} /* end while : infinite */
 
-	if (vflag) print ("#### PRR[%s]:No more data to read\n", 
+	if (vflag) print ("PRR[%s]:No more data to read\n", 
 			rf->cfile->name->s);
 	freeb (content);
 	rf->state = 2; /* thread dead */
@@ -635,7 +635,7 @@ cmdopen (Chan *c, int omode)
 
 					if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
 						/* FIXME: start the reader thread */
-						if (vflag) print ("\n######thread starting" );
+						if (vflag) print ("\nthread starting" );
 //						sprint (buff, "PRR[%s]", c->name->s);
 						kproc (buff, procreadremote, rf, 0 );
 					}
@@ -666,20 +666,23 @@ cmdopen (Chan *c, int omode)
 static void 
 freeremoteresource (RemoteResource *rr) 
 {
-	int i;
+	int i, ret;
+	char *location;
 	if (rr == nil) return;
 
 	for (i = 0; i < RCHANCOUNT ; ++i ) {
 		if (rr->remotefiles[i].cfile != nil) {
+			location=fetchparentpath(rr->remotefiles[i].cfile->name->s);
 			cclose (rr->remotefiles[i].cfile);
 			rr->remotefiles[i].cfile = nil;
 			rr->remotefiles[i].handle = nil;
 			rr->remotefiles[i].buffer =  nil;
 
-			/* unbind ?? 
-			You can't unbind here as rjobcount is already 
-			reset to zero.
-			*/
+			/* unbind ??  */
+
+//			if (vflag) print ("umounting [%s]\n", location);
+//			kunmount (nil, location);
+			free (location);
 		}
 	}
 }
@@ -691,23 +694,26 @@ freeremotejobs (RemoteJob *rjob)
 	RemoteResource *ppr, *tmp;
 	if (rjob == nil) return;
 
-	if (vflag) print ("releaseing remote resources [%d]\n", rjob->x);
+	if (vflag) print ("releaseing [%d] remote resources [%d]\n", rjob->rjobcount, rjob->x);
+	
+	
 	wlock (&rjob->l);
+	/* may be a read lock here */
 	ppr = rjob->first;
-	rjob->first = nil;
-	rjob->last = nil;
-	rjob->rjobcount = 0;
-	for (i = 0; i < RCHANCOUNT; ++i) {
-		qfree (rjob->bufferlist[i]);
-	}
-	wunlock (&rjob->l);
-
 	while (ppr != nil) {
 		tmp = ppr;
 		freeremoteresource (ppr);
 		ppr = ppr->next;
 		free (tmp);
 	}
+
+	for (i = 0; i < RCHANCOUNT; ++i) {
+		qfree (rjob->bufferlist[i]);
+	}
+	rjob->first = nil;
+	rjob->last = nil;
+	rjob->rjobcount = 0;
+	wunlock (&rjob->l);
 }
 
 static void
@@ -891,7 +897,7 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 		error (ENOReservation);
 	}
 
-	if (vflag) print ("*****readfromallasync cname [%s]\n", ch->name->s);
+	if (vflag) print ("readfromallasync cname [%s]\n", ch->name->s);
 
 	filetype = TYPE(ch->qid) - Qdata;
 
@@ -1009,7 +1015,7 @@ readfromallasyncold (Chan *ch, void *a, long n, vlong offset)
 			/* as all nodes are close, return NOW */
 			break;
 		}
-		if (vflag) print ("---###readfromallasync repeating with [%ld][%ld]\n", ccount, bcount);
+		if (vflag) print ("---readfromallasync repeating with [%ld][%ld]\n", ccount, bcount);
 
 	} /* end while : infinite */
 
