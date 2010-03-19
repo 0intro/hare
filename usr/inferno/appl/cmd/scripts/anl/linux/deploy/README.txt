@@ -18,8 +18,8 @@ to execute. "0" signifies local execution.  Requested executions are
 then distributed between available children.  One can also add constraints
 for OS and platform in addition to number of resources.
 Remember that resources parameter is single string, if you plan to
-specify OS and platform constraints, then sround them in double quotes.
-One can use "*" as wildchar for platform if needed.
+specify OS and platform constraints, then surround them in double quotes.
+One can use "*" as wild-char for platform if needed.
 
 <command> : Forth parameter is command to be executed.  If your command has
 its own parameter, then include the entire command in double quotes.
@@ -35,12 +35,12 @@ by directly modifying the code.  Feel free to look into code.
 
 Starting Brasil
 Script "deployBrasil.sh" will start the brasil instance.  This instance
-is started in forground. Following command should work in this location.
+is started in foreground. Following command should work in this location.
 
 $ ./deployBrasil.sh
 using local port 5544 for listening
 
-This script runs brasil instance in forgroud, so you may not be
+This script runs brasil instance in foreground, so you may not be
 able to use shell afterwards.  You can avoid this by starting
 this script to run in background.
 
@@ -54,7 +54,7 @@ using local port 5566 for listening
 
 #############################################################
 
-***** Asumptions *****
+***** Assumptions *****
 Following are the assumptions for proper working of these scripts.
 1. Presence of compiled brasil is assumed, The script 
 	"deployBrasil.sh" only launches it.
@@ -66,4 +66,4 @@ Following are the assumptions for proper working of these scripts.
 
 3. Presence of bash shell is desired.  These scripts are tested on
 	bash shell only.  these should work on other shells but it is
-	not asured.
+	not assured.
