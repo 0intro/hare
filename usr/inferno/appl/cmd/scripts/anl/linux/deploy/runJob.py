@@ -170,13 +170,15 @@ def main ():
         showUsage ()
         sys.exit()
 
+    
     if (len(sys.argv) > 5 ) :
         inFile = sys.argv[5]
 
     # acutal code responsible for working
     mycpu = XCPU3Client (remoteHost, remotePort)
-    print "Top statistics is"
-    mycpu.topStat()
+#    mycpu.DEBUG = True
+#    print "Top statistics is"
+#    mycpu.topStat()
     mycpu.runJob (command, resReq, inFile)
 
     
