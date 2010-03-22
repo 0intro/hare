@@ -5,11 +5,13 @@ host="localhost"
 port=5544
 cmd='"pwd"'
 
-if [ "$#" -eq 3 ]
+if [ "$#" -eq 5 ]
 then
-sid=$1
-count=$2
-ifile=$3
+host=$1
+port=$2
+sid=$3
+count=$4
+ifile=$5
 if [ ! -f $ifile ]
 then
 	echo "input file $ifile is not present, give correct input filename"
@@ -32,7 +34,7 @@ fi
 
 
 else
-	echo "USAGE: $0 <run.no> <no.of.resources> <input.file>"
+	echo "USAGE: $0 <host> <port> <run.no> <no.of.resources> <input.file>"
 	exit 1
 fi
 

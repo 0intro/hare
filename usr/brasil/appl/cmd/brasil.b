@@ -181,15 +181,17 @@ init()
 				fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
 				if(fd == nil)
 					sys->fprint(logfd, "creation of srv export failed: %r\n");
-				sys->export(fd, "/csrv", Sys->EXPWAIT);
+				sys->export(fd, "/csrv", Sys->EXPASYNC);
 			}		
 	}	
 	
 	# TODO: Get better synchronization
 	sys->sleep(5);
 	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /n/local");
-	if(debugaddr != nil)
+	if(debugaddr != nil){
+		sys->fprint(logfd, "exporting to %s\n", debugaddr);
 		sh->system(nil, "/dis/styxlisten.dis -A "+debugaddr+" export /");
+	}
     } exception e { # abuse exceptions
 	"*" =>
     	sys->fprint(logfd, "unexpected exception: %s\n", e);
