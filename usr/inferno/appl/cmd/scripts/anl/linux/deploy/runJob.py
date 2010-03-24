@@ -21,6 +21,7 @@ class XCPU3Client():
     sessionID = None
     DEBUG = False
     bufsize = 512
+    
     def __init__(self, srv, port, authmode='none', user='', passwd=None, authsrv=None, chatty=0, key=None):
         self.sessionID = None
         self.bufSize = 512
@@ -150,8 +151,62 @@ class XCPU3Client():
         self.dPrint ( "Closing session")
         self.endSession ()
         self.dPrint ( "Done..")
-        
     
+    def myPipe (self, inputFile, outputFile) :
+        inf = open(inputFile, "r", 0)
+        otf = open(outputFile, "w", 0)
+         
+        sz = self.bufSize
+        while 1:
+            buf = inf.read(sz)
+            if len(buf) <= 0:
+                break
+            otf.write(buf)
+        otf.close()
+        inf.close()
+        
+    def command2child (self, child, cmd, inp):
+        name = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "ctl"
+        childCtlFile = open (name, "rw", 0) 
+        if childCtlFile  is None :
+            raise Exception("XCPU3: Could not open child" + name)
+        
+        cmdbuf = "exec " + cmd
+        buf = childCtlFile.write(cmdbuf)
+        self.dPrint ("sent command ["+ cmdbuf +"] to child "+ name )
+        if input is not None :
+            self.dPrint ( "sending input")
+            self.myPipe (inputFile, outoutFile)
+        childCtlFile.close()
+            
+    def pipelineCmds (self, input = None ):
+        self.dPrint ("Requesting reservation..")
+        res = str(3)
+        self.requestReservation(res)
+        lastOutput = input
+        
+        child = 0
+        self.command2child (child, "ls -l", lastOutput)
+        lastOutput = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "stdio"
+        
+        child = 1
+        self.command2child (child, "sort", lastOutput )
+        lastOutput = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "stdio"
+        
+        child = 2
+        self.command2child (child, "wc -l", lastOutput)
+        lastOutput = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "stdio"
+
+        self.dPrint ( "getting output")
+        self.cat(lastOutput)
+        if self.DEBUG:
+            self.dPrint ( "checking session status")
+            self.getSessionStatus ()
+        self.dPrint ( "Closing session")
+        self.endSession ()
+        self.dPrint ( "Done..")
+
+        
 def showUsage () :
         print "Usage: " + sys.argv[0] + " <server-ip> <port> <number of resources>"\
         + " <command> <inputFile>"
@@ -179,6 +234,9 @@ def main ():
 #    mycpu.DEBUG = True
 #    print "Top statistics is"
 #    mycpu.topStat()
+    
+    #mycpu.pipelineCmds ()
+    
     mycpu.runJob (command, resReq, inFile)
 
     
