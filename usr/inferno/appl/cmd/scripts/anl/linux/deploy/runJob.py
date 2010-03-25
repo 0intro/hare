@@ -232,8 +232,8 @@ def main ():
     # acutal code responsible for working
     mycpu = XCPU3Client (remoteHost, remotePort)
 #    mycpu.DEBUG = True
-#    print "Top statistics is"
-#    mycpu.topStat()
+    print "Top statistics is"
+    mycpu.topStat()
     
     #mycpu.pipelineCmds ()
     

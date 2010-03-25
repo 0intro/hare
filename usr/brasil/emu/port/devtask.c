@@ -770,6 +770,12 @@ remoteclose (Chan *c, int rjcount)
 	cc = cmd.conv[CONV(c->qid)];
 	filetype = TYPE(c->qid) - Qdata;
 	tmpfilec = getfileopencount (cc->rjob, filetype);
+
+	/* close ctl files only when everything else is closed */
+	if (TYPE(c->qid) == Qctl && cc->inuse > 0 ) {
+		return;	
+	}
+
 	if ( tmpfilec == 1) {
 		/* its opened only once, so close it */
 		/* closing remote resources */
@@ -857,14 +863,13 @@ cmdclose (Chan *c)
 			cmdfdclose(cc, 2);
 		}
 
-		
+		r = --cc->inuse;
+		if (vflag) print ("r value is [%d] for  [%s]\n",r, c->name->s);
+
 		if (tmpjc > 0) {
 			/* close for remote resources also */
 			remoteclose (c, tmpjc);
 		}
-
-		r = --cc->inuse;
-		if (vflag) print ("r value is [%d] for  [%s]\n",r, c->name->s);
 
 		/* This code is only for CTL file */
 		if (cc->child != nil ){
@@ -1718,7 +1723,7 @@ static void addremotenode (long info[OSCOUNT][PLATFORMCOUNT],
 	char buff[100];
 	char buff2[100];
 	long offset;
-	long ret;
+	long count, ret;
 	int i, len, j, k;
 	long hn, an;
 
@@ -1737,28 +1742,29 @@ static void addremotenode (long info[OSCOUNT][PLATFORMCOUNT],
 		
 		/* parse it */
 
-		/* find host type */
+		/* find number of nodes */
 		for (j = 0, k = 0; buff[j] != ' '; ++j, ++k ) {
 			buff2[k] = buff[j];
 		}
 		buff2[k] = '\0';	
+		count = atol(buff2);
+
+		/* find host type */
+		for (++j, k = 0; buff[j] != ' '; ++j, ++k ) {
+			buff2[k] = buff[j];
+		}
+		buff2[k] = '\0';
 		hn = lookup (buff2, oslist, OSCOUNT);
 
 		/* find arch type */
-		for (++j, k = 0; buff[j] != ' '; ++j, ++k ) {
+		for (++j, k = 0; buff[j] != '\0'; ++j, ++k ) {
 			buff2[k] = buff[j];
 		}
 		buff2[k] = '\0';
 		an = lookup (buff2, platformlist, PLATFORMCOUNT);
 
-		/* find number of nodes */
-		for (++j, k = 0; buff[j] != '\0'; ++j, ++k ) {
-			buff2[k] = buff[j];
-		}
-		buff2[k] = '\0';
-
 		/* update statistics */
-		info[hn][an] += atol(buff2);
+		info[hn][an] += count;
 
 		/* prepare for next line */
 		offset += len + 1;
@@ -1785,8 +1791,8 @@ readstatus (char *a, long n, vlong offset)
 	if (validrc == 0 ) { /* Leaf node */
 		/* free up the memory allocated by findrr call */
 		freermounts (allremotenodes, validrc);
-		sprint (buff2, "%s %s %d\n", oslist[IHN], 
-						platformlist[IAN], 1);
+		sprint (buff2, "%d %s %s\n", 1, oslist[IHN], 
+						platformlist[IAN]);
 		return readstr (offset, a, n, buff2);
 	}
 	
@@ -1808,8 +1814,8 @@ readstatus (char *a, long n, vlong offset)
 	for (i = 0; i < OSCOUNT; ++i) {
 		for (j = 0; j < PLATFORMCOUNT; ++j) {
 			if (info[i][j] > 0 ) {
-				sprint (buff2, "%s %s %ld\n", oslist[i], 
-						platformlist[j], info[i][j]);
+				sprint (buff2, "%ld %s %s\n",info[i][j], oslist[i], 
+						platformlist[j]);
 				strcat (buff, buff2);
 			}
 		}
@@ -1852,10 +1858,12 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 	tmprr = c->rjob->first ;
 	runlock (&c->rjob->l);
 
+	if (vflag) print ("#####came here\n");
 	for (i = 0 ; i < tmpjc; ++i) {
 		ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
 				write (tmprr->remotefiles[filetype].cfile, a, n, offset);	
 
+		if (vflag) print ("#####loop here %d\n", i);
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
 	}
