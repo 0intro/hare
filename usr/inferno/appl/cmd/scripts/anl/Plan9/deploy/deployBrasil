@@ -1,0 +1,14 @@
+#!/bin/rc
+BrasilPath=../../../../../../../brasil/
+port=5544
+
+#if [ "$#" -eq 1 ]
+#then
+#port=$1
+#fi
+cd $BrasilPath
+arg=tcp!*!$port
+echo using local port $port for listening
+echo argument is $arg
+./Plan9/386/bin/brasil server -d $arg 
+
