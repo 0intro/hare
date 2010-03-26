@@ -4,8 +4,8 @@
 # Copyright 2010 Eric Van Hensbergen
 # 
 # USAGE: nompirun [-A cobalt_account] [-h brasil_host] [-p brasil_port] 
-#				[-e key=value] [-n numnodes] [-t time] [-k kernelprofile] 
-#				[-r rootpath]
+#				[-e key=value] [-n numnodes] [-t time] 
+#				[-k kernelprofile] [-r rootpath]
 #				cmd args
 # 
 # ARGUMENTS:
@@ -43,11 +43,29 @@ rflag=$PLAN9_ROOT
 hflag=$BRASIL_HOST
 aflag=$COBALT_ACCOUNT
 Dflag=
+oflag=
 
 # Command line defaults
 nflag=64
 tflag=30
 eflag="MODE=nompirun"
+
+# read IO node log
+function read_io_log {
+	echo Block ID: $BLOCK_ID
+	echo     Waiting for boot....
+	echo
+	echo NOTE: console output will be IO Node only
+	echo ----------------------------------------------------------------
+
+	LOG_SUFFIX=${BLOCK_ID#*-}
+	LOG_PREFIX=${LOG_SUFFIX%-*}
+	LOGFILE=/bgsys/logs/BGP/$LOG_PREFIX-J00.log
+	tail -n 0 -f $LOGFILE
+	# TODO: filter log to just my job (or my userid)
+	# TODO: Catch interrupt and cleanup job(?)
+	# TODO: We should be able to give IO Node IPs automagically
+}
 
 while getopts 'DA:e:h:k:n:p:t:r:' OPTION
 do
@@ -139,17 +157,12 @@ do
 	BLOCK_ID=`qstat --header Location $JOBID | tail -n 1`
 done
 
-echo Block ID: $BLOCK_ID
-echo     Waiting for boot....
-echo
-echo NOTE: console output will be IO Node only
-echo ----------------------------------------------------------------
-# TODO: use block id to tail /bgsys/logs/BGP/R00-*-J00.log
-LOG_SUFFIX=${BLOCK_ID#*-}
-LOG_PREFIX=${LOG_SUFFIX%-*}
-LOGFILE=/bgsys/logs/BGP/$LOG_PREFIX-J00.log
-tail -n 0 -f $LOGFILE
+read_io_log &
 
-# TODO: filter log to just my job (or my userid)
-# TODO: Catch interrupt and cleanup job(?)
-# TODO: We should be able to give IO Node IPs automagically
+# FIFO output aggregation hack
+mkfifo $JOBID.stdout-pipe
+tail -f $JOBID.stdout-pipe | tee -a $JOBID.output
+# this version doesn't cleanup to elimnate possible race conditions
+rm $JOBID.stdout-pipe
+
+#TODO: a better job of cleanup!
