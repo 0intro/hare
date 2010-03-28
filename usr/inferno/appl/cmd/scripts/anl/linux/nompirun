@@ -52,7 +52,6 @@ eflag="MODE=nompirun"
 
 # read IO node log
 function read_io_log {
-	echo Block ID: $BLOCK_ID
 	echo     Waiting for boot....
 	echo
 	echo NOTE: console output will be IO Node only
@@ -156,13 +155,19 @@ do
 	sleep 5
 	BLOCK_ID=`qstat --header Location $JOBID | tail -n 1`
 done
+echo Block ID: $BLOCK_ID
 
-read_io_log &
+#read_io_log &
 
 # FIFO output aggregation hack
-mkfifo $JOBID.stdout-pipe
-tail -f $JOBID.stdout-pipe | tee -a $JOBID.output
+mkfifo /tmp/$JOBID.stdout-pipe
+#mkfifo /tmp/$JOBID.log-pipe
+cat /tmp/$JOBID.stdout-pipe | tee -a $JOBID.output
+#tail -f /tmp/$JOBID.log-pipe >> $JOBID.log
+# Use the one below for lots of debug on stdout
+#cat /tmp/$JOBID.log-pipe | tee -a $JOBID.log
 # this version doesn't cleanup to elimnate possible race conditions
-rm $JOBID.stdout-pipe
+rm /tmp/$JOBID.stdout-pipe
+#rm /tmp/$JOBID.log-pipe
 
 #TODO: a better job of cleanup!

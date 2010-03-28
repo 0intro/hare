@@ -76,10 +76,12 @@ power d775 sys sys /tmp/empty
 		mntgen 775 sys sys
 		ramfs 775 sys sys
 		rc 775 sys sys
+		read 775 sys sys
 		rm 775 sys sys 
 		sed 775 sys sys
 		sleep 775 sys sys
 		srv 775 sys sys
+		tail 775 sys sys
 		telnet 775 sys sys
 		test 775 sys sys
 		seq 775 sys sys

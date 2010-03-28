@@ -1,8 +1,9 @@
 #!/boot/rc -m /boot/rcmain
 #flag x +
+#
 
 # try to keep this up to date to keep things straight
-/boot/echo Boot Script Version 0.2 03142010
+/boot/echo Boot Script Version 0.5 03282010
 
 cputype=power
 objtype=$cputype
@@ -11,7 +12,6 @@ authid=glenda
 rootdir=/root
 rootspec=''
 rootsrv=boot
-job_output=''
 job_home=''
 
 beetroot=bgp.rr
@@ -166,6 +166,15 @@ if(~ $cpunode '0'){
 	}
 }
 
+fn prefix_log {
+	while(x=`{read -n 1})
+		echo $sysname : $x
+	
+	# we want to hold the log file open, so don't die
+	while(~ 1 1)
+		sleep 1000
+}
+
 #
 # New FS Backmount Model
 #
@@ -193,13 +202,42 @@ if(test -e '/env/MODE') {
 
 	if(test -e '/env/HOME') {
 		fshome=(`{cat /env/HOME})
-		bind /n/frontend^$fshome /n/home
+		bind -c /n/frontend^$fshome /n/home
 	}
 	
 	if(test -e '/env/PLAN9_ROOT') {
 		plan9root=(`{cat /env/PLAN9_ROOT})
-		bind /n/frontend^$plan9root /n/root
+		bind -c /n/frontend^$plan9root /n/root
 	}
+	
+	# setup a log & output fifo
+	#bind '#|' /n/log
+	bind '#|' /n/output
+	
+	if(test -e '/env/COBALT_JOBID')
+		JOBID=`{cat /env/COBALT_JOBID}
+	if not
+		JOBID=0000
+	
+	# TODO: get rid of logs for now
+	#log_output=/n/frontend/tmp/$JOBID^.log-pipe
+	# TODO: for now
+	#log_output=/n/frontend/tmp/$JOBID^.$sysname.log
+	#@{
+	#	rfork
+	#	redirect_log $log_output
+	#} &
+	
+	#@{
+	#	rfork
+	#	cat /dev/kprint | prefix_log > /n/log/data 
+	#} &
+	
+	# output pipe
+	job_output=/n/frontend/tmp/$JOBID^.stdout-pipe
+	# per-io node output
+	#job_output=/n/frontend/tmp/$JOBID^.$sysname.out
+	cat /n/output/data1 > $job_output &
 }
 if not {
 	echo No mode detected
@@ -225,6 +263,11 @@ if(~ $cpunode '1'){
 	bind -a /n/io/env /env
 	mode=(`{cat /env/MODE})
 	
+	#@{
+	#	rfork
+	#	cat /dev/kprint | prefix_log /n/io/n/log/data
+	#}&
+	
 	echo done.
 }	
 
@@ -233,10 +276,9 @@ ramfs /tmp
 
 # execute user profile
 if(test -e '/n/home/lib/profile') {
-		. /n/home/lib/profile
+	. /n/home/lib/profile
 }
 
-# TODO: evaluate whether to do this in profile or based on option
 echo starting services
 bind /boot/rc/bin/service /bin/service
 
@@ -257,7 +299,7 @@ fn runit {
 }
 
 fn run_app {
-	flag x +
+	#flag x +
 	if(test -e '/env/job_homedir') 
 		job_home=(`{cat /env/job_homedir})
 		
@@ -271,12 +313,7 @@ fn run_app {
 		cd /tmp
 
 	if(test -e '/env/job_argenv') 
-		job_args=(`{cat /env/job_argenv})
-				
-	if(test -e '/env/job_output')
-		job_output=(`{cat /env/job_output})
-	if(~ $#job_output 0)
-		job_output=(`{cat /env/COBALT_JOBID})^.stdout-pipe
+		job_args=(`{cat /env/job_argenv})	
 		
 	if(test -n $job_args)
 		task=`{echo $job_args}
@@ -296,10 +333,8 @@ fn run_app {
 	}
 		
 	# encapsulate as a subtask?
-	if(test -n $job_output)		
-		runit $task >> $job_output
-	if not
-		runit $task
+	job_out = /n/io/n/output/data
+	runit $task | prefix_log > $job_out
 }
 
 # if someone passed us an application to run, then lets run it
