@@ -48,6 +48,7 @@ enum
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
+char EResourcesReleased[] = "Resources already released";
 static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
@@ -155,7 +156,7 @@ static long
 getrjobcount (RemoteJob *rjob) {
 
 	long temp ;
-	if (rjob == nil ) return -1;
+	if (rjob == nil ) return -2;
 	rlock (&rjob->l);
 	temp = rjob->rjobcount ;
 	runlock (&rjob->l);
@@ -727,8 +728,11 @@ closeconv (Conv *c)
 	c->killonclose = 0;
 	c->killed = 0;
 	c->nice = 0;
-	freeremotejobs (c->rjob);
-	free (c->rjob);
+	if (c->rjob != nil) {
+		freeremotejobs (c->rjob);
+		free (c->rjob);
+		c->rjob = nil;
+	}
 	if (vflag) print ("remote resources released\n");
 	if (c->cmd != nil) {
 		if (vflag) print ("freeing cmd\n");
@@ -766,6 +770,12 @@ remoteclose (Chan *c, int rjcount)
 	cc = cmd.conv[CONV(c->qid)];
 	filetype = TYPE(c->qid) - Qdata;
 	tmpfilec = getfileopencount (cc->rjob, filetype);
+
+	/* close ctl files only when everything else is closed */
+	if (TYPE(c->qid) == Qctl && cc->inuse > 0 ) {
+		return;	
+	}
+
 	if ( tmpfilec == 1) {
 		/* its opened only once, so close it */
 		/* closing remote resources */
@@ -828,17 +838,22 @@ cmdclose (Chan *c)
 	case Qwait:
 	case Qstatus:
 
-		if (vflag) print ("actually closing [%s]\n", c->name->s);
 
 		cc = cmd.conv[CONV (c->qid)];
 		tmpjc = getrjobcount (cc->rjob);
 
+		if (vflag) print ("#### rjobcount is [%d]\n", tmpjc);
 		if (tmpjc < 0) {
 			/* FIXME: you can only close status file
 			you cant open other files if job count is -1
 			and if you can't open them, you cant close them.*/
+//			if (vflag) print ("#### returning as rjobcount is [%d]\n", tmpjc);
+//			return;
 		}
 		qlock(&cc->l);
+
+		/* Only for data file: 
+		FIXME: I am not sure if I should do this for remote data files */
 		if(TYPE(c->qid) == Qdata){
 			if(c->mode == OWRITE || c->mode == ORDWR)
 				cmdfdclose(cc, 0);
@@ -848,14 +863,15 @@ cmdclose (Chan *c)
 			cmdfdclose(cc, 2);
 		}
 
-		
+		r = --cc->inuse;
+		if (vflag) print ("r value is [%d] for  [%s]\n",r, c->name->s);
+
 		if (tmpjc > 0) {
 			/* close for remote resources also */
 			remoteclose (c, tmpjc);
 		}
 
-		r = --cc->inuse;
-		if (vflag) print ("r value is [%d] for  [%s]\n",r, c->name->s);
+		/* This code is only for CTL file */
 		if (cc->child != nil ){
 			/* its local execution with child */
 			if (!(cc->killed))
@@ -865,7 +881,12 @@ cmdclose (Chan *c)
 					if (vflag) print ("killing clild\n");
 					cc->killed = 1;
 				}
-		}else if (r == 0) {
+		}
+		
+		if (r == 0) {
+			/* r is count of all open files not just ctl 
+			So resources will be released only when all open
+			files are closed */
 			closeconv (cc);
 		}
 		qunlock (&cc->l);
@@ -1126,6 +1147,10 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 
 	case Qdata:
 	case Qstderr:
+		if (c->rjob == nil) {
+			if(vflag)print("resources released, as clone file closed\n");
+			error (EResourcesReleased);
+		}
 		tmpjc = getrjobcount (c->rjob);
 		if (tmpjc < 0) error(ENOReservation);
 
@@ -1159,6 +1184,10 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 		return n;
 
 	case Qwait:
+		if (c->rjob == nil) {
+			if(vflag)print("resources released, as clone file closed\n");
+			error (EResourcesReleased);
+		}
 		tmpjc = getrjobcount (c->rjob);
 		if (tmpjc < 0) error(ENOReservation);
 
@@ -1507,9 +1536,16 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	long tmpjc;
 	int i;
 
-
+	if (rjob == nil) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
 	if (waserror ()){
 		if (vflag)print ("Could not allocate needed rmt resources\n");
+		if (rjob == nil) {
+			if (vflag)print("resources released,as clone file closed\n");
+			nexterror ();
+		}
 		wlock (&rjob->l);
 		if (rjob->rjobcount == 1) {
 			rjob->rjobcount = -2; /* set as no reservations */ 
@@ -1524,6 +1560,11 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 
 	if (vflag)print ("addrr(%s, %s, %d)\n", localpath, selected, jcount);
 	tmpjc = getrjobcount (rjob);
+
+	if (tmpjc == -2) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
 	
 	if (tmpjc == -1 ) {
 		wlock (&rjob->l);
@@ -1601,6 +1642,13 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 	int validrc;
 
 	c = cmd.conv[CONV (ch->qid)];
+
+	if (c->rjob == nil) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
+
+
 	lpath = fetchparentpathch (ch);
 
 	validrc = 0;
@@ -1675,7 +1723,7 @@ static void addremotenode (long info[OSCOUNT][PLATFORMCOUNT],
 	char buff[100];
 	char buff2[100];
 	long offset;
-	long ret;
+	long count, ret;
 	int i, len, j, k;
 	long hn, an;
 
@@ -1694,28 +1742,29 @@ static void addremotenode (long info[OSCOUNT][PLATFORMCOUNT],
 		
 		/* parse it */
 
-		/* find host type */
+		/* find number of nodes */
 		for (j = 0, k = 0; buff[j] != ' '; ++j, ++k ) {
 			buff2[k] = buff[j];
 		}
 		buff2[k] = '\0';	
+		count = atol(buff2);
+
+		/* find host type */
+		for (++j, k = 0; buff[j] != ' '; ++j, ++k ) {
+			buff2[k] = buff[j];
+		}
+		buff2[k] = '\0';
 		hn = lookup (buff2, oslist, OSCOUNT);
 
 		/* find arch type */
-		for (++j, k = 0; buff[j] != ' '; ++j, ++k ) {
+		for (++j, k = 0; buff[j] != '\0'; ++j, ++k ) {
 			buff2[k] = buff[j];
 		}
 		buff2[k] = '\0';
 		an = lookup (buff2, platformlist, PLATFORMCOUNT);
 
-		/* find number of nodes */
-		for (++j, k = 0; buff[j] != '\0'; ++j, ++k ) {
-			buff2[k] = buff[j];
-		}
-		buff2[k] = '\0';
-
 		/* update statistics */
-		info[hn][an] += atol(buff2);
+		info[hn][an] += count;
 
 		/* prepare for next line */
 		offset += len + 1;
@@ -1742,8 +1791,8 @@ readstatus (char *a, long n, vlong offset)
 	if (validrc == 0 ) { /* Leaf node */
 		/* free up the memory allocated by findrr call */
 		freermounts (allremotenodes, validrc);
-		sprint (buff2, "%s %s %d\n", oslist[IHN], 
-						platformlist[IAN], 1);
+		sprint (buff2, "%d %s %s\n", 1, oslist[IHN], 
+						platformlist[IAN]);
 		return readstr (offset, a, n, buff2);
 	}
 	
@@ -1765,8 +1814,8 @@ readstatus (char *a, long n, vlong offset)
 	for (i = 0; i < OSCOUNT; ++i) {
 		for (j = 0; j < PLATFORMCOUNT; ++j) {
 			if (info[i][j] > 0 ) {
-				sprint (buff2, "%s %s %ld\n", oslist[i], 
-						platformlist[j], info[i][j]);
+				sprint (buff2, "%ld %s %s\n",info[i][j], oslist[i], 
+						platformlist[j]);
 				strcat (buff, buff2);
 			}
 		}
@@ -1786,6 +1835,12 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 	int filetype;
 
 	c = cmd.conv[CONV (ch->qid)];
+
+	if (c->rjob == nil) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
+
 	tmpjc = getrjobcount (c->rjob);
 
 	if (vflag) print ("write to [%s] repeating [%ld] times\n", 
@@ -1803,10 +1858,12 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 	tmprr = c->rjob->first ;
 	runlock (&c->rjob->l);
 
+	if (vflag) print ("#####came here\n");
 	for (i = 0 ; i < tmpjc; ++i) {
 		ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
 				write (tmprr->remotefiles[filetype].cfile, a, n, offset);	
 
+		if (vflag) print ("#####loop here %d\n", i);
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
 	}
@@ -1821,6 +1878,11 @@ preparelocalexecution (Conv *c, char *os, char *arch)
 {
 	int i;
 	int hn, pn;
+
+	if (c->rjob == nil) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
 
 	if (vflag) print ("doing local reservation\n");
 	if (vflag) print ("os=[%s] arch=[%s]\n", os, arch);
@@ -1872,6 +1934,11 @@ dolocalexecution (Conv *c, Cmdbuf *cb)
 
 	int i;
 
+	if (c->rjob == nil) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
+
 	qlock(&c->l);
 	if(waserror()){
 		qunlock(&c->l);
@@ -1919,12 +1986,21 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 
 	/* find no. of remote jobs running */
 	c = cmd.conv[CONV (ch->qid)];
+
+
+
 	tmpjc = getrjobcount (c->rjob);
 
 	switch (TYPE (ch->qid)) {
 	default:
 		error (Eperm);
 	case Qctl:
+
+		if (c->rjob == nil) {
+			if (vflag)print ("resources released, as clone file closed\n");
+			error (EResourcesReleased);
+		}
+
 		cb = parsecmd (a, n);
 		if (waserror ()){
 			free (cb);
@@ -2074,6 +2150,11 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 		break;
 
 	case Qdata:
+		if (c->rjob == nil) {
+			if (vflag)print ("resources released, as clone file closed\n");
+			error (EResourcesReleased);
+		}
+
 		if (tmpjc < 0) {
 			if (vflag) print ("No reservation done\n");
 			error(ENOReservation);
