@@ -129,6 +129,9 @@ bind -a $rootdir/rc/bin /bin
 mntgen
 cd /
 
+#ramfs so we can copy binaries in & have scratch space
+ramfs /tmp
+
 #
 # Finish environment setup and start services.
 #
@@ -271,8 +274,7 @@ if(~ $cpunode '1'){
 	echo done.
 }	
 
-#ramfs so we can copy binaries in
-ramfs /tmp
+
 
 # execute user profile
 if(test -e '/n/home/lib/profile') {

@@ -151,6 +151,8 @@ static int cio_protocol_version;
 static int current_job_id, current_job_mode;
 static int stdiofd = 0;
 
+char *squidboy = "Hello, Squidboy!\n";
+
 unsigned long
 ntohl(int x)
 {
@@ -348,15 +350,17 @@ void process_env(char *envpair)
 
 static int
 cio_write_data_out(int type, int core, int treeaddr, int rank, char *data, int len)
-{
+{	
+	if(cio_write_prefix(type, sizeof(uint32_t)*4 + len) ||
+		stream_write_int(stdiofd, core) ||
+		stream_write_int(stdiofd, treeaddr) ||
+		stream_write_int(stdiofd, rank) ||
+		stream_write_arr(stdiofd, data, len)) {
+		    fprint(logfd, "Error writing message on DATA stream!\n");
+		    return 1;
+	}	
 
-	stream_write_int(stdiofd, type);
-	stream_write_int(stdiofd, core);
-	stream_write_int(stdiofd, treeaddr);
-	stream_write_int(stdiofd, rank);
-	stream_write_arr(stdiofd, data, len);
-
-    return 0;
+	return 0;
 }
 
 static int
@@ -384,60 +388,112 @@ cio_write_data_vers(void)
 	return 0;
 }
 
-/*
- * Function to handle standard I/O operations
- * (for now focused on output, but we may want input threads as well)
- */
+void
+debug_the_rest(int fd)
+{
+	uchar buffer[1024];
+	int n;
+	int count;
+	
+	/* DEBUG FOR NOW, SPIN READING AND REPORTING */
+	for(;;) {
+		n = read(fd, buffer, 1024);
+		fprint(logfd, "--- Read (%d) bytes ---\n\t", n);
+		for(count=0; count < n; count++) {
+			if(count % 16 == 0)
+				fprint(logfd,"\n\t");
+			fprint(logfd, "%#2.2ux ", buffer[count]);
+		}
+		fprint(logfd, "\n");
+	}
+}
+
+int receive_data_loop(void)
+{
+    for (;;) {
+	struct MessagePrefix prefix;
+
+	if (stream_read_prefix(stdiofd, &prefix)) {
+	    /* We don't know what the message type was supposed to be... */
+
+	    fprint(logfd, "Error reading command prefix on DATA stream!\n");
+	    return 1;
+	}
+	
+	switch (prefix.type) {
+	    case CIO_VERSION_MESSAGE:
+	    {
+		char *enc_msg, **enc_msg_p = &enc_msg;
+		int enc_len;
+
+		current_job_id = prefix.jobid;
+
+		if (stream_read_int(stdiofd, &cio_protocol_version)){
+
+		    fprint(logfd, "Error reading message on DATA stream!\n");
+		    return 1;
+		}
+
+		if (cio_protocol_version != 3) {
+		    fprint(logfd, "Version mismatch on DATA stream!\n");
+		    return 1;
+		}
+		
+		//debug_the_rest(stdiofd);
+				
+		if (stream_read_arr(stdiofd, (void**)enc_msg_p,
+				    &enc_len)) {
+		    fprint(logfd, "Error reading message on DATA stream!\n");
+		    return 1;
+		}
+				
+		if (enc_len != VERSION_MSG_ENC_LEN) {
+		    fprint(logfd, "Invalid data on DATA stream!\n");
+		    return 1;
+		}
+
+		if (debug_flags & DEBUG_INITFINI) {
+		    fprint(logfd, "DATA VERSION\n");
+		    fprint(logfd, "received version %d\n",
+			    cio_protocol_version);
+		}
+		
+		/* We don't care about the encrypted message (nor timeout
+		   for that matter).  Just send back an ACK.  */
+
+		memset(enc_msg, '\0', VERSION_MSG_ENC_LEN);
  
-void iomain(void)
-{
-	char *squidboy = "Hello, Squidboy!\n";
-	
-	/* TODO at some point we'll need an input thread */
-	
-	/* Message Output is BROKEN right now, don't use */
-	for(;;);
-	
-	cio_write_data_out(STDOUT_MESSAGE, 0, 0, 0, squidboy, strlen(squidboy));
-	cio_write_data_out(STDERR_MESSAGE, 0, 0, 0, squidboy, strlen(squidboy));
+		if (cio_write_prefix(CIO_VERSION_MESSAGE, sizeof(uint32_t) * 3
+				      + VERSION_MSG_ENC_LEN) ||
+		    stream_write_int(stdiofd, cio_protocol_version) || 
+		    stream_write_arr(stdiofd, enc_msg,
+				     VERSION_MSG_ENC_LEN)) {
+		    fprint(logfd, "Error writing message on DATA stream!\n");
+		    return 1;
+		}
 
-	for(;;);
-}
-#define ESTR 255
+		free(enc_msg);
+		
+		debug_the_rest(stdiofd);
 
-static void
-usage(void)
-{
-	char *e, estr[ESTR], *p;
+/* BUG: This breaks everything 		
+fprint(logfd, "sending squidboy\n");
+		cio_write_data_out(STDERR_MESSAGE, 0, 0, 0, squidboy, strlen(squidboy));
+fprint(logfd, "done sending squidboy\n");
+*/
 
-	e = estr + ESTR;
-	p = seprint(estr, e, "usage: %s"
-		" -[I]: for Data Stream"
-		"\n",
-		argv0);
-	write(2, estr, p-estr);
-	exits("usage");
-}
-
-
-int main(int argc, char *argv[])
-{
-	/* TODO: check args and jump to iomain if appropriate */
-	ARGBEGIN{
-	default:
-		usage();
 		break;
-	case 'I':
-		iomain(); /* should never return */
-		exits("strange");
-		break;
-	} ARGEND;
-	
-    logfd = create("/tmp/ciod.log", OWRITE, 0666|DMAPPEND);
+	    }
 
-    /* Bind system environment first */
-    bind("#ec", "/env", MCREATE);
+	    default:
+		fprint(logfd, "Unknown message type %d on DATA stream!\n",
+			prefix.type);
+	} /* switch (prefix.type) */
+    } /* for (;;) */
+}
 
+int receive_cio_loop(void)
+{
     for (;;) {
 	struct MessagePrefix prefix;
 
@@ -447,7 +503,7 @@ int main(int argc, char *argv[])
 	    fprint(logfd, "Error reading command prefix on CIO stream!\n");
 	    return 1;
 	}
-
+	
 	switch (prefix.type) {
 	    case CIO_VERSION_MESSAGE:
 	    {
@@ -463,18 +519,19 @@ int main(int argc, char *argv[])
 		    return 1;
 		}
 
+
 		if (cio_protocol_version != CIO_VERSION_LATEST) {
 		    fprint(logfd, "Version mismatch on CIO stream!\n");
 		    return 1;
 		}
-
+				
 		if (stream_read_int(stdiofd, &timeout) ||
 		    stream_read_arr(stdiofd, (void**)enc_msg_p,
 				    &enc_len)) {
 		    fprint(logfd, "Error reading message on CIO stream!\n");
 		    return 1;
 		}
-
+				
 		if (enc_len != VERSION_MSG_ENC_LEN) {
 		    fprint(logfd, "Invalid data on CIO stream!\n");
 		    return 1;
@@ -485,7 +542,7 @@ int main(int argc, char *argv[])
 		    fprint(logfd, "received version %d, timeout %d\n",
 			    cio_protocol_version, timeout);
 		}
-
+		
 		/* We don't care about the encrypted message (nor timeout
 		   for that matter).  Just send back an ACK.  */
 
@@ -750,3 +807,59 @@ int main(int argc, char *argv[])
 	} /* switch (prefix.type) */
     } /* for (;;) */
 }
+
+
+/*
+ * Function to handle standard I/O operations
+ * (for now focused on output, but we may want input threads as well)
+ */
+ 
+void iomain(void)
+{
+	logfd = create("/tmp/ciodata.log", OWRITE, 0666|DMAPPEND);
+	
+	/* TODO at some point we'll need an input thread */
+	receive_data_loop();
+	
+	/* Message Output is BROKEN - debug input stream for now */
+	debug_the_rest(stdiofd);
+}
+#define ESTR 255
+
+static void
+usage(void)
+{
+	char *e, estr[ESTR], *p;
+
+	e = estr + ESTR;
+	p = seprint(estr, e, "usage: %s"
+		" -[I]: for Data Stream"
+		"\n",
+		argv0);
+	write(2, estr, p-estr);
+	exits("usage");
+}
+
+
+int main(int argc, char *argv[])
+{
+	/* TODO: check args and jump to iomain if appropriate */
+	ARGBEGIN{
+	default:
+		usage();
+		break;
+	case 'I':
+		iomain(); /* should never return */
+		exits("strange");
+		break;
+	} ARGEND;
+	
+	logfd = create("/tmp/ciod.log", OWRITE, 0666|DMAPPEND);
+
+	/* Bind system environment first */
+	bind("#ec", "/env", MCREATE);
+
+	return receive_cio_loop();
+}
+
+
