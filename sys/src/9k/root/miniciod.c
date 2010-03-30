@@ -131,7 +131,7 @@ struct DataPrefixGeneral
 
 enum DataType
 {
-	VERSION_MESSAGE,
+	DATA_VERSION_MESSAGE,
 	STDIN_MESSAGE,
 	STDOUT_MESSAGE,
 	STDERR_MESSAGE,
@@ -141,6 +141,11 @@ enum DataType
 
 static int DataStreamVersion = 1;
 
+#define DATA_VERSION_V1R1M2 1
+#define DATA_VERSION_V1R2M0 2
+#define DATA_VERSION_V1R3M0 3
+#define DATA_VERSION_LATEST DATA_VERSION_V1R3M0
+
 #define VERSION_MSG_ENC_LEN 64
 
 #define DEBUG_INITFINI 1
@@ -148,6 +153,7 @@ static int logfd;
 static int debug_flags = DEBUG_INITFINI;
 
 static int cio_protocol_version;
+static int data_protocol_version;
 static int current_job_id, current_job_mode;
 static int stdiofd = 0;
 
@@ -289,6 +295,25 @@ cio_write_prefix(int type, int length)
 }
 
 static int
+data_write_prefix(int type, int length)
+{
+    struct MessagePrefix prefix;
+
+    prefix.type = htonl(type);
+    prefix.version = htonl(data_protocol_version);
+    prefix.target = 0;
+    prefix.length = htonl(length);
+    prefix.jobid = current_job_id;
+
+    if (socket_write(stdiofd, &prefix, sizeof(prefix)) !=
+			sizeof(prefix)) {
+		return 1;
+    }
+
+    return 0;
+}
+
+static int
 cio_write_result(enum CioMessageType message, int result, int value)
 {
     if (cio_write_prefix(RESULT_MESSAGE, sizeof(uint32_t) * 3) ||
@@ -349,8 +374,9 @@ void process_env(char *envpair)
 }
 
 static int
-cio_write_data_out(int type, int core, int treeaddr, int rank, char *data, int len)
-{	
+data_write_out(int type, int cpu, int p2p, int rank, char *data, int len, int eof)
+{
+/* sane version 	
 	if(cio_write_prefix(type, sizeof(uint32_t)*4 + len) ||
 		stream_write_int(stdiofd, core) ||
 		stream_write_int(stdiofd, treeaddr) ||
@@ -358,33 +384,21 @@ cio_write_data_out(int type, int core, int treeaddr, int rank, char *data, int l
 		stream_write_arr(stdiofd, data, len)) {
 		    fprint(logfd, "Error writing message on DATA stream!\n");
 		    return 1;
-	}	
+	}
+*/		
+	if ((data_protocol_version < DATA_VERSION_V1R2M0 ?        
+		stream_write_int(stdiofd, type) :
+		data_write_prefix(type, sizeof(uint32_t) * 5 + len)) ||
+		(data_protocol_version >= DATA_VERSION_V1R2M0 &&
+		stream_write_int(stdiofd, eof)) ||
+		stream_write_int(stdiofd, cpu) ||
+		stream_write_int(stdiofd, p2p) ||
+		stream_write_int(stdiofd, rank) ||
+		stream_write_arr(stdiofd, data, len)) {
+		    fprint(logfd, "Error writing message on DATA stream!\n");
+		    return 1;
+	}			
 
-	return 0;
-}
-
-static int
-cio_write_data_general(int type, char *data, int len)
-{
-
-	stream_write_int(stdiofd, GENERAL_MESSAGE);
-	stream_write_int(stdiofd, type);
-	stream_write_arr(stdiofd, data, len);
-
-    return 0;
-}
-
-static int
-cio_write_data_vers(void)
-{
-	char *eyecatcher = "<DataStream>";
-	char _encMessage[64]; /* don't know what goes here */
-	
-	stream_write_int(stdiofd, VERSION_MESSAGE);
-	stream_write_arr(stdiofd, eyecatcher, 12);
-	stream_write_int(stdiofd, 1);
-	stream_write_arr(stdiofd,_encMessage, 64);
-	
 	return 0;
 }
 
@@ -421,20 +435,20 @@ int receive_data_loop(void)
 	}
 	
 	switch (prefix.type) {
-	    case CIO_VERSION_MESSAGE:
+	    case DATA_VERSION_MESSAGE:
 	    {
 		char *enc_msg, **enc_msg_p = &enc_msg;
 		int enc_len;
 
 		current_job_id = prefix.jobid;
 
-		if (stream_read_int(stdiofd, &cio_protocol_version)){
+		if (stream_read_int(stdiofd, &data_protocol_version)){
 
 		    fprint(logfd, "Error reading message on DATA stream!\n");
 		    return 1;
 		}
 
-		if (cio_protocol_version != 3) {
+		if (data_protocol_version != 3) {
 		    fprint(logfd, "Version mismatch on DATA stream!\n");
 		    return 1;
 		}
@@ -455,32 +469,33 @@ int receive_data_loop(void)
 		if (debug_flags & DEBUG_INITFINI) {
 		    fprint(logfd, "DATA VERSION\n");
 		    fprint(logfd, "received version %d\n",
-			    cio_protocol_version);
+			    data_protocol_version);
 		}
 		
 		/* We don't care about the encrypted message (nor timeout
-		   for that matter).  Just send back an ACK.  */
+		   for that matter). */
 
+	/* WE DONT SEND AN ACK ON DATA STREAM
 		memset(enc_msg, '\0', VERSION_MSG_ENC_LEN);
  
-		if (cio_write_prefix(CIO_VERSION_MESSAGE, sizeof(uint32_t) * 3
+		if (data_write_prefix(DATA_VERSION_MESSAGE, sizeof(uint32_t) * 3
 				      + VERSION_MSG_ENC_LEN) ||
-		    stream_write_int(stdiofd, cio_protocol_version) || 
+		    stream_write_int(stdiofd, data_protocol_version) || 
 		    stream_write_arr(stdiofd, enc_msg,
 				     VERSION_MSG_ENC_LEN)) {
 		    fprint(logfd, "Error writing message on DATA stream!\n");
 		    return 1;
 		}
-
+     */
 		free(enc_msg);
 		
-		debug_the_rest(stdiofd);
+		//debug_the_rest(stdiofd);
 
-/* BUG: This breaks everything 		
+/* BUG: This breaks everything */ 		
 fprint(logfd, "sending squidboy\n");
-		cio_write_data_out(STDERR_MESSAGE, 0, 0, 0, squidboy, strlen(squidboy));
+		data_write_out(STDERR_MESSAGE, 1, 1, 1, squidboy, strlen(squidboy), 0);
 fprint(logfd, "done sending squidboy\n");
-*/
+/* End BUG */
 
 		break;
 	    }
