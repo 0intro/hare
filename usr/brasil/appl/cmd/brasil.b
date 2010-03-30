@@ -143,9 +143,8 @@ init()
 	sys->bind("/tmp/brasil.log", "/dev/cons", sys->MREPL);
 		
 	sh->system(nil, "mount -c {/dis/mntgen.dis} /n"); # setup tmp for us
-	
+	sys->bind("#C", "/", sys->MAFTER);
 	sys->bind("#e", "/env", sys->MREPL|sys->MCREATE);
-#	sys->bind("#T", "/task", sys->MREPL|sys->MCREATE);	
 	sys->bind("#U*", "/n/local", sys->MREPL|sys->MCREATE);
 	if(sys->bind("#I", "/net", sys->MREPL) < 0) {
 		# no net might mean we are on Plan 9
@@ -157,7 +156,6 @@ init()
 	}
 	
 	sh->system(nil, "mount -c {mntgen} /n/csrv"); # shadow csrv
-#	sys->bind("#2", "/csrv", sys->MBEFORE);
 	sys->bind("#T", "/csrv", sys->MBEFORE);
 	sys->bind("#U*", "/csrv/local/fs", sys->MREPL|sys->MCREATE);
 	sys->bind("/net", "/csrv/local/net", sys->MREPL);
