@@ -22,7 +22,7 @@ Emuinit: module
 # isnt this in env.m?
 
 logfd: ref Sys->FD;
-fsaddr: string;		# host file system export
+fsaddr: string;		# file system export
 debugaddr: string;	# brasil debug export
 csrvaddr: string;	# central services export
 backaddr: string;	# back mount address (for Linux)
@@ -84,7 +84,7 @@ init()
 	arg = load Arg Arg->PATH;
 	mode: string;
 	
-	fsaddr = "tcp!*!5670";		# host file system export
+	fsaddr = "tcp!*!5670";		#  file system export
 	backaddr = "tcp!127.0.0.1!5640";# csrv backmount export
 	
 	if (arg == nil)
@@ -109,7 +109,7 @@ init()
 			arg->init(args);
 			while((c = arg->opt()) != 0)
 				case c {
-				'h' =>			# host export addr
+				'h' =>			# fs export addr
 					fsaddr = arg->arg();
 				'd' =>			# brasil debug addr
 					debugaddr = arg->arg();
@@ -187,7 +187,7 @@ init()
 	
 	# TODO: Get better synchronization
 	sys->sleep(5);
-	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /n/local");
+	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 	if(debugaddr != nil){
 		sys->fprint(logfd, "exporting to %s\n", debugaddr);
 		sh->system(nil, "/dis/styxlisten.dis -A "+debugaddr+" export /");

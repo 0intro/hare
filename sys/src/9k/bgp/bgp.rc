@@ -3,7 +3,7 @@
 #
 
 # try to keep this up to date to keep things straight
-/boot/echo Boot Script Version 0.5 03282010
+/boot/echo Boot Script Version 0.6 03302010
 
 cputype=power
 objtype=$cputype
@@ -195,13 +195,16 @@ if(test -e '/env/MODE') {
 		echo Atomic batteries to power
 
 		times=0
-		while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr frontend /n/frontend) {
+		while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr brasil /n/brasil) {
 			echo -n '.'
 			times=($times 1)
 			sleep 5
 		}
 		echo done.
 	}
+	
+	# frontend host file system is at n/local under brasil
+	bind -c /n/brasil/n/local /n/frontend
 
 	if(test -e '/env/HOME') {
 		fshome=(`{cat /env/HOME})
