@@ -96,7 +96,7 @@ remoteURL = ""
 baseURL = "/csrv/local/"
 #baseURL = "/local/"
 
-class XCPU3Client():
+class XCPU3Client:
     
     sessionID = None
     DEBUG = False
