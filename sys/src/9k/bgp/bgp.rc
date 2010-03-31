@@ -3,7 +3,7 @@
 #
 
 # try to keep this up to date to keep things straight
-/boot/echo Boot Script Version 0.6 03302010
+/boot/echo Boot Script Version 0.7 03312010
 
 cputype=power
 objtype=$cputype
@@ -147,6 +147,13 @@ prompt=($sysname'# ' '	')
 # start CIOD services
 #
 if(~ $cpunode '0'){
+	#
+	# Setup standard out and error fifo pipes
+	#
+	
+	bind '#|' /n/error
+	bind '#|' /n/output
+
 	# wait for ethernet to come up
 	echo Waiting for turbines to come up to speed
 	sleep 30
@@ -169,6 +176,7 @@ if(~ $cpunode '0'){
 	}
 }
 
+# TODO: fix this
 fn prefix_log {
 	while(x=`{read -n 1})
 		echo $sysname : $x
@@ -216,34 +224,11 @@ if(test -e '/env/MODE') {
 		bind -c /n/frontend^$plan9root /n/root
 	}
 	
-	# setup a log & output fifo
-	#bind '#|' /n/log
-	bind '#|' /n/output
-	
-	if(test -e '/env/COBALT_JOBID')
-		JOBID=`{cat /env/COBALT_JOBID}
-	if not
-		JOBID=0000
-	
-	# TODO: get rid of logs for now
-	#log_output=/n/frontend/tmp/$JOBID^.log-pipe
-	# TODO: for now
-	#log_output=/n/frontend/tmp/$JOBID^.$sysname.log
-	#@{
-	#	rfork
-	#	redirect_log $log_output
-	#} &
-	
-	#@{
-	#	rfork
-	#	cat /dev/kprint | prefix_log > /n/log/data 
-	#} &
-	
-	# output pipe
-	job_output=/n/frontend/tmp/$JOBID^.stdout-pipe
-	# per-io node output
-	#job_output=/n/frontend/tmp/$JOBID^.$sysname.out
-	cat /n/output/data1 > $job_output &
+	# redirect IO node log and console
+	@{
+		rfork
+		cat /dev/kmesg /dev/kprint | prefix_log > /n/error/data 
+	} &
 }
 if not {
 	echo No mode detected
@@ -269,10 +254,11 @@ if(~ $cpunode '1'){
 	bind -a /n/io/env /env
 	mode=(`{cat /env/MODE})
 	
-	#@{
-	#	rfork
-	#	cat /dev/kprint | prefix_log /n/io/n/log/data
-	#}&
+	# Redirect CPU node console and log
+	@{
+		rfork
+		cat /dev/kmesg /dev/kprint | prefix_log > /n/io/n/error/data
+	}&
 	
 	echo done.
 }	
@@ -338,8 +324,7 @@ fn run_app {
 	}
 		
 	# encapsulate as a subtask?
-	job_out = /n/io/n/output/data
-	runit $task | prefix_log > $job_out
+	runit $task | prefix_log > /n/io/n/output/data
 }
 
 # if someone passed us an application to run, then lets run it

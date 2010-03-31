@@ -1,6 +1,7 @@
 #include <u.h>
 #include <libc.h>
 #include <stdio.h>
+#include <bio.h>
 
 typedef u8int uint8_t;
 typedef u16int uint16_t;
@@ -376,29 +377,13 @@ void process_env(char *envpair)
 static int
 data_write_out(int type, int cpu, int p2p, int rank, char *data, int len, int eof)
 {
-/* sane version 	
-	if(cio_write_prefix(type, sizeof(uint32_t)*4 + len) ||
-		stream_write_int(stdiofd, core) ||
-		stream_write_int(stdiofd, treeaddr) ||
-		stream_write_int(stdiofd, rank) ||
-		stream_write_arr(stdiofd, data, len)) {
-		    fprint(logfd, "Error writing message on DATA stream!\n");
-		    return 1;
-	}
-*/		
-	if ((data_protocol_version < DATA_VERSION_V1R2M0 ?        
-		stream_write_int(stdiofd, type) :
-		data_write_prefix(type, sizeof(uint32_t) * 5 + len)) ||
-		(data_protocol_version >= DATA_VERSION_V1R2M0 &&
-		stream_write_int(stdiofd, eof)) ||
-		stream_write_int(stdiofd, cpu) ||
-		stream_write_int(stdiofd, p2p) ||
-		stream_write_int(stdiofd, rank) ||
-		stream_write_arr(stdiofd, data, len)) {
-		    fprint(logfd, "Error writing message on DATA stream!\n");
-		    return 1;
-	}			
-
+	data_write_prefix(type, sizeof(uint32_t) * 5 + len);
+	stream_write_int(stdiofd, eof);
+	stream_write_int(stdiofd, cpu);
+	stream_write_int(stdiofd, p2p);
+	stream_write_int(stdiofd, rank);
+	stream_write_arr(stdiofd, data, len);
+	
 	return 0;
 }
 
@@ -419,6 +404,29 @@ debug_the_rest(int fd)
 			fprint(logfd, "%#2.2ux ", buffer[count]);
 		}
 		fprint(logfd, "\n");
+	}
+}
+
+void
+forward_stdio(int type, char *path)
+{
+	Biobuf *buf;
+	void *line;
+	int len;
+	
+	/* open stderr pipe for reading */
+	buf = Bopen(path, OREAD);
+	
+	/* read a line */
+	for(;;) {
+		line = Brdline(buf, '\n');
+		if(line != 0) {
+			len = Blinelen(buf);
+			/* NOTE: the 1's here are arbitrary */
+			data_write_out(type, 1, 1, 1, line, len, 0);
+		} else {
+			sleep(5);	/* do we need to do something else here? */
+		}
 	}
 }
 
@@ -490,13 +498,8 @@ int receive_data_loop(void)
 		free(enc_msg);
 		
 		//debug_the_rest(stdiofd);
-
-/* BUG: This breaks everything */ 		
-fprint(logfd, "sending squidboy\n");
-		data_write_out(STDERR_MESSAGE, 1, 1, 1, squidboy, strlen(squidboy), 0);
-fprint(logfd, "done sending squidboy\n");
-/* End BUG */
-
+		
+		forward_stdio(STDERR_MESSAGE, "/n/error/data1");
 		break;
 	    }
 
