@@ -1997,7 +1997,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	case Qctl:
 
 		if (c->rjob == nil) {
-			if (vflag)print ("resources released, as clone file closed\n");
+			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
 		}
 
