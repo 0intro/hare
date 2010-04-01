@@ -61,6 +61,6 @@ then
 	exit 2
 fi
 arg=`echo "'"tcp!*!$pflag"'"`
-$brasil_exec server -h $arg 
+$brasil_exec server -h $arg < /dev/null > /dev/null &
 #$brasil_exec server -d $arg 
 
