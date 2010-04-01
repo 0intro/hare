@@ -53,13 +53,16 @@ if [ -z $lflag ]
 then
 	lflag="/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"
 fi
-brasil_exec="$lflag/brasil"
 
+# Making sure that executable exists
+brasil_exec="$lflag/brasil"
 if  [ ! -x "$brasil_exec" ]
 then
 	echo "Could not find the brasil executable at [$brasil_exec]"
 	exit 2
 fi
+
+# Launch the brasil
 arg=`echo "'"tcp!*!$pflag"'"`
 $brasil_exec server -h $arg 
 #$brasil_exec server -d $arg 

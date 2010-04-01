@@ -299,6 +299,14 @@ def main ():
     archType = None
     debug = False
     
+    # Overriding the values from environment variables
+
+    if 'BRASIL_HOST' in os.environ:
+        brasilHost = os.environ['BRASIL_HOST']
+    
+    if 'BRASIL_PORT' in os.environ:
+        brasilPort = int (os.environ['BRASIL_PORT'])
+
     try:
         opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
         for o,a in opts:
