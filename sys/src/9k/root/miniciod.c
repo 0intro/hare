@@ -157,7 +157,12 @@ static int cio_protocol_version;
 static int data_protocol_version;
 static int current_job_id, current_job_mode;
 static int stdiofd = 0;
-
+/* this is used to prevent multiple folks from writing at once */
+/* we'll use it to protect the output blocks first, but later we */
+/* may want more */
+QLock stdiolock;
+int stdoutpid;
+int stderrpid;
 char *squidboy = "Hello, Squidboy!\n";
 
 unsigned long
@@ -407,15 +412,25 @@ debug_the_rest(int fd)
 	}
 }
 
-void
+/*
+ * This will fork off a process to read
+ */
+ 
+int
 forward_stdio(int type, char *path)
 {
 	Biobuf *buf;
 	void *line;
 	int len;
+	int cpid;
 	
 	/* open stderr pipe for reading */
 	buf = Bopen(path, OREAD);
+	
+	/* fork first */
+	cpid = rfork(RFPROC|RFMEM);
+	if(cpid != 0)
+		return cpid;
 	
 	/* read a line */
 	for(;;) {
@@ -423,11 +438,15 @@ forward_stdio(int type, char *path)
 		if(line != 0) {
 			len = Blinelen(buf);
 			/* NOTE: the 1's here are arbitrary */
+			qlock(&stdiolock);
 			data_write_out(type, 1, 1, 1, line, len, 0);
+			qunlock(&stdiolock);
 		} else {
 			sleep(5);	/* do we need to do something else here? */
 		}
 	}
+	
+	/* should never get here */
 }
 
 int receive_data_loop(void)
@@ -483,23 +502,17 @@ int receive_data_loop(void)
 		/* We don't care about the encrypted message (nor timeout
 		   for that matter). */
 
-	/* WE DONT SEND AN ACK ON DATA STREAM
-		memset(enc_msg, '\0', VERSION_MSG_ENC_LEN);
- 
-		if (data_write_prefix(DATA_VERSION_MESSAGE, sizeof(uint32_t) * 3
-				      + VERSION_MSG_ENC_LEN) ||
-		    stream_write_int(stdiofd, data_protocol_version) || 
-		    stream_write_arr(stdiofd, enc_msg,
-				     VERSION_MSG_ENC_LEN)) {
-		    fprint(logfd, "Error writing message on DATA stream!\n");
-		    return 1;
-		}
-     */
 		free(enc_msg);
 		
-		//debug_the_rest(stdiofd);
+
 		
-		forward_stdio(STDERR_MESSAGE, "/n/error/data1");
+		/* 
+		 * TODO: this is where we want to fork of streamers
+		 * for stderr and stdout.
+		 * we can deal with stdin later.
+		 */ 
+		stderrpid = forward_stdio(STDERR_MESSAGE, "/n/error/data1");
+		stdoutpid = forward_stdio(STDOUT_MESSAGE, "/n/output/data1");
 		break;
 	    }
 
