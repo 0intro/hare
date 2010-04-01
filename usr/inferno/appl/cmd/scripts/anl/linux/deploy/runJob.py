@@ -1,5 +1,40 @@
 #!/usr/bin/env python
 
+# runJob.py - start a XCPU3 job
+# Copyright 2010 Pravin Shinde
+# 
+
+def showUsage () :
+    print """
+USAGE: runJob.py [-l hare_location] [-9 py9p_location]  
+                [-h brasil_host] [-p brasil_port] 
+                [-n numnodes] [-o os_type] [-a architecture_type]
+                "cmd arg1 arg2 ..." </path/to/inputfile>
+ 
+ARGUMENTS:
+    -l: hare_location default value ["/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"]
+    -9: py9p_loation (specify only if py9p is installed separately)
+    -D: debug mode
+    -h: host running brasil daemon (defaults to current host)
+    -p: port running brasil daemon (default: 5670)
+    -n: number of cpu nodes to provision (mandetory)
+    -o: OS type (default value "any") (supported values: Linux, Plan9, MacOSX, Nt)
+    -a: arch type (default value "any") (supported values: 386, arm, power, spim)
+    "cmd arg1 arg2 ...": command to run on I/O nodes (eventually compute nodes maybe)
+        (WARN: if commmand has arguments, make sure to include it in double quotes)
+   <path/to/inputfile> If present, this file is used as STDIN
+
+ENVIRONMENT VARIABLES: (can be used to override defaults in place of cmdline)
+	HARE_LOCATION - Place where hare executables are installed
+	BRASIL_HOST - host running brasil daemon
+	BRASIL_PORT - port running brasil daemon
+
+EXAMPLES
+    runJob.py -n 4 date
+    runJob.py -l /path/to/hare/binaries/ -n 8 -o Linux -a 386 "wc -l" /path/to/input/file
+    runJob.py -9 /path/to/py9p/ -n 3 -o Linux date
+"""
+
 
 import socket
 import sys
@@ -9,14 +44,59 @@ import getpass
 import code
 import readline
 import atexit
-sys.path.append ('./py9p/py9p')
-import py9p
 
+# Find the location of py9p
+DEFAULTPY9P = "/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"
+import getopt
+py9pPath = DEFAULTPY9P + "/py9p/"
+pathSource = "Default Path ["  + DEFAULTPY9P + "] "
+
+if 'HARE_PATH' in os.environ:
+    py9pPath = os.environ['HARE_PATH'] + "/py9p/"
+    pathSource = "Environment Variable HARE_PATH ["  + os.environ['HARE_PATH'] + "] "
+
+try:
+    opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
+    for o,a in opts:
+        if o == "-l" :
+            py9pPath = a + "/py9p/"
+            pathSource = "cmdline arg -l ["  + a + "] "
+        
+        if o == "-9" :
+            py9pPath = a
+            pathSource = "cmdline arg -9 ["  + a + "] "
+except getopt.GetoptError:
+    pass
+    
+if not os.path.exists(py9pPath+"/py9p/py9p.py"):
+    print "ERROR: Could not find py9p in the location [" \
+        + py9pPath + "] specified by : " + pathSource
+    print """
+    You can do following to solve this problem.
+        1. use -l to specify the path to brasil binary executables.
+        2. use -9 to specify the path to py9p if it is not inside brasil binaries. 
+        3. Set environment variable HARE_PATH pointing to brasil binary executables
+        4. Copy the brasil binary executables in default location : """ + DEFAULTPY9P
+    showUsage ()
+    sys.exit()
+
+#print "Using py9p location [" + py9pPath +"]"
+sys.path.append (py9pPath + '/py9p')
+try:
+    import py9p
+except :
+    print "ERROR: Could not import py9p"
+    print "Please provide path to py9p or hare installation " \
+        + "from environment variable or command line parameter"
+    sys.exit()
+        
 remoteURL = ""
 #baseURL = "/cmd2/local/"
 #baseURL = "/task/remote/"
 baseURL = "/csrv/local/"
-class XCPU3Client():
+#baseURL = "/local/"
+
+class XCPU3Client:
     
     sessionID = None
     DEBUG = False
@@ -207,31 +287,90 @@ class XCPU3Client():
         self.dPrint ( "Done..")
 
         
-def showUsage () :
-        print "Usage: " + sys.argv[0] + " <server-ip> <port> <number of resources>"\
-        + " <command> <inputFile>"
-        print "Example: " + sys.argv[0] + " localhost 5544 0 \"ls -l\""
-        print "Example: " + sys.argv[0] + " localhost 5544 \"3 Linux 386\" \"wc -l\" " + sys.argv[0]
+
         
 
 def main ():
-    if (len(sys.argv) > 4 ) :
-        remoteHost = sys.argv[1]
-        remotePort = int(sys.argv[2])
-        resReq = sys.argv[3]
-        command = sys.argv[4]
-        inFile = None
-    else :
+    # Filling default values to all the variables which are not provided with
+    brasilHost = "localhost"
+    brasilPort = 5670
+    nflag = None
+    osType = None
+    archType = None
+    debug = False
+    
+    # Overriding the values from environment variables
+    if 'BRASIL_HOST' in os.environ:
+        brasilHost = os.environ['BRASIL_HOST']
+    
+    if 'BRASIL_PORT' in os.environ:
+        brasilPort = int (os.environ['BRASIL_PORT'])
+
+    try:
+        opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
+        for o,a in opts:
+            if o == "-h" :
+                brasilHost = a
+            elif o == "-p" :
+                brasilPort = int (a)
+            elif o == "-n" :
+                nflag = a
+            elif o == "-o" :
+                osType = a
+            elif o == "-a" :
+                archType = a
+            elif o  == "-D" :
+                debug = True
+            elif ( o in ( "-9", "-l" ) ) :
+                a = 1 + 1
+            else :
+                print "ERROR: Wrong option provided " + o
+                showUsage ()
+                sys.exit ()
+
+        argLen = len (args)
+        
+        if nflag == None :
+            print "ERROR: Number of CPU's needed is not provided"
+            showUsage ()
+            sys.exit ()
+        
+        if (int(nflag) < 0 ) :
+            print "ERROR: Number of CPU's provided are invalid"
+            showUsage ()
+            sys.exit ()
+        
+        resReq = nflag
+        
+        if osType not in (None, "any", "Any", "ANY", "*" ) :
+            resReq = resReq + " " + osType
+            if archType not in (None, "any", "Any", "ANY", "*" ) :
+                resReq = resReq + " " + archType
+            
+        if (argLen == 1 ):
+            command = args[0]
+            inFile=None
+        elif (argLen == 2):
+            command = args[0]
+            inFile=args[1]
+        elif (argLen > 2 ):
+            print "ERROR: Too many arguments provided"
+            showUsage ()
+            sys.exit ()
+        else :
+            print "ERROR: command to execute is not provided"
+            showUsage ()
+            sys.exit ()
+            
+    except getopt.GetoptError:
+        print "exception"
         showUsage ()
         sys.exit()
 
-    
-    if (len(sys.argv) > 5 ) :
-        inFile = sys.argv[5]
 
     # acutal code responsible for working
-    mycpu = XCPU3Client (remoteHost, remotePort)
-#    mycpu.DEBUG = True
+    mycpu = XCPU3Client (brasilHost, brasilPort)
+    mycpu.DEBUG = debug
     print "Top statistics is"
     mycpu.topStat()
     

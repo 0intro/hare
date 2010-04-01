@@ -459,6 +459,35 @@ procreadremote (void *a)
 } /* end function : procreadremote () */
 
 
+static void 
+proc_splice (void *) 
+{
+	Chan *src;
+	Chan *dst;
+	char buff[513];
+	char *a;
+	long r, ret;
+
+	while (1) {
+		/* read data from source channel */
+		ret = devtab[src->type]->read(src, buff, 512, 0);
+		if (ret <= 0 ) {
+			break;
+		}
+
+		a = buff;
+		while (ret > 0) {
+			r = devtab[dst->type]->write(dst, a, ret, 0);
+			ret = ret - r;
+			a = a + r;
+		}
+
+	} /* end while */
+	cclose (src);
+	cclose (dst);
+
+} /* end function : proc_splice */
+
 /* Opens file/dir 
 	It checks if specified channel is allowed to open,
 	if yes, it marks channel as open and returns it.
@@ -635,7 +664,7 @@ cmdopen (Chan *c, int omode)
 
 
 					if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
-						/* FIXME: start the reader thread */
+						/* start the reader thread */
 						if (vflag) print ("\nthread starting" );
 //						sprint (buff, "PRR[%s]", c->name->s);
 						kproc (buff, procreadremote, rf, 0 );
@@ -1216,6 +1245,7 @@ enum
 {
 	CMres,
 	CMdir,
+	CMsplice,
 	CMexec,
 	CMkill,
 	CMnice,
@@ -1226,6 +1256,7 @@ static
 Cmdtab cmdtab[] = {
 	CMres,	"res",	0,
 	CMdir,	"dir",	2,
+	CMsplice,	"splice",	2,
 	CMexec,	"exec",	0,
 	CMkill,	"kill",	1,
 	CMnice,	"nice",	0,
@@ -1858,12 +1889,10 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 	tmprr = c->rjob->first ;
 	runlock (&c->rjob->l);
 
-	if (vflag) print ("#####came here\n");
 	for (i = 0 ; i < tmpjc; ++i) {
 		ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
 				write (tmprr->remotefiles[filetype].cfile, a, n, offset);	
 
-		if (vflag) print ("#####loop here %d\n", i);
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
 	}
@@ -1974,11 +2003,15 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	int r, ret;
 	long tmpjc;
 	Conv *c;
+	Chan *chan_array[2];
 	Cmdbuf *cb;
 	Cmdtab *ct;
 	long resNo;
 	char *os;
 	char *arch;
+	char *parent_path;
+	char *buff;
+
 
 	USED (offset);
 	if (vflag) print ("write in file [%s]\n", ch->name->s); 
@@ -1986,8 +2019,6 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 
 	/* find no. of remote jobs running */
 	c = cmd.conv[CONV (ch->qid)];
-
-
 
 	tmpjc = getrjobcount (c->rjob);
 
@@ -1997,7 +2028,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	case Qctl:
 
 		if (c->rjob == nil) {
-			if (vflag)print ("resources released, as clone file closed\n");
+			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
 		}
 
@@ -2119,6 +2150,30 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 			if (vflag) print ("executing cammand - done\n");
 			break;
 
+		case CMsplice:
+			if (tmpjc < 0) {
+				if (vflag) print ("No reservation done\n");
+				error(ENOReservation);
+				break;
+			}
+
+			if (waserror ()){
+				if (vflag) print ("splice failed\n");
+				nexterror ();
+			}
+			/* find the path to stdio file */
+			parent_path = fetchparentpathch (ch);
+			buff  = malloc (strlen(parent_path) + 8);
+			sprint (buff, "%s/stdio", parent_path );
+			chan_array[0] = namec (buff, Aopen, OREAD, 0);
+			chan_array[1] = namec (cb->f[1], Aopen, OWRITE, 0);
+			kproc ("splice", chan_array, 0);
+			poperror ();
+
+			break;
+
+
+			
 		case CMdir:
 			if (tmpjc < 0) {
 				if (vflag) print ("No reservation done\n");
