@@ -13,7 +13,7 @@ dev
 	fs
 	task
 	cmd	cmd
-	cmd2	cmd
+#	cmd2	cmd
 	indir
 
 #	draw	win-x11a

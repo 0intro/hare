@@ -22,7 +22,7 @@ Emuinit: module
 # isnt this in env.m?
 
 logfd: ref Sys->FD;
-fsaddr: string;		# host file system export
+fsaddr: string;		# file system export
 debugaddr: string;	# brasil debug export
 csrvaddr: string;	# central services export
 backaddr: string;	# back mount address (for Linux)
@@ -84,7 +84,7 @@ init()
 	arg = load Arg Arg->PATH;
 	mode: string;
 	
-	fsaddr = "tcp!*!5670";		# host file system export
+	fsaddr = "tcp!*!5670";		#  file system export
 	backaddr = "tcp!127.0.0.1!5640";# csrv backmount export
 	
 	if (arg == nil)
@@ -109,7 +109,7 @@ init()
 			arg->init(args);
 			while((c = arg->opt()) != 0)
 				case c {
-				'h' =>			# host export addr
+				'h' =>			# fs export addr
 					fsaddr = arg->arg();
 				'd' =>			# brasil debug addr
 					debugaddr = arg->arg();
@@ -143,9 +143,8 @@ init()
 	sys->bind("/tmp/brasil.log", "/dev/cons", sys->MREPL);
 		
 	sh->system(nil, "mount -c {/dis/mntgen.dis} /n"); # setup tmp for us
-	
+	sys->bind("#C", "/", sys->MAFTER);
 	sys->bind("#e", "/env", sys->MREPL|sys->MCREATE);
-#	sys->bind("#T", "/task", sys->MREPL|sys->MCREATE);	
 	sys->bind("#U*", "/n/local", sys->MREPL|sys->MCREATE);
 	if(sys->bind("#I", "/net", sys->MREPL) < 0) {
 		# no net might mean we are on Plan 9
@@ -157,7 +156,6 @@ init()
 	}
 	
 	sh->system(nil, "mount -c {mntgen} /n/csrv"); # shadow csrv
-#	sys->bind("#2", "/csrv", sys->MBEFORE);
 	sys->bind("#T", "/csrv", sys->MBEFORE);
 	sys->bind("#U*", "/csrv/local/fs", sys->MREPL|sys->MCREATE);
 	sys->bind("/net", "/csrv/local/net", sys->MREPL);
@@ -187,7 +185,7 @@ init()
 	
 	# TODO: Get better synchronization
 	sys->sleep(5);
-	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /n/local");
+	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 	if(debugaddr != nil){
 		sys->fprint(logfd, "exporting to %s\n", debugaddr);
 		sh->system(nil, "/dis/styxlisten.dis -A "+debugaddr+" export /");

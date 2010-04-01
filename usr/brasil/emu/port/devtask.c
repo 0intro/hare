@@ -139,6 +139,11 @@ static struct
 	Conv	**conv;
 } cmd;
 
+static struct for_splice
+{
+	Chan *src;
+	Chan *dst;
+};
 
 /* function prototypes */
 static Conv *cmdclone (char *);
@@ -149,6 +154,8 @@ static void cmdproc(void *a);
 static long lookup(char *word, char **wordlist, int len);
 static void initinfo (long info[OSCOUNT][PLATFORMCOUNT]);
 static long readstatus (char *a, long n, vlong offset);
+static void proc_splice (void *);
+
 /* function prototypes from other files */
 long dirpackage (uchar *buff, long ts, Dir **d);
 
@@ -460,13 +467,19 @@ procreadremote (void *a)
 
 
 static void 
-proc_splice (void *) 
+proc_splice (void *param) 
 {
 	Chan *src;
 	Chan *dst;
 	char buff[513];
 	char *a;
 	long r, ret;
+	struct for_splice *fs;
+	
+	fs = (struct for_splice *) param;
+
+	src = fs->src;
+	dst = fs->dst;
 
 	while (1) {
 		/* read data from source channel */
@@ -2011,6 +2024,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	char *arch;
 	char *parent_path;
 	char *buff;
+	struct for_splice *fs;
 
 
 	USED (offset);
@@ -2165,15 +2179,14 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 			parent_path = fetchparentpathch (ch);
 			buff  = malloc (strlen(parent_path) + 8);
 			sprint (buff, "%s/stdio", parent_path );
-			chan_array[0] = namec (buff, Aopen, OREAD, 0);
-			chan_array[1] = namec (cb->f[1], Aopen, OWRITE, 0);
-			kproc ("splice", chan_array, 0);
+			fs = (struct for_splice *)malloc(sizeof(struct for_splice));
+			fs->src = namec (buff, Aopen, OREAD, 0);
+			fs->dst = namec (cb->f[1], Aopen, OWRITE, 0);
+			kproc ("proc_splice", proc_splice, fs, 0);
 			poperror ();
 
 			break;
 
-
-			
 		case CMdir:
 			if (tmpjc < 0) {
 				if (vflag) print ("No reservation done\n");

@@ -1,8 +1,9 @@
 #!/boot/rc -m /boot/rcmain
 #flag x +
+#
 
 # try to keep this up to date to keep things straight
-/boot/echo Boot Script Version 0.2 03142010
+/boot/echo Boot Script Version 0.7 03312010
 
 cputype=power
 objtype=$cputype
@@ -11,6 +12,7 @@ authid=glenda
 rootdir=/root
 rootspec=''
 rootsrv=boot
+job_home=''
 
 beetroot=bgp.rr
 #authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'	# -a ...
@@ -127,6 +129,9 @@ bind -a $rootdir/rc/bin /bin
 mntgen
 cd /
 
+#ramfs so we can copy binaries in & have scratch space
+ramfs /tmp
+
 #
 # Finish environment setup and start services.
 #
@@ -142,6 +147,13 @@ prompt=($sysname'# ' '	')
 # start CIOD services
 #
 if(~ $cpunode '0'){
+	#
+	# Setup standard out and error fifo pipes
+	#
+	
+	bind '#|' /n/error
+	bind '#|' /n/output
+
 	# wait for ethernet to come up
 	echo Waiting for turbines to come up to speed
 	sleep 30
@@ -164,6 +176,16 @@ if(~ $cpunode '0'){
 	}
 }
 
+# TODO: fix this
+fn prefix_log {
+	while(x=`{read -n 1})
+		echo $sysname : $x
+	
+	# we want to hold the log file open, so don't die
+	while(~ 1 1)
+		sleep 1000
+}
+
 #
 # New FS Backmount Model
 #
@@ -181,23 +203,32 @@ if(test -e '/env/MODE') {
 		echo Atomic batteries to power
 
 		times=0
-		while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr frontend /n/frontend) {
+		while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr brasil /n/brasil) {
 			echo -n '.'
 			times=($times 1)
 			sleep 5
 		}
 		echo done.
 	}
+	
+	# frontend host file system is at n/local under brasil
+	bind -c /n/brasil/n/local /n/frontend
 
 	if(test -e '/env/HOME') {
 		fshome=(`{cat /env/HOME})
-		bind /n/frontend^$fshome /n/home
+		bind -c /n/frontend^$fshome /n/home
 	}
 	
 	if(test -e '/env/PLAN9_ROOT') {
 		plan9root=(`{cat /env/PLAN9_ROOT})
-		bind /n/frontend^$plan9root /n/root
+		bind -c /n/frontend^$plan9root /n/root
 	}
+	
+	# redirect IO node log and console
+	@{
+		rfork
+		cat /dev/kmesg /dev/kprint | prefix_log > /n/error/data 
+	} &
 }
 if not {
 	echo No mode detected
@@ -207,7 +238,7 @@ if(~ $cpunode '1'){
 	# wait at least 40 before proceeding to let I/O Node Setup
 	echo Waiting for turbines to come up to speed
 	sleep 40	
-	echo would have mounted here!
+
 	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
 	times=0
 	while(! ~ $#times 12 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr ionode /n/io) {
@@ -223,18 +254,22 @@ if(~ $cpunode '1'){
 	bind -a /n/io/env /env
 	mode=(`{cat /env/MODE})
 	
+	# Redirect CPU node console and log
+	@{
+		rfork
+		cat /dev/kmesg /dev/kprint | prefix_log > /n/io/n/error/data
+	}&
+	
 	echo done.
 }	
 
-#ramfs so we can copy binaries in
-ramfs /tmp
+
 
 # execute user profile
 if(test -e '/n/home/lib/profile') {
-		. /n/home/lib/profile
+	. /n/home/lib/profile
 }
 
-# TODO: evaluate whether to do this in profile or based on option
 echo starting services
 bind /boot/rc/bin/service /bin/service
 
@@ -244,36 +279,68 @@ if not
 	aux/listen -i -t /bin/service tcp
 	
 fn runit {
-	# this can probably be done a better way, but
-	#   first check if its in our namespace, then check if its in the frontend ns
-	if(test -e $job_home)
-		cd $job_home
-	if not
-		cd /n/frontend^$job_home
-	
 	if(test -e $1)
-		eval $task
-	if not
+		eval $* 
+	if not {
 		cmd = /n/frontend^$1
 		shift 1
 		args = $*
 		eval ($cmd $args)
+	}
 }
 
-# TODO: send output someplace nice
-if(~ $cpunode '1'){
-	if(~ $mode nompirun) {
-		if(test -e '/env/job_homedir') 
-			job_home=(`{cat /env/job_homedir})
-		if(test -e '/env/job_args') 
-			job_args=(`{cat /env/job_args})	
-	
-		task=`{echo $job_args}
-		runit $task
+fn run_app {
+	#flag x +
+	if(test -e '/env/job_homedir') 
+		job_home=(`{cat /env/job_homedir})
 		
-		echo done
+	if(test -n $job_home) {
+		if(test -e $job_home)
+			cd $job_home		
+		if not
+			cd /n/frontend^$job_home
+	}
+	if not
+		cd /tmp
+
+	if(test -e '/env/job_argenv') 
+		job_args=(`{cat /env/job_argenv})	
+		
+	if(test -n $job_args)
+		task=`{echo $job_args}
+	if not
+		task='echo WARNING: command not detected'
+
+	if(test -n $job_home) {		
+		# EVH: took this out for now because result can be unexpected
+		# EVH: such as going to cpu's /tmp instead of front-ends
+		# EVH: perhaps we need a special switch to override front-end
+		# EVH: job_home behavior
+		#	
+		#if(test -e $job_home)
+		#	cd $job_home
+		#if not
+		cd /n/frontend^$job_home
+	}
+		
+	# encapsulate as a subtask?
+	runit $task | prefix_log > /n/io/n/output/data
+}
+
+# if someone passed us an application to run, then lets run it
+if(~ $cpunode '1'){
+echo cpu node only bits: $mode
+	if(~ $mode nompirun) {
+		echo nompirun mode: starting request application
+		@{
+			rfork
+			run_app
+		} &
+
+		wait
 		# TODO: perhaps send a RAS message signaling job completetion?
-		# and then spin - exiting here seems to be bad		
+
+		echo done	
 	}
 }
 	
