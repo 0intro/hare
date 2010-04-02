@@ -1,29 +1,33 @@
 #!/bin/bash
 #
-# deployBrasil.sh : Script to launch the brasil instance
-#
-# USAGE: 
-# deployBrasil.sh [-p brasil_port] [-l hare_location] [-f]
-#
-# ARGUMENTS :
-#    -p: port running brasil daemon (should be unique per user)
-#    -l: path to the location of hare installation
-#	 -f: runs brasil in foreground (by default it runs in background)
-#
-# ENVIRONMENT VARIABLES: (Can be used to override defaults in the place of cmdline)
-#   HARE_LOCATION: Location of hare installation 
-#				(default location [/bgsys/argonne-utils/profiles/plan9/LATEST/bin/])
-#	BRASIL_PORT - port running brasil daemon (should be unique) (default 5670)
-#
-# By default, Inferno root filesystem will be exported on port 5670.
-# User can give different port by passing command line option -p.
-#
-# EXAMPLES
-#   deployBrasil.sh 
-#   deployBrasil.sh -p 4433
-#   deployBrasil.sh -l /path/to/hare/installation/bin/ -p 4433
-#
-#
+usage () {
+printf """
+deployBrasil.sh : Script to launch the brasil instance
+
+USAGE: 
+deployBrasil.sh [-p brasil_port] [-l hare_location] [-f]
+
+ARGUMENTS :
+   -p: port running brasil daemon (should be unique per user)
+   -l: path to the location of hare installation
+   -f: runs brasil in foreground (by default it runs in background)
+
+ENVIRONMENT VARIABLES: (Can be used to override defaults in the place of cmdline)
+	HARE_LOCATION: Location of hare installation 
+			(default location [/bgsys/argonne-utils/profiles/plan9/LATEST/bin/])
+	BRASIL_PORT - port running brasil daemon (should be unique) (default 5670)
+
+By default, Inferno root filesystem will be exported on port 5670.
+User can give different port by passing command line option -p.
+
+EXAMPLES
+  deployBrasil.sh 
+  deployBrasil.sh -p 4433
+  deployBrasil.sh -l /path/to/hare/installation/bin/ -p 4433
+
+""" >&2
+
+}
 
 # Loading ENVIRONMENTAL DEFAULTS
 pflag=$BRASIL_PORT
@@ -39,7 +43,7 @@ do
 	f)	echo "Running in forground"	
 		fflag="true"
 		;;
-	?)	printf "Usage: %s: [-p brasil_port] [-l hare_location] [-f]\n" $(basename $0) >&2
+	?)	usage 
 		exit 2
 		;;
 	esac
