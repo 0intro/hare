@@ -139,7 +139,7 @@ static struct
 	Conv	**conv;
 } cmd;
 
-static struct for_splice
+struct for_splice
 {
 	Chan *src;
 	Chan *dst;
@@ -481,6 +481,7 @@ proc_splice (void *param)
 	src = fs->src;
 	dst = fs->dst;
 
+	if (vflag) print ("###### proc_splice starting [%s]->[%s]\n", src->name->s, dst->name->s);
 	while (1) {
 		/* read data from source channel */
 		ret = devtab[src->type]->read(src, buff, 512, 0);
@@ -488,6 +489,7 @@ proc_splice (void *param)
 			break;
 		}
 
+		if (vflag) print ("###### proc_splice copying [%s]->[%s] %ld data \n", src->name->s, dst->name->s, ret);
 		a = buff;
 		while (ret > 0) {
 			r = devtab[dst->type]->write(dst, a, ret, 0);
@@ -496,9 +498,11 @@ proc_splice (void *param)
 		}
 
 	} /* end while */
+	if (vflag) print ("###### proc_splice closing [%s]->[%s] \n", src->name->s, dst->name->s);
+
 	cclose (src);
 	cclose (dst);
-
+	if (vflag) print ("###### proc_splice complete \n");
 } /* end function : proc_splice */
 
 /* Opens file/dir 
@@ -884,12 +888,12 @@ cmdclose (Chan *c)
 		cc = cmd.conv[CONV (c->qid)];
 		tmpjc = getrjobcount (cc->rjob);
 
-		if (vflag) print ("#### rjobcount is [%d]\n", tmpjc);
+		if (vflag) print ("rjobcount is [%d]\n", tmpjc);
 		if (tmpjc < 0) {
 			/* FIXME: you can only close status file
 			you cant open other files if job count is -1
 			and if you can't open them, you cant close them.*/
-//			if (vflag) print ("#### returning as rjobcount is [%d]\n", tmpjc);
+//			if (vflag) print ("returning as rjobcount is [%d]\n", tmpjc);
 //			return;
 		}
 		qlock(&cc->l);
@@ -2176,12 +2180,12 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				nexterror ();
 			}
 			/* find the path to stdio file */
-			parent_path = fetchparentpathch (ch);
+			parent_path = fetchparentpath (ch->name->s);
 			buff  = malloc (strlen(parent_path) + 8);
 			sprint (buff, "%s/stdio", parent_path );
 			fs = (struct for_splice *)malloc(sizeof(struct for_splice));
-			fs->src = namec (buff, Aopen, OREAD, 0);
-			fs->dst = namec (cb->f[1], Aopen, OWRITE, 0);
+			fs->dst = namec (buff, Aopen, OWRITE, 0);
+			fs->src = namec (cb->f[1], Aopen, OREAD, 0);
 			kproc ("proc_splice", proc_splice, fs, 0);
 			poperror ();
 
