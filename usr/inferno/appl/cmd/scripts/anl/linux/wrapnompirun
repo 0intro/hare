@@ -1,0 +1,24 @@
+#!/bin/bash
+
+function cleanup {
+	echo cleaning up $JOBID
+	qdel $JOBID
+	echo done.
+}
+
+# main block
+JOBID=`nompirun $@`
+export JOBID
+trap cleanup EXIT
+echo     Waiting for job start....
+BLOCK_ID=None
+while [ $BLOCK_ID = "None" ];
+do
+       sleep 5
+       BLOCK_ID=`qstat --header Location $JOBID | tail -n 1`
+done
+echo Block ID: $BLOCK_ID
+echo Waiting 30 seconds for initialization
+sleep 30
+echo ---------
+tail -f $JOBID.error $JOBID.output

@@ -64,6 +64,6 @@ fi
 
 # Launch the brasil
 arg=`echo "'"tcp!*!$pflag"'"`
-$brasil_exec server -h $arg 
+$brasil_exec server -h $arg < /dev/null > /dev/null &
 #$brasil_exec server -d $arg 
 
