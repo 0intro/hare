@@ -139,6 +139,11 @@ static struct
 	Conv	**conv;
 } cmd;
 
+struct for_splice
+{
+	Chan *src;
+	Chan *dst;
+};
 
 /* function prototypes */
 static Conv *cmdclone (char *);
@@ -149,6 +154,8 @@ static void cmdproc(void *a);
 static long lookup(char *word, char **wordlist, int len);
 static void initinfo (long info[OSCOUNT][PLATFORMCOUNT]);
 static long readstatus (char *a, long n, vlong offset);
+static void proc_splice (void *);
+
 /* function prototypes from other files */
 long dirpackage (uchar *buff, long ts, Dir **d);
 
@@ -459,6 +466,45 @@ procreadremote (void *a)
 } /* end function : procreadremote () */
 
 
+static void 
+proc_splice (void *param) 
+{
+	Chan *src;
+	Chan *dst;
+	char buff[513];
+	char *a;
+	long r, ret;
+	struct for_splice *fs;
+	
+	fs = (struct for_splice *) param;
+
+	src = fs->src;
+	dst = fs->dst;
+
+	if (vflag) print ("###### proc_splice starting [%s]->[%s]\n", src->name->s, dst->name->s);
+	while (1) {
+		/* read data from source channel */
+		ret = devtab[src->type]->read(src, buff, 512, 0);
+		if (ret <= 0 ) {
+			break;
+		}
+
+		if (vflag) print ("###### proc_splice copying [%s]->[%s] %ld data \n", src->name->s, dst->name->s, ret);
+		a = buff;
+		while (ret > 0) {
+			r = devtab[dst->type]->write(dst, a, ret, 0);
+			ret = ret - r;
+			a = a + r;
+		}
+
+	} /* end while */
+	if (vflag) print ("###### proc_splice closing [%s]->[%s] \n", src->name->s, dst->name->s);
+
+	cclose (src);
+	cclose (dst);
+	if (vflag) print ("###### proc_splice complete \n");
+} /* end function : proc_splice */
+
 /* Opens file/dir 
 	It checks if specified channel is allowed to open,
 	if yes, it marks channel as open and returns it.
@@ -635,7 +681,7 @@ cmdopen (Chan *c, int omode)
 
 
 					if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
-						/* FIXME: start the reader thread */
+						/* start the reader thread */
 						if (vflag) print ("\nthread starting" );
 //						sprint (buff, "PRR[%s]", c->name->s);
 						kproc (buff, procreadremote, rf, 0 );
@@ -842,12 +888,12 @@ cmdclose (Chan *c)
 		cc = cmd.conv[CONV (c->qid)];
 		tmpjc = getrjobcount (cc->rjob);
 
-		if (vflag) print ("#### rjobcount is [%d]\n", tmpjc);
+		if (vflag) print ("rjobcount is [%d]\n", tmpjc);
 		if (tmpjc < 0) {
 			/* FIXME: you can only close status file
 			you cant open other files if job count is -1
 			and if you can't open them, you cant close them.*/
-//			if (vflag) print ("#### returning as rjobcount is [%d]\n", tmpjc);
+//			if (vflag) print ("returning as rjobcount is [%d]\n", tmpjc);
 //			return;
 		}
 		qlock(&cc->l);
@@ -1216,6 +1262,7 @@ enum
 {
 	CMres,
 	CMdir,
+	CMsplice,
 	CMexec,
 	CMkill,
 	CMnice,
@@ -1226,6 +1273,7 @@ static
 Cmdtab cmdtab[] = {
 	CMres,	"res",	0,
 	CMdir,	"dir",	2,
+	CMsplice,	"splice",	2,
 	CMexec,	"exec",	0,
 	CMkill,	"kill",	1,
 	CMnice,	"nice",	0,
@@ -1858,12 +1906,10 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 	tmprr = c->rjob->first ;
 	runlock (&c->rjob->l);
 
-	if (vflag) print ("#####came here\n");
 	for (i = 0 ; i < tmpjc; ++i) {
 		ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
 				write (tmprr->remotefiles[filetype].cfile, a, n, offset);	
 
-		if (vflag) print ("#####loop here %d\n", i);
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
 	}
@@ -1974,11 +2020,16 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	int r, ret;
 	long tmpjc;
 	Conv *c;
+	Chan *chan_array[2];
 	Cmdbuf *cb;
 	Cmdtab *ct;
 	long resNo;
 	char *os;
 	char *arch;
+	char *parent_path;
+	char *buff;
+	struct for_splice *fs;
+
 
 	USED (offset);
 	if (vflag) print ("write in file [%s]\n", ch->name->s); 
@@ -1986,8 +2037,6 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 
 	/* find no. of remote jobs running */
 	c = cmd.conv[CONV (ch->qid)];
-
-
 
 	tmpjc = getrjobcount (c->rjob);
 
@@ -2117,6 +2166,29 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 
 			ret = sendtoall (ch, a, n, offset);
 			if (vflag) print ("executing cammand - done\n");
+			break;
+
+		case CMsplice:
+			if (tmpjc < 0) {
+				if (vflag) print ("No reservation done\n");
+				error(ENOReservation);
+				break;
+			}
+
+			if (waserror ()){
+				if (vflag) print ("splice failed\n");
+				nexterror ();
+			}
+			/* find the path to stdio file */
+			parent_path = fetchparentpath (ch->name->s);
+			buff  = malloc (strlen(parent_path) + 8);
+			sprint (buff, "%s/stdio", parent_path );
+			fs = (struct for_splice *)malloc(sizeof(struct for_splice));
+			fs->dst = namec (buff, Aopen, OWRITE, 0);
+			fs->src = namec (cb->f[1], Aopen, OREAD, 0);
+			kproc ("proc_splice", proc_splice, fs, 0);
+			poperror ();
+
 			break;
 
 		case CMdir:
