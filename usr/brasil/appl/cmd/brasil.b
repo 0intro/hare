@@ -176,7 +176,6 @@ init()
 		sh->system(nil, "/dis/ndb/cs.dis");
 	}
 	
-	sh->system(nil, "mount -c {mntgen} /n/csrv"); # shadow csrv
 	sys->bind("#T", "/csrv", sys->MBEFORE);
 	sys->bind("#U*", "/csrv/local/fs", sys->MREPL|sys->MCREATE);
 	sys->bind("/net", "/csrv/local/net", sys->MREPL);

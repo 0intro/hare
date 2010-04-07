@@ -327,7 +327,7 @@ init(nil: ref Draw->Context, nil: list of string)
 	# spawn mntgen thread to handle tree
 	# and feed it one end of a pipe to boot
 	spawn mntgeninit(fspipe[0], addchan);
-	sys->mount(fspipe[1], nil, "/csrv", Sys->MREPL, nil);
+	sys->mount(fspipe[1], nil, "/csrv", Sys->MAFTER, nil);
 	
 	# spawn ctl process
 	spawn ctlworker(addchan, status);
