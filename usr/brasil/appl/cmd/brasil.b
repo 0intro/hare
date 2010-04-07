@@ -91,6 +91,23 @@ redirectoutput(s : chan of int)
 	}
 }
 
+# Establish a backmount for the host
+# Also serves as an external export right now
+# and blocks?
+backmountexport()
+{
+	# export result to host (via srv on Plan 9 or port on UNIX)
+	if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
+		sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
+	} else {
+		sys->fprint(sys->fildes(2), "creating srv export\n");
+		fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
+		if(fd == nil)
+			sys->fprint(sys->fildes(2), "creation of srv export failed: %r\n");
+		sys->export(fd, "/csrv", Sys->EXPWAIT);
+	}			
+}
+
 init()
 {
 	sys = load Sys Sys->PATH;
@@ -168,23 +185,11 @@ init()
 		"simple" =>
 			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 		"csrvlite" =>
-			# TODO: csrv-lite
-			
-			# TODO: this should be the local port
-			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
+			sh->system(nil, "/dis/csrv-lite.dis");
+			backmountexport();
 		"terminal" =>
 			# TODO: initiate ssh duct to remote system
-			
-			# export result to host (via srv on Plan 9 or port on UNIX)
-			if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
-				sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
-			} else {
-				sys->fprint(sys->fildes(2), "creating srv export\n");
-				fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
-				if(fd == nil)
-					sys->fprint(sys->fildes(2), "creation of srv export failed: %r\n");
-				sys->export(fd, "/csrv", Sys->EXPWAIT);
-			}			
+			backmountexport();
 		* => # unknown mode
 			sys->fprint(sys->fildes(2), "unrecognized mode \n");
 			sys->sleep(30);

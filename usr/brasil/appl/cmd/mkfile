@@ -54,6 +54,7 @@ TARG=\
 	cpu.dis\
 	crypt.dis\
 	csrv.dis\
+	csrv-lite.dis\
 	date.dis\
 	dbfs.dis\
 	dd.dis\
