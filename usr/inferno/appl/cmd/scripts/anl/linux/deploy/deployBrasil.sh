@@ -3,11 +3,12 @@
 # deployBrasil.sh : Script to launch the brasil instance
 #
 # USAGE: 
-# deployBrasil.sh [-p brasil_port] [-l hare_location]
+# deployBrasil.sh [-p brasil_port] [-l hare_location] [-f]
 #
 # ARGUMENTS :
 #    -p: port running brasil daemon (should be unique per user)
 #    -l: path to the location of hare installation
+#	 -f: runs brasil in foreground (by default it runs in background)
 #
 # ENVIRONMENT VARIABLES: (Can be used to override defaults in the place of cmdline)
 #   HARE_LOCATION: Location of hare installation 
@@ -28,14 +29,17 @@
 pflag=$BRASIL_PORT
 lflag=$HARE_LOCATION
 
-while getopts 'p:l:' OPTION
+while getopts 'fp:l:' OPTION
 do
 	case $OPTION in
 	p)	pflag="$OPTARG"
 		;;
 	l)	lflag="$OPTARG"
 		;;
-	?)	printf "Usage: %s: [-p brasil_port] [-l hare_location]\n" $(basename $0) >&2
+	f)	echo "Running in forground"	
+		fflag="true"
+		;;
+	?)	printf "Usage: %s: [-p brasil_port] [-l hare_location] [-f]\n" $(basename $0) >&2
 		exit 2
 		;;
 	esac
@@ -49,18 +53,34 @@ then
 	pflag=5670
 fi
 
+# checking if the port is already in use
+if netstat -ntap 2> /dev/null | grep $pflag
+then
+	printf "ERROR: port $pflag is already in use.\nPlease use another port\n\n"
+	exit 2
+fi
+
 if [ -z $lflag ]
 then
 	lflag="/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"
 fi
-brasil_exec="$lflag/brasil"
 
+# Making sure that executable exists
+brasil_exec="$lflag/brasil"
 if  [ ! -x "$brasil_exec" ]
 then
 	echo "Could not find the brasil executable at [$brasil_exec]"
 	exit 2
 fi
+
+# Launch the brasil
 arg=`echo "'"tcp!*!$pflag"'"`
-$brasil_exec server -h $arg < /dev/null > /dev/null &
+
+if [ -z $fflag ]
+then
+	$brasil_exec server -h $arg < /dev/null > /dev/null &
+else
+	$brasil_exec server -h $arg 
+fi
 #$brasil_exec server -d $arg 
 
