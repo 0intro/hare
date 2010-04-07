@@ -44,7 +44,7 @@ enum
 #define RCHANCOUNT 10
 #define BASE "/csrv/local/"
 #define VALIDATEDIR "local"
-#define REMOTEMOUNTPOINT "/remote"
+#define REMOTEMOUNTPOINT "/csrv"
 
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
