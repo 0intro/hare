@@ -20,12 +20,7 @@ Emuinit: module
 };
 
 # isnt this in env.m?
-
-logfd: ref Sys->FD;
 fsaddr: string;		# file system export
-debugaddr: string;	# brasil debug export
-csrvaddr: string;	# central services export
-backaddr: string;	# back mount address (for Linux)
 
 unquoted(s: string): list of string
 {
@@ -73,11 +68,36 @@ getenv(v: string): list of string
 	return unquoted(string buf[0:n]);
 }
 
+# redirect standard output and what not to the log file
+redirectoutput(s : chan of int)
+{
+	# this was for log files (only?)
+	sys->bind("#U*/tmp/", "/tmp", sys->MBEFORE|sys->MCREATE);
+
+	userfd := sys->open("/dev/user", Sys->OREAD);
+	userbuf := array[255] of byte;
+	n := sys->read(userfd, userbuf, 255);
+	logfd := sys->create("/tmp/"+string userbuf[0:n]+"-brasil.log", Sys->OWRITE, 8r666);
+	if(logfd == nil) {
+		sys->print("couldn't open log file: %r\n");
+		s <-= 1;
+	}
+	
+	kpfd := sys->open("/dev/kprint", Sys->OREAD);
+	s <-= 0;
+	while(1) {
+		n = sys->read(kpfd, userbuf, 255);
+		sys->write(logfd, userbuf, n);
+	}
+}
+
 init()
 {
 	sys = load Sys Sys->PATH;
 	sh = load Sh Sh->PATH;
-    {	
+	
+	gateway := 0;
+ 
 	if (sh == nil)
 		sys->fprint(sys->fildes(2), "Couldn't load shell module\n");
 	args := getenv("emuargs");
@@ -85,7 +105,6 @@ init()
 	mode: string;
 	
 	fsaddr = "tcp!*!5670";		#  file system export
-	backaddr = "tcp!127.0.0.1!5640";# csrv backmount export
 	
 	if (arg == nil)
 		sys->fprint(sys->fildes(2), "emuinit: cannot load %s: %r\n", Arg->PATH);
@@ -100,7 +119,7 @@ init()
 		args = arg->argv();
 	
 		if(args==nil) {
-			mode = "Server";
+			mode = "simple";
 		} else {	
 			# pull mode from arguments
 			mode = hd args;
@@ -111,12 +130,8 @@ init()
 				case c {
 				'h' =>			# fs export addr
 					fsaddr = arg->arg();
-				'd' =>			# brasil debug addr
-					debugaddr = arg->arg();
-				'c' =>			# central services addr
-					csrvaddr = arg->arg();
-				'b' =>			# backmount address
-					backaddr = arg->arg();
+				'g' =>			# setup an inbound ssh gateway duct
+					gateway++;	
 				* =>
 					sys->print("detected option: %c\n", c);
 	                  	}		
@@ -126,22 +141,11 @@ init()
 			args = list of {"none"};
 		}
 	}
-	sys->bind("#U*/tmp/", "/tmp", sys->MBEFORE|sys->MCREATE);
 	
-	# bind log file over stdio
-	if(mode == "gateway") {
-		logfd = sys->create("/tmp/brasil.log", Sys->OWRITE, 8r666);
-		if(logfd == nil)
-			sys->print("couldn't open log file: %r\n");
-		else {
-			sys->dup(logfd.fd, 2);	# override stderr? 
-			sys->dup(logfd.fd, 1);	# override stdout? 
-		}
-	} else
-		logfd = sys->fildes(2);
+	sync := chan of int;
+	spawn redirectoutput(sync);
+	<- sync;			# technically a return value
 	
-	sys->bind("/tmp/brasil.log", "/dev/cons", sys->MREPL);
-		
 	sh->system(nil, "mount -c {/dis/mntgen.dis} /n"); # setup tmp for us
 	sys->bind("#C", "/", sys->MAFTER);
 	sys->bind("#e", "/env", sys->MREPL|sys->MCREATE);
@@ -149,7 +153,7 @@ init()
 	if(sys->bind("#I", "/net", sys->MREPL) < 0) {
 		# no net might mean we are on Plan 9
 		if(sys->bind("/n/local/net", "/net", sys->MREPL) < 0) {
-			sys->fprint(logfd, "WARNING: brasil: unable to bind network\n");
+			sys->fprint(sys->fildes(2), "WARNING: brasil: unable to bind network\n");
 		}
 	} else {
 		sh->system(nil, "/dis/ndb/cs.dis");
@@ -161,38 +165,30 @@ init()
 	sys->bind("/net", "/csrv/local/net", sys->MREPL);
 	
 	case mode {
-		#"terminal" =>
-		#	# initiate a remote ssh and 27b-6 over it
-		#	sys->print("terminal");
-		"gateway" =>
-			# TODO: pass csrv port number
-			sh->system(nil, "mount -ca {csrv gw} /csrv");
-		* => # server: provide a backmount
-			if(csrvaddr != nil) {
-				# TODO: pass csrv addr to csrv
-				sh->system(nil, "mount -ca {csrv} /csrv");
-			}
+		"simple" =>
+			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
+		"csrvlite" =>
+			# TODO: csrv-lite
+			
+			# TODO: this should be the local port
+			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
+		"terminal" =>
+			# TODO: initiate ssh duct to remote system
+			
+			# export result to host (via srv on Plan 9 or port on UNIX)
 			if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
-				sh->system(nil, "/dis/styxlisten.dis -A "+backaddr+" export /csrv");
+				sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 			} else {
-				sys->fprint(logfd, "creating srv export\n");
+				sys->fprint(sys->fildes(2), "creating srv export\n");
 				fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
 				if(fd == nil)
-					sys->fprint(logfd, "creation of srv export failed: %r\n");
-				sys->export(fd, "/csrv", Sys->EXPASYNC);
-			}		
+					sys->fprint(sys->fildes(2), "creation of srv export failed: %r\n");
+				sys->export(fd, "/csrv", Sys->EXPWAIT);
+			}			
+		* => # unknown mode
+			sys->fprint(sys->fildes(2), "unrecognized mode \n");
+			sys->sleep(30);
+			getout := sys->open("/dev/sysctl", Sys->OWRITE);
+			sys->fprint(getout, "halt\n");
 	}	
-	
-	# TODO: Get better synchronization
-	sys->sleep(5);
-	sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
-	if(debugaddr != nil){
-		sys->fprint(logfd, "exporting to %s\n", debugaddr);
-		sh->system(nil, "/dis/styxlisten.dis -A "+debugaddr+" export /");
-	}
-    } exception e { # abuse exceptions
-	"*" =>
-    	sys->fprint(logfd, "unexpected exception: %s\n", e);
-    	return;
-    }
 }
