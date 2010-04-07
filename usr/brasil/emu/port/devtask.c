@@ -1498,12 +1498,13 @@ findrr (int *validrc, char *os, char *arch)
 			snprint (location, sizeof (location), 
 				"%s/%s", path, tmpDr->name);
 
-		if (vflag) print ("checking for remote location[%s]\n",location);
-		if (DMDIR & tmpDr->mode) { 
-					tmp = validaterr (location, os, arch);
-				if (tmp != nil) {
-					allremotenodes[tmprc] = tmp;
-						++tmprc;
+		/* entry should be directory and should not be "local" */
+		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) ) { 
+			if (vflag) print ("checking for remote location[%s]\n",location);
+			tmp = validaterr (location, os, arch);
+			if (tmp != nil) {
+				allremotenodes[tmprc] = tmp;
+					++tmprc;
 				if (vflag) print ("Resource [%s]\n", tmp->path);
 			} 
 		}

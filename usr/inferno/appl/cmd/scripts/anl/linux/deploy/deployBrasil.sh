@@ -33,12 +33,15 @@ EXAMPLES
 pflag=$BRASIL_PORT
 lflag=$HARE_LOCATION
 
-while getopts 'fp:l:' OPTION
+while getopts 'fbp:l:' OPTION
 do
 	case $OPTION in
 	p)	pflag="$OPTARG"
 		;;
 	l)	lflag="$OPTARG"
+		;;
+	b)	echo "Running without any arguments"	
+		bflag="true"
 		;;
 	f)	echo "Running in forground"	
 		fflag="true"
@@ -80,6 +83,11 @@ fi
 # Launch the brasil
 arg=`echo "'"tcp!*!$pflag"'"`
 
+
+if [ ! -z $bflag ]
+then
+	$brasil_exec 
+fi
 if [ -z $fflag ]
 then
 	$brasil_exec server -h $arg < /dev/null > /dev/null &
