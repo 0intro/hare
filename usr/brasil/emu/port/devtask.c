@@ -32,7 +32,7 @@ enum
 	Qwait,
 	QLconrdir,
 
-	Debug=0	/* to help debug os.c */
+	Debug=1	/* to help debug os.c */
 };
      
 #define TYPE(x) 	 ( (ulong) (x).path & 0xff)
@@ -50,7 +50,7 @@ char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -1380,6 +1380,7 @@ validaterr (char *location, char *os, char *arch)
 
 	if (vflag) print ("remote dir[%s]= %ld entries\n", location, count);
 	for (i = 0, tmpDr = dr; i < count; ++ i, ++tmpDr) {
+		if (vflag) print ("#### %d [%s/%s]\n", i, location, tmpDr->name);
 		if (DMDIR & tmpDr->mode) {
 			if (strcmp (tmpDr->name, localName) == 0) {
 				break;	
@@ -1498,9 +1499,9 @@ findrr (int *validrc, char *os, char *arch)
 			snprint (location, sizeof (location), 
 				"%s/%s", path, tmpDr->name);
 
+		if (vflag) print ("### checking for remote location[%s]\n",location);
 		/* entry should be directory and should not be "local" */
 		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) ) { 
-			if (vflag) print ("checking for remote location[%s]\n",location);
 			tmp = validaterr (location, os, arch);
 			if (tmp != nil) {
 				allremotenodes[tmprc] = tmp;
