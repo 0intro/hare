@@ -90,9 +90,9 @@ then
 fi
 if [ -z $fflag ]
 then
-	$brasil_exec server -h $arg < /dev/null > /dev/null &
+	$brasil_exec csrvlite  -h $arg < /dev/null > /dev/null &
 else
-	$brasil_exec server -h $arg 
+	$brasil_exec csrvlite  -h $arg 
 fi
 #$brasil_exec server -d $arg 
 
