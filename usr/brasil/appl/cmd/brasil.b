@@ -101,7 +101,7 @@ backmountexport()
 		sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 	} else {
 		sys->fprint(sys->fildes(2), "creating srv export\n");
-		fd := sys->create("/srv/brasil", Sys->ORDWR, 8r600);
+		fd := sys->create("/srv/csrv", Sys->ORDWR, 8r600);
 		if(fd == nil)
 			sys->fprint(sys->fildes(2), "creation of srv export failed: %r\n");
 		sys->export(fd, "/csrv", Sys->EXPWAIT);
