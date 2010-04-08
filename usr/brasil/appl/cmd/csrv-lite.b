@@ -292,6 +292,9 @@ ctlworker(buf: array of byte) :string
 				sys->print("csrv: can't dial %s: %r\n", dialstr);
 				return "csrv: couldn't dial dest";
 			}
+			# setup keepalive for 1 second (aggressive)
+			sys->fprint(dest.cfd, "keepalive 1000\n");
+
 			if(sys->mount(dest.dfd, nil, "/n/"+name, sys->MREPL, nil) < 0) {
 				sys->print("csrv: can't mount %s %s: %r\n", dialstr, csrvroot+name);		
 				return "csrv: couldn't mount dest";
@@ -324,3 +327,4 @@ init(nil: ref Draw->Context, nil: list of string)
 	spawn mntgeninit(fspipe[0]);
 	sys->mount(fspipe[1], nil, "/csrv", Sys->MAFTER, nil);
 }
+
