@@ -13,6 +13,7 @@ enum
 	Qcmd,		/* "remote" dir */
 	Qclonus,
 	Qlocalfs,   /* local fs mount point */
+	Qlocalnet,   /* local net mount point */
 	Qarch,	/* architecture description */
 	Qtopns,	/* default ns for host */
 	Qtopenv,	/* default env for host */
@@ -43,7 +44,7 @@ enum
 #define RCHANCOUNT 10
 #define BASE "/csrv/local/"
 #define VALIDATEDIR "local"
-#define REMOTEMOUNTPOINT "/remote"
+#define REMOTEMOUNTPOINT "/csrv"
 
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
@@ -304,21 +305,26 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		if (s == 2){
+			mkqid (&q, QID (0, Qlocalnet), 0, QTDIR);
+			devdir (c, q, "net", 0, eve, DMDIR|0555, dp);
+			return 1;
+		}
+		if (s == 3){
 			mkqid (&q, QID (0, Qarch), 0, QTFILE);
 			devdir (c, q, "arch", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 3){
+		if (s == 4){
 			mkqid (&q, QID (0, Qtopns), 0, QTDIR);
 			devdir (c, q, "ns", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 4){
+		if (s == 5){
 			mkqid (&q, QID (0, Qtopenv), 0, QTDIR);
 			devdir (c, q, "env", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 5){
+		if (s == 6){
 			mkqid (&q, QID (0, Qtopstat), 0, QTFILE);
 			devdir (c, q, "status", 0, eve, 0666, dp);
 			return 1;
@@ -348,7 +354,15 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		return -1;	
-	
+
+	case Qlocalnet:
+		if (s == 0){
+			mkqid (&q, QID (0, Qlocalnet), 0, QTDIR);
+			devdir (c, q, "net", 0, eve, DMDIR|0555, dp);
+			return 1;
+		}
+		return -1;	
+
 	case Qarch:
 		if (s == 0){
 			mkqid (&q, QID (0, Qarch), 0, QTFILE);
@@ -570,6 +584,7 @@ cmdopen (Chan *c, int omode)
 		break;
 		
 	case Qlocalfs:
+	case Qlocalnet:
 		error (Eperm);
 		break;
 	case Qclonus:
@@ -1483,12 +1498,13 @@ findrr (int *validrc, char *os, char *arch)
 			snprint (location, sizeof (location), 
 				"%s/%s", path, tmpDr->name);
 
-		if (vflag) print ("checking for remote location[%s]\n",location);
-		if (DMDIR & tmpDr->mode) { 
-					tmp = validaterr (location, os, arch);
-				if (tmp != nil) {
-					allremotenodes[tmprc] = tmp;
-						++tmprc;
+		/* entry should be directory and should not be "local" */
+		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) ) { 
+			if (vflag) print ("checking for remote location[%s]\n",location);
+			tmp = validaterr (location, os, arch);
+			if (tmp != nil) {
+				allremotenodes[tmprc] = tmp;
+					++tmprc;
 				if (vflag) print ("Resource [%s]\n", tmp->path);
 			} 
 		}

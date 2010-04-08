@@ -1,22 +1,26 @@
 #!/bin/bash
 #
-# installHelp.sh : Script to help installation of  hare binaries to  proper location
-# 
-# USAGE: 
-# ./installHelp.sh [-l hare_location]
-#
-# WARNING : 
-#	This script *MUST* be executed from the same directory where is is found,
-#		as it depends on "pwd" for locating other files.
-# 
-#
-# ARGUMENTS :
-#    -l: path to the location where hare binaries will be installed.
-#
-# ENVIRONMENT VARIABLES: (Can be used to override defaults in the place of cmdline)
-#   HARE_LOCATION: path to the location where hare binaries will be installed. 
-# 
-# 
+usage () {
+printf """
+installHelp.sh : Script to help installation of  hare binaries to  proper location
+ 
+USAGE: 
+./installHelp.sh [-l hare_location]
+
+WARNING : 
+This script *MUST* be executed from the same directory where is is found,
+	as it depends on pwd for locating other files.
+
+ARGUMENTS :
+	-l: path to the location where hare binaries will be installed.
+
+	ENVIRONMENT VARIABLES: (Can be used to override defaults in the place of cmdline)
+	HARE_LOCATION: path to the location where hare binaries will be installed. 
+""" >&2
+
+}
+
+
 set -e
 # ENVIRONMENTAL DEFAULTS
 lflag=$HARE_LOCATION
@@ -26,7 +30,7 @@ do
 	case $OPTION in
 	l)	lflag="$OPTARG"
 		;;
-	?)	printf "Usage: %s: [-l hare_location]\n" $(basename $0) >&2
+	?)	usage
 		exit 2
 		;;
 	esac
