@@ -1,25 +1,25 @@
 #!/bin/rc
 #host=9.3.45.5
 host=127.1
-port=5544
+port=5670
 cmd='wc -l'
 input=runJob
-srv -b tcp!$host!$port csrv
+#srv -b tcp!$host!$port csrv
 mount /srv/csrv /n/XCPU3
 @{
 x=`{cat }
 echo $x
-cat /n/XCPU3/csrv/local/$x/status
-rsrc=`{cat /n/XCPU3/csrv/local/status}
+cat /n/XCPU3/local/$x/status
+rsrc=`{cat /n/XCPU3/local/status}
 echo $rsrc
-echo res 1 >/n/XCPU3/csrv/local/$x/ctl
-cat /n/XCPU3/csrv/local/$x/status
-echo exec $cmd >/n/XCPU3/csrv/local/$x/ctl
-cat $input > /n/XCPU3/csrv/local/$x/stdio
-cat /n/XCPU3/csrv/local/$x/stdio 
-cat /n/XCPU3/csrv/local/$x/status
-cat /n/XCPU3/csrv/local/$x/status
-}<>/n/XCPU3/csrv/local/clone 
+echo res 1 >/n/XCPU3/local/$x/ctl
+cat /n/XCPU3/local/$x/status
+echo exec $cmd >/n/XCPU3/local/$x/ctl
+cat $input > /n/XCPU3/local/$x/stdio
+cat /n/XCPU3/local/$x/stdio 
+cat /n/XCPU3/local/$x/status
+cat /n/XCPU3/local/$x/status
+}<>/n/XCPU3/local/clone 
 
 unmount /n/XCPU3
 

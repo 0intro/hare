@@ -495,7 +495,7 @@ proc_splice (void *param)
 	src = fs->src;
 	dst = fs->dst;
 
-	if (vflag) print ("###### proc_splice starting [%s]->[%s]\n", src->name->s, dst->name->s);
+	if (vflag) print ("proc_splice starting [%s]->[%s]\n", src->name->s, dst->name->s);
 	while (1) {
 		/* read data from source channel */
 		ret = devtab[src->type]->read(src, buff, 512, 0);
@@ -503,7 +503,7 @@ proc_splice (void *param)
 			break;
 		}
 
-		if (vflag) print ("###### proc_splice copying [%s]->[%s] %ld data \n", src->name->s, dst->name->s, ret);
+		if (vflag) print ("proc_splice copying [%s]->[%s] %ld data \n", src->name->s, dst->name->s, ret);
 		a = buff;
 		while (ret > 0) {
 			r = devtab[dst->type]->write(dst, a, ret, 0);
@@ -512,11 +512,11 @@ proc_splice (void *param)
 		}
 
 	} /* end while */
-	if (vflag) print ("###### proc_splice closing [%s]->[%s] \n", src->name->s, dst->name->s);
+	if (vflag) print ("proc_splice closing [%s]->[%s] \n", src->name->s, dst->name->s);
 
 	cclose (src);
 	cclose (dst);
-	if (vflag) print ("###### proc_splice complete \n");
+	if (vflag) print ("proc_splice complete \n");
 } /* end function : proc_splice */
 
 /* Opens file/dir 
@@ -1387,20 +1387,24 @@ validaterr (char *location, char *os, char *arch)
 			}
 		}
 	}
+	if (vflag) print ("validaterr: Freeing up\n");
 	free (dr);
+	if (vflag) print ("validaterr: Freeing done\n");
 	
 	ans = (remoteMount *) malloc (sizeof (remoteMount));
 	ans->path = (char *)malloc (strlen (location) + strlen (localName) + 2);
 	snprint (ans->path, (strlen (location) + strlen (localName) + 2),
 				"%s/%s", location, localName);
 
+	
 	if (i == count) {
+		if (vflag) print ("validaterr: [%s] not found, returning\n", localName);
 		free (ans->path);
 		free(ans);
-		free (dr);
 		poperror ();
 		return nil;
 	}
+	if (vflag) print ("validaterr: now  searching for clone file\n");
 
 	count = lsdir (ans->path, &dr);
 	poperror ();
@@ -1499,7 +1503,7 @@ findrr (int *validrc, char *os, char *arch)
 			snprint (location, sizeof (location), 
 				"%s/%s", path, tmpDr->name);
 
-		if (vflag) print ("### checking for remote location[%s]\n",location);
+		if (vflag) print ("checking for remote location[%s]\n",location);
 		/* entry should be directory and should not be "local" */
 		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) ) { 
 			tmp = validaterr (location, os, arch);
@@ -2455,6 +2459,74 @@ Dev taskdevtab = {
 /*************** UTILITY FUNCTIONS *************/
 
 
+long
+myunionread(Chan *c, void *va, long n)
+{
+	int i;
+	long nr;
+	long a_nr;
+	void *a_va;
+	long a_n;
+	Mhead *m;
+	Mount *mount;
+
+	qlock(&c->umqlock);
+	m = c->umh;
+	rlock(&m->lock);
+	mount = m->mount;
+
+
+	if (vflag) print ("#### inside myunionread for [%s]\n", c->name->s);
+	/* bring mount in sync with c->uri and c->umc */
+	for(i = 0; mount != nil && i < c->uri; i++)
+		mount = mount->next;
+
+	nr = 0;
+	a_va = va;
+	a_n = n;
+	a_nr = 0;
+	while(mount != nil) {
+		if (vflag) print("#### myunionread looping  [%s]\n", c->name->s);
+		/* Error causes component of union to be skipped */
+		if(mount->to && !waserror()) {
+			if(c->umc == nil){
+				c->umc = cclone(mount->to);
+				c->umc = devtab[c->umc->type]->open(c->umc, OREAD);
+			}
+	
+			if (vflag) print("#### myuninrd reading [%s]\n",c->umc->name->s);
+			nr = devtab[c->umc->type]->read(c->umc, a_va, a_n, c->umc->offset);
+			if(nr < 0)
+				nr = 0;	/* dev.c can return -1 */
+			c->umc->offset += nr;
+			poperror();
+		} /* end if */
+		if(nr > 0) {
+			if (vflag) print ("#### myunionread got something out[%s]\n", c->umc->name->s);
+			/* break; */ /* commenting so that it will read from all chans*/
+			a_va = (char *)a_va + nr;
+			a_n = a_n - nr;
+			a_nr = a_nr + nr;
+			if (a_n <= 0 ) {
+				if (vflag) print ("#### myunionread buffer full, breking");
+				break;
+			}
+		} /* end if : nr > 0 */
+
+		/* Advance to next element */
+		c->uri++;
+		if(c->umc) {
+			cclose(c->umc);
+			c->umc = nil;
+		}
+		mount = mount->next;
+	} /* end while */
+	runlock(&m->lock);
+	qunlock(&c->umqlock);
+	return a_nr;
+} /* end function : myunionread */
+
+
 /* Reads from specified channel.
 	It works on both directory and file channels.
 */
@@ -2474,7 +2546,8 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 	dir = rc->qid.type & QTDIR;
 	if (dir && rc->umh) {
 		if (vflag) print ("### going for unionread\n");
-		n = unionread (rc, va, n);
+		n = myunionread (rc, va, n);
+		if (vflag) print ("### done from unionread\n");
 	}
 	else{
 		if (vflag) print ("### not going for unionread\n");
