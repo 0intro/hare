@@ -2473,9 +2473,11 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 
 	dir = rc->qid.type & QTDIR;
 	if (dir && rc->umh) {
+		if (vflag) print ("### going for unionread\n");
 		n = unionread (rc, va, n);
 	}
 	else{
+		if (vflag) print ("### not going for unionread\n");
 		n = devtab[rc->type]->read (rc, va, n, off);
 	}
 
