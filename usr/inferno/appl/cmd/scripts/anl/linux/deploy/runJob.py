@@ -371,8 +371,9 @@ def main ():
     # acutal code responsible for working
     mycpu = XCPU3Client (brasilHost, brasilPort)
     mycpu.DEBUG = debug
-    print "Top statistics is"
-    mycpu.topStat()
+    if mycpu.DEBUG :
+        print "Top statistics is"
+        mycpu.topStat()
     
     #mycpu.pipelineCmds ()
     

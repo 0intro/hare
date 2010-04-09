@@ -51,7 +51,7 @@ char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -1425,7 +1425,6 @@ validaterr (char *location, char *os, char *arch)
 			ans->status = namec (buff, Aopen, OREAD, 0); 
 
 			/* verify if requested platform is available or not */
-			analyseremotenode (ans);
 
 			/* give priority to OS */
 			if ( os == nil ) {
@@ -1440,6 +1439,7 @@ validaterr (char *location, char *os, char *arch)
 			hn = lookup (os, oslist, OSCOUNT);
 			if (hn == 0 ) break; /* unknown os */
 
+			analyseremotenode (ans);
 			if (arch == nil || arch[0] == '*' ) { 
 				/* wild card for architecture */
 				for ( i = 1; i < PLATFORMCOUNT; ++i) {
