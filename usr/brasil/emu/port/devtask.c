@@ -2389,6 +2389,7 @@ cmdproc(void *a)
 	int n;
 	char status[ERRMAX];
 	void *t;
+	char root[] = "/"; 
 
 	c = a;
 	qlock(&c->l);
@@ -2403,7 +2404,7 @@ cmdproc(void *a)
 		Wakeup(&c->startr);
 		pexit("cmdproc", 0);
 	}
-	t = oscmd(c->cmd->f+1, c->nice, c->dir, c->fd);
+	t = oscmd(c->cmd->f+1, c->nice, root, c->fd);
 	if(t == nil)
 		oserror();
 	c->child = t;	/* to allow oscmdkill */
