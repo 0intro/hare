@@ -45,6 +45,7 @@ enum
 #define BASE "/csrv/local/"
 #define VALIDATEDIR "local"
 #define REMOTEMOUNTPOINT "/csrv"
+#define PARENTNAME "parent"
 
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
@@ -1385,11 +1386,13 @@ validaterr (char *location, char *os, char *arch)
 			if (strcmp (tmpDr->name, localName) == 0) {
 				break;	
 			}
+			if (strcmp (tmpDr->name, PARENTNAME) == 0) {
+				if (vflag) print ("#### this is parent dir, ignoring\n");
+				break;	
+			}
 		}
 	}
-	if (vflag) print ("validaterr: Freeing up\n");
 	free (dr);
-	if (vflag) print ("validaterr: Freeing done\n");
 	
 	ans = (remoteMount *) malloc (sizeof (remoteMount));
 	ans->path = (char *)malloc (strlen (location) + strlen (localName) + 2);
