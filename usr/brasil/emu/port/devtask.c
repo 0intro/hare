@@ -2564,7 +2564,7 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 /* copied this structure from other file */
 enum
 {
-	DIRSIZE = STATFIXLEN + 32 * 4,
+	DIRSIZE = STATFIXLEN + 128 * 4,
 	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
 };
 
