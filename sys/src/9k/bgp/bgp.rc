@@ -237,7 +237,8 @@ if not {
 if(~ $cpunode '1'){
 	# wait at least 40 before proceeding to let I/O Node Setup
 	echo Waiting for turbines to come up to speed
-	sleep 40	
+	# extended sleep to allow for brasil load on io node
+	sleep 60	
 
 	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
 	times=0
