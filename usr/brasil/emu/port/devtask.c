@@ -2565,7 +2565,7 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 enum
 {
 	DIRSIZE = STATFIXLEN + 128 * 4,
-	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
+	DIRREADLIM = 8048,	/* should handle the largest reasonable directory entry */
 };
 
 /* read from Chanel of type dir */
