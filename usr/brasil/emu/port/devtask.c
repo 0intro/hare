@@ -32,7 +32,7 @@ enum
 	Qwait,
 	QLconrdir,
 
-	Debug=1	/* to help debug os.c */
+	Debug=0	/* to help debug os.c */
 };
      
 #define TYPE(x) 	 ( (ulong) (x).path & 0xff)
@@ -51,7 +51,7 @@ char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
