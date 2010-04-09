@@ -51,7 +51,7 @@ char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -1714,6 +1714,7 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 	int jcount;
 	remoteMount **allremotenodes;
 	int validrc;
+	int hn, pn;
 
 	c = cmd.conv[CONV (ch->qid)];
 
@@ -1728,9 +1729,41 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 	validrc = 0;
 	allremotenodes = findrr (&validrc, os, arch);
 	if (validrc == 0 || allremotenodes == nil ) {
+		/* no remote resources */
 		if (vflag) print("no remote resources,reserving [%d]locally\n",
 		resNo);
-		/* no remote resources */
+
+		if ((os != nil) && (os[0] != '*')) {
+			hn = lookup (os, oslist, OSCOUNT);
+			if (hn == 0 ) {
+				/* unknown os */
+				if (vflag) print ("Wrong OS type\n");
+				error (Eperm);
+			}
+			if (hn != IHN ) {
+				/* Wrong os requested */
+				if (vflag) print ("Local OS differs requested OS\n");
+				error (ENoResourceMatch);
+			}
+		} /* end if : OS specified */
+
+		/* We have proper OS, lets check for architecture */
+		if ((arch != nil) && (arch[0] != '*')) {
+			pn = lookup (arch, platformlist, PLATFORMCOUNT);
+			if (pn == 0 ) {
+				/* unknown platform */
+				if (vflag) print ("Wrong platform type\n");
+				error (Eperm);
+			}
+
+			if (pn != IAN ) {
+			/* Wrong platform requested */
+				if (vflag) print ("Local platform differs requested one\n");
+				error (ENoResourceMatch);
+			}
+		} /* end if : platform specified */
+
+		/* now, doing local reservation */
 		jcount = 0;
 		for (i = 0; i < resNo; ++ i) {
 			selected = BASE;
