@@ -1368,6 +1368,7 @@ validaterr (char *location, char *os, char *arch)
 	int hn, pn;
 	long i, count;
 	char localName[] = VALIDATEDIR; /* for validation */
+	char parentName[] = PARENTNAME; /* for ignoring parent */
 	remoteMount *ans;
 	char buff[KNAMELEN*3];
 
@@ -1383,10 +1384,11 @@ validaterr (char *location, char *os, char *arch)
 	for (i = 0, tmpDr = dr; i < count; ++ i, ++tmpDr) {
 		if (vflag) print ("#### %d [%s/%s]\n", i, location, tmpDr->name);
 		if (DMDIR & tmpDr->mode) {
+			if (vflag) print ("####checking for dir[%s]\n",tmpDr->name);
 			if (strcmp (tmpDr->name, localName) == 0) {
 				break;	
 			}
-			if (strcmp (tmpDr->name, PARENTNAME) == 0) {
+			if (strcmp (tmpDr->name, parentName) == 0) {
 				if (vflag) print ("#### this is parent dir, ignoring\n");
 				break;	
 			}
@@ -1508,7 +1510,7 @@ findrr (int *validrc, char *os, char *arch)
 
 		if (vflag) print ("checking for remote location[%s]\n",location);
 		/* entry should be directory and should not be "local" */
-		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) ) { 
+		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) && (strcmp (tmpDr->name, PARENTNAME) != 0)) { 
 			tmp = validaterr (location, os, arch);
 			if (tmp != nil) {
 				allremotenodes[tmprc] = tmp;
