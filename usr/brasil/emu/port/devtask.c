@@ -13,6 +13,7 @@ enum
 	Qcmd,		/* "remote" dir */
 	Qclonus,
 	Qlocalfs,   /* local fs mount point */
+	Qlocalnet,   /* local net mount point */
 	Qarch,	/* architecture description */
 	Qtopns,	/* default ns for host */
 	Qtopenv,	/* default env for host */
@@ -43,7 +44,8 @@ enum
 #define RCHANCOUNT 10
 #define BASE "/csrv/local/"
 #define VALIDATEDIR "local"
-#define REMOTEMOUNTPOINT "/remote"
+#define REMOTEMOUNTPOINT "/csrv"
+#define PARENTNAME "parent"
 
 char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
@@ -304,21 +306,26 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		if (s == 2){
+			mkqid (&q, QID (0, Qlocalnet), 0, QTDIR);
+			devdir (c, q, "net", 0, eve, DMDIR|0555, dp);
+			return 1;
+		}
+		if (s == 3){
 			mkqid (&q, QID (0, Qarch), 0, QTFILE);
 			devdir (c, q, "arch", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 3){
+		if (s == 4){
 			mkqid (&q, QID (0, Qtopns), 0, QTDIR);
 			devdir (c, q, "ns", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 4){
+		if (s == 5){
 			mkqid (&q, QID (0, Qtopenv), 0, QTDIR);
 			devdir (c, q, "env", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 5){
+		if (s == 6){
 			mkqid (&q, QID (0, Qtopstat), 0, QTFILE);
 			devdir (c, q, "status", 0, eve, 0666, dp);
 			return 1;
@@ -348,7 +355,15 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		return -1;	
-	
+
+	case Qlocalnet:
+		if (s == 0){
+			mkqid (&q, QID (0, Qlocalnet), 0, QTDIR);
+			devdir (c, q, "net", 0, eve, DMDIR|0555, dp);
+			return 1;
+		}
+		return -1;	
+
 	case Qarch:
 		if (s == 0){
 			mkqid (&q, QID (0, Qarch), 0, QTFILE);
@@ -481,7 +496,7 @@ proc_splice (void *param)
 	src = fs->src;
 	dst = fs->dst;
 
-	if (vflag) print ("###### proc_splice starting [%s]->[%s]\n", src->name->s, dst->name->s);
+	if (vflag) print ("proc_splice starting [%s]->[%s]\n", src->name->s, dst->name->s);
 	while (1) {
 		/* read data from source channel */
 		ret = devtab[src->type]->read(src, buff, 512, 0);
@@ -489,7 +504,7 @@ proc_splice (void *param)
 			break;
 		}
 
-		if (vflag) print ("###### proc_splice copying [%s]->[%s] %ld data \n", src->name->s, dst->name->s, ret);
+		if (vflag) print ("proc_splice copying [%s]->[%s] %ld data \n", src->name->s, dst->name->s, ret);
 		a = buff;
 		while (ret > 0) {
 			r = devtab[dst->type]->write(dst, a, ret, 0);
@@ -498,11 +513,11 @@ proc_splice (void *param)
 		}
 
 	} /* end while */
-	if (vflag) print ("###### proc_splice closing [%s]->[%s] \n", src->name->s, dst->name->s);
+	if (vflag) print ("proc_splice closing [%s]->[%s] \n", src->name->s, dst->name->s);
 
 	cclose (src);
 	cclose (dst);
-	if (vflag) print ("###### proc_splice complete \n");
+	if (vflag) print ("proc_splice complete \n");
 } /* end function : proc_splice */
 
 /* Opens file/dir 
@@ -570,6 +585,7 @@ cmdopen (Chan *c, int omode)
 		break;
 		
 	case Qlocalfs:
+	case Qlocalnet:
 		error (Eperm);
 		break;
 	case Qclonus:
@@ -1352,6 +1368,7 @@ validaterr (char *location, char *os, char *arch)
 	int hn, pn;
 	long i, count;
 	char localName[] = VALIDATEDIR; /* for validation */
+	char parentName[] = PARENTNAME; /* for ignoring parent */
 	remoteMount *ans;
 	char buff[KNAMELEN*3];
 
@@ -1365,8 +1382,14 @@ validaterr (char *location, char *os, char *arch)
 
 	if (vflag) print ("remote dir[%s]= %ld entries\n", location, count);
 	for (i = 0, tmpDr = dr; i < count; ++ i, ++tmpDr) {
+		if (vflag) print ("#### %d [%s/%s]\n", i, location, tmpDr->name);
 		if (DMDIR & tmpDr->mode) {
+			if (vflag) print ("####checking for dir[%s]\n",tmpDr->name);
 			if (strcmp (tmpDr->name, localName) == 0) {
+				break;	
+			}
+			if (strcmp (tmpDr->name, parentName) == 0) {
+				if (vflag) print ("#### this is parent dir, ignoring\n");
 				break;	
 			}
 		}
@@ -1378,13 +1401,15 @@ validaterr (char *location, char *os, char *arch)
 	snprint (ans->path, (strlen (location) + strlen (localName) + 2),
 				"%s/%s", location, localName);
 
+	
 	if (i == count) {
+		if (vflag) print ("validaterr: [%s] not found, returning\n", localName);
 		free (ans->path);
 		free(ans);
-		free (dr);
 		poperror ();
 		return nil;
 	}
+	if (vflag) print ("validaterr: now  searching for clone file\n");
 
 	count = lsdir (ans->path, &dr);
 	poperror ();
@@ -1400,7 +1425,6 @@ validaterr (char *location, char *os, char *arch)
 			ans->status = namec (buff, Aopen, OREAD, 0); 
 
 			/* verify if requested platform is available or not */
-			analyseremotenode (ans);
 
 			/* give priority to OS */
 			if ( os == nil ) {
@@ -1415,6 +1439,7 @@ validaterr (char *location, char *os, char *arch)
 			hn = lookup (os, oslist, OSCOUNT);
 			if (hn == 0 ) break; /* unknown os */
 
+			analyseremotenode (ans);
 			if (arch == nil || arch[0] == '*' ) { 
 				/* wild card for architecture */
 				for ( i = 1; i < PLATFORMCOUNT; ++i) {
@@ -1484,11 +1509,12 @@ findrr (int *validrc, char *os, char *arch)
 				"%s/%s", path, tmpDr->name);
 
 		if (vflag) print ("checking for remote location[%s]\n",location);
-		if (DMDIR & tmpDr->mode) { 
-					tmp = validaterr (location, os, arch);
-				if (tmp != nil) {
-					allremotenodes[tmprc] = tmp;
-						++tmprc;
+		/* entry should be directory and should not be "local" */
+		if ( (DMDIR & tmpDr->mode) && (strcmp (tmpDr->name, VALIDATEDIR) != 0) && (strcmp (tmpDr->name, PARENTNAME) != 0)) { 
+			tmp = validaterr (location, os, arch);
+			if (tmp != nil) {
+				allremotenodes[tmprc] = tmp;
+					++tmprc;
 				if (vflag) print ("Resource [%s]\n", tmp->path);
 			} 
 		}
@@ -1688,6 +1714,7 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 	int jcount;
 	remoteMount **allremotenodes;
 	int validrc;
+	int hn, pn;
 
 	c = cmd.conv[CONV (ch->qid)];
 
@@ -1702,9 +1729,41 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 	validrc = 0;
 	allremotenodes = findrr (&validrc, os, arch);
 	if (validrc == 0 || allremotenodes == nil ) {
+		/* no remote resources */
 		if (vflag) print("no remote resources,reserving [%d]locally\n",
 		resNo);
-		/* no remote resources */
+
+		if ((os != nil) && (os[0] != '*')) {
+			hn = lookup (os, oslist, OSCOUNT);
+			if (hn == 0 ) {
+				/* unknown os */
+				if (vflag) print ("Wrong OS type\n");
+				error (Eperm);
+			}
+			if (hn != IHN ) {
+				/* Wrong os requested */
+				if (vflag) print ("Local OS differs requested OS\n");
+				error (ENoResourceMatch);
+			}
+		} /* end if : OS specified */
+
+		/* We have proper OS, lets check for architecture */
+		if ((arch != nil) && (arch[0] != '*')) {
+			pn = lookup (arch, platformlist, PLATFORMCOUNT);
+			if (pn == 0 ) {
+				/* unknown platform */
+				if (vflag) print ("Wrong platform type\n");
+				error (Eperm);
+			}
+
+			if (pn != IAN ) {
+			/* Wrong platform requested */
+				if (vflag) print ("Local platform differs requested one\n");
+				error (ENoResourceMatch);
+			}
+		} /* end if : platform specified */
+
+		/* now, doing local reservation */
 		jcount = 0;
 		for (i = 0; i < resNo; ++ i) {
 			selected = BASE;
@@ -2365,6 +2424,7 @@ cmdproc(void *a)
 	int n;
 	char status[ERRMAX];
 	void *t;
+	char root[] = "/"; 
 
 	c = a;
 	qlock(&c->l);
@@ -2379,7 +2439,7 @@ cmdproc(void *a)
 		Wakeup(&c->startr);
 		pexit("cmdproc", 0);
 	}
-	t = oscmd(c->cmd->f+1, c->nice, c->dir, c->fd);
+	t = oscmd(c->cmd->f+1, c->nice, root, c->fd);
 	if(t == nil)
 		oserror();
 	c->child = t;	/* to allow oscmdkill */
@@ -2438,6 +2498,74 @@ Dev taskdevtab = {
 /*************** UTILITY FUNCTIONS *************/
 
 
+long
+myunionread(Chan *c, void *va, long n)
+{
+	int i;
+	long nr;
+	long a_nr;
+	void *a_va;
+	long a_n;
+	Mhead *m;
+	Mount *mount;
+
+	qlock(&c->umqlock);
+	m = c->umh;
+	rlock(&m->lock);
+	mount = m->mount;
+
+
+	if (vflag) print ("#### inside myunionread for [%s]\n", c->name->s);
+	/* bring mount in sync with c->uri and c->umc */
+	for(i = 0; mount != nil && i < c->uri; i++)
+		mount = mount->next;
+
+	nr = 0;
+	a_va = va;
+	a_n = n;
+	a_nr = 0;
+	while(mount != nil) {
+		if (vflag) print("#### myunionread looping  [%s]\n", c->name->s);
+		/* Error causes component of union to be skipped */
+		if(mount->to && !waserror()) {
+			if(c->umc == nil){
+				c->umc = cclone(mount->to);
+				c->umc = devtab[c->umc->type]->open(c->umc, OREAD);
+			}
+	
+			if (vflag) print("#### myuninrd reading [%s]\n",c->umc->name->s);
+			nr = devtab[c->umc->type]->read(c->umc, a_va, a_n, c->umc->offset);
+			if(nr < 0)
+				nr = 0;	/* dev.c can return -1 */
+			c->umc->offset += nr;
+			poperror();
+		} /* end if */
+		if(nr > 0) {
+			if (vflag) print ("#### myunionread got something out[%s]\n", c->umc->name->s);
+			/* break; */ /* commenting so that it will read from all chans*/
+			a_va = (char *)a_va + nr;
+			a_n = a_n - nr;
+			a_nr = a_nr + nr;
+			if (a_n <= 0 ) {
+				if (vflag) print ("#### myunionread buffer full, breking");
+				break;
+			}
+		} /* end if : nr > 0 */
+
+		/* Advance to next element */
+		c->uri++;
+		if(c->umc) {
+			cclose(c->umc);
+			c->umc = nil;
+		}
+		mount = mount->next;
+	} /* end while */
+	runlock(&m->lock);
+	qunlock(&c->umqlock);
+	return a_nr;
+} /* end function : myunionread */
+
+
 /* Reads from specified channel.
 	It works on both directory and file channels.
 */
@@ -2456,9 +2584,12 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 
 	dir = rc->qid.type & QTDIR;
 	if (dir && rc->umh) {
-		n = unionread (rc, va, n);
+		if (vflag) print ("### going for unionread\n");
+		n = myunionread (rc, va, n);
+		if (vflag) print ("### done from unionread\n");
 	}
 	else{
+		if (vflag) print ("### not going for unionread\n");
 		n = devtab[rc->type]->read (rc, va, n, off);
 	}
 
@@ -2469,8 +2600,8 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 /* copied this structure from other file */
 enum
 {
-	DIRSIZE = STATFIXLEN + 32 * 4,
-	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
+	DIRSIZE = STATFIXLEN + 128 * 4,
+	DIRREADLIM = 8048,	/* should handle the largest reasonable directory entry */
 };
 
 /* read from Chanel of type dir */

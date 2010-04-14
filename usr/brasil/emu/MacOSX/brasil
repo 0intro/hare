@@ -100,13 +100,14 @@ root
 	/nvfs	/
 	/n		/
 	/env	/
-	/dis/27b-6.dis
+#	/dis/27b-6.dis
 	/dis/bind.dis
 	/dis/brasil.sh	
 	/dis/cat.dis
-	/dis/csrv.dis
-	/dis/csrv.sh	
-	/dis/duct.dis	
+#	/dis/csrv.dis
+	/dis/csrv-lite.dis
+#	/dis/csrv.sh	
+#	/dis/duct.dis	
 	/dis/echo.dis
 	/dis/emuinit.dis /dis/brasil.dis
 	/dis/export.dis	
