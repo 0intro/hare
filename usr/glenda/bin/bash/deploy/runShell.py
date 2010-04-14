@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-# runJob.py - start a XCPU3 job
+# runShell.py - start a shell over XCPU3
 # Copyright 2010 Pravin Shinde
 # 
 
 def showUsage () :
     print """
-USAGE: runJob.py [-l hare_location] [-9 py9p_location]  
+USAGE: runShell.py [-l hare_location] [-9 py9p_location]  
                 [-h brasil_host] [-p brasil_port] 
                 [-n numnodes] [-o os_type] [-a architecture_type]
-                "cmd arg1 arg2 ..." </path/to/inputfile>
+                [-s shell_name]
  
 ARGUMENTS:
     -l: hare_location default value ["/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"]
@@ -20,9 +20,7 @@ ARGUMENTS:
     -n: number of cpu nodes to provision (mandetory)
     -o: OS type (default value "any") (supported values: Linux, Plan9, MacOSX, Nt)
     -a: arch type (default value "any") (supported values: 386, arm, power, spim)
-    "cmd arg1 arg2 ...": command to run on I/O nodes (eventually compute nodes maybe)
-        (WARN: if commmand has arguments, make sure to include it in double quotes)
-   <path/to/inputfile> If present, this file is used as STDIN
+    -s: shell name name of the shell to run (NOTE: this option *MUST* be provided)
 
 ENVIRONMENT VARIABLES: (can be used to override defaults in place of cmdline)
 	HARE_LOCATION - Place where hare executables are installed
@@ -30,9 +28,14 @@ ENVIRONMENT VARIABLES: (can be used to override defaults in place of cmdline)
 	BRASIL_PORT - port running brasil daemon
 
 EXAMPLES
-    runJob.py -n 4 date
-    runJob.py -l /path/to/hare/binaries/ -n 8 -o Linux -a 386 "wc -l" /path/to/input/file
-    runJob.py -9 /path/to/py9p/ -n 3 -o Linux date
+    runShell.py -n 4 -s bash
+    runSell.py -l /path/to/hare/binaries/ -n 8 -o Linux -a 386 -s bash
+    runJob.py -9 /path/to/py9p/ -n 3 -o Plan9 -s rc
+    
+NOTES
+    To close the session, you should send command that will terminate the shell,
+    For example, in case of bash, user should type "exit" and then to terminate
+    the input, press "CTRL+D" which will close the input file.
 """
 
 
@@ -44,6 +47,8 @@ import getpass
 import code
 import readline
 import atexit
+import threading
+import thread
 
 # Find the location of py9p
 DEFAULTPY9P = "/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"
@@ -56,7 +61,7 @@ if 'HARE_PATH' in os.environ:
     pathSource = "Environment Variable HARE_PATH ["  + os.environ['HARE_PATH'] + "] "
 
 try:
-    opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
+    opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:s:")
     for o,a in opts:
         if o == "-l" :
             py9pPath = a + "/py9p/"
@@ -96,6 +101,22 @@ remoteURL = ""
 baseURL = "/csrv/local/"
 #baseURL = "/local/"
 
+
+def catAsync (obj, *args):
+    debug = False
+    if debug : print "thread started"
+    while 1:
+        if debug : print "thread reading"
+        buf = obj.read(2)
+        #buf = obj.readline()
+        if debug : print "thread read " + buf
+        if len(buf) <= 0:
+            break
+        sys.stdout.write (buf)
+
+    if debug : print "thread dead"
+
+
 class XCPU3Client:
     
     sessionID = None
@@ -108,8 +129,9 @@ class XCPU3Client:
         self.DEBUG = False
         
         self.extraLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
-        self.IOLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.inputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.ctlLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.outputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
 
     def dPrint (self, msg):
         if (self.DEBUG):
@@ -177,6 +199,14 @@ class XCPU3Client:
             self.startSession()
         param = "exec " + cmd
         self.ctlLink.write(param)
+        name = baseURL + str(self.sessionID) + "/stdio"
+        
+        if self.outputLink.open (name, py9p.OREAD ) is None :
+            raise Exception("XCPU3: Could not open " + name)
+
+        if self.inputLink.open(name, py9p.OWRITE) is None:
+            raise Exception("XCPU3: Could not open stdio file " + name)
+
         
     def sendInput (self, input):
         if self.sessionID is None :
@@ -184,33 +214,53 @@ class XCPU3Client:
 
         if input is None :
             return
-        inf = open(input, "r", 0)
-        
-        name = baseURL + str(self.sessionID) + "/stdio"
-        if self.IOLink.open(name, py9p.OWRITE) is None:
-            raise Exception("XCPU3: Could not open stdio file " + name)
+        if  input == '-' :
+            inf = sys.stdin
+            self.dPrint ("Using stdin for input")
+        else :
+            inf = open(input, "r", 0)
         
         sz = self.bufSize
         while 1:
-            buf = inf.read(sz)
+            # buf = inf.read(sz)
+            buf = inf.readline()
             if len(buf) <= 0:
                 break
-            self.IOLink.write(buf)
-        self.IOLink.close()
+            self.dPrint ("sending line [" + buf + "]")
+            self.inputLink.write(buf)
+        self.dPrint ("input sent")
         inf.close()
+
+
+    def getOutputAsync (self) :
+
+        if self.sessionID is None :
+            raise Exception("XCPU3: Session not created")
+        
+        try:
+            threading.Thread(target=catAsync, args=(self.outputLink, 1)).start()
+        except Exception, errtxt:
+            print errtxt
+            raise Exception
+            return
+        self.dPrint ("Thread started ...")
         
     def getOutput (self) :
         if self.sessionID is None :
             raise Exception("XCPU3: Session not created")
-        
-        name = baseURL + str(self.sessionID) + "/stdio"
-        self.cat (name, self.IOLink )
+        while 1:
+            buf = self.outputLink.read(self.bufSize)
+            if len(buf) <= 0:
+                break
+            sys.stdout.write(buf)        
     
     def endSession (self) :
         if self.sessionID is None :
             self.dPrint ( "Session already close")
             return
+        self.inputLink.close()
         self.ctlLink.close()
+        self.outputLink.close()
         self.sessionID = None
 
 
@@ -220,11 +270,14 @@ class XCPU3Client:
         self.requestReservation(res)
         self.dPrint ( "Requesting execution..")
         self.requestExecution(cmd)
-        if input is not None :
-            self.dPrint ( "sending input")
-            self.sendInput (input)
         self.dPrint ( "getting output")
-        self.getOutput()
+        self.getOutputAsync()
+
+        self.dPrint ( "sending input")
+
+        self.sendInput ("-")
+#        self.getOutput()
+
         if self.DEBUG:
             self.dPrint ( "checking session status")
             self.getSessionStatus ()
@@ -232,63 +285,7 @@ class XCPU3Client:
         self.endSession ()
         self.dPrint ( "Done..")
     
-    def myPipe (self, inputFile, outputFile) :
-        inf = open(inputFile, "r", 0)
-        otf = open(outputFile, "w", 0)
-         
-        sz = self.bufSize
-        while 1:
-            buf = inf.read(sz)
-            if len(buf) <= 0:
-                break
-            otf.write(buf)
-        otf.close()
-        inf.close()
-        
-    def command2child (self, child, cmd, inp):
-        name = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "ctl"
-        childCtlFile = open (name, "rw", 0) 
-        if childCtlFile  is None :
-            raise Exception("XCPU3: Could not open child" + name)
-        
-        cmdbuf = "exec " + cmd
-        buf = childCtlFile.write(cmdbuf)
-        self.dPrint ("sent command ["+ cmdbuf +"] to child "+ name )
-        if input is not None :
-            self.dPrint ( "sending input")
-            self.myPipe (inputFile, outoutFile)
-        childCtlFile.close()
-            
-    def pipelineCmds (self, input = None ):
-        self.dPrint ("Requesting reservation..")
-        res = str(3)
-        self.requestReservation(res)
-        lastOutput = input
-        
-        child = 0
-        self.command2child (child, "ls -l", lastOutput)
-        lastOutput = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "stdio"
-        
-        child = 1
-        self.command2child (child, "sort", lastOutput )
-        lastOutput = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "stdio"
-        
-        child = 2
-        self.command2child (child, "wc -l", lastOutput)
-        lastOutput = baseURL + str(self.sessionID) + "/" + str(child) + "/" + "stdio"
 
-        self.dPrint ( "getting output")
-        self.cat(lastOutput)
-        if self.DEBUG:
-            self.dPrint ( "checking session status")
-            self.getSessionStatus ()
-        self.dPrint ( "Closing session")
-        self.endSession ()
-        self.dPrint ( "Done..")
-
-        
-
-        
 
 def main ():
     # Filling default values to all the variables which are not provided with
@@ -298,6 +295,7 @@ def main ():
     osType = None
     archType = None
     debug = False
+    shellType = None
     
     # Overriding the values from environment variables
     if 'BRASIL_HOST' in os.environ:
@@ -307,7 +305,7 @@ def main ():
         brasilPort = int (os.environ['BRASIL_PORT'])
 
     try:
-        opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
+        opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:s:")
         for o,a in opts:
             if o == "-h" :
                 brasilHost = a
@@ -319,6 +317,8 @@ def main ():
                 osType = a
             elif o == "-a" :
                 archType = a
+            elif o == "-s" :
+                shellType = a
             elif o  == "-D" :
                 debug = True
             elif ( o in ( "-9", "-l" ) ) :
@@ -347,18 +347,10 @@ def main ():
             if archType not in (None, "any", "Any", "ANY", "*" ) :
                 resReq = resReq + " " + archType
             
-        if (argLen == 1 ):
-            command = args[0]
-            inFile=None
-        elif (argLen == 2):
-            command = args[0]
-            inFile=args[1]
-        elif (argLen > 2 ):
-            print "ERROR: Too many arguments provided"
-            showUsage ()
-            sys.exit ()
-        else :
-            print "ERROR: command to execute is not provided"
+            
+            
+        if shellType == None :
+            print "ERROR: shell name not provided"
             showUsage ()
             sys.exit ()
             
@@ -375,9 +367,7 @@ def main ():
         print "Top statistics is"
         mycpu.topStat()
     
-    #mycpu.pipelineCmds ()
-    
-    mycpu.runJob (command, resReq, inFile)
+    mycpu.runJob (shellType, resReq )
 
     
 if __name__ == "__main__" :
