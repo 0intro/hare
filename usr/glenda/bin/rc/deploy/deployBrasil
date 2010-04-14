@@ -1,5 +1,5 @@
 #!/bin/rc
-BrasilPath=../../../../../../../brasil/
+BrasilPath../../../../brasil/
 port=5670
 
 #if [ "$#" -eq 1 ]

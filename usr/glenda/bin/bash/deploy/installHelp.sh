@@ -44,13 +44,15 @@ then
 fi
 mkdir -p $lflag
 
-hare_src_dir="../../../../../../../../" 
+# Change following variables only if code structure changes
+hare_src_dir="../../../../../" 
+deploy_script_location="/usr/glenda/bin/bash/deploy/"
 
 # Find brasil executable
 brasil_location=`find "$hare_src_dir/usr/brasil/Linux/" -name brasil`
 echo "brasil exec location is $brasil_location"
 
-# making sure that it is executable
+# Making sure that it is executable
 if [ ! -x $brasil_location ]
 then
 	echo "ERROR: Could not find brasil executable at $brasil_location"
@@ -58,18 +60,16 @@ then
 	exit 1
 fi
 
-# copy it to destination
+# Copy it to destination
 cp -f $brasil_location $lflag
 echo "Copied brasil"
 
 
-deploy_script_location="/usr/inferno/appl/cmd/scripts/anl/linux/deploy/"
-
-# copy the deployBrasil.sh script.
+# Copy the deployBrasil.sh script.
 script_name="deployBrasil.sh"
 src="$hare_src_dir/$deploy_script_location/$script_name"
 
-# making sure that it is executable
+# Making sure that it is executable
 if [ ! -x $src ]
 then
 	echo "ERROR: Could not find $script_name executable at $src."
