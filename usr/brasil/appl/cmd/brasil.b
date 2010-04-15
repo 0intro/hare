@@ -100,6 +100,8 @@ backmountexport()
 	if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
 		sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 	} else {
+		#maybe we need to start a styxlisten as well for both
+		sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export / &");
 		sys->fprint(sys->fildes(2), "creating srv export\n");
 		fd := sys->create("/srv/csrv", Sys->ORDWR, 8r600);
 		if(fd == nil)
