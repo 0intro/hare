@@ -2709,4 +2709,3 @@ fetchparentpath (char *filepath)
 	}
 	return ptr;
 }
-
