@@ -51,6 +51,7 @@ char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
+char EResourcesINUse[] = "Resources already in use";
 static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
@@ -372,7 +373,8 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 
 	case Qconvdir:
 		myc = cmd.conv[CONV (c->qid)];
-		tmpjc = getrjobcount (myc->rjob);
+//		tmpjc = getrjobcount (myc->rjob);
+		tmpjc = myc->rjob->rjobcount;
 		if (s < tmpjc) {
 			mkqid (&q, RQID (s, CONV (c->qid), QLconrdir), 0, QTDIR);
 			sprint (up->genbuf, "%d", s);
@@ -1557,13 +1559,14 @@ findrr (int *validrc, char *os, char *arch)
 
 
 static Chan *
-allocatesinglerr (char *localpath, char *selected, int jcount) 
+allocatesinglerr (RemoteResource *r_resource, char *localsession, char *selected, int jcount) 
 {
 	char data[100];
 	Block *content = nil;
 	char location[KNAMELEN*3];
 	volatile struct { Chan *cc; } rock;
 	int len, ret;
+	char localpath[KNAMELEN*3];
 
 	if (waserror ()){
 		/* FIXME : following warning msg is incorrect */
@@ -1571,6 +1574,8 @@ allocatesinglerr (char *localpath, char *selected, int jcount)
 		nexterror ();
 	}
 
+	sprint (localpath, "%s/%d", localsession, r_resource->x);
+	if (vflag) print ("allocating rresource for location [%s]\n",localpath);
 	snprint (location, KNAMELEN*3, "%s/%s", selected, "clone");
 
 	if (vflag) print (" opening [%s]\n", location);
@@ -1626,96 +1631,130 @@ allocatesinglerr (char *localpath, char *selected, int jcount)
 	kbind (location, localpath, MREPL);
 	freeb (content);
 	poperror ();
-
+	r_resource->remotefiles[Qctl-Qdata].cfile = rock.cc;
+	r_resource->inuse = 1;
+	if (vflag) print ("binding [%s]->[%s] done\n", location, localpath);
+	/* use r_resource->remotefiles[Qctl-Qdata].async_queue to inform completion  */
 	return (rock.cc);
 }
 
+/* allocates memory and initialize the RemoteResource */
+RemoteResource *
+allocate_remote_resource (RemoteJob *rjob, int rrnumber )
+{
+	RemoteResource * pp;
+	int i;
+	pp = malloc (sizeof (RemoteResource));
+	pp->next = nil;
+ 	for (i = 0; i < RCHANCOUNT ; ++i ) {
+		pp->remotefiles[i].cfile = nil;
+		pp->remotefiles[i].async_queue =  rjob->async_queue_list[i];
+		pp->remotefiles[i].state = 0;
+	} 
+	pp->x = rrnumber;
+	return pp;
+}
 
 int
-addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
+parallelres (char *localpath, remoteMount **remote_node_list, int validrc, 
+				Conv *c, int resno, int first, int others)
 {
+	RemoteJob *rjob;
 	RemoteResource *pp;
-	char buff[KNAMELEN*3];
+	RemoteResource *prev;
 	Chan *tmpchan;
+	char *selected;
 	long tmpjc;
+	int sub_sessions;
 	int i;
 
+	rjob = c->rjob;
+	/* error checking */
 	if (rjob == nil) {
 		if (vflag)print ("resources released, as clone file closed\n");
 		error (EResourcesReleased);
 	}
-	if (waserror ()){
-		if (vflag)print ("Could not allocate needed rmt resources\n");
-		if (rjob == nil) {
-			if (vflag)print("resources released,as clone file closed\n");
-			nexterror ();
-		}
-		wlock (&rjob->l);
-		if (rjob->rjobcount == 1) {
-			rjob->rjobcount = -2; /* set as no reservations */ 
-		} else {
-			/* undo the effect of last reservation attempt */ 
-			rjob->rjobcount -= 1;
-		}
-		wunlock (&rjob->l);
-		nexterror ();
-	}
 
-
-	if (vflag)print ("addrr(%s, %s, %d)\n", localpath, selected, jcount);
+	
+	if (vflag)print ("parallelres(%s, %d, %d, %d)\n", 
+		localpath, resno, first, others);
+	
+	/* I think these errors should be checked much before */
 	tmpjc = getrjobcount (rjob);
-
 	if (tmpjc == -2) {
 		if (vflag)print ("resources released, as clone file closed\n");
 		error (EResourcesReleased);
 	}
+	if (tmpjc != -1) {
+		if (vflag)print ("already in use\n");
+		error (EResourcesINUse);
+	}
 	
-	if (tmpjc == -1 ) {
-		wlock (&rjob->l);
-		for (i = 0; i < RCHANCOUNT; ++i ) {
-			rjob->rcinuse[i] = 0;
-			rjob->async_queue_list[i] = qopen (1024, 0, nil, 0);
-		}
+	/* handle failure */
+	if (waserror ()){
+		if (vflag)print ("Could not allocate needed rmt resources\n");
+
+		rjob->rjobcount = -1; 
+		/* TODO: I should also release the RemoteResource memory here */
 		wunlock (&rjob->l);
+		qunlock (&c->l);
+		nexterror ();
 	}
-
-	pp = malloc (sizeof (RemoteResource));
-	pp->next = nil;
-	for (i = 0; i < RCHANCOUNT; ++i ) {
-		pp->remotefiles[i].cfile = nil;
-		pp->remotefiles[i].async_queue =  rjob->async_queue_list[i];
-		pp->remotefiles[i].state = 0;
-	}
-
-	wlock (&rjob->l);
-	if (rjob->rjobcount < 0) {
-		/* making sure that it will be treated as remote resources */
-		rjob->rjobcount = 1; 
-	} else {
-		/* needed so that cmdgen will give local dir */
-		rjob->rjobcount += 1;
-	}
-	pp->x = rjob->rjobcount - 1;
-	wunlock (&rjob->l);
-
-	sprint (buff, "%s/%d", localpath, pp->x);
-	if (vflag) print ("allocating rresource for location [%s]\n",buff);
-	tmpchan = allocatesinglerr (buff, selected, jcount);
+	/* now doing real work */
 	
+	/* completely lock this session */
+	qlock (&c->l);
 	wlock (&rjob->l);
-	pp->remotefiles[Qctl-Qdata].cfile = tmpchan; 
-	rjob->rcinuse[Qctl-Qdata] = 1; 
-	if (rjob->first == nil) { /* if list is empty */
-		rjob->first = pp;  /* add it at begining */
-	} else {  /* if there are previous resources */
-		rjob->last->next = pp; /* add it at end */
+
+	/* initiate rjob */
+	/* create asynce_queue_list */
+	for (i = 0; i < RCHANCOUNT; ++i ) {
+		rjob->rcinuse[i] = 0;
+		rjob->async_queue_list[i] = qopen (1024, 0, nil, 0);
 	}
-	rjob->last = pp; /* mark this resource as last */
+
+	/* allocate memory and initialize RemoteResource */
+	pp = allocate_remote_resource (rjob, 0);
+	rjob->first = pp;
+	prev = pp;
+	for (i = 1; i < resno ; ++i ) {
+		pp = allocate_remote_resource (rjob, i);
+		prev->next = pp;
+		prev = pp;
+	}
+	rjob->last = pp;
+	
+	/* set the remote job count */
+	rjob->rjobcount = resno; 
+
+	pp = rjob->first; 
+	sub_sessions = first;
+	for (i = 0; i < resno; ++i ) {
+		if (remote_node_list == nil ) {
+			selected = BASE;
+		} else {
+				lastrrselected = (lastrrselected + 1) % validrc;
+				selected = remote_node_list[lastrrselected]->path; 
+		}
+		if (vflag) print ("creating session id %s/[%d]\n", localpath, pp->x);
+		/* FIXME: create kprocs for each job */
+		allocatesinglerr (pp, localpath, selected, sub_sessions);
+		pp = pp->next;
+		sub_sessions = others; 
+		if (vflag) print ("allocated one session [%d]\n", i);
+	}
+	
+	/* FIXME: ensure that resources are properly allocated */
+	
+	rjob->rcinuse[Qctl-Qdata] = 1; 
+	
+	/* completely unlock this session */
 	wunlock (&rjob->l);
+	qunlock (&c->l);
 
 	poperror ();
-	return 1;
-} /* end function :  allocateRemoteResource */
+	return resno;
+} /* end function : parellelres */
 
 
 /* frees the list of remote mounts */
@@ -1741,7 +1780,7 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 	char *lpath;
 	char *selected;
 	Conv *c;
-	int jcount;
+	int first, others;
 	remoteMount **allremotenodes;
 	int validrc;
 	int hn, pn;
@@ -1752,7 +1791,6 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 		if (vflag)print ("resources released, as clone file closed\n");
 		error (EResourcesReleased);
 	}
-
 
 	lpath = fetchparentpathch (ch);
 
@@ -1794,31 +1832,21 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 		} /* end if : platform specified */
 
 		/* now, doing local reservation */
-		jcount = 0;
-		for (i = 0; i < resNo; ++ i) {
-			selected = BASE;
-			addrr (lpath, selected, c->rjob, jcount);
-		}
+		first = others = 0;
+		parallelres (lpath, nil, 0, c, resNo, first, others);
+
 	} else {
 		if ( validrc >= resNo ) {
 			/* more than enough remote resources */
 			if (vflag) print ("lot of rr[%d], every1 get 1\n",validrc);
-			jcount = 0;
-			for (i = 0; i < resNo; ++ i) {
-				/* select next resource in the list */
-				lastrrselected = (lastrrselected + 1) % validrc;
-				selected = allremotenodes[lastrrselected]->path; 
-				addrr (lpath, selected, c->rjob, jcount);
-			}
+			first = others = 0;
+			parallelres (lpath, allremotenodes, validrc, c, resNo, first, others);
 		} else {
 			if (vflag)print("not enough rr[%d], distribute\n",validrc);
 			/* not enough remote resources */
-			jcount = ( resNo / validrc ) + (resNo % validrc);
-			for (i = 0; i < validrc; ++ i) {
-				selected = allremotenodes[i%validrc]->path;
-				addrr (lpath, selected, c->rjob, jcount);
-				jcount = resNo / validrc; 
-			}
+			first = ( resNo / validrc ) + (resNo % validrc);
+			others = resNo / validrc; 
+			parallelres (lpath, allremotenodes, validrc, c, resNo, first, others);
 		} /* end else : not enough remote resources */
 	}
 	freermounts (allremotenodes, validrc);
