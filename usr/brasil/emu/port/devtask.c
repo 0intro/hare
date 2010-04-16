@@ -731,7 +731,10 @@ freeremoteresource (RemoteResource *rr)
 {
 	int i, ret;
 	char *location;
-	if (rr == nil) return;
+	
+	if (rr == nil) {
+	  return ;
+	}
 
 	for (i = 0; i < RCHANCOUNT ; ++i ) {
 		if (rr->remotefiles[i].cfile != nil) {
@@ -1732,7 +1735,8 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 		/* no remote resources */
 		if (vflag) print("no remote resources,reserving [%d]locally\n",
 		resNo);
-
+		/* making sure that OS and architecture are correct for local
+			reservations. */
 		if ((os != nil) && (os[0] != '*')) {
 			hn = lookup (os, oslist, OSCOUNT);
 			if (hn == 0 ) {
