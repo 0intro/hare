@@ -32,7 +32,7 @@ enum
 	Qwait,
 	QLconrdir,
 
-	Debug=0	/* to help debug os.c */
+	Debug=1	/* to help debug os.c */
 };
      
 #define TYPE(x) 	 ( (ulong) (x).path & 0xff)
@@ -51,18 +51,17 @@ char ENoRemoteResources[] = "No remote resources available";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
 struct RemoteFile
 {
 	int state;
+	int pstate;
 	Chan *cfile;
-	Queue *buffer;
-	Rendez *handle;
+	Queue *async_queue;
 };
-
 typedef struct RemoteFile RemoteFile;
 
 struct RemoteResource 
@@ -74,20 +73,19 @@ struct RemoteResource
 	/* Next remote resource */
 	struct RemoteResource *next;
 };
-
 typedef struct RemoteResource RemoteResource;
 
 struct RemoteJob 
 {
+	long rjobcount; /* number of jobs in current session */
 	int x;
 	RWlock	l;	/* protects state changes */
-	long rjobcount;
 	int rcinuse[RCHANCOUNT];
-	Queue *bufferlist[RCHANCOUNT];
+	RWlock perfilelock[RCHANCOUNT];
+	Queue *async_queue_list[RCHANCOUNT];
 	RemoteResource *first;
 	RemoteResource *last;
 };
-
 typedef struct RemoteJob RemoteJob;
 
 #define PLATFORMCOUNT 7 
@@ -468,7 +466,7 @@ procreadremote (void *a)
 		} /* end if */
 		
 		/* Write data to queue */
-		qbwrite (rf->buffer, content); 
+		qbwrite (rf->async_queue, content); 
 	} /* end while : infinite */
 
 	if (vflag) print ("PRR[%s]:No more data to read\n", 
@@ -520,6 +518,58 @@ proc_splice (void *param)
 	if (vflag) print ("proc_splice complete \n");
 } /* end function : proc_splice */
 
+
+static void
+remoteopen (Chan *c, int omode, char *fname, int resno )
+{
+	Conv *cv;
+	int tmpfileuse;
+	RemoteResource *tmprr;
+	int filetype;
+	RemoteFile *rf;
+	char buff[KNAMELEN*3];
+	Chan *tmpchan;
+	int i;
+	
+	cv = cmd.conv[CONV (c->qid)];
+	filetype = TYPE(c->qid) - Qdata;
+	tmpfileuse = getfileopencount (cv->rjob, filetype);
+	
+	if ( tmpfileuse < 1) {
+		/* opening file for first time */
+		/* open should be done on all resources */
+		if (vflag) print ("opening file for first times[%d]\n", cv->rjob->rcinuse[filetype]);
+		rlock (&cv->rjob->l);
+		tmprr = cv->rjob->first;
+		runlock (&cv->rjob->l);
+		for (i = 0 ; i < resno; ++i) {
+			sprint(buff,"%s/%ld/%d/%s", BASE,CONV(c->qid),i,fname);
+			tmpchan = namec (buff,Aopen,omode,0);
+
+			wlock (&cv->rjob->l);
+			rf = &tmprr->remotefiles[filetype];
+			rf->cfile = tmpchan;
+
+			if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
+				/* start the reader thread */
+				if (vflag) print ("\nthread starting" );
+//				sprint (buff, "PRR[%s]", c->name->s);
+				kproc (buff, procreadremote, rf, 0 );
+			}
+			tmprr = tmprr->next; /* this can be RO lock*/
+			wunlock (&cv->rjob->l);
+		} /* end for : */
+		wlock (&cv->rjob->l);
+		cv->rjob->rcinuse[filetype] = 1;
+		wunlock (&cv->rjob->l);
+	} else {
+			if (vflag) print ("file is already open for [%d] times\n", tmpfileuse);
+			wlock (&cv->rjob->l);
+			cv->rjob->rcinuse[filetype] += 1;
+			wunlock (&cv->rjob->l);
+	}
+} /* end function : remoteopen */
+
 /* Opens file/dir 
 	It checks if specified channel is allowed to open,
 	if yes, it marks channel as open and returns it.
@@ -529,15 +579,9 @@ cmdopen (Chan *c, int omode)
 {
 	int perm;
 	Conv *cv;
-	Chan *tmpchan;
 	char *user;
-	char buff[KNAMELEN*3];
-	RemoteResource *tmprr;
 	int tmpjc, filetype;
-	int i;
-	int tmpfileuse;
 	char *fname;
-	RemoteFile *rf;
 
 
 	if (vflag) print ("trying to open [%s]\n", c->name->s);
@@ -567,8 +611,6 @@ cmdopen (Chan *c, int omode)
 
 	case Qtopns:
 	case Qtopenv:
-	case Qstdin:
-	case Qstdout:
 	case Qenv:
 	case Qargs:
 	case Qns:
@@ -605,13 +647,22 @@ cmdopen (Chan *c, int omode)
 		if (vflag) print ("clone open successful [%s]\n", c->name->s);
 		break;
 			
+	case Qstdout:
 	case Qstatus:
+	case Qstderr:
+	case Qwait:
 		if (omode != OREAD)
 			error (Eperm);
-	case Qdata:
-	case Qstderr:
+		
+	case Qdata: 
 	case Qctl:
-	case Qwait:
+	case Qstdin: /* FIXME: make sure that file is open in write only mode */
+	  
+		if (TYPE(c->qid) == Qstdin ) {
+			if (omode != OWRITE ) {
+			  error (Eperm);
+			}
+		}
 
 		qlock (&cmd.l);
 		cv = cmd.conv[CONV (c->qid)];
@@ -648,25 +699,41 @@ cmdopen (Chan *c, int omode)
 				error (ENOReservation);
 			}
 		}
+		
 		filetype = TYPE(c->qid) - Qdata;
 
 		switch (TYPE (c->qid)){
 		case Qdata:
 			fname = "stdio";
-			if(omode == OWRITE || omode == ORDWR)
+			if(omode == OWRITE || omode == ORDWR) {
 				cv->count[0]++;
-			if(omode == OREAD || omode == ORDWR)
+			}
+			if(omode == OREAD || omode == ORDWR) {
 				cv->count[1]++;
+			}
 			break;
+			
+		case Qstdin:
+			fname = "stdin";
+			cv->count[0]++;
+			break;
+			  
+		case Qstdout:
+			fname = "stdout";
+			cv->count[1]++;
+			break;
+			
 		case Qstderr:
 			fname = "stderr";
 			if(omode != OREAD)
 				error(Eperm);
 			cv->count[2]++;
 			break;
+			
 		case Qstatus:
 			fname = "status";
 			break;
+			
 		case Qwait:
 			fname = nil;
 			if (cv->waitq == nil)
@@ -677,43 +744,7 @@ cmdopen (Chan *c, int omode)
 		}
 		
 		if ( fname != nil && tmpjc > 0 ) {
-
-			tmpfileuse = getfileopencount (cv->rjob, filetype);
-			if ( tmpfileuse < 1) {
-				/* opening file for first time */
-				/* open should be done on all resources */
-				if (vflag) print ("opening file for first times[%d]\n", cv->rjob->rcinuse[filetype]);
-				rlock (&cv->rjob->l);
-				tmprr = cv->rjob->first ;
-				runlock (&cv->rjob->l);
-				for (i = 0 ; i < tmpjc; ++i) {
-					sprint(buff,"%s/%ld/%d/%s",
-							BASE,CONV(c->qid),i,fname);
-					tmpchan = namec (buff,Aopen,omode,0);
-
-					wlock (&cv->rjob->l);
-					rf = &tmprr->remotefiles[filetype];
-					rf->cfile = tmpchan;
-
-
-					if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
-						/* start the reader thread */
-						if (vflag) print ("\nthread starting" );
-//						sprint (buff, "PRR[%s]", c->name->s);
-						kproc (buff, procreadremote, rf, 0 );
-					}
-					tmprr = tmprr->next; /* this can be RO lock*/
-					wunlock (&cv->rjob->l);
-				} /* end for : */
-				wlock (&cv->rjob->l);
-				cv->rjob->rcinuse[filetype] = 1;
-				wunlock (&cv->rjob->l);
-			} else {
-					if (vflag) print ("file is already open for [%d] times\n", tmpfileuse);
-					wlock (&cv->rjob->l);
-					cv->rjob->rcinuse[filetype] += 1;
-					wunlock (&cv->rjob->l);
-			}
+		  remoteopen (c, omode, fname, tmpjc);
 		} /* end if : fname != nil */
 
 		break;
@@ -724,25 +755,21 @@ cmdopen (Chan *c, int omode)
 
 	if (vflag) print ("open for [%s] complete\n", c->name->s );
 	return c;
-}
+} /* end function : cmdopen */
 
 static void 
 freeremoteresource (RemoteResource *rr) 
 {
 	int i, ret;
 	char *location;
-	
-	if (rr == nil) {
-	  return ;
-	}
+	if (rr == nil) return;
 
 	for (i = 0; i < RCHANCOUNT ; ++i ) {
 		if (rr->remotefiles[i].cfile != nil) {
 			location=fetchparentpath(rr->remotefiles[i].cfile->name->s);
 			cclose (rr->remotefiles[i].cfile);
 			rr->remotefiles[i].cfile = nil;
-			rr->remotefiles[i].handle = nil;
-			rr->remotefiles[i].buffer =  nil;
+			rr->remotefiles[i].async_queue =  nil;
 
 			/* unbind ??  */
 
@@ -774,7 +801,7 @@ freeremotejobs (RemoteJob *rjob)
 	}
 
 	for (i = 0; i < RCHANCOUNT; ++i) {
-		qfree (rjob->bufferlist[i]);
+		qfree (rjob->async_queue_list[i]);
 	}
 	rjob->first = nil;
 	rjob->last = nil;
@@ -1006,7 +1033,7 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 			tmprr = tmprr->next;
 		}
 
-		ret = qconsume (c->rjob->bufferlist[filetype], a, n);
+		ret = qconsume (c->rjob->async_queue_list[filetype], a, n);
 		if (ret >= 0) {
 			return ret ;
 		}
@@ -1067,7 +1094,7 @@ readfromallasyncold (Chan *ch, void *a, long n, vlong offset)
 			rf = &tmprr->remotefiles[filetype];
 
 			/* read from queue */
-			c_ret = qconsume (rf->buffer, c_a, c_n);
+			c_ret = qconsume (rf->async_queue, c_a, c_n);
 			if (vflag) print ("******%ldth read gave [%ld] data, state[%d]\n", i, c_ret, rf->state);
 			if (c_ret >= 0 ) {
 				ret = ret + c_ret;
@@ -1647,7 +1674,7 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 		wlock (&rjob->l);
 		for (i = 0; i < RCHANCOUNT; ++i ) {
 			rjob->rcinuse[i] = 0;
-			rjob->bufferlist[i] = qopen (1024, 0, nil, 0);
+			rjob->async_queue_list[i] = qopen (1024, 0, nil, 0);
 		}
 		wunlock (&rjob->l);
 	}
@@ -1656,7 +1683,7 @@ addrr (char *localpath, char *selected, RemoteJob *rjob, int jcount)
 	pp->next = nil;
 	for (i = 0; i < RCHANCOUNT; ++i ) {
 		pp->remotefiles[i].cfile = nil;
-		pp->remotefiles[i].buffer =  rjob->bufferlist[i];
+		pp->remotefiles[i].async_queue =  rjob->async_queue_list[i];
 		pp->remotefiles[i].state = 0;
 	}
 
@@ -1735,8 +1762,7 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 		/* no remote resources */
 		if (vflag) print("no remote resources,reserving [%d]locally\n",
 		resNo);
-		/* making sure that OS and architecture are correct for local
-			reservations. */
+
 		if ((os != nil) && (os[0] != '*')) {
 			hn = lookup (os, oslist, OSCOUNT);
 			if (hn == 0 ) {
@@ -1920,7 +1946,7 @@ readstatus (char *a, long n, vlong offset)
 	/* Free up the memory allocated by findrr call */
 	freermounts (allremotenodes, validrc);
 
-	/* Prepare buffer to return */
+	/* Prepare Buffer to return */
 	buff[0] = '\0';
 	for (i = 0; i < OSCOUNT; ++i) {
 		for (j = 0; j < PLATFORMCOUNT; ++j) {
@@ -2551,7 +2577,7 @@ myunionread(Chan *c, void *va, long n)
 			a_n = a_n - nr;
 			a_nr = a_nr + nr;
 			if (a_n <= 0 ) {
-				if (vflag) print ("#### myunionread buffer full, breking");
+				if (vflag) print ("#### myunionread Buffer full, breking");
 				break;
 			}
 		} /* end if : nr > 0 */
