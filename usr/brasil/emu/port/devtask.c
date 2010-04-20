@@ -48,6 +48,7 @@ enum
 #define PARENTNAME "parent"
 
 char ENoRemoteResources[] = "No remote resources available";
+char ERemoteResFail[] = "remote reservation request failed";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
@@ -59,7 +60,7 @@ long lastrrselected = 0;
 struct RemoteFile
 {
 	int state;
-	int pstate;
+	int local_session_id;
 	Chan *cfile;
 	Queue *async_queue;
 };
@@ -1568,29 +1569,32 @@ findrr (int *validrc, char *os, char *arch)
 	return allremotenodes; 
 }
 
+/* allocates single remote resource,
+	can be executed in kproc */
 static void 
 allocatesinglerr (void *info) 
 {
 	char data[100];
 	char report[10];
-	volatile struct { Chan *cc; } rock;
 	int len, ret;
 	RemoteResource *r_resource;
+	RemoteFile *r_file;
 	int jcount;
+	int filetype;
 
+	filetype = Qctl - Qdata;
 	r_resource = (RemoteResource *)info;
 	jcount = r_resource->sub_sessions;
-	rock.cc = r_resource->remotefiles[Qctl-Qdata].cfile;
+	r_file = &r_resource->remotefiles[filetype];
 	
-	
-	report[0] = r_resource->local_session_id;
+	report[0] = r_file->local_session_id;
 	report[1] = 0; /* indicates failure */
 	report[2] = 0; /* indicate end of report */
 
 	if (waserror ()){
 		if (vflag) print ("#### error in sending reservation request to remote\n");
 		/* report failure */
-		qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue, report, 2 );
+		qwrite ( r_file->async_queue, report, 2 );
 		pexit ("", 0);
 	}
 
@@ -1598,27 +1602,26 @@ allocatesinglerr (void *info)
 	snprint (data, sizeof(data), "res %d", jcount);
 	len = strlen (data);
 
-	ret = devtab[rock.cc->type]->write (rock.cc, data, len, 0);
+	ret = devtab[r_file->cfile->type]->write (r_file->cfile, data, len, 0);
 	if (ret != len ) {
 		if (vflag) print ("#### ERR : res write size(%d) returned [%d]\n", 
 			len, ret);
 		/* report failure */
-		qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue, report, 2 );
+		qwrite ( r_file->async_queue, report, 2 );
 		pexit ("", 0);
 	} 
 	poperror ();
 
-	//r_resource->remotefiles[Qctl-Qdata].cfile = rock.cc;
+	r_file->state = 1;
 	r_resource->inuse = 1;
-	r_resource->remotefiles[Qctl-Qdata].state = 1;
 	
 	/* report success */
 	report[1] = 1; /* indicates success */
-	qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue, report, 2 );
-	if (vflag) print ("#### done with thread [%d]\n", r_resource->local_session_id);
+	qwrite ( r_file->async_queue, report, 2 );
+	if (vflag) print ("#### done with thread [%d]\n", r_file->local_session_id);
 	pexit ("", 0);
 	return;
-}
+} /* end function : allocatesinglerr */
 
 /* allocates memory and initialize the RemoteResource */
 RemoteResource *
@@ -1632,6 +1635,7 @@ allocate_remote_resource (RemoteJob *rjob, int sub_sessions, int rrnumber )
 		pp->remotefiles[i].cfile = nil;
 		pp->remotefiles[i].async_queue =  rjob->async_queue_list[i];
 		pp->remotefiles[i].state = 0;
+		pp->remotefiles[i].local_session_id = rrnumber;
 	} 
 	pp->local_session_id = rrnumber;
 	pp->remote_session_id = -1;
@@ -1640,12 +1644,13 @@ allocate_remote_resource (RemoteJob *rjob, int sub_sessions, int rrnumber )
 	return pp;
 }
 
+/* does multiple remote reservation in parallel */
 int
 parallelres (char *localpath, remoteMount **remote_node_list, int validrc, 
 				Conv *c, int resno, int first, int others)
 {
 	RemoteJob *rjob;
-	RemoteResource *pp;
+	RemoteResource *rr;
 	RemoteResource *prev;
 	char *selected;
 	long tmpjc;
@@ -1656,6 +1661,7 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 	char remote_ctl_path[KNAMELEN*3];
 	int i;
 	int flag;
+	int filetype;
 	int ret;
 	Block *content = nil;
 
@@ -1666,7 +1672,6 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 		error (EResourcesReleased);
 	}
 
-	
 	if (vflag)print ("parallelres(%s, %d, %d, %d)\n", 
 		localpath, resno, first, others);
 	
@@ -1705,22 +1710,23 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 	}
 
 	/* allocate memory and initialize RemoteResource */
-	pp = allocate_remote_resource (rjob, first, 0);
-	rjob->first = pp;
-	prev = pp;
+	rr = allocate_remote_resource (rjob, first, 0);
+	rjob->first = rr;
+	prev = rr;
 	for (i = 1; i < resno ; ++i ) {
-		pp = allocate_remote_resource (rjob, others, i);
-		prev->next = pp;
-		prev = pp;
+		rr = allocate_remote_resource (rjob, others, i);
+		prev->next = rr;
+		prev = rr;
 	}
-	rjob->last = pp;
+	rjob->last = rr;
 	
 	/* set the remote job count */
 	rjob->rjobcount = resno; 
 	
+	filetype = Qctl -Qdata;
 	/* clear any old notifications from queue */
-	qflush (rjob->async_queue_list[Qctl-Qdata]);
-	pp = rjob->first; 
+	qflush (rjob->async_queue_list[filetype]);
+	rr = rjob->first; 
 	for (i = 0; i < resno; ++i ) {
 		
 		/* find which remote resource to use */
@@ -1731,7 +1737,7 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 				selected = remote_node_list[lastrrselected]->path; 
 		}
 		
-		sprint (local_session_path, "%s/%ld",localpath, pp->local_session_id);
+		sprint (local_session_path, "%s/%ld",localpath, rr->local_session_id);
 		sprint (remote_ctl_path, "%s/%s", selected, "clone");
 		
 		if (vflag) print ("creating session id [%s]\n", local_session_path);
@@ -1744,7 +1750,7 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 			nexterror ();
 		}
 		if (vflag) print ("before namec on [%s]\n", remote_ctl_path);
-		pp->remotefiles[Qctl-Qdata].cfile = namec (remote_ctl_path, 
+		rr->remotefiles[filetype].cfile = namec (remote_ctl_path, 
 							Aopen, ORDWR, 0); 
 		if (vflag) print ("namec successful\n", remote_ctl_path);
 		poperror ();
@@ -1754,7 +1760,7 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 			error (ENOReservation);
 		}
 	
-		content = devbread (pp->remotefiles[Qctl-Qdata].cfile, 10, 0);
+		content = devbread (rr->remotefiles[filetype].cfile, 10, 0);
 		
 		if (BLEN (content) == 0) {
 			error (ENOReservation);
@@ -1763,10 +1769,10 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 				BLEN (content), (char *)content->rp);
 		
 		content->rp[BLEN(content)] = 0;
-		pp->remote_session_id = atol ((char *)content->rp);
+		rr->remote_session_id = atol ((char *)content->rp);
 		
 		/* creating remote session paths */
-		sprint (remote_session_path, "%s/%ld",selected,pp->remote_session_id);
+		sprint (remote_session_path, "%s/%ld",selected,rr->remote_session_id);
 	
 		/* bind remote resource on local dir. */
 		if (vflag) print ("binding r[%s]->l[%s]\n", remote_session_path,
@@ -1777,19 +1783,18 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 		freeb (content);
 		
 		/* create kprocs for each job */
-		sprint (buf, "ctlProc_%d__", pp->local_session_id);
+		sprint (buf, "ctlProc_%d__", rr->local_session_id);
 //		allocatesinglerr (pp);
-		kproc (buf,  allocatesinglerr, pp,  0);
-		
-		pp = pp->next;
+		kproc (buf, allocatesinglerr, rr, 0);
+		rr = rr->next;
 		if (vflag) print ("allocated one session [%d]\n", i);
 	} /* end for : for each session resource */
 	
-	/* ensure that resources are properly allocated */
 	
+	/* ensure that resources are properly allocated */
 	flag = 0;
 	for (i = 0; i < resno; ++i ) {
-		ret = qread (rjob->async_queue_list[Qctl-Qdata], buf, 2);
+		ret = qread (rjob->async_queue_list[filetype], buf, 2);
 		if (ret != 2 ) {
 			++flag;
 			if (vflag) print ("qread on ctl buff failed\n");
@@ -1801,24 +1806,28 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 			} else {
 				if (vflag) print ("resource allocation for [%d] successful\n",
 						buf[0]);
+				
 			}
 		}
-	}
-	
-	if  (flag > 0) {
-		if (vflag) print ("resource allocation failed for [%d] times\n",
-					flag);
-		/* release half allocated resources */
-	}
+	} /* end for : for each resource */
+
 	
 	/* mark ctl file in use */
-	rjob->rcinuse[Qctl-Qdata] = 1; 
+	rjob->rcinuse[filetype] = 1; 
 	
 	/* completely unlock this session */
 	wunlock (&rjob->l);
 	qunlock (&c->l);
 
 	poperror ();
+	
+	/* report failure */
+	if  (flag > 0) {
+		if (vflag) print ("resource allocation failed for [%d] times\n",
+					flag);
+		/* FIXME: release half allocated resources */
+		error (ERemoteResFail);
+	}
 	return resno;
 } /* end function : parellelres */
 
@@ -2054,8 +2063,71 @@ readstatus (char *a, long n, vlong offset)
 	return readstr (offset, a, n, buff);
 } /* end function : readstatus */
 
+/* function : p_send2one : will send data to one node
+		but this function can be executed parallelly in thread */
+static void
+p_send2one (void *param)
+{
+	RemoteFile *rf;
+	int filetype;
+	rf = (RemoteFile *) param;
+	
+} /* end function : p_send2one */
 
+/* p_send2all : sends write command to all nodes parallelly 
+	FIXME: works only for ctl file
+*/ 
+static long p_send2all (Chan *ch, void *a, long n, vlong offset)
+{
+	int i, ret = 0;
+	Conv *c;
+	long tmpjc;
+	RemoteResource *rr;
+	int filetype;
 
+	c = cmd.conv[CONV (ch->qid)];
+
+	/* sanity checks : making sure that this session is eligible for
+		parallel send to all */
+	if (c->rjob == nil) {
+		if (vflag)print ("resources released, as clone file closed\n");
+		error (EResourcesReleased);
+	}
+
+	tmpjc = getrjobcount (c->rjob);
+
+	if (vflag) print ("write to [%s] repeating [%ld] times\n", 
+			ch->name->s, tmpjc);
+	/* making sure that remote resources are allocated */
+	if (tmpjc <= 0) {
+		if (vflag) print ("resources not reserved\n");
+		error (ENOReservation);
+	}
+
+	filetype = TYPE(ch->qid) - Qdata;
+
+	/* data should be sent to all resources */
+	wlock (&c->rjob->l);
+	rr = c->rjob->first ;
+	qflush (c->rjob->async_queue_list[filetype]);
+	wunlock (&c->rjob->l);
+
+	for (i = 0 ; i < tmpjc; ++i) {
+			
+		/* FIXME: create kproc to do the write */
+		p_send2one (rr);
+		ret = devtab[rr->remotefiles[filetype].cfile->type]->
+				write (rr->remotefiles[filetype].cfile, a, n, offset);	
+
+		/* FIXME: should I lock following also in read mode ??  */
+		rr = rr->next;
+	}
+	if (vflag) print ("write to [%ld] res successful of size[%ld]\n", tmpjc, n);
+
+	return ret;
+} /* end function : p_send2all */
+
+/* sendtoall : sends write command to all nodes sequentially */
 static long 
 sendtoall (Chan *ch, void *a, long n, vlong offset)
 {
