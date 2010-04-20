@@ -150,12 +150,12 @@ struct for_splice
 	Chan *dst;
 };
 
-struct single_res_wrap
+struct parallel_send_wrap
 {
-	RemoteResource *r_resource;
-	char *localsession;
-	char  *selected;
-	int jcount;
+	RemoteFile *rf;
+	void *p_a;
+	long p_n;
+	vlong p_offset;
 };
 
 /* function prototypes */
@@ -2068,11 +2068,70 @@ readstatus (char *a, long n, vlong offset)
 static void
 p_send2one (void *param)
 {
+	long ret;
+	struct parallel_send_wrap *psw;
 	RemoteFile *rf;
+	void *a;
+	long n;
+	vlong offset;
 	int filetype;
-	rf = (RemoteFile *) param;
+	char report[10];
 	
+	
+	if (vflag) print ("###p_send2one: started\n" );
+	psw = (struct parallel_send_wrap *) param;
+	rf = psw->rf;
+	a = psw->p_a;
+	n = psw->p_n;
+	offset = psw->p_offset;
+	free (psw);
+	
+	if (vflag) print ("###p_send2one: started\n" );
+	report[0] = rf->local_session_id;
+	report[1] = 0; /* indicates failure */
+	report[2] = 0; /* indicate end of report */
+	
+	if (vflag) print ("###p_send2one: started\n" );
+	
+	if (waserror ()){
+		if (vflag) print ("###p_send2one[%d]: error in sending write\n",
+		rf->local_session_id);
+		/* report failure */
+		qwrite ( rf->async_queue, report, 2 );
+//		pexit ("", 0);
+	}
+
+	if (vflag) print ("###p_send2one: started\n" );
+	/* FIXME : lock the file to be used */
+	
+	if (vflag) print ("###p_send2one[%d]: about to write\n",
+			rf->local_session_id);
+	
+	/* do actual write */
+	ret = devtab[rf->cfile->type]->write(rf->cfile, a, n, offset);	
+			
+	if (vflag) print ("###p_send2one[%d]: write done\n",
+			rf->local_session_id);
+	
+	if (ret != n) {
+		/* problem: all bytes are not written, report failure */
+		if (vflag) print ("###p_send2one[%d]:wrot %d instd of %d bytes\n",
+				rf->local_session_id, ret, n);
+		/* report failure */
+		qwrite ( rf->async_queue, report, 2 );
+//		pexit ("", 0);
+	}
+	poperror ();
+	
+	/* report success */
+	report[1] = 1; /* indicates success */
+	qwrite ( rf->async_queue, report, 2 );
+	if (vflag) print ("###p_send2one[%d]:  success wrot %d bytes\n",
+			rf->local_session_id, ret );
+//	pexit ("", 0);
+	return;
 } /* end function : p_send2one */
+
 
 /* p_send2all : sends write command to all nodes parallelly 
 	FIXME: works only for ctl file
@@ -2084,6 +2143,9 @@ static long p_send2all (Chan *ch, void *a, long n, vlong offset)
 	long tmpjc;
 	RemoteResource *rr;
 	int filetype;
+	char buf[100];
+	int flag;
+	struct parallel_send_wrap *psw;
 
 	c = cmd.conv[CONV (ch->qid)];
 
@@ -2113,18 +2175,59 @@ static long p_send2all (Chan *ch, void *a, long n, vlong offset)
 	wunlock (&c->rjob->l);
 
 	for (i = 0 ; i < tmpjc; ++i) {
-			
-		/* FIXME: create kproc to do the write */
-		p_send2one (rr);
-		ret = devtab[rr->remotefiles[filetype].cfile->type]->
-				write (rr->remotefiles[filetype].cfile, a, n, offset);	
+		
+		/* create argument to pass */
+		psw = (struct parallel_send_wrap *) malloc( 
+					sizeof(struct parallel_send_wrap));
+		psw->rf = &rr->remotefiles[filetype];
+		psw->p_a = a;
+		psw->p_n = n;
+		psw->p_offset = offset;
+		
+		/* create kproc to do the write */
+		sprint (buf, "send2allProc_%d_%d__", c->x, rr->local_session_id);
+//		p_send2one (psw);
+		kproc (buf, p_send2one , psw, 0);
 
 		/* FIXME: should I lock following also in read mode ??  */
 		rr = rr->next;
 	}
-	if (vflag) print ("write to [%ld] res successful of size[%ld]\n", tmpjc, n);
+	
+	if (vflag) print ("looping done anayling result\n");
+	/* ensure that resources are properly allocated */
+	
+	/* FIXME: lock the filetype for remote resources */
+	flag = 0;
+	for (i = 0; i < tmpjc; ++i ) {
+		ret = qread (c->rjob->async_queue_list[filetype], buf, 2);
+		if (ret != 2 ) {
+			++flag;
+			if (vflag) print ("qread on ctl buff failed\n");
+		} else {
+			if (buf[1] != 1) {
+				++flag;
+				if (vflag) print ("resource allocation for [%d] failed\n",
+						buf[0]);
+			} else {
+				if (vflag) print ("resource allocation for [%d] successful\n",
+						buf[0]);
+				
+			}
+		}
+	} /* end for : for each resource */
+	if (vflag) print ("analysis done, declaring\n");
+	
+	/* report failure */
+	if  (flag > 0) {
+		if (vflag) print ("write failed for [%d] nodes\n",
+					flag);
+		error (ERemoteResFail);
+	}
+	
+	if (vflag) print ("write to [%ld] res successful of size[%ld]\n", 
+			tmpjc, n);
 
-	return ret;
+	return n;
 } /* end function : p_send2all */
 
 /* sendtoall : sends write command to all nodes sequentially */
@@ -2373,7 +2476,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 			}
 
 			if (vflag) print ("executing cammand remotely\n" );
-			ret = sendtoall (ch, a, n, offset);
+			ret = p_send2all (ch, a, n, offset);
 			if (vflag) print ("executing cammand - done\n" );
 			break;
 
@@ -2391,7 +2494,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				break;
 			}
 
-			ret = sendtoall (ch, a, n, offset);
+			ret = p_send2all (ch, a, n, offset);
 			if (vflag) print ("executing cammand - done\n" );
 			break;
 
@@ -2419,7 +2522,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				break;
 			}
 
-			ret = sendtoall (ch, a, n, offset);
+			ret = p_send2all (ch, a, n, offset);
 			if (vflag) print ("executing cammand - done\n");
 			break;
 
@@ -2460,7 +2563,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				break;
 			}
 
-			ret = sendtoall (ch, a, n, offset);
+			ret = p_send2all (ch, a, n, offset);
 			if (vflag) print ("executing cammand - done\n");
 			break; 
 
