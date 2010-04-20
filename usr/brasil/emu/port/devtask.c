@@ -1572,21 +1572,26 @@ static void
 allocatesinglerr (void *info) 
 {
 	char data[100];
+	char report[10];
 	volatile struct { Chan *cc; } rock;
 	int len, ret;
 	RemoteResource *r_resource;
 	int jcount;
-	char *tmp;
 
 	r_resource = (RemoteResource *)info;
 	jcount = r_resource->sub_sessions;
 	rock.cc = r_resource->remotefiles[Qctl-Qdata].cfile;
+	
+	
+	report[0] = r_resource->local_session_id;
+	report[1] = 0; /* indicates failure */
+	report[2] = 0; /* indicate end of report */
 
 	if (waserror ()){
-		if (vflag) print ("#### No remote resource\n");
-//		cclose (rock.cc);
+		if (vflag) print ("#### error in sending reservation request to remote\n");
+		/* report failure */
+		qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue, report, 2 );
 		pexit ("", 0);
-//		nexterror ();
 	}
 
 	/* send reservation request */
@@ -1597,18 +1602,19 @@ allocatesinglerr (void *info)
 	if (ret != len ) {
 		if (vflag) print ("#### ERR : res write size(%d) returned [%d]\n", 
 			len, ret);
+		/* report failure */
+		qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue, report, 2 );
 		pexit ("", 0);
-//		error (ENOReservation);
 	} 
 	poperror ();
 
 	//r_resource->remotefiles[Qctl-Qdata].cfile = rock.cc;
 	r_resource->inuse = 1;
-	data[0] = r_resource->local_session_id;
-	data[1] = 1; /* indicates success */
-	data[2] = 0;
 	r_resource->remotefiles[Qctl-Qdata].state = 1;
-	qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue,data, 2 );
+	
+	/* report success */
+	report[1] = 1; /* indicates success */
+	qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue, report, 2 );
 	if (vflag) print ("#### done with thread [%d]\n", r_resource->local_session_id);
 	pexit ("", 0);
 	return;
