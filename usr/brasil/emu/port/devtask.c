@@ -67,8 +67,13 @@ typedef struct RemoteFile RemoteFile;
 
 struct RemoteResource 
 {
-	int x;
+	int local_session_id;
+	int remote_session_id;
+	int state;
 	int inuse;
+	int sub_sessions;
+	char *localsession;
+	char *remotesession;
 	/* List of all files in remote resource directory */
 	RemoteFile remotefiles[RCHANCOUNT];
 	/* Next remote resource */
@@ -144,6 +149,14 @@ struct for_splice
 {
 	Chan *src;
 	Chan *dst;
+};
+
+struct single_res_wrap
+{
+	RemoteResource *r_resource;
+	char *localsession;
+	char  *selected;
+	int jcount;
 };
 
 /* function prototypes */
@@ -1414,14 +1427,14 @@ validaterr (char *location, char *os, char *arch)
 
 	if (vflag) print ("remote dir[%s]= %ld entries\n", location, count);
 	for (i = 0, tmpDr = dr; i < count; ++ i, ++tmpDr) {
-		if (vflag) print ("#### %d [%s/%s]\n", i, location, tmpDr->name);
+		if (vflag) print ("%d [%s/%s]\n", i, location, tmpDr->name);
 		if (DMDIR & tmpDr->mode) {
-			if (vflag) print ("####checking for dir[%s]\n",tmpDr->name);
+			if (vflag) print ("checking for dir[%s]\n",tmpDr->name);
 			if (strcmp (tmpDr->name, localName) == 0) {
 				break;	
 			}
 			if (strcmp (tmpDr->name, parentName) == 0) {
-				if (vflag) print ("#### this is parent dir, ignoring\n");
+				if (vflag) print ("this is parent dir, ignoring\n");
 				break;	
 			}
 		}
@@ -1557,55 +1570,26 @@ findrr (int *validrc, char *os, char *arch)
 	return allremotenodes; 
 }
 
-
-static Chan *
-allocatesinglerr (RemoteResource *r_resource, char *localsession, char *selected, int jcount) 
+static void 
+allocatesinglerr (void *info) 
 {
 	char data[100];
-	Block *content = nil;
-	char location[KNAMELEN*3];
 	volatile struct { Chan *cc; } rock;
 	int len, ret;
-	char localpath[KNAMELEN*3];
+	RemoteResource *r_resource;
+	int jcount;
+	char *tmp;
+
+	r_resource = (RemoteResource *)info;
+	jcount = r_resource->sub_sessions;
+	rock.cc = r_resource->remotefiles[Qctl-Qdata].cfile;
 
 	if (waserror ()){
-		/* FIXME : following warning msg is incorrect */
-		if (vflag) print ("Remote resources not present at [%s]\n", REMOTEMOUNTPOINT);
-		nexterror ();
+		if (vflag) print ("#### No remote resource\n");
+//		cclose (rock.cc);
+		pexit ("", 0);
+//		nexterror ();
 	}
-
-	sprint (localpath, "%s/%d", localsession, r_resource->x);
-	if (vflag) print ("allocating rresource for location [%s]\n",localpath);
-	snprint (location, KNAMELEN*3, "%s/%s", selected, "clone");
-
-	if (vflag) print (" opening [%s]\n", location);
-
-	if (waserror ()){
-		/* FIXME : following warning msg is incorrect */
-		if (vflag) print ("namec failed\n");
-		nexterror ();
-	}
-	rock.cc = namec (location, Aopen, ORDWR, 0); 
-	poperror();
-	if (vflag) print (" namec successful\n", location);
-	poperror ();
-
-	if (waserror ()){
-		if (vflag) print ("No remote resource\n");
-		freeb (content);
-		cclose (rock.cc);
-		nexterror ();
-	}
-	content = devbread (rock.cc, 10, 0);
-	if (BLEN (content) == 0) {
-		error (ENOReservation);
-	}
-
-	snprint (location, KNAMELEN*3, 
-			"%s/%s",selected, (char *)content->rp);
-	if (vflag) print ("clone returned %ld data [%s]\n", 
-			BLEN (content), (char *)content->rp);
-	if (vflag) print ("Remote Resource Path[%s]\n", location);
 
 	/* send reservation request */
 	snprint (data, sizeof(data), "res %d", jcount);
@@ -1613,34 +1597,28 @@ allocatesinglerr (RemoteResource *r_resource, char *localsession, char *selected
 
 	ret = devtab[rock.cc->type]->write (rock.cc, data, len, 0);
 	if (ret != len ) {
-		if (vflag) print ("ERR : res write size(%d) returned [%d]\n", 
+		if (vflag) print ("#### ERR : res write size(%d) returned [%d]\n", 
 			len, ret);
-		error (ENOReservation);
+		pexit ("", 0);
+//		error (ENOReservation);
 	} 
-
 	poperror ();
 
-	if (waserror ()){
-		if (vflag) print("could not bind remote and local resource\n");
-		freeb (content);
-		cclose (rock.cc);
-		nexterror ();
-	}
-	/* bind remote resource on local dir. */
-	if (vflag) print ("binding [%s]->[%s]\n", location, localpath);
-	kbind (location, localpath, MREPL);
-	freeb (content);
-	poperror ();
-	r_resource->remotefiles[Qctl-Qdata].cfile = rock.cc;
+	//r_resource->remotefiles[Qctl-Qdata].cfile = rock.cc;
 	r_resource->inuse = 1;
-	if (vflag) print ("binding [%s]->[%s] done\n", location, localpath);
-	/* use r_resource->remotefiles[Qctl-Qdata].async_queue to inform completion  */
-	return (rock.cc);
+	data[0] = r_resource->local_session_id;
+	data[1] = 1; /* indicates success */
+	data[2] = 0;
+	r_resource->remotefiles[Qctl-Qdata].state = 1;
+	qwrite ( r_resource->remotefiles[Qctl-Qdata].async_queue,data, 2 );
+	if (vflag) print ("#### done with thread [%d]\n", r_resource->local_session_id);
+	pexit ("", 0);
+	return;
 }
 
 /* allocates memory and initialize the RemoteResource */
 RemoteResource *
-allocate_remote_resource (RemoteJob *rjob, int rrnumber )
+allocate_remote_resource (RemoteJob *rjob, int sub_sessions, int rrnumber )
 {
 	RemoteResource * pp;
 	int i;
@@ -1651,7 +1629,10 @@ allocate_remote_resource (RemoteJob *rjob, int rrnumber )
 		pp->remotefiles[i].async_queue =  rjob->async_queue_list[i];
 		pp->remotefiles[i].state = 0;
 	} 
-	pp->x = rrnumber;
+	pp->local_session_id = rrnumber;
+	pp->remote_session_id = -1;
+	pp->sub_sessions = sub_sessions;
+	pp->state = 0;
 	return pp;
 }
 
@@ -1662,11 +1643,17 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 	RemoteJob *rjob;
 	RemoteResource *pp;
 	RemoteResource *prev;
-	Chan *tmpchan;
 	char *selected;
 	long tmpjc;
 	int sub_sessions;
+	char buf[100];
+	char local_session_path[KNAMELEN*3];
+	char remote_session_path[KNAMELEN*3];
+	char remote_ctl_path[KNAMELEN*3];
 	int i;
+	int flag;
+	int ret;
+	Block *content = nil;
 
 	rjob = c->rjob;
 	/* error checking */
@@ -1690,7 +1677,7 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 		error (EResourcesINUse);
 	}
 	
-	/* handle failure */
+	/* handle all failures */
 	if (waserror ()){
 		if (vflag)print ("Could not allocate needed rmt resources\n");
 
@@ -1714,11 +1701,11 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 	}
 
 	/* allocate memory and initialize RemoteResource */
-	pp = allocate_remote_resource (rjob, 0);
+	pp = allocate_remote_resource (rjob, first, 0);
 	rjob->first = pp;
 	prev = pp;
 	for (i = 1; i < resno ; ++i ) {
-		pp = allocate_remote_resource (rjob, i);
+		pp = allocate_remote_resource (rjob, others, i);
 		prev->next = pp;
 		prev = pp;
 	}
@@ -1726,26 +1713,101 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 	
 	/* set the remote job count */
 	rjob->rjobcount = resno; 
-
+	
+	/* clear any old notifications from queue */
+	qflush (rjob->async_queue_list[Qctl-Qdata]);
 	pp = rjob->first; 
-	sub_sessions = first;
 	for (i = 0; i < resno; ++i ) {
+		
+		/* find which remote resource to use */
 		if (remote_node_list == nil ) {
 			selected = BASE;
 		} else {
 				lastrrselected = (lastrrselected + 1) % validrc;
 				selected = remote_node_list[lastrrselected]->path; 
 		}
-		if (vflag) print ("creating session id %s/[%d]\n", localpath, pp->x);
-		/* FIXME: create kprocs for each job */
-		allocatesinglerr (pp, localpath, selected, sub_sessions);
+		
+		sprint (local_session_path, "%s/%ld",localpath, pp->local_session_id);
+		sprint (remote_ctl_path, "%s/%s", selected, "clone");
+		
+		if (vflag) print ("creating session id [%s]\n", local_session_path);
+		
+		/* quickfix as calls like namec and kbind are not working from 
+			threads */
+		if (waserror ()){
+			/* FIXME : following warning msg is incorrect */
+			if (vflag) print ("namec failed\n");
+			nexterror ();
+		}
+		if (vflag) print ("before namec on [%s]\n", remote_ctl_path);
+		pp->remotefiles[Qctl-Qdata].cfile = namec (remote_ctl_path, 
+							Aopen, ORDWR, 0); 
+		if (vflag) print ("namec successful\n", remote_ctl_path);
+		poperror ();
+		
+		if (waserror ()){
+			if (vflag) print("could not bind remote and local resource\n");
+			error (ENOReservation);
+		}
+	
+		content = devbread (pp->remotefiles[Qctl-Qdata].cfile, 10, 0);
+		
+		if (BLEN (content) == 0) {
+			error (ENOReservation);
+		}
+		if (vflag) print ("clone returned %ld data [%s]\n", 
+				BLEN (content), (char *)content->rp);
+		
+		content->rp[BLEN(content)] = 0;
+		pp->remote_session_id = atol ((char *)content->rp);
+		
+		/* creating remote session paths */
+		sprint (remote_session_path, "%s/%ld",selected,pp->remote_session_id);
+	
+		/* bind remote resource on local dir. */
+		if (vflag) print ("binding r[%s]->l[%s]\n", remote_session_path,
+			local_session_path);
+		kbind (remote_session_path, local_session_path, MREPL);
+		poperror ();
+		
+		freeb (content);
+		
+		/* create kprocs for each job */
+		sprint (buf, "ctlProc_%d__", pp->local_session_id);
+//		allocatesinglerr (pp);
+		kproc (buf,  allocatesinglerr, pp,  0);
+		
 		pp = pp->next;
-		sub_sessions = others; 
 		if (vflag) print ("allocated one session [%d]\n", i);
+	} /* end for : for each session resource */
+	
+	/* ensure that resources are properly allocated */
+	
+	flag = 0;
+	for (i = 0; i < resno; ++i ) {
+		ret = qread (rjob->async_queue_list[Qctl-Qdata], buf, 2);
+		if (ret != 2 ) {
+			++flag;
+			if (vflag) print ("qread on ctl buff failed\n");
+		} else {
+			if (buf[1] != 1) {
+				++flag;
+				if (vflag) print ("resource allocation for [%d] failed\n",
+						buf[0]);
+			} else {
+				if (vflag) print ("resource allocation for [%d] successful\n",
+						buf[0]);
+			}
+		}
 	}
 	
-	/* FIXME: ensure that resources are properly allocated */
+	if  (flag > 0) {
+		if (vflag) print ("resource allocation failed for [%d] times\n",
+					flag);
+		/* release half allocated resources */
+	}
 	
+	/* mark ctl file in use */
 	rjob->rcinuse[Qctl-Qdata] = 1; 
 	
 	/* completely unlock this session */
@@ -2573,7 +2635,7 @@ myunionread(Chan *c, void *va, long n)
 	mount = m->mount;
 
 
-	if (vflag) print ("#### inside myunionread for [%s]\n", c->name->s);
+	if (vflag) print ("inside myunionread for [%s]\n", c->name->s);
 	/* bring mount in sync with c->uri and c->umc */
 	for(i = 0; mount != nil && i < c->uri; i++)
 		mount = mount->next;
@@ -2583,7 +2645,7 @@ myunionread(Chan *c, void *va, long n)
 	a_n = n;
 	a_nr = 0;
 	while(mount != nil) {
-		if (vflag) print("#### myunionread looping  [%s]\n", c->name->s);
+		if (vflag) print("myunionread looping  [%s]\n", c->name->s);
 		/* Error causes component of union to be skipped */
 		if(mount->to && !waserror()) {
 			if(c->umc == nil){
@@ -2591,7 +2653,7 @@ myunionread(Chan *c, void *va, long n)
 				c->umc = devtab[c->umc->type]->open(c->umc, OREAD);
 			}
 	
-			if (vflag) print("#### myuninrd reading [%s]\n",c->umc->name->s);
+			if (vflag) print("myuninrd reading [%s]\n",c->umc->name->s);
 			nr = devtab[c->umc->type]->read(c->umc, a_va, a_n, c->umc->offset);
 			if(nr < 0)
 				nr = 0;	/* dev.c can return -1 */
@@ -2599,13 +2661,14 @@ myunionread(Chan *c, void *va, long n)
 			poperror();
 		} /* end if */
 		if(nr > 0) {
-			if (vflag) print ("#### myunionread got something out[%s]\n", c->umc->name->s);
+			if (vflag) print ("myunionread got something out[%s]\n",
+c->umc->name->s);
 			/* break; */ /* commenting so that it will read from all chans*/
 			a_va = (char *)a_va + nr;
 			a_n = a_n - nr;
 			a_nr = a_nr + nr;
 			if (a_n <= 0 ) {
-				if (vflag) print ("#### myunionread Buffer full, breking");
+				if (vflag) print ("myunionread Buffer full, breking");
 				break;
 			}
 		} /* end if : nr > 0 */
@@ -2642,12 +2705,12 @@ readfromchan (Chan *rc, void *va, long n, vlong off)
 
 	dir = rc->qid.type & QTDIR;
 	if (dir && rc->umh) {
-		if (vflag) print ("### going for unionread\n");
+		if (vflag) print ("going for unionread\n");
 		n = myunionread (rc, va, n);
-		if (vflag) print ("### done from unionread\n");
+		if (vflag) print ("done from unionread\n");
 	}
 	else{
-		if (vflag) print ("### not going for unionread\n");
+		if (vflag) print ("not going for unionread\n");
 		n = devtab[rc->type]->read (rc, va, n, off);
 	}
 
