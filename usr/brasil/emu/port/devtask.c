@@ -72,8 +72,6 @@ struct RemoteResource
 	int state;
 	int inuse;
 	int sub_sessions;
-	char *localsession;
-	char *remotesession;
 	/* List of all files in remote resource directory */
 	RemoteFile remotefiles[RCHANCOUNT];
 	/* Next remote resource */
