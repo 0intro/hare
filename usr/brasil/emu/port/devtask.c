@@ -12,6 +12,7 @@ enum
 	Qtopdir,	/* top level directory */
 	Qcmd,		/* "remote" dir */
 	Qclonus,
+	Qtopctl,
 	Qlocalfs,   /* local fs mount point */
 	Qlocalnet,   /* local net mount point */
 	Qarch,	/* architecture description */
@@ -53,7 +54,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -312,31 +313,36 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		if (s == 1){
+			mkqid (&q, QID (0, Qtopctl), 0, QTFILE);
+			devdir (c, q, "ctl", 0, eve, 0777, dp);
+			return 1;
+		}
+		if (s == 2){
 			mkqid (&q, QID (0, Qlocalfs), 0, QTDIR);
 			devdir (c, q, "fs", 0, eve, DMDIR|0555, dp);
 			return 1;
 		}
-		if (s == 2){
+		if (s == 3){
 			mkqid (&q, QID (0, Qlocalnet), 0, QTDIR);
 			devdir (c, q, "net", 0, eve, DMDIR|0555, dp);
 			return 1;
 		}
-		if (s == 3){
+		if (s == 4){
 			mkqid (&q, QID (0, Qarch), 0, QTFILE);
 			devdir (c, q, "arch", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 4){
+		if (s == 5){
 			mkqid (&q, QID (0, Qtopns), 0, QTDIR);
 			devdir (c, q, "ns", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 5){
+		if (s == 6){
 			mkqid (&q, QID (0, Qtopenv), 0, QTDIR);
 			devdir (c, q, "env", 0, eve, 0666, dp);
 			return 1;
 		}
-		if (s == 6){
+		if (s == 7){
 			mkqid (&q, QID (0, Qtopstat), 0, QTFILE);
 			devdir (c, q, "status", 0, eve, 0666, dp);
 			return 1;
@@ -350,7 +356,15 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			return 1;
 		}
 		return -1;
-		
+		 
+	case Qtopctl:
+		if (s == 0){
+			mkqid (&q, QID (0, Qtopctl), 0, QTFILE);
+			devdir (c, q, "ctl", 0, eve, 0777, dp);
+			return 1;
+		}
+		return -1;
+		 
 	case Qtopstat:
 		if (s == 0){
 			mkqid (&q, QID (0, Qtopstat), 0, QTFILE);
@@ -425,7 +439,6 @@ cmdinit (void)
 	IHN = lookup (hosttype, oslist, OSCOUNT );
 	IAN = lookup (platform, platformlist, PLATFORMCOUNT);
 }
-
 
 static Chan *
 cmdattach (char *spec)
@@ -620,6 +633,10 @@ cmdopen (Chan *c, int omode)
 	default:
 		break;
 
+	case Qtopctl :
+		print ("opening ctl file\n");
+		break;
+		
 	case Qarch:
 	case Qtopstat:
 		if (omode != OREAD)
@@ -934,7 +951,8 @@ cmdclose (Chan *c)
 	switch (TYPE (c->qid)) {
 
 	case Qarch:
-	case Qtopstat :
+	case Qtopstat:
+	case Qtopctl:
 		break;
 		
 	case Qctl:
@@ -1164,6 +1182,10 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 	case QLconrdir:
 		return devdirread (ch, a, n, 0, 0, cmdgen);
 
+	case Qtopctl:
+		sprint (up->genbuf, "debug %d\n", vflag);
+		return readstr (offset, p, n, up->genbuf);
+		
 	case Qctl:
 		sprint (up->genbuf, "%ld", CONV (ch->qid));
 		return readstr (offset, p, n, up->genbuf);
@@ -1248,6 +1270,16 @@ cmdstarted (void *a)
 	c = a;
 	return c->child != nil || c->error != nil || strcmp (c->state, "Execute") != 0;
 }
+enum
+{
+	CTLDebug,
+};
+
+
+static
+Cmdtab ctlcmdtab[] = {
+	CTLDebug,	"debug",	2,
+}; 
 
 enum
 {
@@ -2340,8 +2372,25 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	switch (TYPE (ch->qid)) {
 	default:
 		error (Eperm);
+		
+	case Qtopctl :
+		print ("came here\n");
+		cb = parsecmd (a, n);
+		print ("cmd arg[%d] done [%s]\n", cb->nf, a); 
+		ct = lookupcmd (cb, ctlcmdtab, nelem (ctlcmdtab));
+		switch (ct->index){
+		default:
+			error (Eperm);
+		
+		case CTLDebug :
+			/* two statements so that atlease one will be shown */
+			if(vflag) print("setting debug to %d\n", atoi(cb->f[1]));
+			vflag = atoi(cb->f[1]);
+			if(vflag) print("setting debug to %d\n", vflag);
+		}
+		break;
+			
 	case Qctl:
-
 		if (c->rjob == nil) {
 			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
@@ -2666,10 +2715,10 @@ cmdproc(void *a)
 
 	c = a;
 	qlock(&c->l);
-	if(Debug)
+	if(vflag)
 		print("f[0]=%q f[1]=%q\n", c->cmd->f[0], c->cmd->f[1]);
 	if(waserror()){
-		if(Debug)
+		if(vflag)
 			print("failed: %q\n", up->env->errstr);
 		kstrdup(&c->error, up->env->errstr);
 		c->state = "Done";
@@ -2684,7 +2733,7 @@ cmdproc(void *a)
 	poperror();
 	qunlock(&c->l);
 	Wakeup(&c->startr);
-	if(Debug)
+	if(vflag)
 		print("started\n");
 	while(waserror())
 		oscmdkill(t);
@@ -2698,7 +2747,7 @@ cmdproc(void *a)
 	qlock(&c->l);
 	c->child = nil;
 	oscmdfree(t);
-	if(Debug){
+	if(vflag){
 		status[n]=0;
 		print("done %d %d %d: %q\n", c->fd[0], c->fd[1], c->fd[2], status);
 	}

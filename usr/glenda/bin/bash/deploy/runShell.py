@@ -132,10 +132,28 @@ class XCPU3Client:
         self.inputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.ctlLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.outputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.debugLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+
 
     def dPrint (self, msg):
         if (self.DEBUG):
             print msg
+
+    def enableDebug (self) :
+        name = "/csrv/local/ctl"
+        print "enabling debugging"
+        if self.debugLink.open (name, py9p.ORDWR) is  None:
+            raise Exception ("XCPU3: could not open " + name)
+        self.debugLink.write ("debug 1");
+        self.debugLink.close ();
+        
+    def disableDebug (self) :
+        name = "/csrv/local/ctl"
+        print "disabling debugging"
+        if self.debugLink.open (name, py9p.ORDWR) is  None:
+            raise Exception ("XCPU3: could not open " + name)
+        self.debugLink.write ("debug 0");
+        self.debugLink.close ();
 
     def get9pClient (self, srv, port, authmode='none', user='', passwd=None, authsrv=None, chatty=0, key=None) :
         privkey = None
@@ -364,11 +382,14 @@ def main ():
     mycpu = XCPU3Client (brasilHost, brasilPort)
     mycpu.DEBUG = debug
     if mycpu.DEBUG :
+        mycpu.enableDebug()
         print "Top statistics is"
         mycpu.topStat()
     
     mycpu.runJob (shellType, resReq )
-
+    
+    if mycpu.DEBUG :
+        mycpu.disableDebug()
     
 if __name__ == "__main__" :
     main ()

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # runJob.py - start a XCPU3 job
 # Copyright 2010 Pravin Shinde
@@ -110,10 +111,27 @@ class XCPU3Client:
         self.extraLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.IOLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.ctlLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.debugLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
 
     def dPrint (self, msg):
         if (self.DEBUG):
             print msg
+
+    def enableDebug (self) :
+        name = "/csrv/local/ctl"
+        print "enabling debugging"
+        if self.debugLink.open (name, py9p.ORDWR) is  None:
+            raise Exception ("XCPU3: could not open " + name)
+        self.debugLink.write ("debug 1");
+        self.debugLink.close ();
+        
+    def disableDebug (self) :
+        name = "/csrv/local/ctl"
+        print "disabling debugging"
+        if self.debugLink.open (name, py9p.ORDWR) is  None:
+            raise Exception ("XCPU3: could not open " + name)
+        self.debugLink.write ("debug 0");
+        self.debugLink.close ();
 
     def get9pClient (self, srv, port, authmode='none', user='', passwd=None, authsrv=None, chatty=0, key=None) :
         privkey = None
@@ -286,9 +304,6 @@ class XCPU3Client:
         self.endSession ()
         self.dPrint ( "Done..")
 
-        
-
-        
 
 def main ():
     # Filling default values to all the variables which are not provided with
@@ -372,6 +387,7 @@ def main ():
     mycpu = XCPU3Client (brasilHost, brasilPort)
     mycpu.DEBUG = debug
     if mycpu.DEBUG :
+        mycpu.enableDebug()
         print "Top statistics is"
         mycpu.topStat()
     
@@ -379,6 +395,8 @@ def main ():
     
     mycpu.runJob (command, resReq, inFile)
 
+    if mycpu.DEBUG :
+        mycpu.disableDebug()
     
 if __name__ == "__main__" :
     main ()
