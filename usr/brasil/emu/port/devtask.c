@@ -54,7 +54,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -272,7 +272,8 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 			break;
 		case Qconvdir:
 			mkqid (&q, QID (0, Qcmd), 0, QTDIR);
-			devdir (c, q, "local", 0, eve, DMDIR|0555, dp);
+//			devdir (c, q, "local", 0, eve, DMDIR|0555, dp);
+			devdir (c, q, "local", 0, up->env->user, DMDIR|0555, dp);
 			break;
 		case QLconrdir :  /* for remote resource bindings */
 			if (vflag) print ("cmdindex [%ld], rjobi [%ld]\n", 
@@ -296,7 +297,8 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 		if (s >= 1)
 			return -1;
 		mkqid (&q, QID (0, Qcmd), 0, QTDIR);
-		devdir (c, q, "local", 0, eve, DMDIR|0555, dp);
+//		devdir (c, q, "local", 0, eve, DMDIR|0555, dp);
+		devdir (c, q, "local", 0, up->env->user, DMDIR|0555, dp);
 		return 1;
 	case Qcmd:
 		if (s < cmd.nc) {
@@ -314,7 +316,8 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 		}
 		if (s == 1){
 			mkqid (&q, QID (0, Qtopctl), 0, QTFILE);
-			devdir (c, q, "ctl", 0, eve, 0777, dp);
+//			devdir (c, q, "ctl", 0, eve, 0777, dp);
+			devdir (c, q, "ctl", 0, up->env->user, 0777, dp);
 			return 1;
 		}
 		if (s == 2){
@@ -360,7 +363,8 @@ cmdgen (Chan *c, char *name, Dirtab *d, int nd, int s, Dir *dp)
 	case Qtopctl:
 		if (s == 0){
 			mkqid (&q, QID (0, Qtopctl), 0, QTFILE);
-			devdir (c, q, "ctl", 0, eve, 0777, dp);
+//			devdir (c, q, "ctl", 0, eve, 0777, dp);
+			devdir (c, q, "ctl", 0, up->env->user, 0777, dp);
 			return 1;
 		}
 		return -1;
@@ -2364,11 +2368,6 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	if (vflag) print ("write in file [%s]\n", ch->name->s); 
 	ret = n; /* for default return value */
 
-	/* find no. of remote jobs running */
-	c = cmd.conv[CONV (ch->qid)];
-
-	tmpjc = getrjobcount (c->rjob);
-
 	switch (TYPE (ch->qid)) {
 	default:
 		error (Eperm);
@@ -2387,10 +2386,16 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 			if(vflag) print("setting debug to %d\n", atoi(cb->f[1]));
 			vflag = atoi(cb->f[1]);
 			if(vflag) print("setting debug to %d\n", vflag);
-		}
+			break;
+		} /* end switch : Qtopctl commands  */
 		break;
 			
 	case Qctl:
+		
+		/* find no. of remote jobs running */
+		c = cmd.conv[CONV (ch->qid)];
+		tmpjc = getrjobcount (c->rjob);
+		
 		if (c->rjob == nil) {
 			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
@@ -2416,6 +2421,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 				if (vflag) print ("Error: negative error value\n");
 				error (Eperm);
 			}
+			
 
 			if (tmpjc != -1) {
 				if (vflag) print ("resource already in use\n");
@@ -2568,11 +2574,15 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 		break;
 
 	case Qdata:
+		/* find no. of remote jobs running */
+		c = cmd.conv[CONV (ch->qid)];
+		tmpjc = getrjobcount (c->rjob);
+		
 		if (c->rjob == nil) {
 			if (vflag)print ("resources released, as clone file closed\n");
 			error (EResourcesReleased);
 		}
-
+		
 		if (tmpjc < 0) {
 			if (vflag) print ("No reservation done\n");
 			error(ENOReservation);
