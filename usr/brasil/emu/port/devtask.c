@@ -534,19 +534,19 @@ proc_splice (void *param)
 
 
 static void
-remoteopen (Chan *c, int omode, char *fname, int resno )
+remoteopen (Chan *c, int omode, char *fname, int filetype, int resno )
 {
 	Conv *cv;
 	int tmpfileuse;
 	RemoteResource *tmprr;
-	int filetype;
+	int stdin, stdout;
 	RemoteFile *rf;
 	char buff[KNAMELEN*3];
 	Chan *tmpchan;
 	int i;
 	
 	cv = cmd.conv[CONV (c->qid)];
-	filetype = TYPE(c->qid) - Qdata;
+	
 	tmpfileuse = getfileopencount (cv->rjob, filetype);
 	
 	if ( tmpfileuse < 1) {
@@ -564,11 +564,14 @@ remoteopen (Chan *c, int omode, char *fname, int resno )
 			rf = &tmprr->remotefiles[filetype];
 			rf->cfile = tmpchan;
 
-			if ( (TYPE (c->qid) == Qdata) && (omode == OREAD || omode == ORDWR)){
-				/* start the reader thread */
-				if (vflag) print ("\nthread starting" );
-//				sprint (buff, "PRR[%s]", c->name->s);
-				kproc (buff, procreadremote, rf, 0 );
+			if ((TYPE (c->qid) == Qdata)) {
+				
+				if (omode == OREAD || omode == ORDWR) {
+					/* start the reader thread */
+					if (vflag) print ("\nthread starting" );
+//					sprint (buff, "PRR[%s]", c->name->s);
+					kproc (buff, procreadremote, rf, 0 );
+				}
 			}
 			tmprr = tmprr->next; /* this can be RO lock*/
 			wunlock (&cv->rjob->l);
@@ -628,6 +631,8 @@ cmdopen (Chan *c, int omode)
 	case Qenv:
 	case Qargs:
 	case Qns:
+	case Qstdin: 
+	case Qstdout:
 		error (Egreg);	/* TODO: IMPLEMENT */
 		break;	
 
@@ -661,7 +666,6 @@ cmdopen (Chan *c, int omode)
 		if (vflag) print ("clone open successful [%s]\n", c->name->s);
 		break;
 			
-	case Qstdout:
 	case Qstatus:
 	case Qstderr:
 	case Qwait:
@@ -670,14 +674,7 @@ cmdopen (Chan *c, int omode)
 		
 	case Qdata: 
 	case Qctl:
-	case Qstdin: /* FIXME: make sure that file is open in write only mode */
 	  
-		if (TYPE(c->qid) == Qstdin ) {
-			if (omode != OWRITE ) {
-			  error (Eperm);
-			}
-		}
-
 		qlock (&cmd.l);
 		cv = cmd.conv[CONV (c->qid)];
 		qlock (&cv->l);
@@ -727,16 +724,6 @@ cmdopen (Chan *c, int omode)
 			}
 			break;
 			
-		case Qstdin:
-			fname = "stdin";
-			cv->count[0]++;
-			break;
-			  
-		case Qstdout:
-			fname = "stdout";
-			cv->count[1]++;
-			break;
-			
 		case Qstderr:
 			fname = "stderr";
 			if(omode != OREAD)
@@ -757,8 +744,20 @@ cmdopen (Chan *c, int omode)
 			fname = nil;
 		}
 		
+		/* do remote open when there are sub-sessions */
 		if ( fname != nil && tmpjc > 0 ) {
-		  remoteopen (c, omode, fname, tmpjc);
+			if (TYPE(c->qid) == Qdata) {
+				/* special case of */
+				if(omode == OWRITE || omode == ORDWR) {
+					/* open stdin part */
+					remoteopen (c, omode, fname, (Qstdin-Qdata), tmpjc);
+				}
+				if(omode == OREAD || omode == ORDWR) {
+					remoteopen (c, omode, fname, (Qstdout-Qdata), tmpjc);
+				}
+			} else {
+				remoteopen (c, omode, fname, filetype, tmpjc);
+			}
 		} /* end if : fname != nil */
 
 		break;
@@ -862,19 +861,18 @@ closeconv (Conv *c)
 }
 
 static void
-remoteclose (Chan *c, int rjcount)
+remoteclose (Chan *c, int filetype, int rjcount)
 {
 	Conv *cc;
 	RemoteResource *tmprr;
 	int i;
-	int filetype;
 	int tmpfilec;
 
 
 
 	if (vflag) print ("remote closing [%s]\n", c->name->s);
 	cc = cmd.conv[CONV(c->qid)];
-	filetype = TYPE(c->qid) - Qdata;
+	
 	tmpfilec = getfileopencount (cc->rjob, filetype);
 
 	/* close ctl files only when everything else is closed */
@@ -926,6 +924,7 @@ cmdclose (Chan *c)
 {
 	Conv *cc;
 	int r;
+	int filetype;
 	int tmpjc;
 
 	if ( (c->flag & COPEN) == 0)
@@ -947,7 +946,8 @@ cmdclose (Chan *c)
 
 		cc = cmd.conv[CONV (c->qid)];
 		tmpjc = getrjobcount (cc->rjob);
-
+		filetype = TYPE(c->qid) - Qdata;
+		
 		if (vflag) print ("rjobcount is [%d]\n", tmpjc);
 		if (tmpjc < 0) {
 			/* FIXME: you can only close status file
@@ -974,7 +974,17 @@ cmdclose (Chan *c)
 
 		if (tmpjc > 0) {
 			/* close for remote resources also */
-			remoteclose (c, tmpjc);
+			
+			if(TYPE(c->qid) == Qdata){
+				if(c->mode == OWRITE || c->mode == ORDWR) {
+					remoteclose (c, (Qstdin-Qdata), tmpjc);
+				}
+				if(c->mode == OREAD || c->mode == ORDWR) {
+					remoteclose (c, (Qstdout-Qdata), tmpjc);
+				}
+			} else {
+				remoteclose (c, filetype, tmpjc);
+			}
 		}
 
 		/* This code is only for CTL file */
@@ -1025,8 +1035,12 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 	}
 
 	if (vflag) print ("readfromallasync cname [%s]\n", ch->name->s);
-
-	filetype = TYPE(ch->qid) - Qdata;
+	
+	if (TYPE(ch->qid) == Qdata) {
+		filetype = Qstdout - Qdata;
+	} else {
+		filetype = TYPE(ch->qid) - Qdata;
+	}
 
 	while (1) {
 		rlock (&c->rjob->l);
@@ -1063,94 +1077,6 @@ readfromallasync (Chan *ch, void *a, long n, vlong offset)
 
 
 static long 
-readfromallasyncold (Chan *ch, void *a, long n, vlong offset)
-{
-	void *c_a;
-	vlong c_offset;
-	long ret, c_ret, c_n, i;
-	Conv *c;
-	long tmpjc;
-	long ccount, bcount;
-	int filetype; 
-	RemoteResource *tmprr;
-	RemoteFile *rf;
-
-	USED (offset);
-	c = cmd.conv[CONV (ch->qid)];
-
-	tmpjc = getrjobcount (c->rjob);
-	/* making sure that remote resources are allocated */
-	if (tmpjc < 0) {
-		if (vflag) print ("resources not reserved\n");
-		error (ENOReservation);
-	}
-
-	if (vflag) print ("*****readfromallasync cname [%s]\n", ch->name->s);
-
-	filetype = TYPE(ch->qid) - Qdata;
-
-
-	/* read from multiple remote files */
-	c_a = a;
-	c_n = n;
-	c_offset = offset;
-	ret = 0;
-
-	while (1) {
-
-		rlock (&c->rjob->l);
-		tmprr = c->rjob->first;
-		runlock (&c->rjob->l);
-
-		ccount = 0;
-		bcount = 0;
-		for (i = 0 ; i < tmpjc; ++i) {
-			rf = &tmprr->remotefiles[filetype];
-
-			/* read from queue */
-			c_ret = qconsume (rf->async_queue, c_a, c_n);
-			if (vflag) print ("******%ldth read gave [%ld] data, state[%d]\n", i, c_ret, rf->state);
-			if (c_ret >= 0 ) {
-				ret = ret + c_ret;
-				c_a = (uchar *)c_a + c_ret;
-				c_n = c_n - c_ret;
-			}
-			else {
-				if (rf->state == 2 ) {
-					/* This thread is done */
-					++ccount;
-				} else {
-					++bcount;
-				}
-
-			}
-			if ( c_n <= 0 ) {
-				break;
-			}
-		
-			/* FIXME: should I lock following also in read mode ??  */
-			tmprr = tmprr->next;
-		} /* end for : */
-
-		if (ret > 0 ) {
-			break;
-		}
-
-		if (ccount >= tmpjc) {
-			if (vflag) print ("----readfromallasync fileclose [%ld]\n", 
-				ccount );
-			/* as all nodes are close, return NOW */
-			break;
-		}
-		if (vflag) print ("---readfromallasync repeating with [%ld][%ld]\n", ccount, bcount);
-
-	} /* end while : infinite */
-
-	if (vflag) print ("******readfromallasync [%ld]\n", ret);
-	return ret;
-} /* end function : readfromallasync */
-
-static long 
 readfromall (Chan *ch, void *a, long n, vlong offset)
 {
 	void *c_a;
@@ -1172,8 +1098,13 @@ readfromall (Chan *ch, void *a, long n, vlong offset)
 	}
 
 	if (vflag) print ("readfromall cname [%s]\n", ch->name->s);
-
-	filetype = TYPE(ch->qid) - Qdata;
+	
+	if (TYPE(ch->qid) == Qdata) {
+		filetype = Qstdout - Qdata;
+	} else {
+		filetype = TYPE(ch->qid) - Qdata;
+	}
+	
 	/* read from multiple remote files */
 	c_a = a;
 	c_n = n;
@@ -2166,7 +2097,11 @@ static long p_send2all (Chan *ch, void *a, long n, vlong offset)
 		error (ENOReservation);
 	}
 
-	filetype = TYPE(ch->qid) - Qdata;
+	if (TYPE(ch->qid) == Qdata) {
+		filetype = Qstdin - Qdata;
+	} else {
+		filetype = TYPE(ch->qid) - Qdata;
+	}
 
 	/* data should be sent to all resources */
 	wlock (&c->rjob->l);
@@ -2256,8 +2191,12 @@ sendtoall (Chan *ch, void *a, long n, vlong offset)
 		if (vflag) print ("resources not reserved\n");
 		error (ENOReservation);
 	}
-
-	filetype = TYPE(ch->qid) - Qdata;
+	
+	if (TYPE(ch->qid) == Qdata) {
+		filetype = Qstdin - Qdata;
+	} else {
+		filetype = TYPE(ch->qid) - Qdata;
+	}
 
 	/* data should be sent to all resources */
 	rlock (&c->rjob->l);
@@ -2613,7 +2552,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 		} /* end if : local file write request */
 		
 		/* sending to remote resources */
-		return sendtoall (ch, a, n, offset);
+		return p_send2all (ch, a, n, offset);
 	} /* end switch : on filename */
 
 	return ret;
