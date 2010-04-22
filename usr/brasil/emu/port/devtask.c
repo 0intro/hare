@@ -951,6 +951,7 @@ cmdclose (Chan *c)
 	if ( (c->flag & COPEN) == 0)
 		return;
 
+	if (vflag) print ("trying to close \n");
 	if (vflag) print ("trying to close file [%s]\n", c->name->s);
 	switch (TYPE (c->qid)) {
 
@@ -1161,11 +1162,11 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 	Conv *c;
 	char *p, *cmds;
 	long tmpjc;
+	long ret;
 	int fd;
 
 	if (vflag) print ("reading from [%s]\n", ch->name->s);
 	USED (offset);
-	c = cmd.conv[CONV (ch->qid)];
 	p = a;
 
 	switch (TYPE (ch->qid)) {
@@ -1184,7 +1185,9 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 	case Qtopdir:
 	case Qconvdir:
 	case QLconrdir:
-		return devdirread (ch, a, n, 0, 0, cmdgen);
+		ret = devdirread (ch, a, n, 0, 0, cmdgen);
+		if (vflag) print ("### devdirread returned  %d\n", ret);
+		return ret;
 
 	case Qtopctl:
 		sprint (up->genbuf, "debug %d\n", vflag);
@@ -1195,6 +1198,8 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 		return readstr (offset, p, n, up->genbuf);
 
 	case Qstatus:
+		
+		c = cmd.conv[CONV (ch->qid)];
 		tmpjc = getrjobcount (c->rjob);
 		if (tmpjc > 0 ) {
 			return readfromall (ch, a, n, offset);
@@ -1210,6 +1215,7 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 
 	case Qdata:
 	case Qstderr:
+		c = cmd.conv[CONV (ch->qid)];
 		if (c->rjob == nil) {
 			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
@@ -1247,6 +1253,7 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 		return n;
 
 	case Qwait:
+		c = cmd.conv[CONV (ch->qid)];
 		if (c->rjob == nil) {
 			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
@@ -1680,7 +1687,7 @@ parallelres (char *localpath, remoteMount **remote_node_list, int validrc,
 	rr = allocate_remote_resource (rjob, first, 0);
 	rjob->first = rr;
 	prev = rr;
-	for (i = 1; i < resno ; ++i ) {
+	for (i = 1; i < resno; ++i ) {
 		rr = allocate_remote_resource (rjob, others, i);
 		prev->next = rr;
 		prev = rr;
@@ -1888,7 +1895,7 @@ groupres (Chan * ch, int resNo, char *os, char *arch) {
 			/* not enough remote resources */
 			first = ( resNo / validrc ) + (resNo % validrc);
 			others = resNo / validrc; 
-			parallelres (lpath, allremotenodes, validrc, c, resNo, first, others);
+			parallelres (lpath, allremotenodes, validrc, c, validrc, first, others);
 		} /* end else : not enough remote resources */
 	}
 	freermounts (allremotenodes, validrc);
