@@ -188,6 +188,7 @@ init()
 		"simple" =>
 			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 		"csrvlite" =>
+			sys->fprint(sys->fildes(2), "csrvlite\n");
 			sh->system(nil, "/dis/csrv-lite.dis");
 			backmountexport();
 		"terminal" =>

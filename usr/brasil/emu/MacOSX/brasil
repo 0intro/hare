@@ -11,9 +11,9 @@ dev
 #	ssl
 #	cap
 	fs
-#	task
+	task
 	cmd	cmd
-	cmd2	cmd
+#	cmd2	cmd
 	indir
 
 #	draw	win-x11a
@@ -97,6 +97,7 @@ root
 	/net.alt	/
 	/chan	/
 	/csrv	/
+	/remote	/
 	/nvfs	/
 	/n		/
 	/env	/

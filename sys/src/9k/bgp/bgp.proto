@@ -75,6 +75,7 @@ power d775 sys sys /tmp/empty
 		iostats 775 sys sys
 		miniciod 775 sys sys ../root/q.miniciod
 		mntgen 775 sys sys
+		ramcfs 775 sys sys ../root/ramcfs/q.out
 		ramfs 775 sys sys
 		rc 775 sys sys
 		read 775 sys sys

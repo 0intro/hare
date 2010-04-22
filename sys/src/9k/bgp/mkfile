@@ -44,7 +44,7 @@ init.out:	init9.$O initcode.$O /$objtype/lib/libc.a
 $CONF.rr:	../mk/mkrr $CONF $CONF.proto
 	../mk/mkrr $CONF
 
-$CONF.rr:	../root/$O.cpu ../root/$O.miniciod ../root/$O.suck ../root/$O.blow 
+$CONF.rr:	../root/$O.cpu ../root/$O.miniciod ../root/$O.suck ../root/$O.blow ../root/ramcfs/$O.out
 
 archbgp.$O:	../port/netif.h bgp_personality.h bgcns.h etherif.h io.h
 cnksyscall.$O:	../port/error.h ../cnk/cnksystab.h
