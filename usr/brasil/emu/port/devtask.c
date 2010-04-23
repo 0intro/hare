@@ -898,7 +898,7 @@ closeconv (Conv *c)
 	if (vflag) print ("remote resources released\n");
 	if (c->cmd != nil) {
 		if (vflag) print ("freeing cmd\n");
-	//	free (c->cmd); /* FIXME: why this fails???? */
+		free (c->cmd); /* FIXME: why this fails???? */
 		if (vflag) print ("freeing cmd done\n");
 	}
 	c->cmd = nil;
