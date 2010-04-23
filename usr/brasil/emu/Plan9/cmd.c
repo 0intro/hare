@@ -1,6 +1,7 @@
 #include	"dat.h"
 #include	"fns.h"
 #include	"error.h"
+#include <bio.h>
 
 extern	void	vstack(void*);
 
@@ -21,6 +22,42 @@ struct Targ
 	int	nice;
 };
 
+extern int readfile(char *, char *, int );
+
+
+void
+fdvec(int pid, int **arg)
+{
+	char fdfile[128];
+	char fdbuf[8192];
+	int i = 0;
+	int n;
+	int fdvec[MAXNFD];
+	char *s;
+	int *a;
+		
+	snprint(fdfile, 512, "/proc/%d/fd", pid);
+	if(!(n = readfile(fdfile, fdbuf, sizeof fdbuf)))
+		panic("couldn't open our fds");
+	s = fdbuf;
+	s[n]=0;
+	s = strchr(s, '\n');
+	if(s == 0)
+		panic("bad fd file format");
+	do {
+		s++;
+		if(i >= MAXNFD)
+			panic("too many fds");
+		fdvec[i++]=atoi(s);
+	}while((s = strchr(s, '\n')) != 0);
+	n = i;
+	*arg = malloc((n+1) *sizeof(int));
+	a = *arg;
+	for(i = 0; i < n; i++)
+		a[i]=fdvec[i];
+	a[i]=-1;
+}
+
 /*
  * called by vstack once it has moved to
  * the unshared stack in the new process.
@@ -30,6 +67,8 @@ exectramp(Targ *t)
 {
 	int *fd, i, nfd;
 	char filename[128], err[ERRMAX], status[2*ERRMAX];
+	int *fdv;
+	int *p;
 
 	t->pid = getpid();
 	*t->spin = 0;	/* allow parent to proceed: can't just rendezvous: see below */
@@ -40,9 +79,12 @@ exectramp(Targ *t)
 	/* if it failed, we'll manage */
 
 	nfd = MAXNFD;	/* TO DO: should read from /fd */
-	for(i = 0; i < nfd; i++)
+	fdvec(t->pid, &fdv);
+	for(p=fdv; *p >= 0; p++){
+		i = *p;
 		if(i != fd[0] && i != fd[1] && i != fd[2] && i != t->wfd)
 			close(i);
+	}		
 
 	if(fd[0] != 0){
 		dup(fd[0], 0);

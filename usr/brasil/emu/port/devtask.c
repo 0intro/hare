@@ -7,6 +7,38 @@ extern char *hosttype;
 static int IHN = 0; 
 static int IAN = 0; 
 
+/* I hate myself for this */
+void*
+mymalloc(size_t x)
+{
+       void *z;
+
+       z=malloc(x);
+       print("         mymalloc  0x%8.8lux 0x%8.8lux\n", z, getcallerpc(&x));
+       return z;
+}
+
+void*
+mymallocz(ulong x, int y)
+{
+       void *z;
+
+       z=mallocz(x,y);
+       print("         mymallocz 0x%8.8lux 0x%8.8lux\n", z, getcallerpc(&x));
+       return z;
+}
+
+void
+myfree(void *x)
+{
+       print("         myfree    0x%8.8lux 0x%8.8lux\n", x, getcallerpc(&x));
+       free(x);
+}
+
+#define malloc(x) mymalloc(x)
+#define mallocz(x,y) mymallocz(x,y)
+#define free(x) myfree(x)
+
 enum
 {
 	Qtopdir,	/* top level directory */
@@ -54,7 +86,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -2328,7 +2360,6 @@ dolocalexecution (Conv *c, Cmdbuf *cb)
 	qlock(&c->l);
 	if(waserror()){
 		qunlock(&c->l);
-		free(cb);
 		nexterror();
 	}
 	if(c->child != nil || c->cmd != nil)
@@ -2369,6 +2400,7 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 	char *parent_path;
 	char *buff;
 	struct for_splice *fs;
+	char *s;
 
 
 	USED (offset);
@@ -2407,8 +2439,9 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 			if(vflag)print("resources released, as clone file closed\n");
 			error (EResourcesReleased);
 		}
-
-		cb = parsecmd (a, n);
+		s = (char*)a;
+		s[n]=0;
+		cb = parsecmd (s, n);
 		if (waserror ()){
 			free (cb);
 			nexterror ();
