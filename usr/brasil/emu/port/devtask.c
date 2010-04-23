@@ -7,8 +7,6 @@ extern char *hosttype;
 static int IHN = 0; 
 static int IAN = 0; 
 
-<<<<<<< local
-=======
 #ifdef ndef
 /* I hate myself for this */
 void*
@@ -42,7 +40,6 @@ myfree(void *x)
 #define mallocz(x,y) mymallocz(x,y)
 #define free(x) myfree(x)
 #endif 
->>>>>>> other
 
 enum
 {
@@ -91,7 +88,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 0; /* for debugging messages: control prints */
+static int vflag = 1; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -1237,19 +1234,31 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 		return readstr (offset, p, n, up->genbuf);
 
 	case Qstatus:
-		
 		c = cmd.conv[CONV (ch->qid)];
+		if(vflag) print ( "came here 1 %d\n", c->x);
 		tmpjc = getrjobcount (c->rjob);
 		if (tmpjc > 0 ) {
 			return readfromall (ch, a, n, offset);
 		}
 
+		if (tmpjc < 0) {
+			snprint(up->genbuf, sizeof(up->genbuf), "cmd/unreserved\n");
+			return readstr(offset, p, n, up->genbuf);
+		}
+		
+		if(vflag) print ( "came here 2 [%s]\n", c->state);
 		/* getting status locally */
 		cmds = "";
-		if(c->cmd != nil)
+		if(c->cmd != nil) {
+			if(vflag) print ( "came here 31 [%q]\n", c->dir);
 			cmds = c->cmd->f[1];
+//			if(vflag) print ( "came here 32 [%q]\n", cmds);
+		}
+		
+		if(vflag) print ( "came here 4\n");
 		snprint(up->genbuf, sizeof(up->genbuf), "cmd/%d %d %s %q %q\n",
 			c->x, c->inuse, c->state, c->dir, cmds);
+		if(vflag) print ( "came here 5\n");
 		return readstr(offset, p, n, up->genbuf);
 
 	case Qdata:
