@@ -7,6 +7,42 @@ extern char *hosttype;
 static int IHN = 0; 
 static int IAN = 0; 
 
+<<<<<<< local
+=======
+#ifdef ndef
+/* I hate myself for this */
+void*
+mymalloc(size_t x)
+{
+       void *z;
+
+       z=malloc(x);
+       print("         mymalloc  0x%8.8lux 0x%8.8lux\n", z, getcallerpc(&x));
+       return z;
+}
+
+void*
+mymallocz(ulong x, int y)
+{
+       void *z;
+
+       z=mallocz(x,y);
+       print("         mymallocz 0x%8.8lux 0x%8.8lux\n", z, getcallerpc(&x));
+       return z;
+}
+
+void
+myfree(void *x)
+{
+       print("         myfree    0x%8.8lux 0x%8.8lux\n", x, getcallerpc(&x));
+       free(x);
+}
+
+#define malloc(x) mymalloc(x)
+#define mallocz(x,y) mymallocz(x,y)
+#define free(x) myfree(x)
+#endif 
+>>>>>>> other
 
 enum
 {
@@ -55,7 +91,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
