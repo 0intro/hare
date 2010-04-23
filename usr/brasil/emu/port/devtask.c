@@ -7,6 +7,7 @@ extern char *hosttype;
 static int IHN = 0; 
 static int IAN = 0; 
 
+#ifdef ndef
 /* I hate myself for this */
 void*
 mymalloc(size_t x)
@@ -38,6 +39,7 @@ myfree(void *x)
 #define malloc(x) mymalloc(x)
 #define mallocz(x,y) mymallocz(x,y)
 #define free(x) myfree(x)
+#endif 
 
 enum
 {
@@ -86,7 +88,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
