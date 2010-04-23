@@ -88,7 +88,7 @@ char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-static int vflag = 1; /* for debugging messages: control prints */
+static int vflag = 0; /* for debugging messages: control prints */
 
 long lastrrselected = 0;
 
@@ -898,7 +898,8 @@ closeconv (Conv *c)
 	if (vflag) print ("remote resources released\n");
 	if (c->cmd != nil) {
 		if (vflag) print ("freeing cmd\n");
-		free (c->cmd);
+	//	free (c->cmd); /* FIXME: why this fails???? */
+		if (vflag) print ("freeing cmd done\n");
 	}
 	c->cmd = nil;
 	if (c->waitq != nil){
@@ -1248,11 +1249,12 @@ cmdread (Chan *ch, void *a, long n, vlong offset)
 		
 		if(vflag) print ( "came here 2 [%s]\n", c->state);
 		/* getting status locally */
-		cmds = "";
+		cmds ="";
 		if(c->cmd != nil) {
 			if(vflag) print ( "came here 31 [%q]\n", c->dir);
 			cmds = c->cmd->f[1];
-//			if(vflag) print ( "came here 32 [%q]\n", cmds);
+			if(vflag) print ( "came here 32 [%q]\n", c->dir);
+			if(vflag) print ( "came here 33 [%q]\n", cmds);
 		}
 		
 		if(vflag) print ( "came here 4\n");
@@ -2099,7 +2101,6 @@ p_send2one (void *param)
 	int filetype;
 	char report[10];
 	
-	
 	if (vflag) print ("###p_send2one: started\n" );
 	psw = (struct parallel_send_wrap *) param;
 	rf = psw->rf;
@@ -2108,19 +2109,16 @@ p_send2one (void *param)
 	offset = psw->p_offset;
 	free (psw);
 	
-	if (vflag) print ("###p_send2one: started\n" );
 	report[0] = rf->local_session_id;
 	report[1] = 0; /* indicates failure */
 	report[2] = 0; /* indicate end of report */
-	
-	if (vflag) print ("###p_send2one: started\n" );
 	
 	if (waserror ()){
 		if (vflag) print ("###p_send2one[%d]: error in sending write\n",
 		rf->local_session_id);
 		/* report failure */
 		qwrite ( rf->async_queue, report, 2 );
-//		pexit ("", 0);
+		pexit ("", 0);
 	}
 
 	if (vflag) print ("###p_send2one: started\n" );
@@ -2141,7 +2139,7 @@ p_send2one (void *param)
 				rf->local_session_id, ret, n);
 		/* report failure */
 		qwrite ( rf->async_queue, report, 2 );
-//		pexit ("", 0);
+		pexit ("", 0);
 	}
 	poperror ();
 	
@@ -2150,7 +2148,7 @@ p_send2one (void *param)
 	qwrite ( rf->async_queue, report, 2 );
 	if (vflag) print ("###p_send2one[%d]:  success wrot %d bytes\n",
 			rf->local_session_id, ret );
-//	pexit ("", 0);
+	pexit ("", 0);
 	return;
 } /* end function : p_send2one */
 
@@ -2395,6 +2393,7 @@ dolocalexecution (Conv *c, Cmdbuf *cb)
 	kproc("cmdproc", cmdproc, c, 0); /* cmdproc held back until unlock below */
 	if (c->cmd != nil) {
 		free(c->cmd);
+		c->cmd = nil;
 	}
 	c->cmd = cb;	/* don't free cb */
 	/* c->cmd  will be freed in closeconv call */
@@ -2467,8 +2466,9 @@ cmdwrite (Chan *ch, void *a, long n, vlong offset)
 		cb = parsecmd (s, n);
 		if (waserror ()){
 			if(vflag) print("screw you cmd buffer!\n");
-			free (cb);
-			nexterror ();
+		//	free (cb); // FIXME: something bad happening
+			/* send the actual error code back */
+			error ("Execution failed");
 		}
 
 		if (vflag) print ("cmd arg[%d] done [%s]\n", cb->nf, a); 
@@ -2797,7 +2797,8 @@ cmdproc(void *a)
 		if(vflag)
 			print("failed: %q\n", up->env->errstr);
 		kstrdup(&c->error, up->env->errstr);
-		c->state = "Done";
+//		c->state = "Done";
+		c->state = "Fail";
 		qunlock(&c->l);
 		Wakeup(&c->startr);
 		pexit("cmdproc", 0);
