@@ -9,7 +9,8 @@ static int IAN = 0;
 
 #ifdef ndef
 /* I hate myself for this */
-void *mymalloc(size_t x)
+void *
+mymalloc(size_t x)
 {
     void *z;
 
@@ -18,7 +19,8 @@ void *mymalloc(size_t x)
     return z;
 }
 
-void *mymallocz(ulong x, int y)
+void *
+mymallocz(ulong x, int y)
 {
     void *z;
 
@@ -27,7 +29,8 @@ void *mymallocz(ulong x, int y)
     return z;
 }
 
-void myfree(void *x)
+void
+myfree(void *x)
 {
     print("         myfree    0x%8.8lux 0x%8.8lux\n", x, getcallerpc(&x));
     free(x);
@@ -199,7 +202,8 @@ static void proc_splice(void *);
 /* function prototypes from other files */
 long dirpackage(uchar * buff, long ts, Dir ** d);
 
-static long getrjobcount(RemoteJob * rjob)
+static long
+getrjobcount(RemoteJob * rjob)
 {
 
     long temp;
@@ -211,7 +215,8 @@ static long getrjobcount(RemoteJob * rjob)
     return temp;
 }
 
-static int getfileopencount(RemoteJob * rjob, int filetype)
+static int
+getfileopencount(RemoteJob * rjob, int filetype)
 {
 
     int temp;
@@ -224,7 +229,8 @@ static int getfileopencount(RemoteJob * rjob, int filetype)
 }
 
 /* Generate entry within resource directory */
-static int cmd3gen(Chan * c, int i, Dir * dp)
+static int
+cmd3gen(Chan * c, int i, Dir * dp)
 {
     Qid q;
     Conv *cv;
@@ -460,7 +466,8 @@ cmdgen(Chan * c, char *name, Dirtab * d, int nd, int s, Dir * dp)
 }
 
 
-static void cmdinit(void)
+static void
+cmdinit(void)
 {
     cmd.maxconv = 1000;
     cmd.conv = mallocz(sizeof(Conv *) * (cmd.maxconv + 1), 1);
@@ -473,7 +480,8 @@ static void cmdinit(void)
     IAN = lookup(platform, platformlist, PLATFORMCOUNT);
 }
 
-static Chan *cmdattach(char *spec)
+static Chan *
+cmdattach(char *spec)
 {
     Chan *c;
 
@@ -484,17 +492,20 @@ static Chan *cmdattach(char *spec)
     return c;
 }
 
-static Walkqid *cmdwalk(Chan * c, Chan * nc, char **name, int nname)
+static Walkqid *
+cmdwalk(Chan * c, Chan * nc, char **name, int nname)
 {
     return devwalk(c, nc, name, nname, 0, 0, cmdgen);
 }
 
-static int cmdstat(Chan * c, uchar * db, int n)
+static int
+cmdstat(Chan * c, uchar * db, int n)
 {
     return devstat(c, db, n, 0, 0, cmdgen);
 }
 
-static void procreadremote(void *a)
+static void
+procreadremote(void *a)
 {
     RemoteFile *rf;
     Block *content = nil;
@@ -537,7 +548,8 @@ static void procreadremote(void *a)
 }				/* end function : procreadremote () */
 
 
-static void proc_splice(void *param)
+static void
+proc_splice(void *param)
 {
     Chan *src;
     Chan *dst;
@@ -644,7 +656,8 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
  * Opens file/dir It checks if specified channel is allowed to open, if yes,
  * it marks channel as open and returns it.
  */
-static Chan *cmdopen(Chan * c, int omode)
+static Chan *
+cmdopen(Chan * c, int omode)
 {
     int perm;
     Conv *cv;
@@ -831,7 +844,8 @@ static Chan *cmdopen(Chan * c, int omode)
     return c;
 }				/* end function : cmdopen */
 
-static void freeremoteresource(RemoteResource * rr)
+static void
+freeremoteresource(RemoteResource * rr)
 {
     int i, ret;
     char *location;
@@ -855,7 +869,8 @@ static void freeremoteresource(RemoteResource * rr)
     }
 }
 
-static void freeremotejobs(RemoteJob * rjob)
+static void
+freeremotejobs(RemoteJob * rjob)
 {
     long i;
     RemoteResource *ppr, *tmp;
@@ -886,7 +901,8 @@ static void freeremotejobs(RemoteJob * rjob)
     wunlock(&rjob->l);
 }
 
-static void closeconv(Conv * c)
+static void
+closeconv(Conv * c)
 {
     if (vflag)
 	print("releasing [%d] remote resource\n", c->x);
@@ -932,7 +948,8 @@ static void closeconv(Conv * c)
 
 }
 
-static void remoteclose(Chan * c, int filetype, int rjcount)
+static void
+remoteclose(Chan * c, int filetype, int rjcount)
 {
     Conv *cc;
     RemoteResource *tmprr;
@@ -982,7 +999,8 @@ static void remoteclose(Chan * c, int filetype, int rjcount)
 }
 
 
-static void cmdfdclose(Conv * c, int fd)
+static void
+cmdfdclose(Conv * c, int fd)
 {
     if (--c->count[fd] == 0 && c->fd[fd] != -1) {
 	if (vflag)
@@ -993,7 +1011,8 @@ static void cmdfdclose(Conv * c, int fd)
 }
 
 
-static void cmdclose(Chan * c)
+static void
+cmdclose(Chan * c)
 {
     Conv *cc;
     int r;
@@ -1096,7 +1115,8 @@ static void cmdclose(Chan * c)
 	print("close complete\n");
 }
 
-static long readfromallasync(Chan * ch, void *a, long n, vlong offset)
+static long
+readfromallasync(Chan * ch, void *a, long n, vlong offset)
 {
     void *c_a;
     vlong c_offset;
@@ -1163,7 +1183,8 @@ static long readfromallasync(Chan * ch, void *a, long n, vlong offset)
 }				/* end function : readfromallasync */
 
 
-static long readfromall(Chan * ch, void *a, long n, vlong offset)
+static long
+readfromall(Chan * ch, void *a, long n, vlong offset)
 {
     void *c_a;
     vlong c_offset;
@@ -1204,13 +1225,8 @@ static long readfromall(Chan * ch, void *a, long n, vlong offset)
 
     for (i = 0; i < tmpjc; ++i) {
 	c_ret =
-	    devtab[tmprr->remotefiles[filetype].cfile->type]->read(tmprr->
-								   remotefiles
-								   [filetype].
-								   cfile,
-								   c_a,
-								   c_n,
-								   c_offset);
+	    devtab[tmprr->remotefiles[filetype].cfile->type]->
+	    read(tmprr->remotefiles[filetype].cfile, c_a, c_n, c_offset);
 	if (vflag)
 	    print("%ldth read gave [%ld] data\n", i, c_ret);
 	ret = ret + c_ret;
@@ -1227,7 +1243,8 @@ static long readfromall(Chan * ch, void *a, long n, vlong offset)
     return ret;
 }
 
-static long cmdread(Chan * ch, void *a, long n, vlong offset)
+static long
+cmdread(Chan * ch, void *a, long n, vlong offset)
 {
     Conv *c;
     char *p, *cmds;
@@ -1369,7 +1386,8 @@ static long cmdread(Chan * ch, void *a, long n, vlong offset)
 }
 
 
-static int cmdstarted(void *a)
+static int
+cmdstarted(void *a)
 {
     Conv *c;
 
@@ -1412,7 +1430,8 @@ Cmdtab cmdtab[] = {
 /*
  * Adds information of client status file into aggregation.
  */
-static void analyseremotenode(remoteMount * rmt)
+static void
+analyseremotenode(remoteMount * rmt)
 {
 
     char buff[100];
@@ -1477,7 +1496,8 @@ static void analyseremotenode(remoteMount * rmt)
  * returns remoteMount to the exact remote resource.  It is callers
  * responsibility to free the memory of path returned
  */
-static remoteMount *validaterr(char *location, char *os, char *arch)
+static remoteMount *
+validaterr(char *location, char *os, char *arch)
 {
 
     Dir *dr;
@@ -1601,7 +1621,8 @@ static remoteMount *validaterr(char *location, char *os, char *arch)
 
 
 /* find remote resource for usage */
-static remoteMount **findrr(int *validrc, char *os, char *arch)
+static remoteMount **
+findrr(int *validrc, char *os, char *arch)
 {
 
     char *path = REMOTEMOUNTPOINT;	/* location where remote
@@ -1659,7 +1680,8 @@ static remoteMount **findrr(int *validrc, char *os, char *arch)
 /*
  * allocates single remote resource, can be executed in kproc
  */
-static void allocatesinglerr(void *info)
+static void
+allocatesinglerr(void *info)
 {
     char data[100];
     char report[10];
@@ -1713,8 +1735,8 @@ static void allocatesinglerr(void *info)
 }				/* end function : allocatesinglerr */
 
 /* allocates memory and initialize the RemoteResource */
-RemoteResource *allocate_remote_resource(RemoteJob * rjob,
-					 int sub_sessions, int rrnumber)
+RemoteResource *
+allocate_remote_resource(RemoteJob * rjob, int sub_sessions, int rrnumber)
 {
     RemoteResource *pp;
     int i;
@@ -1938,7 +1960,8 @@ parallelres(char *localpath, remoteMount ** remote_node_list, int validrc,
 
 
 /* frees the list of remote mounts */
-void freermounts(remoteMount ** allremotenodes, int validrc)
+void
+freermounts(remoteMount ** allremotenodes, int validrc)
 {
     int i;
 
@@ -1953,7 +1976,8 @@ void freermounts(remoteMount ** allremotenodes, int validrc)
 
 
 /* reserve the needed number of resources */
-static long groupres(Chan * ch, int resNo, char *os, char *arch)
+static long
+groupres(Chan * ch, int resNo, char *os, char *arch)
 {
     int i;
     char *lpath;
@@ -2039,7 +2063,8 @@ static long groupres(Chan * ch, int resNo, char *os, char *arch)
     return resNo;
 }
 
-static void initinfo(long info[OSCOUNT][PLATFORMCOUNT])
+static void
+initinfo(long info[OSCOUNT][PLATFORMCOUNT])
 {
     int i, j;
     for (i = 0; i < OSCOUNT; ++i) {
@@ -2054,7 +2079,8 @@ static void initinfo(long info[OSCOUNT][PLATFORMCOUNT])
  * words are searched only from postion 1 ahead position zero is reserved for
  * "NOT MATCHED"
  */
-static long lookup(char *word, char **wordlist, int len)
+static long
+lookup(char *word, char **wordlist, int len)
 {
     int i;
     for (i = 1; i < len; ++i) {
@@ -2067,7 +2093,8 @@ static long lookup(char *word, char **wordlist, int len)
 /*
  * Adds information of client status file into aggregation.
  */
-static void addremotenode(long info[OSCOUNT][PLATFORMCOUNT], Chan * status)
+static void
+addremotenode(long info[OSCOUNT][PLATFORMCOUNT], Chan * status)
 {
 
     char buff[100];
@@ -2125,7 +2152,8 @@ static void addremotenode(long info[OSCOUNT][PLATFORMCOUNT], Chan * status)
 
 
 /* reads top level status file */
-static long readstatus(char *a, long n, vlong offset)
+static long
+readstatus(char *a, long n, vlong offset)
 {
     long i, j;
     int validrc;
@@ -2175,7 +2203,8 @@ static long readstatus(char *a, long n, vlong offset)
  * function : p_send2one : will send data to one node but this function can
  * be executed parallelly in thread
  */
-static void p_send2one(void *param)
+static void
+p_send2one(void *param)
 {
     long ret;
     struct parallel_send_wrap *psw;
@@ -2246,7 +2275,8 @@ static void p_send2one(void *param)
  * p_send2all : sends write command to all nodes parallelly FIXME: works only
  * for ctl file
  */
-static long p_send2all(Chan * ch, void *a, long n, vlong offset)
+static long
+p_send2all(Chan * ch, void *a, long n, vlong offset)
 {
     int i, ret = 0;
     Conv *c;
@@ -2293,8 +2323,7 @@ static long p_send2all(Chan * ch, void *a, long n, vlong offset)
     for (i = 0; i < tmpjc; ++i) {
 
 	/* create argument to pass */
-	psw =
-	    (struct parallel_send_wrap *)
+	psw = (struct parallel_send_wrap *)
 	    malloc(sizeof(struct parallel_send_wrap));
 	psw->rf = &rr->remotefiles[filetype];
 	psw->p_a = a;
@@ -2351,7 +2380,8 @@ static long p_send2all(Chan * ch, void *a, long n, vlong offset)
 }				/* end function : p_send2all */
 
 /* sendtoall : sends write command to all nodes sequentially */
-static long sendtoall(Chan * ch, void *a, long n, vlong offset)
+static long
+sendtoall(Chan * ch, void *a, long n, vlong offset)
 {
     int i, ret = 0;
     Conv *c;
@@ -2389,12 +2419,8 @@ static long sendtoall(Chan * ch, void *a, long n, vlong offset)
 
     for (i = 0; i < tmpjc; ++i) {
 	ret =
-	    devtab[tmprr->remotefiles[filetype].cfile->type]->write(tmprr->
-								    remotefiles
-								    [filetype].
-								    cfile,
-								    a, n,
-								    offset);
+	    devtab[tmprr->remotefiles[filetype].cfile->type]->
+	    write(tmprr->remotefiles[filetype].cfile, a, n, offset);
 
 	/* FIXME: should I lock following also in read mode ??  */
 	tmprr = tmprr->next;
@@ -2406,7 +2432,8 @@ static long sendtoall(Chan * ch, void *a, long n, vlong offset)
 }
 
 /* Prepares given Conv for local execution */
-static void preparelocalexecution(Conv * c, char *os, char *arch)
+static void
+preparelocalexecution(Conv * c, char *os, char *arch)
 {
     int i;
     int hn, pn;
@@ -2466,7 +2493,8 @@ static void preparelocalexecution(Conv * c, char *os, char *arch)
 }				/* end function : preparelocalexecution  */
 
 /* executes given command locally */
-static void dolocalexecution(Conv * c, Cmdbuf * cb)
+static void
+dolocalexecution(Conv * c, Cmdbuf * cb)
 {
 
     int i;
@@ -2520,7 +2548,8 @@ static void dolocalexecution(Conv * c, Cmdbuf * cb)
 	error(c->error);
 }
 
-static long cmdwrite(Chan * ch, void *a, long n, vlong offset)
+static long
+cmdwrite(Chan * ch, void *a, long n, vlong offset)
 {
     int r, ret;
     long tmpjc;
@@ -2816,7 +2845,8 @@ static long cmdwrite(Chan * ch, void *a, long n, vlong offset)
     return ret;
 }
 
-static int cmdwstat(Chan * c, uchar * dp, int n)
+static int
+cmdwstat(Chan * c, uchar * dp, int n)
 {
     Dir *d;
     Conv *cv;
@@ -2853,7 +2883,8 @@ static int cmdwstat(Chan * c, uchar * dp, int n)
     return n;
 }
 
-static Conv *cmdclone(char *user)
+static Conv *
+cmdclone(char *user)
 {
     Conv *c, **pp, **ep;
     int i;
@@ -2916,7 +2947,8 @@ static Conv *cmdclone(char *user)
     return c;
 }
 
-static void cmdproc(void *a)
+static void
+cmdproc(void *a)
 {
     Conv *c;
     int n;
@@ -3001,7 +3033,8 @@ Dev taskdevtab = {
 /*************** UTILITY FUNCTIONS *************/
 
 
-long myunionread(Chan * c, void *va, long n)
+long
+myunionread(Chan * c, void *va, long n)
 {
     int i;
     long nr;
@@ -3081,7 +3114,8 @@ long myunionread(Chan * c, void *va, long n)
  * Reads from specified channel. It works on both directory and file
  * channels.
  */
-long readfromchan(Chan * rc, void *va, long n, vlong off)
+long
+readfromchan(Chan * rc, void *va, long n, vlong off)
 {
     int dir;
 
@@ -3118,7 +3152,8 @@ enum {
 };
 
 /* read from Chanel of type dir */
-long readchandir(Chan * dirChan, Dir ** d)
+long
+readchandir(Chan * dirChan, Dir ** d)
 {
     uchar *buf;
     long ts, t2;
@@ -3146,7 +3181,8 @@ long readchandir(Chan * dirChan, Dir ** d)
 
 
 /* Returns the list of Dir entries for given directory name */
-long lsdir(char *name, Dir ** d)
+long
+lsdir(char *name, Dir ** d)
 {
     long count;
     volatile struct {
@@ -3182,7 +3218,8 @@ long lsdir(char *name, Dir ** d)
  * returns string containing path to parent, and path will end with '/'
  * memory should be released by caller
  */
-char *fetchparentpathch(Chan * ch)
+char *
+fetchparentpathch(Chan * ch)
 {
     char *ptr;
     char buff[KNAMELEN * 3];
@@ -3203,7 +3240,8 @@ char *fetchparentpathch(Chan * ch)
  * returns string containing path to parent, and path will end with '/'
  * memory should be released by caller
  */
-char *fetchparentpath(char *filepath)
+char *
+fetchparentpath(char *filepath)
 {
     char *ptr;
     int i, len;
