@@ -600,7 +600,6 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
     Conv *cv;
     int tmpfileuse;
     RemoteResource *tmprr;
-    int stdin, stdout;
     RemoteFile *rf;
     char buff[KNAMELEN * 3];
     Chan *tmpchan;
@@ -847,7 +846,7 @@ cmdopen(Chan * c, int omode)
 static void
 freeremoteresource(RemoteResource * rr)
 {
-    int i, ret;
+    int i;
     char *location;
     if (rr == nil)
 	return;
@@ -878,7 +877,7 @@ freeremotejobs(RemoteJob * rjob)
 	return;
 
     if (vflag)
-	print("releaseing [%d] remote resources [%d]\n", rjob->rjobcount,
+	print("releaseing [%lud] remote resources [%d]\n", rjob->rjobcount,
 	      rjob->x);
 
 
@@ -1118,9 +1117,7 @@ cmdclose(Chan * c)
 static long
 readfromallasync(Chan * ch, void *a, long n, vlong offset)
 {
-    void *c_a;
-    vlong c_offset;
-    long ret, c_ret, c_n, i;
+    long ret, i;
     Conv *c;
     long tmpjc;
     long ccount, bcount;
@@ -1274,7 +1271,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
     case QLconrdir:
 	ret = devdirread(ch, a, n, 0, 0, cmdgen);
 	if (vflag)
-	    print("### devdirread returned  %d\n", ret);
+	    print("### devdirread returned  %ld\n", ret);
 	return ret;
 
     case Qtopctl:
@@ -1522,7 +1519,7 @@ validaterr(char *location, char *os, char *arch)
 	print("remote dir[%s]= %ld entries\n", location, count);
     for (i = 0, tmpDr = dr; i < count; ++i, ++tmpDr) {
 	if (vflag)
-	    print("%d [%s/%s]\n", i, location, tmpDr->name);
+	    print("%ld [%s/%s]\n", i, location, tmpDr->name);
 	if (DMDIR & tmpDr->mode) {
 	    if (vflag)
 		print("checking for dir[%s]\n", tmpDr->name);
@@ -1642,7 +1639,6 @@ findrr(int *validrc, char *os, char *arch)
 	*validrc = 0;
 	free(dr);
 	return nil;
-	nexterror();		/* not reachable */
     }
     count = lsdir(path, &dr);
     poperror();
@@ -1765,7 +1761,6 @@ parallelres(char *localpath, remoteMount ** remote_node_list, int validrc,
     RemoteResource *prev;
     char *selected;
     long tmpjc;
-    int sub_sessions;
     char buf[100];
     char local_session_path[KNAMELEN * 3];
     char remote_session_path[KNAMELEN * 3];
@@ -1774,7 +1769,7 @@ parallelres(char *localpath, remoteMount ** remote_node_list, int validrc,
     int flag;
     int filetype;
     int ret;
-    Block *content = nil;
+    Block *content;
 
     rjob = c->rjob;
     /* error checking */
@@ -1851,7 +1846,7 @@ parallelres(char *localpath, remoteMount ** remote_node_list, int validrc,
 	    selected = remote_node_list[lastrrselected]->path;
 	}
 
-	sprint(local_session_path, "%s/%ld", localpath,
+	sprint(local_session_path, "%s/%d", localpath,
 	       rr->local_session_id);
 	sprint(remote_ctl_path, "%s/%s", selected, "clone");
 
@@ -1873,7 +1868,7 @@ parallelres(char *localpath, remoteMount ** remote_node_list, int validrc,
 	rr->remotefiles[filetype].cfile = namec(remote_ctl_path,
 						Aopen, ORDWR, 0);
 	if (vflag)
-	    print("namec successful\n", remote_ctl_path);
+	    print("namec successful\n");
 	poperror();
 
 	if (waserror()) {
@@ -1894,7 +1889,7 @@ parallelres(char *localpath, remoteMount ** remote_node_list, int validrc,
 	rr->remote_session_id = atol((char *) content->rp);
 
 	/* creating remote session paths */
-	sprint(remote_session_path, "%s/%ld", selected,
+	sprint(remote_session_path, "%s/%d", selected,
 	       rr->remote_session_id);
 
 	/* bind remote resource on local dir. */
@@ -1979,9 +1974,7 @@ freermounts(remoteMount ** allremotenodes, int validrc)
 static long
 groupres(Chan * ch, int resNo, char *os, char *arch)
 {
-    int i;
     char *lpath;
-    char *selected;
     Conv *c;
     int first, others;
     remoteMount **allremotenodes;
@@ -2212,7 +2205,6 @@ p_send2one(void *param)
     void *a;
     long n;
     vlong offset;
-    int filetype;
     char report[10];
 
     if (vflag)
@@ -2252,7 +2244,7 @@ p_send2one(void *param)
     if (ret != n) {
 	/* problem: all bytes are not written, report failure */
 	if (vflag)
-	    print("###p_send2one[%d]:wrot %d instd of %d bytes\n",
+	    print("###p_send2one[%d]:wrot %ld instd of %ld bytes\n",
 		  rf->local_session_id, ret, n);
 	/* report failure */
 	qwrite(rf->async_queue, report, 2);
@@ -2264,7 +2256,7 @@ p_send2one(void *param)
     report[1] = 1;		/* indicates success */
     qwrite(rf->async_queue, report, 2);
     if (vflag)
-	print("###p_send2one[%d]:  success wrot %d bytes\n",
+	print("###p_send2one[%d]:  success wrot %ld bytes\n",
 	      rf->local_session_id, ret);
     pexit("", 0);
     return;
@@ -2278,7 +2270,7 @@ p_send2one(void *param)
 static long
 p_send2all(Chan * ch, void *a, long n, vlong offset)
 {
-    int i, ret = 0;
+    int i, ret;
     Conv *c;
     long tmpjc;
     RemoteResource *rr;
@@ -2378,58 +2370,6 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 
     return n;
 }				/* end function : p_send2all */
-
-/* sendtoall : sends write command to all nodes sequentially */
-static long
-sendtoall(Chan * ch, void *a, long n, vlong offset)
-{
-    int i, ret = 0;
-    Conv *c;
-    long tmpjc;
-    RemoteResource *tmprr;
-    int filetype;
-
-    c = cmd.conv[CONV(ch->qid)];
-
-    if (c->rjob == nil) {
-	if (vflag)
-	    print("resources released, as clone file closed\n");
-	error(EResourcesReleased);
-    }
-    tmpjc = getrjobcount(c->rjob);
-
-    if (vflag)
-	print("write to [%s] repeating [%ld] times\n", ch->name->s, tmpjc);
-    /* making sure that remote resources are allocated */
-    if (tmpjc < 0) {
-	if (vflag)
-	    print("resources not reserved\n");
-	error(ENOReservation);
-    }
-    if (TYPE(ch->qid) == Qdata) {
-	filetype = Qstdin - Qdata;
-    } else {
-	filetype = TYPE(ch->qid) - Qdata;
-    }
-
-    /* data should be sent to all resources */
-    rlock(&c->rjob->l);
-    tmprr = c->rjob->first;
-    runlock(&c->rjob->l);
-
-    for (i = 0; i < tmpjc; ++i) {
-	ret =
-	    devtab[tmprr->remotefiles[filetype].cfile->type]->
-	    write(tmprr->remotefiles[filetype].cfile, a, n, offset);
-
-	/* FIXME: should I lock following also in read mode ??  */
-	tmprr = tmprr->next;
-    }
-    if (vflag)
-	print("write to [%ld] res successful of size[%ld]\n", tmpjc, n);
-
-    return ret;
-}
 
 /* Prepares given Conv for local execution */
 static void
@@ -2554,7 +2494,6 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
     int r, ret;
     long tmpjc;
     Conv *c;
-    Chan *chan_array[2];
     Cmdbuf *cb;
     Cmdtab *ct;
     long resNo;
