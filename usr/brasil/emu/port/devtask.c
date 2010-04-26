@@ -100,7 +100,7 @@ char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
 
-static int vflag = 0;		/* for debugging messages: control prints */
+static int vflag = 2;		/* for debugging messages: control prints */
 				/* right now everything set to 9 */
 void
 _dprint(ulong debuglevel, char *fmt, ...)
@@ -232,6 +232,12 @@ static void proc_splice(void *);
 
 /* function prototypes from other files */
 long dirpackage(uchar * buff, long ts, Dir ** d);
+
+static vlong 
+timestamp (vlong stime)
+{
+	return osusectime() - stime;
+}
 
 static long
 getrjobcount(RemoteJob * rjob)
@@ -681,7 +687,9 @@ cmdopen(Chan * c, int omode)
 	char *user;
 	int tmpjc, filetype;
 	char *fname;
+	vlong stime;
 
+	stime = osusectime (); /* recording start time */
 	DPRINT(9,"trying to open [%s]\n", c->name->s);
 	perm = 0;
 	omode = openmode(omode);
@@ -702,7 +710,7 @@ cmdopen(Chan * c, int omode)
 		break;
 
 	case Qtopctl:
-		print("opening ctl file\n");
+		DPRINT (9, "opening ctl file\n");
 		break;
 
 	case Qarch:
@@ -850,7 +858,7 @@ cmdopen(Chan * c, int omode)
 	c->flag |= COPEN;
 	c->offset = 0;
 
-	DPRINT(9,"open for [%s] complete\n", c->name->s);
+	DPRINT(1,"open for [%s] complete in %uld\n", c->name->s, timestamp(stime));
 	return c;
 } /* end function : cmdopen */
 
@@ -1009,7 +1017,9 @@ cmdclose(Chan * c)
 	int r;
 	int filetype;
 	int tmpjc;
+	vlong stime;
 
+	stime = osusectime (); /* recording start time */
 	if ((c->flag & COPEN) == 0)
 		return;
 
@@ -1093,7 +1103,7 @@ cmdclose(Chan * c)
 		qunlock(&cc->l);
 		break;
 	} /* end switch : per file type */
-	DPRINT(9,"close complete\n");
+	DPRINT(1,"close on [%s] complete in %uld\n", c->name->s, timestamp(stime));
 }
 
 static long
@@ -1223,7 +1233,9 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	long tmpjc;
 	long ret;
 	int fd;
+	vlong stime;
 
+	stime = osusectime (); /* recording start time */
 	DPRINT(9,"reading from [%s]\n", ch->name->s);
 	USED(offset);
 	p = a;
@@ -1234,10 +1246,12 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 
 	case Qarch:
 		sprint(up->genbuf, "%s %s\n", oslist[IHN], platformlist[IAN]);
-		return readstr(offset, p, n, up->genbuf);
+		ret = readstr(offset, p, n, up->genbuf);
+		break;
 
 	case Qtopstat:
-		return readstatus(a, n, offset);
+		ret = readstatus(a, n, offset);
+		break;
 
 	case Qcmd:
 	case Qtopdir:
@@ -1245,26 +1259,30 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	case QLconrdir:
 		ret = devdirread(ch, a, n, 0, 0, cmdgen);
 		DPRINT(9,"### devdirread returned  %ld\n", ret);
-		return ret;
+		break;
 
 	case Qtopctl:
 		sprint(up->genbuf, "debug %d\n", vflag);
-		return readstr(offset, p, n, up->genbuf);
+		ret = readstr(offset, p, n, up->genbuf);
+		break;
 
 	case Qctl:
 		sprint(up->genbuf, "%ld", CONV(ch->qid));
-		return readstr(offset, p, n, up->genbuf);
+		ret = readstr(offset, p, n, up->genbuf);
+		break;
 
 	case Qstatus:
 		c = cmd.conv[CONV(ch->qid)];
 		DPRINT(9,"came here 1 %d\n", c->x);
 		tmpjc = getrjobcount(c->rjob);
 		if (tmpjc > 0) {
-			return readfromall(ch, a, n, offset);
+			ret = readfromall(ch, a, n, offset);
+			break;
 		}
 		if (tmpjc < 0) {
 			snprint(up->genbuf, sizeof(up->genbuf), "cmd/unreserved\n");
-			return readstr(offset, p, n, up->genbuf);
+			ret = readstr(offset, p, n, up->genbuf);
+			break;
 		}
 		DPRINT(9,"came here 2 [%s]\n", c->state);
 		/* getting status locally */
@@ -1275,11 +1293,12 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			DPRINT(9,"came here 32 [%q]\n", c->dir);
 			DPRINT(9,"came here 33 [%q]\n", cmds);
 		}
-			DPRINT(9,"came here 4\n");
+		DPRINT(9,"came here 4\n");
 		snprint(up->genbuf, sizeof(up->genbuf), "cmd/%d %d %s %q %q\n",
 				c->x, c->inuse, c->state, c->dir, cmds);
-			DPRINT(9,"came here 5\n");
-		return readstr(offset, p, n, up->genbuf);
+		DPRINT(9,"came here 5\n");
+		ret = readstr(offset, p, n, up->genbuf);
+		break;
 
 	case Qdata:
 	case Qstderr:
@@ -1294,10 +1313,11 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 
 		if (tmpjc > 0) {
 			if (TYPE(ch->qid) == Qdata) {
-				return readfromallasync(ch, a, n, offset);
+				ret = readfromallasync(ch, a, n, offset);
 			} else {
-				return readfromall(ch, a, n, offset);
+				ret = readfromall(ch, a, n, offset);
 			}
+			break;
 		}
 		/* getting data locally */
 		DPRINT(9,"reading data locally\n");
@@ -1309,7 +1329,8 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		if (c->fd[fd] == -1) {
 			qunlock(&c->l);
 			DPRINT(9,"file descriptor is closed\n");
-			return 0;
+			ret = 0;
+			break;
 		}
 		qunlock(&c->l);
 		osenter();
@@ -1318,7 +1339,8 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		if (n < 0)
 			oserror();
 		DPRINT(9,"reading %ld locally done\n", n);
-		return n;
+		ret = n;
+		break;
 
 	case Qwait:
 		c = cmd.conv[CONV(ch->qid)];
@@ -1339,8 +1361,11 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		}
 		/* Doing it locally */
 		c = cmd.conv[CONV(ch->qid)];
-		return qread(c->waitq, a, n);
+		ret = qread(c->waitq, a, n);
+		break;
 	} /* end switch : file-type */
+	DPRINT(1,"read on [%s] of [%ld] bytes complete in %uld\n", ch->name->s, timestamp(stime));
+	return ret;
 }
 
 static int
@@ -2375,8 +2400,9 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 	char *buff;
 	struct for_splice *fs;
 	char *s;
+	vlong stime;
 
-
+	stime = osusectime (); /* recording start time */
 	USED(offset);
 	DPRINT(9,"write in file [%s]\n", ch->name->s);
 	ret = n;				/* for default return value */
@@ -2386,9 +2412,9 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		error(Eperm);
 
 	case Qtopctl:
-		print("came here\n");
+		DPRINT(9, "came here\n");
 		cb = parsecmd(a, n);
-		print("cmd arg[%d] done [%s]\n", cb->nf, a);
+		DPRINT(9, "cmd arg[%d] done [%s]\n", cb->nf, a);
 		ct = lookupcmd(cb, ctlcmdtab, nelem(ctlcmdtab));
 		switch (ct->index) {
 		default:
@@ -2420,9 +2446,9 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			//free(cb);
 			//FIXME:        something bad happening
 			/* send the actual error code back */
-			error("Execution failed");
+			error("CTL request failed");
 		}
-		DPRINT(9,"cmd arg[%d] done [%s]\n", cb->nf, a);
+		DPRINT(1,"cmd arg[%d] done [%s]\n", cb->nf, a);
 		ct = lookupcmd(cb, cmdtab, nelem(cmdtab));
 		switch (ct->index) {
 		case CMres:
@@ -2474,12 +2500,11 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				/* local execution request */
 				DPRINT(9,"executing cmd locally\n");
 				dolocalexecution(c, cb);
-				poperror();
-				return ret;
+			} else {
+				DPRINT(9,"executing cammand remotely\n");
+				ret = p_send2all(ch, a, n, offset);
+				DPRINT(9,"executing cammand - done\n");
 			}
-			DPRINT(9,"executing cammand remotely\n");
-			ret = p_send2all(ch, a, n, offset);
-			DPRINT(9,"executing cammand - done\n");
 			break;
 
 		case CMkillonclose:
@@ -2544,7 +2569,6 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			fs->src = namec(cb->f[1], Aopen, OREAD, 0);
 			kproc("proc_splice", proc_splice, fs, 0);
 			poperror();
-
 			break;
 
 		case CMdir:
@@ -2572,8 +2596,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 
 		poperror();
 		//free(cb);
-		return ret;
-		break;
+		break; /* end of write in ctl file */
 
 	case Qdata:
 		/* find no. of remote jobs running */
@@ -2600,24 +2623,27 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			}
 			qunlock(&c->l);
 			osenter();
-			r = write(c->fd[0], a, n);
+			ret = write(c->fd[0], a, n);
 			osleave();
-			if (r == 0)
+			if (ret == 0)
 				error(Ehungup);
-			if (r < 0) {
+			if (ret < 0) {
 				/*
 				 * XXX perhaps should kill writer "write on
 				 * closed pipe" here, 2nd time around?
 				 */
 				oserror();
 			}
-			return r;
-		}
-		/* end if : local file write request */
-		/* sending to remote resources */
-		return p_send2all(ch, a, n, offset);
+			break;
+		} else {
+			/* sending to remote resources */
+			ret = p_send2all(ch, a, n, offset);
+			break;
+		} /* end if : local file write request */
+		break;
 	} /* end switch : on filename */
 
+	DPRINT(1,"write on [%s] of [%ld] bytes complete in %uld\n", ch->name->s, ret, timestamp(stime));
 	return ret;
 }
 
