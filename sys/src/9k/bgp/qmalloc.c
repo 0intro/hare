@@ -484,6 +484,17 @@ smalloc(ulong size)
 	return v;
 }
 
+/* it damn well better be for more */
+void*
+realloc(void* v, ulong size)
+{
+	void *nv;
+	nv = smalloc(size);
+	memmove(nv, v, size);
+	free(v);
+	return nv;
+}
+
 void
 setmalloctag(void*, ulong)
 {

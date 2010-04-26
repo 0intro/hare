@@ -743,6 +743,7 @@ struct Proc
 
 	Fastcall* fc;
 	int	fcount;
+	char *syscalltrace;
 
 	/*
 	 *  machine specific fpu, mmu and notify

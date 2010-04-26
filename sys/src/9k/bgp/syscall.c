@@ -202,24 +202,37 @@ syscall(Ureg* ureg)
 	uintptr sp;
 	int i, scallnr;
 	static Ar0 zar0;
+	uvlong startnsec, stopnsec;
+	void syscallprint(int syscallno, uintptr *sp);
+	void retprint(int syscallno, uintptr *sp, Ar0 *ar0, uvlong start, uvlong stop);
 
+	USED(startnsec);
 	m->syscall++;
 	up->insyscall = 1;
 	up->pc = ureg->pc;
 	up->dbgreg = ureg;
+	sp = ureg->sp;
+	scallnr = ureg->r3;
 
 	if(up->procctl == Proc_tracesyscall){
 		up->procctl = Proc_stopme;
+		/* redundant validaddr. Do we care? Tracing syscalls is not exactly a fast path ...*/
+		if(sp < (USTKTOP-BY2PG) || sp > (USTKTOP-sizeof(up->arg)-BY2SE))
+			validaddr(UINT2PTR(sp), sizeof(up->arg)+BY2SE, 0);
+
+		syscallprint(scallnr, (uintptr *)sp);
 		procctl(up);
+		if(up->syscalltrace)
+			free(up->syscalltrace);
+		up->syscalltrace = nil;
+		startnsec = todget(nil);
 	}
 
-	scallnr = ureg->r3;
 	up->scallnr = scallnr;
 	if(scallnr == RFORK)
 		fpusysrfork(ureg);
 	spllo();
 
-	sp = ureg->sp;
 	up->nerrlab = 0;
 	ar0 = zar0;
 	if(!waserror()){
@@ -281,10 +294,15 @@ syscall(Ureg* ureg)
 	ureg->r3 = ar0.p;
 
 	if(up->procctl == Proc_tracesyscall){
+		stopnsec = todget(nil);
 		up->procctl = Proc_stopme;
+		retprint(scallnr, (uintptr *) sp, &ar0, startnsec, stopnsec);
 		s = splhi();
 		procctl(up);
 		splx(s);
+		if(up->syscalltrace)
+			free(up->syscalltrace);
+		up->syscalltrace = nil;
 	}
 
 	up->insyscall = 0;

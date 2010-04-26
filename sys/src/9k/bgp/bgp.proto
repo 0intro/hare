@@ -106,6 +106,7 @@ power d775 sys sys /tmp/empty
 
 		# benchmarks
 		suck 775 sys sys ../root/q.suck		
+		syscalltrace 775 sys sys ../root/q.syscalltrace		
 		blow 775 sys sys ../root/q.blow
 		pp 775 sys sys
 		fcp 775 sys sys

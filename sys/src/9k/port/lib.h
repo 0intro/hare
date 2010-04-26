@@ -119,6 +119,8 @@ extern	int	sprint(char*, char*, ...);
 #pragma	varargck	type	"p"	void*
 #pragma	varargck	flag	','
 
+extern	int	fmtstrinit(Fmt*);
+extern	char*	fmtstrflush(Fmt*);
 extern	int	fmtinstall(int, int (*)(Fmt*));
 extern	int	fmtprint(Fmt*, char*, ...);
 extern	int	fmtstrcpy(Fmt*, char*);
