@@ -280,6 +280,11 @@ oslongjmp(void *regs, osjmpbuf env, int val)
 	siglongjmp(env, val);
 }
 
+void incrap (void)
+{
+	return;
+}
+
 static void
 termset(void)
 {

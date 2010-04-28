@@ -320,14 +320,17 @@ cmd3gen(Chan * c, int i, Dir * dp)
 
 /* supposed to generate top level directory structure for task */
 static int
-cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
+cmdgen (Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 {
 	Qid q;
 	Conv *cv;
 	Conv *myc;
 	char buf[KNAMELEN * 3];
 	long jc;
+	int ret;
 
+/*	DPRINT(9,"inside cmdgen\n"); */
+	
 	if (s == DEVDOTDOT) {
 		switch (TYPE(c->qid)) {
 		case Qtopdir:
@@ -341,13 +344,224 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 				dp);
 			break;
 		case QLconrdir:		/* for remote resource bindings */
-			DPRINT(9,"cmdindex [%ld], rjobi [%ld]\n",
-				CONV(c->qid), RJOBI(c->qid));
-			snprint(buf, sizeof buf, "%ld", CONV(c->qid));
+//			DPRINT(9,"cmdindex [%ld], rjobi [%ld]\n",
+//				CONV(c->qid), RJOBI(c->qid));
+			snprint(buf, sizeof(buf), "%ld", CONV(c->qid));
 			cv = cmd.conv[CONV(c->qid)];
 			mkqid(&q, QID(CONV(c->qid), Qconvdir), 0, QTDIR);
 			devdir(c, q, buf, 0, cv->owner, DMDIR | 0555, dp);
 			break;
+		default:
+			panic("cmdgen %llux", c->qid.path);
+		}
+		DPRINT(9,"done cmdgen top\n");
+		return 1;
+	}
+	
+	switch (TYPE(c->qid)) {
+	case Qtopdir:
+		if (s >= 1) {
+			ret = -1;
+			break;
+		}
+		mkqid(&q, QID(0, Qcmd), 0, QTDIR);
+		//devdir(c, q, "local", 0, eve, DMDIR | 0555, dp);
+		devdir(c, q, "local", 0, up->env->user, DMDIR | 0555, dp);
+		ret = 1;
+		break;
+	case Qcmd:
+		if (s < cmd.nc) {	
+			cv = cmd.conv[s];
+			mkqid(&q, QID(s, Qconvdir), 0, QTDIR);
+			snprint(buf, sizeof(buf), "%d", s);
+			devdir(c, q, buf, 0, cv->owner, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		
+		s -= cmd.nc;
+		switch(s){
+		case 0:
+			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
+			devdir(c, q, "clone", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 1:
+			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
+			//devdir(c, q, "ctl", 0, eve, 0777, dp);
+			devdir(c, q, "ctl", 0, up->env->user, 0777, dp);
+			ret = 1;
+			break;
+		case 2:
+			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
+			devdir(c, q, "fs", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		case 3:
+			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
+			devdir(c, q, "net", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		case 4:
+			mkqid(&q, QID(0, Qarch), 0, QTFILE);
+			devdir(c, q, "arch", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 5:
+			mkqid(&q, QID(0, Qtopns), 0, QTDIR);
+			devdir(c, q, "ns", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 6:
+			mkqid(&q, QID(0, Qtopenv), 0, QTDIR);
+			devdir(c, q, "env", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 7:
+			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
+			devdir(c, q, "status", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		default :
+			ret = -1;
+			break;
+		}
+		break;
+		
+	case Qclonus:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
+			devdir(c, q, "clone", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qtopctl:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
+			//devdir(c, q, "ctl", 0, eve, 0777, dp);
+			devdir(c, q, "ctl", 0, up->env->user, 0777, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qtopstat:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
+			devdir(c, q, "status", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qlocalfs:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
+			devdir(c, q, "fs", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qlocalnet:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
+			devdir(c, q, "net", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qarch:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qarch), 0, QTFILE);
+			devdir(c, q, "arch", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qconvdir:
+		myc = cmd.conv[CONV(c->qid)];
+/*		jc = getrjobcount(myc->rjob); */ /* not using because locking issue */
+		if (myc->rjob == nil ) {
+			jc = -2;
+		} else {
+			jc = myc->rjob->rjobcount;
+		}
+		if (s < jc) {
+			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
+			snprint(buf, sizeof (buf), "%d", s);
+			devdir(c, q, buf, 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		if (jc > 0) {
+			s -= jc;
+		}
+		ret = cmd3gen(c, Qconvbase + s, dp);
+		break;
+	case Qdata:
+	case Qstderr:
+	case Qctl:
+	case Qstatus:
+	case Qwait:
+	case Qstdin:
+	case Qstdout:
+	case Qenv:
+	case Qns:
+	case Qargs:
+		ret = cmd3gen(c, TYPE(c->qid), dp);
+		break;
+	default :
+		ret = -1;
+	} /* end switch : */
+	
+/*	DPRINT(9,"Done with cmdgen with ret [%d]\n", ret);
+*/
+	return ret;
+}
+
+
+/* supposed to generate top level directory structure for task */
+static int
+cmdgen_old (Chan * c, char *name, Dirtab * d, int nd, int s, Dir * dp)
+{
+	Qid q;
+	Conv *cv;
+	Conv *myc;
+	char tmpbuff[KNAMELEN * 3];
+	long tmpjc;
+
+	USED(name);
+	USED(nd);
+	USED(d);
+
+	if (s == DEVDOTDOT) {
+		switch (TYPE(c->qid)) {
+		case Qtopdir:
+		case Qcmd:
+			mkqid(&q, QID(0, Qtopdir), 0, QTDIR);
+			devdir(c, q, "#T", 0, eve, DMDIR | 0555, dp);
+			break;
+		case Qconvdir:
+			mkqid(&q, QID(0, Qcmd), 0, QTDIR);
+			devdir(c, q, "local", 0, up->env->user, DMDIR | 0555, 
+									dp);
+			break;
+		case QLconrdir:		/* for remote resource bindings */
+			DPRINT(9,"cmdindex [%ld], rjobi [%ld]\n",
+					  CONV(c->qid), RJOBI(c->qid));
+
+			sprint(tmpbuff, "%ld", CONV(c->qid));
+			cv = cmd.conv[CONV(c->qid)];
+
+			mkqid(&q, QID(CONV(c->qid), Qconvdir), 0, QTDIR);
+			devdir(c, q, tmpbuff, 0, cv->owner, DMDIR | 0555, dp);
+			break;
+
 		default:
 			panic("cmdgen %llux", c->qid.path);
 		}
@@ -365,47 +579,54 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 		if (s < cmd.nc) {
 			cv = cmd.conv[s];
 			mkqid(&q, QID(s, Qconvdir), 0, QTDIR);
-			snprint(up->genbuf, sizeof up->genbuf, "%d", s);
+			sprint(up->genbuf, "%d", s);
 			devdir(c, q, up->genbuf, 0, cv->owner, DMDIR | 0555, dp);
 			return 1;
 		}
 		s -= cmd.nc;
-		switch(s){
-		case 0:
+		if (s == 0) {
 			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
 			devdir(c, q, "clone", 0, eve, 0666, dp);
 			return 1;
-		case 1:
+		}
+		if (s == 1) {
 			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
 			//devdir(c, q, "ctl", 0, eve, 0777, dp);
 			devdir(c, q, "ctl", 0, up->env->user, 0777, dp);
 			return 1;
-		case 2:
+		}
+		if (s == 2) {
 			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
 			devdir(c, q, "fs", 0, eve, DMDIR | 0555, dp);
 			return 1;
-		case 3:
+		}
+		if (s == 3) {
 			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
 			devdir(c, q, "net", 0, eve, DMDIR | 0555, dp);
 			return 1;
-		case 4:
+		}
+		if (s == 4) {
 			mkqid(&q, QID(0, Qarch), 0, QTFILE);
 			devdir(c, q, "arch", 0, eve, 0666, dp);
 			return 1;
-		case 5:
+		}
+		if (s == 5) {
 			mkqid(&q, QID(0, Qtopns), 0, QTDIR);
 			devdir(c, q, "ns", 0, eve, 0666, dp);
 			return 1;
-		case 6:
+		}
+		if (s == 6) {
 			mkqid(&q, QID(0, Qtopenv), 0, QTDIR);
 			devdir(c, q, "env", 0, eve, 0666, dp);
 			return 1;
-		case 7:
+		}
+		if (s == 7) {
 			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
 			devdir(c, q, "status", 0, eve, 0666, dp);
 			return 1;
 		}
 		return -1;
+
 	case Qclonus:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
@@ -413,6 +634,7 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qtopctl:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
@@ -421,6 +643,7 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qtopstat:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
@@ -428,6 +651,7 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qlocalfs:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
@@ -435,6 +659,7 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qlocalnet:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
@@ -442,6 +667,7 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qarch:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qarch), 0, QTFILE);
@@ -449,19 +675,22 @@ cmdgen(Chan * c, char *, Dirtab * , int , int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qconvdir:
 		myc = cmd.conv[CONV(c->qid)];
-		//jc = getrjobcount(myc->rjob);
-		jc = myc->rjob->rjobcount;
-		if (s < jc) {
+		//tmpjc = getrjobcount(myc->rjob);
+		tmpjc = myc->rjob->rjobcount;
+		if (s < tmpjc) {
 			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
-			snprint(up->genbuf, sizeof up->genbuf, "%d", s);
+			sprint(up->genbuf, "%d", s);
 			devdir(c, q, up->genbuf, 0, eve, DMDIR | 0555, dp);
 			return 1;
 		}
-		if (jc > 0)
-			s -= jc;
+		if (tmpjc > 0)
+			s -= tmpjc;
+
 		return cmd3gen(c, Qconvbase + s, dp);
+
 	case Qdata:
 	case Qstderr:
 	case Qctl:
