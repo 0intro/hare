@@ -65,7 +65,7 @@ fdvec(int pid, int **arg)
 void
 exectramp(Targ *t)
 {
-	int *fd, i, nfd;
+	int *fd, i;
 	char filename[128], err[ERRMAX], status[2*ERRMAX];
 	int *fdv;
 	int *p;
@@ -77,8 +77,7 @@ exectramp(Targ *t)
 	snprint(filename, sizeof(filename), "#d/%d", t->wfd);
 	t->wfd = open(filename, OWRITE|OCEXEC);
 	/* if it failed, we'll manage */
-
-	nfd = MAXNFD;	/* TO DO: should read from /fd */
+//	print("%d %s FD0 %d FD1 %d FD2 %d\n", getpid(), t->args[0], fd[0], fd[1], fd[2]);
 	fdvec(t->pid, &fdv);
 	for(p=fdv; *p >= 0; p++){
 		i = *p;
@@ -157,6 +156,7 @@ oscmd(char **args, int nice, char *dir, int *fd)
 	t->fd[1] = fd1[1];
 	t->fd[2] = fd2[1];
 	t->wfd = wfd[1];
+//	print("%d %s oscmd FD0 %d %d FD1 %d %d FD2 %d %d WFD %d %d\n", getpid(), t->args[0], fd0[0], fd0[1], fd1[0], fd1[1], fd2[0], fd2[1], wfd[0], wfd[1]);
 	t->spin = spinptr;
 	switch(rfork(RFPROC|RFMEM|RFREND|RFNOTEG|RFFDG|RFNAMEG|RFENVG)) {
 	case -1:
