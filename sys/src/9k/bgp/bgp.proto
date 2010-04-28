@@ -108,7 +108,7 @@ power d775 sys sys /tmp/empty
 		suck 775 sys sys ../root/q.suck		
 		syscalltrace 775 sys sys ../root/q.syscalltrace		
 		blow 775 sys sys ../root/q.blow
-		pp 775 sys sys
+		pp 775 sys sys ../root/q.pp
 		fcp 775 sys sys
 		ps 775 sys sys
 		cp 775 sys sys
