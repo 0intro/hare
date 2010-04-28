@@ -74,14 +74,15 @@ _dprint(ulong debuglevel, char *fmt, ...)
 	va_list args;
 	int len = 0;
 	char s[255];
+	char *newfmt;
 
 	if(vflag<debuglevel)
 		return;
-
+	newfmt = smprint("%ld %d %s", time(0), getpid(), fmt);
 	va_start(args, fmt);
-	len += vsnprint(s + len, sizeof s - len, fmt, args);
+	len += vsnprint(s + len, sizeof s - len, newfmt, args);
 	va_end(args);
-
+	free(newfmt);
 	print(s, len);
 }
 #define DPRINT if(vflag)_dprint
@@ -185,6 +186,12 @@ dumpconv(Conv *c, char *s)
 		print("BAD MAGIC BOOOOOOOOOOOOOOOOOOOOOOOOPOOOIOOOOOOM\n");
 		return;
 	}
+	if(c->cmd == nil){
+		print("BAD CMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMD\n");
+	}
+	if(c->fd == nil){
+		print("BAD FDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\n");
+	}	
 	print("%s: owner %s state %s error %s dir %s cmd->f[1] %s fd0 %d fd1 %d fd2 %d\n", s,
 		c->owner, c->state, c->error, c->dir, c->cmd->f[1], c->fd[0], c->fd[1], c->fd[2]);
 
@@ -565,14 +572,14 @@ proc_splice(void *param)
 
 	DPRINT(9,"proc_splice starting [%s]->[%s]\n", src->name->s,
 		dst->name->s);
-	while (1) {
+	for(;;) {
 		/* read data from source channel */
 		ret = devtab[src->type]->read(src, buf, 512, 0);
 		if (ret <= 0) {
 			break;
 		}
-		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data \n",
-			src->name->s, dst->name->s, ret);
+		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data %*s\n",
+			src->name->s, dst->name->s, ret, ret, buf);
 		a = buf;
 		while (ret > 0) {
 			incrap();
@@ -582,12 +589,12 @@ proc_splice(void *param)
 		}
 
 	} /* end while */
-	DPRINT(9,"proc_splice closing [%s]->[%s] \n", src->name->s,
+	DPRINT(9,"%ld %d proc_splice closing [%s]->[%s] \n", time(0), getpid(), src->name->s,
 		dst->name->s);
 
 	cclose(src);
 	cclose(dst);
-	DPRINT(9,"proc_splice complete \n");
+	DPRINT(9,"%ld %d proc_splice complete \n",time(0), getpid());
 } /* end function : proc_splice */
 
 
@@ -2533,7 +2540,6 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				break;
 			}
 			if (waserror()) {
-				dumpconv(c, "splice failed");
 				DPRINT(9,"splice failed %r\n");
 				nexterror();
 			}
@@ -2596,19 +2602,15 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		DPRINT(9,"sending data locally\n");
 
 		qlock(&c->l);
-		dumpconv(c, "1");
 		if (c->fd[0] == -1) {
-			dumpconv(c, "bad fd");
 			qunlock(&c->l);
-			DPRINT(9, "can't dial 8675309\n");
+			DPRINT(9, "can't dial 8675309 %r\n");
 			error(Ehungup);
 		}
 		qunlock(&c->l);
-		dumpconv(c, "2");
 		osenter();
 		incrap();
 		ret = write(c->fd[0], a, n);
-		dumpconv(c, "3");
 	
 		DPRINT(8,"%d WRITEFD %d ret %d %*s\n", getpid(), c->fd[0], ret, n, a);
 		incrap();
