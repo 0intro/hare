@@ -33,6 +33,15 @@ default:V:	$O.$CONF
 
 <../port/portmkfile
 
+$CONF.acid:	$OBJ $CONF.c $CONF.root.h $LIBFILES
+	$CC $CFLAGS -DKERNDATE'='$KERNDATE -a $CONF.c >brasil.acid
+	for(i in $OBJ){
+		stem=`{echo $i | sed 's/\.[0-9a-z]$//'}
+		if(test -f $stem.c)
+			$CC $CFLAGS -DKERNDATE'='$KERNDATE -a $stem.c >>brasil.acid
+	}
+	echo 'print("/sys/lib/acid/brasil");' >>brasil.acid
+
 $O.$CONF:	$OBJ $CONF.c $CONF.root.h $LIBFILES
 	$CC $CFLAGS '-DKERNDATE='$KERNDATE $CONF.c
 	$LD  -o $target $OBJ $CONF.$O $LIBFILES $SYSLIBS

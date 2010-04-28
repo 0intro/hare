@@ -1,6 +1,10 @@
 #include	"dat.h"
 #include	"fns.h"
 #include	"error.h"
+#include <ureg.h>
+
+typedef struct Ureg Ureg;
+jmp_buf crap;
 
 enum
 {
@@ -30,6 +34,13 @@ void
 osready(Proc *p)
 {
 	rendezvous(p, nil);
+}
+
+void
+incrap(void)
+{
+	if(setjmp(crap))
+		for(;;) sleep(0xffff);
 }
 
 void
@@ -134,13 +145,18 @@ kproc(char *name, void (*func)(void*), void *arg, int flags)
 void
 traphandler(void *reg, char *msg)
 {
+	Ureg *u;
+	
+	u = (Ureg*)reg;
 	int intwait;
-
+	print("traphandler: %d: %s\n", getpid(), msg);
 	intwait = up->intwait;
 	up->intwait = 0;
 	/* Ignore pipe writes from devcmd */
 	if(strstr(msg, "write on closed pipe") != nil)
-		noted(NCONT);
+		notejmp(reg, crap, 1);
+		//noted(NCONT);
+		//noted(NDFLT);
 
 	if(sflag) {
 		if(intwait && strcmp(msg, Eintr) == 0)
@@ -226,7 +242,7 @@ libinit(char *imod)
 	dobinds();
 
 	notify(traphandler);
-
+	incrap(); // XXX: will this work?
 	/*
 	 * dummy up a up and stack so the first proc
 	 * calls emuinit after setting up his private jmp_buf
@@ -273,6 +289,7 @@ libinit(char *imod)
 	 */
 	up = p;
 	up->pid = up->sigid = getpid();
+	incrap();
 	tramp(sp+KSTACK, up->func, up->arg);
 	panic("tramp returned");
 }

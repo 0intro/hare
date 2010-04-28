@@ -247,3 +247,5 @@ void		cleancname(Cname*);
 void		cnameclose(Cname*);
 
 #pragma varargck argpos iprint 1
+
+void incrap(void);
