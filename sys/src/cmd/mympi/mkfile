@@ -1,0 +1,37 @@
+</$objtype/mkfile
+#
+#		programs
+#
+TARG=\
+	mympihello\
+
+DIRS=\
+
+OTHEROFILES=\
+	torus.$O\
+	mympi.$O\
+
+HFILES=mpi.h
+
+LIB=lib.$O.a
+BIN=.
+CLIB=mympi.c torus.c
+
+UPDATE=\
+	mkfile\
+	$HFILES\
+	${OTHEROFILES:%.$O=%.c}\
+	${TARG:%=%.c}\
+
+</sys/src/cmd/mkmany
+
+clean:V:
+	rm -f *.[$OS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG
+
+nuke:V:
+	rm -f *.[$OS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG *.acid
+
+$O.%: lib.$O.a
+
+${LIB}: ${OTHEROFILES}
+	ar r $LIB $OTHEROFILES

@@ -142,10 +142,12 @@ threadmain(int argc, char **argv)
 {
 	int pid;
 	char *cmd = nil;
+	char **args = nil;
 
 	ARGBEGIN{
 	case 'c':
 		cmd = EARGF(usage());
+		args = argv++;
 		break;
 	default:
 		usage();
@@ -159,7 +161,7 @@ threadmain(int argc, char **argv)
 			exits("fork failed");
 		}
 		if(pid == 0) {
-			execl("/bin/rc", "rc",  "-c", cmd, nil);
+			exec(cmd, args);
 			print("Bad exec: %s: %r\n", cmd);
 			exits("Bad exec");
 		}
