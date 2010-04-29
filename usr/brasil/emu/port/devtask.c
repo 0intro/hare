@@ -67,7 +67,7 @@ char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
 char EBadstatus[] = "Invalid status";
 
-static int vflag = 9;		/* for debugging messages: control prints */
+static int vflag = 0;		/* for debugging messages: control prints */
 
 void
 _dprint(ulong debuglevel, char *fmt, ...)
@@ -847,7 +847,7 @@ cmdopen(Chan * c, int omode)
 	c->flag |= COPEN;
 	c->offset = 0;
 
-	DPRINT(1,"open for [%s] complete in %uld\n", c->name->s, timestamp(stime));
+	DPRINT(8,"open for [%s] complete in %uld\n", c->name->s, timestamp(stime));
 	return c;
 } /* end function : cmdopen */
 
@@ -1021,6 +1021,7 @@ cmdclose(Chan * c)
 
 	case Qctl:
 	case Qdata:
+		DPRINT(7, "Closing data file\n");
 	case Qstderr:
 	case Qwait:
 	case Qstatus:
@@ -1091,7 +1092,7 @@ cmdclose(Chan * c)
 		qunlock(&cc->l);
 		break;
 	} /* end switch : per file type */
-	DPRINT(1,"close on [%s] complete in %uld\n", c->name->s, timestamp(stime));
+	DPRINT(8,"close on [%s] complete in %uld\n", c->name->s, timestamp(stime));
 }
 
 static long
@@ -1303,6 +1304,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		fd = 1;
 		if (TYPE(ch->qid) == Qstderr)
 			fd = 2;
+		DPRINT(7, "READ fd %d n %d %.*s\n", c->fd[fd], n, n, a);
 		c = cmd.conv[CONV(ch->qid)];
 		qlock(&c->l);
 		if (c->fd[fd] == -1) {
@@ -1314,7 +1316,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		qunlock(&c->l);
 		osenter();
 		n = read(c->fd[fd], a, n);
-		DPRINT(9, "READ fd %d n %d %.*s\n", c->fd[fd], n, n, a);
+		DPRINT(7, "READ FINISHED fd %d n %d %.*s\n", c->fd[fd], n, n, a);
 		osleave();
 		if (n < 0)
 			oserror();
@@ -1343,7 +1345,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		ret = qread(c->waitq, a, n);
 		break;
 	} /* end switch : file-type */
-	DPRINT(1,"read on [%s] of [%ld] bytes complete in %uld\n", ch->name->s, ret, timestamp(stime));
+	DPRINT(8,"read on [%s] of [%ld] bytes complete in %uld\n", ch->name->s, ret, timestamp(stime));
 	return ret;
 }
 
@@ -2368,7 +2370,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			/* send the actual error code back */
 			error("CTL request failed");
 		}
-		DPRINT(1,"cmdwrite: cmd arg[%d] done [%s]\n", cb->nf, a);
+		DPRINT(8,"cmdwrite: cmd arg[%d] done [%s]\n", cb->nf, a);
 		ct = lookupcmd(cb, cmdtab, nelem(cmdtab));
 		switch (ct->index) {
 		case CMres:
@@ -2532,11 +2534,12 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			break;
 		}
 		if (jc != 0) {
+			DPRINT(7, "EVH: Remote Qdatawrite: [%d] %s", n, a);
 			ret = p_send2all(ch, a, n, offset);
 			break;
 		}
 		/* local data file write request */
-		DPRINT(9,"sending data locally\n");
+		DPRINT(7, "EVH: Local Qdatawrite: [%d] %s", n, a);
 
 		qlock(&c->l);
 		if (c->fd[0] == -1) {
@@ -2550,22 +2553,10 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		ret = write(c->fd[0], a, n);
 		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d %.*s\n", c->fd[0], ret, n, n, a);
 		osleave();
-		if (ret == 0){
-			DPRINT(9, "cmdwrite: No worry no bytes: %r\n");
-			error(Ehungup);
-		}
-		if (ret < 0) {
-			/*
-			 * XXX perhaps should kill writer "write on
-			 * closed pipe" here, 2nd time around?
-			 */
-			 DPRINT(9,"cmdwrite: mr pipes is not happy %d: %r\n", ret);
-			oserror();
-		}
 		break;
 	}
 
-	DPRINT(1,"cmdwrite: %s wrote %ld in %uld\n", ch->name->s, ret, timestamp(stime));
+	DPRINT(8,"cmdwrite: %s wrote %ld in %uld\n", ch->name->s, ret, timestamp(stime));
 	return ret;
 }
 

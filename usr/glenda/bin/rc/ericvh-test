@@ -8,13 +8,13 @@ splice 0 1
 end 1' | pxcpu &&
 echo 'res 8
 exec 0 fdecho test
+exec filt xirf 1 5 7 4 6
+exec filt self 2 7 4 6 5
 exec 3 mecat
 exec 4 mecat
 exec 5 mecat
 exec 6 mecat
 exec 7 mecat
-exec filt xirf 1 5 7 4 6
-exec filt self 2 7 4 6 5
 splice 0 2
 splice 1 3
 end 3 ' | pxcpu
