@@ -342,9 +342,10 @@ consread(Chan *c, void *va, long n, vlong offset)
 			nexterror();
 		}
 
-		if(dflag)
+		if(dflag){				
+			print("consread: Enonexist\n");
 			error(Enonexist);
-
+		}
 		while(!qcanread(lineq)) {
 			if(qread(kbdq, &ch, 1) == 0)
 				continue;
