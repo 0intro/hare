@@ -129,10 +129,8 @@ fswalk(Chan *c, Chan *nc, char **name, int nname)
 			dir = dirstat(next->s);
 			if(dir == nil){
 				cnameclose(next);
-				panic("Enonexist");
 				if(j == 0)
 					error(Enonexist);
-		
 				strcpy(up->env->errstr, Enonexist);
 				break;
 			}

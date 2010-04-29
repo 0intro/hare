@@ -1071,8 +1071,10 @@ namec(char *aname, int amode, int omode, ulong perm)
 		   (utfrune("|esDa", r) == nil || r == 's' && up->genbuf[n]!='\0'))
 			error(Enoattach);
 		t = devno(r, 1);
-		if(t == -1)
+		if(t == -1) {
+			print("%c", r);
 			error(Ebadsharp);
+		}
 		c = devtab[t]->attach(up->genbuf+n);
 		break;
 
