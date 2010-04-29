@@ -145,9 +145,6 @@ kproc(char *name, void (*func)(void*), void *arg, int flags)
 void
 traphandler(void *reg, char *msg)
 {
-	Ureg *u;
-	
-	u = (Ureg*)reg;
 	int intwait;
 	print("traphandler: %d: %s\n", getpid(), msg);
 	intwait = up->intwait;

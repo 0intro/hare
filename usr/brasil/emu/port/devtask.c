@@ -75,7 +75,6 @@ _dprint(ulong debuglevel, char *fmt, ...)
 	va_list args;
 	char *p;
 	int len = 0;
-	int hasnl = 0;
 	char s[255];
 	char *newfmt;
 
@@ -1396,15 +1395,13 @@ analyseremotenode(RemMount * rmt)
 {
 	char buf[128];
 	char *a[3];
-	char *s, *p;
-	long offset;
+	char *p;
+	long offset = 0;
 	long ret;
-	int n;
+	int n = 0;
 	long hn, an;
 
 	initinfo(rmt->info);
-	/* XXX: FIXME! */
-	s = buf;
 	for(;;) {
 		ret = devtab[rmt->status->type]->read(rmt->status, buf, 30, offset);
 		DPRINT(9, "remnode: n %d %.*s\n", n, n, buf);
@@ -1424,7 +1421,6 @@ analyseremotenode(RemMount * rmt)
 		if(an == 0)
 			error(EBadstatus);
 		rmt->info[hn][an] += atol(a[0]);
-		s = p + 1;
 	}
 }
 
@@ -1453,7 +1449,7 @@ validrr(char *mnt, char *os, char *arch)
 	if(n < 0)
 		error("invalid dir");
 	DPRINT(9,"remote dir[%s]= %ld entries\n", mnt, n);
-	e = d+n;
+	e = dirs+n;
 	for(d = dirs; d != e; d++) {
 		DPRINT(9,"%ld [%s/%s]\n", d - dirs, mnt, d->name);
 		if (DMDIR & d->mode) {

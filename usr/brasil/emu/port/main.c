@@ -345,15 +345,14 @@ void
 error(char *err)
 {
 	if(err != nil)
-		print("%ld error: %s pc=0x%.8lux\n", getpid(), err, getcallerpc(&err));
+		print("%d error: %s pc=0x%.8lux\n", getpid(), err, getcallerpc(&err));
 	else
-		print("%ld error: pc=0x%.8lux\n", getpid(), getcallerpc(&err));
+		print("%d error: pc=0x%.8lux\n", getpid(), getcallerpc(&err));
 		
 	if(strncmp(err, "fail:", 5) == 0){
-		int n;
 		char name[3*KNAMELEN];
 		modstatus(&R, name, sizeof(name));
-		print("%ld %s: unhandled exception: %s\n", getpid(), name, err);
+		print("%d %s: unhandled exception: %s\n", getpid(), name, err);
 	}
 	if(err != up->env->errstr && up->env->errstr != nil)
 		kstrcpy(up->env->errstr, err, ERRMAX);
