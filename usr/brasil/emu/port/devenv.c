@@ -82,7 +82,6 @@ envopen(Chan *c, int mode)
 			break;
 	if(e == nil) {
 		qunlock(&eg->l);
-		panic("Enonexist");
 		error(Enonexist);
 	}
 	if(mode == (OWRITE|OTRUNC) && e->val) {
@@ -156,8 +155,6 @@ envread(Chan *c, void *a, long n, vlong offset)
 		if(e->qid.path == c->qid.path)
 			break;
 	if(e == nil) {
-			panic("Enonexist");
-
 		qunlock(&eg->l);
 		error(Enonexist);
 	}
@@ -193,8 +190,6 @@ envwrite(Chan *c, void *a, long n, vlong offset)
 			break;
 	if(e == nil) {
 		qunlock(&eg->l);
-				panic("Enonexist");
-
 		error(Enonexist);
 	}
 	if(ve > e->len) {
@@ -227,8 +222,6 @@ envremove(Chan *c)
 	e = *l;
 	if(e == nil) {
 		qunlock(&eg->l);
-				panic("Enonexist");
-
 		error(Enonexist);
 	}
 	*l = e->next;

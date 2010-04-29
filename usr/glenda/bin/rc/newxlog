@@ -1,5 +1,0 @@
-#!/bin/rc
-
-rm /tmp/xcpu.log
-touch /tmp/xcpu.log
-chmod +a /tmp/xcpu.log

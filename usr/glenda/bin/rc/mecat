@@ -1,6 +1,0 @@
-#!/bin/rc
-
-@{
-echo -n $sysname '	'
-fdcat
-}

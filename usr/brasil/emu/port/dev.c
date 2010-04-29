@@ -195,8 +195,6 @@ devwalk(Chan *c, Chan *nc, char **name, int nname, Dirtab *tab, int ntab, Devgen
 	 */
 Done:
 	poperror();
-//	iprint("devwalk: %s pc=0x%.8ulx\n", n, getcallerpc(&c));
-	
 	if(wq->nqid < nname){
 		if(alloc)
 			cclose(wq->clone);

@@ -249,4 +249,3 @@ void		cnameclose(Cname*);
 #pragma varargck argpos iprint 1
 
 void incrap(void);
-void curmod(char *, int );

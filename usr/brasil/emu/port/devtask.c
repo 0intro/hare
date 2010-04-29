@@ -54,18 +54,17 @@ enum {
 #define QID(c, y) 	 ( ( (c)<<8) | (y))
 #define RQID(c, x, y) 	 ( ( ( (c)<< 16) | ( (x) << 8)) | (y))
 
-char* base = "/csrv/local";
+char* base = "/csrv/local/";
 char* validdir = "local";
 char* remmnt = "/csrv";
 char* parent = "parent";
 
-char ENoRemResrcs[] = "No remote resources available";
+char ENoRemoteResources[] = "No remote resources available";
 char ERemoteResFail[] = "remote reservation request failed";
 char ENoResourceMatch[] = "No resources matching request";
 char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
-char EBadstatus[] = "Invalid status";
 
 static int vflag = 9;		/* for debugging messages: control prints */
 
@@ -73,20 +72,13 @@ void
 _dprint(ulong debuglevel, char *fmt, ...)
 {
 	va_list args;
-	char *p;
 	int len = 0;
-	int hasnl = 0;
 	char s[255];
 	char *newfmt;
 
 	if(vflag<debuglevel)
 		return;
-	p = strchr(fmt, '\n');
-	newfmt = smprint("%ld %d %s :%q\n", time(0), getpid(), fmt, up->env->errstr);
-	if(p != nil){
-		p = strchr(newfmt, '\n');
-		*p = ' ';
-	}
+	newfmt = smprint("%ld %d %s", time(0), getpid(), fmt);
 	va_start(args, fmt);
 	len += vsnprint(s + len, sizeof s - len, newfmt, args);
 	va_end(args);
@@ -97,38 +89,38 @@ _dprint(ulong debuglevel, char *fmt, ...)
 
 long lastrrselected = 0;
 
-struct RemFile {
+struct RemoteFile {
 	int state;
-	int lsessid;
+	int local_session_id;
 	Chan *cfile;
-	Queue *asyncq;
+	Queue *async_queue;
 };
-typedef struct RemFile RemFile;
+typedef struct RemoteFile RemoteFile;
 
-struct RemResrc {
-	int lsessid;
-	int rsessid;
+struct RemoteResource {
+	int local_session_id;
+	int remote_session_id;
 	int state;
 	int inuse;
-	int subsess;
+	int sub_sessions;
 	/* List of all files in remote resource directory */
-	RemFile remotefiles[Nremchan];
+	RemoteFile remotefiles[Nremchan];
 	/* Next remote resource */
-	struct RemResrc *next;
+	struct RemoteResource *next;
 };
-typedef struct RemResrc RemResrc;
+typedef struct RemoteResource RemoteResource;
 
-struct RemJob {
+struct RemoteJob {
 	long rjobcount;				/* number of jobs in current session */
 	int x;
 	RWlock l;					/* protects state changes */
 	int rcinuse[Nremchan];
 	RWlock perfilelock[Nremchan];
-	Queue *asyncq_list[Nremchan];
-	RemResrc *first;
-	RemResrc *last;
+	Queue *async_queue_list[Nremchan];
+	RemoteResource *first;
+	RemoteResource *last;
 };
-typedef struct RemJob RemJob;
+typedef struct RemoteJob RemoteJob;
 
 enum {
 	Nplatform = 7,
@@ -180,7 +172,7 @@ struct Conv {
 	short killonclose;
 	short killed;
 	Rendez startr;
-	RemJob *rjob;		/* path to researved remote resource */
+	RemoteJob *rjob;		/* path to researved remote resource */
 };
 
 void
@@ -220,7 +212,7 @@ struct for_splice {
 };
 
 struct parallel_send_wrap {
-	RemFile *rf;
+	RemoteFile *rf;
 	void *p_a;
 	long p_n;
 	vlong p_offset;
@@ -247,7 +239,7 @@ timestamp (vlong stime)
 }
 
 static long
-getrjobcount(RemJob * rjob)
+getrjobcount(RemoteJob * rjob)
 {
 
 	long temp;
@@ -260,7 +252,7 @@ getrjobcount(RemJob * rjob)
 }
 
 static int
-getfileopencount(RemJob * rjob, int filetype)
+getfileopencount(RemoteJob * rjob, int filetype)
 {
 
 	int temp;
@@ -328,18 +320,17 @@ cmd3gen(Chan * c, int i, Dir * dp)
 
 /* supposed to generate top level directory structure for task */
 static int
-cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
+cmdgen (Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 {
 	Qid q;
 	Conv *cv;
 	Conv *myc;
 	char buf[KNAMELEN * 3];
 	long jc;
+	int ret;
 
-	USED(name);
-	USED(d);
-	USED(nd);
-
+/*	DPRINT(9,"inside cmdgen\n"); */
+	
 	if (s == DEVDOTDOT) {
 		switch (TYPE(c->qid)) {
 		case Qtopdir:
@@ -353,13 +344,224 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 				dp);
 			break;
 		case QLconrdir:		/* for remote resource bindings */
-			DPRINT(9,"cmdindex [%ld], rjobi [%ld]\n",
-				CONV(c->qid), RJOBI(c->qid));
-			snprint(buf, sizeof buf, "%ld", CONV(c->qid));
+//			DPRINT(9,"cmdindex [%ld], rjobi [%ld]\n",
+//				CONV(c->qid), RJOBI(c->qid));
+			snprint(buf, sizeof(buf), "%ld", CONV(c->qid));
 			cv = cmd.conv[CONV(c->qid)];
 			mkqid(&q, QID(CONV(c->qid), Qconvdir), 0, QTDIR);
 			devdir(c, q, buf, 0, cv->owner, DMDIR | 0555, dp);
 			break;
+		default:
+			panic("cmdgen %llux", c->qid.path);
+		}
+		DPRINT(9,"done cmdgen top\n");
+		return 1;
+	}
+	
+	switch (TYPE(c->qid)) {
+	case Qtopdir:
+		if (s >= 1) {
+			ret = -1;
+			break;
+		}
+		mkqid(&q, QID(0, Qcmd), 0, QTDIR);
+		//devdir(c, q, "local", 0, eve, DMDIR | 0555, dp);
+		devdir(c, q, "local", 0, up->env->user, DMDIR | 0555, dp);
+		ret = 1;
+		break;
+	case Qcmd:
+		if (s < cmd.nc) {	
+			cv = cmd.conv[s];
+			mkqid(&q, QID(s, Qconvdir), 0, QTDIR);
+			snprint(buf, sizeof(buf), "%d", s);
+			devdir(c, q, buf, 0, cv->owner, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		
+		s -= cmd.nc;
+		switch(s){
+		case 0:
+			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
+			devdir(c, q, "clone", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 1:
+			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
+			//devdir(c, q, "ctl", 0, eve, 0777, dp);
+			devdir(c, q, "ctl", 0, up->env->user, 0777, dp);
+			ret = 1;
+			break;
+		case 2:
+			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
+			devdir(c, q, "fs", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		case 3:
+			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
+			devdir(c, q, "net", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		case 4:
+			mkqid(&q, QID(0, Qarch), 0, QTFILE);
+			devdir(c, q, "arch", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 5:
+			mkqid(&q, QID(0, Qtopns), 0, QTDIR);
+			devdir(c, q, "ns", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 6:
+			mkqid(&q, QID(0, Qtopenv), 0, QTDIR);
+			devdir(c, q, "env", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		case 7:
+			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
+			devdir(c, q, "status", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		default :
+			ret = -1;
+			break;
+		}
+		break;
+		
+	case Qclonus:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
+			devdir(c, q, "clone", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qtopctl:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
+			//devdir(c, q, "ctl", 0, eve, 0777, dp);
+			devdir(c, q, "ctl", 0, up->env->user, 0777, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qtopstat:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
+			devdir(c, q, "status", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qlocalfs:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
+			devdir(c, q, "fs", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qlocalnet:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
+			devdir(c, q, "net", 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qarch:
+		if (s == 0) {
+			mkqid(&q, QID(0, Qarch), 0, QTFILE);
+			devdir(c, q, "arch", 0, eve, 0666, dp);
+			ret = 1;
+			break;
+		}
+		ret = -1;
+		break;
+	case Qconvdir:
+		myc = cmd.conv[CONV(c->qid)];
+/*		jc = getrjobcount(myc->rjob); */ /* not using because locking issue */
+		if (myc->rjob == nil ) {
+			jc = -2;
+		} else {
+			jc = myc->rjob->rjobcount;
+		}
+		if (s < jc) {
+			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
+			snprint(buf, sizeof (buf), "%d", s);
+			devdir(c, q, buf, 0, eve, DMDIR | 0555, dp);
+			ret = 1;
+			break;
+		}
+		if (jc > 0) {
+			s -= jc;
+		}
+		ret = cmd3gen(c, Qconvbase + s, dp);
+		break;
+	case Qdata:
+	case Qstderr:
+	case Qctl:
+	case Qstatus:
+	case Qwait:
+	case Qstdin:
+	case Qstdout:
+	case Qenv:
+	case Qns:
+	case Qargs:
+		ret = cmd3gen(c, TYPE(c->qid), dp);
+		break;
+	default :
+		ret = -1;
+	} /* end switch : */
+	
+/*	DPRINT(9,"Done with cmdgen with ret [%d]\n", ret);
+*/
+	return ret;
+}
+
+
+/* supposed to generate top level directory structure for task */
+static int
+cmdgen_old (Chan * c, char *name, Dirtab * d, int nd, int s, Dir * dp)
+{
+	Qid q;
+	Conv *cv;
+	Conv *myc;
+	char tmpbuff[KNAMELEN * 3];
+	long tmpjc;
+
+	USED(name);
+	USED(nd);
+	USED(d);
+
+	if (s == DEVDOTDOT) {
+		switch (TYPE(c->qid)) {
+		case Qtopdir:
+		case Qcmd:
+			mkqid(&q, QID(0, Qtopdir), 0, QTDIR);
+			devdir(c, q, "#T", 0, eve, DMDIR | 0555, dp);
+			break;
+		case Qconvdir:
+			mkqid(&q, QID(0, Qcmd), 0, QTDIR);
+			devdir(c, q, "local", 0, up->env->user, DMDIR | 0555, 
+									dp);
+			break;
+		case QLconrdir:		/* for remote resource bindings */
+			DPRINT(9,"cmdindex [%ld], rjobi [%ld]\n",
+					  CONV(c->qid), RJOBI(c->qid));
+
+			sprint(tmpbuff, "%ld", CONV(c->qid));
+			cv = cmd.conv[CONV(c->qid)];
+
+			mkqid(&q, QID(CONV(c->qid), Qconvdir), 0, QTDIR);
+			devdir(c, q, tmpbuff, 0, cv->owner, DMDIR | 0555, dp);
+			break;
+
 		default:
 			panic("cmdgen %llux", c->qid.path);
 		}
@@ -377,47 +579,54 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 		if (s < cmd.nc) {
 			cv = cmd.conv[s];
 			mkqid(&q, QID(s, Qconvdir), 0, QTDIR);
-			snprint(up->genbuf, sizeof up->genbuf, "%d", s);
+			sprint(up->genbuf, "%d", s);
 			devdir(c, q, up->genbuf, 0, cv->owner, DMDIR | 0555, dp);
 			return 1;
 		}
 		s -= cmd.nc;
-		switch(s){
-		case 0:
+		if (s == 0) {
 			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
 			devdir(c, q, "clone", 0, eve, 0666, dp);
 			return 1;
-		case 1:
+		}
+		if (s == 1) {
 			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
 			//devdir(c, q, "ctl", 0, eve, 0777, dp);
 			devdir(c, q, "ctl", 0, up->env->user, 0777, dp);
 			return 1;
-		case 2:
+		}
+		if (s == 2) {
 			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
 			devdir(c, q, "fs", 0, eve, DMDIR | 0555, dp);
 			return 1;
-		case 3:
+		}
+		if (s == 3) {
 			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
 			devdir(c, q, "net", 0, eve, DMDIR | 0555, dp);
 			return 1;
-		case 4:
+		}
+		if (s == 4) {
 			mkqid(&q, QID(0, Qarch), 0, QTFILE);
 			devdir(c, q, "arch", 0, eve, 0666, dp);
 			return 1;
-		case 5:
+		}
+		if (s == 5) {
 			mkqid(&q, QID(0, Qtopns), 0, QTDIR);
 			devdir(c, q, "ns", 0, eve, 0666, dp);
 			return 1;
-		case 6:
+		}
+		if (s == 6) {
 			mkqid(&q, QID(0, Qtopenv), 0, QTDIR);
 			devdir(c, q, "env", 0, eve, 0666, dp);
 			return 1;
-		case 7:
+		}
+		if (s == 7) {
 			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
 			devdir(c, q, "status", 0, eve, 0666, dp);
 			return 1;
 		}
 		return -1;
+
 	case Qclonus:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qclonus), 0, QTFILE);
@@ -425,6 +634,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qtopctl:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qtopctl), 0, QTFILE);
@@ -433,6 +643,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qtopstat:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qtopstat), 0, QTFILE);
@@ -440,6 +651,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qlocalfs:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qlocalfs), 0, QTDIR);
@@ -447,6 +659,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qlocalnet:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qlocalnet), 0, QTDIR);
@@ -454,6 +667,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qarch:
 		if (s == 0) {
 			mkqid(&q, QID(0, Qarch), 0, QTFILE);
@@ -461,19 +675,22 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 			return 1;
 		}
 		return -1;
+
 	case Qconvdir:
 		myc = cmd.conv[CONV(c->qid)];
-		//jc = getrjobcount(myc->rjob);
-		jc = myc->rjob->rjobcount;
-		if (s < jc) {
+		//tmpjc = getrjobcount(myc->rjob);
+		tmpjc = myc->rjob->rjobcount;
+		if (s < tmpjc) {
 			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
-			snprint(up->genbuf, sizeof up->genbuf, "%d", s);
+			sprint(up->genbuf, "%d", s);
 			devdir(c, q, up->genbuf, 0, eve, DMDIR | 0555, dp);
 			return 1;
 		}
-		if (jc > 0)
-			s -= jc;
+		if (tmpjc > 0)
+			s -= tmpjc;
+
 		return cmd3gen(c, Qconvbase + s, dp);
+
 	case Qdata:
 	case Qstderr:
 	case Qctl:
@@ -531,7 +748,7 @@ cmdstat(Chan * c, uchar * db, int n)
 static void
 procreadremote(void *a)
 {
-	RemFile *rf;
+	RemoteFile *rf;
 	Block *content = nil;
 
 	rf = a;
@@ -556,7 +773,7 @@ procreadremote(void *a)
 		}
 		/* end if */
 		/* Write data to queue */
-		qbwrite(rf->asyncq, content);
+		qbwrite(rf->async_queue, content);
 	}					/* end while : infinite */
 
 	DPRINT(9,"PRR[%s]:No more data to read\n", rf->cfile->name->s);
@@ -590,10 +807,11 @@ proc_splice(void *param)
 		if (ret <= 0) {
 			break;
 		}
-		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data %.*s\n",
+		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data %*s\n",
 			src->name->s, dst->name->s, ret, ret, buf);
 		a = buf;
 		while (ret > 0) {
+			incrap();
 			r = devtab[dst->type]->write(dst, a, ret, 0);
 			ret = ret - r;
 			a = a + r;
@@ -602,8 +820,7 @@ proc_splice(void *param)
 	} /* end while */
 	DPRINT(9,"%ld %d proc_splice closing [%s]->[%s] \n", time(0), getpid(), src->name->s,
 		dst->name->s);
-	/* write nothing to close the pipe */
-	devtab[dst->type]->write(dst, "\0", 0, 0);
+
 	cclose(src);
 	cclose(dst);
 	DPRINT(9,"%ld %d proc_splice complete \n",time(0), getpid());
@@ -615,8 +832,8 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
 {
 	Conv *cv;
 	int tmpfileuse;
-	RemResrc *tmprr;
-	RemFile *rf;
+	RemoteResource *tmprr;
+	RemoteFile *rf;
 	char buf[KNAMELEN * 3];
 	Chan *tmpchan;
 	int i;
@@ -680,7 +897,7 @@ cmdopen(Chan * c, int omode)
 	vlong stime;
 
 	stime = osusectime (); /* recording start time */
-	DPRINT(9,"cmdopen: open %s\n", c->name->s);
+	DPRINT(9,"trying to open [%s]\n", c->name->s);
 	perm = 0;
 	omode = openmode(omode);
 	switch (omode) {
@@ -700,7 +917,7 @@ cmdopen(Chan * c, int omode)
 		break;
 
 	case Qtopctl:
-		DPRINT(9, "cmdopen: opening ctl\n");
+		DPRINT (9, "opening ctl file\n");
 		break;
 
 	case Qarch:
@@ -736,7 +953,7 @@ cmdopen(Chan * c, int omode)
 		/* in case of clone, check if it is locked */
 		qlock(&cmd.l);
 		if (waserror()) {
-			DPRINT(9,"cmdopen: bye bye clone\n");
+			DPRINT(9,"bye bye clone\n");
 			qunlock(&cmd.l);
 			nexterror();
 		}
@@ -747,7 +964,7 @@ cmdopen(Chan * c, int omode)
 		if (cv == 0)
 			error(Enodev);
 		mkqid(&c->qid, QID(cv->x, Qctl), 0, QTFILE);
-		DPRINT(9,"cmdopen: clone open successful [%s]\n", c->name->s);
+		DPRINT(9,"clone open successful [%s]\n", c->name->s);
 		break;
 
 	case Qstatus:
@@ -763,7 +980,7 @@ cmdopen(Chan * c, int omode)
 		cv = cmd.conv[CONV(c->qid)];
 		qlock(&cv->l);
 		if (waserror()) {
-			DPRINT(9,"cmdopen: bye byte ctl\n");
+			DPRINT(9,"bye byte ctl\n");
 			qunlock(&cv->l);
 			qunlock(&cmd.l);
 			nexterror();
@@ -853,7 +1070,7 @@ cmdopen(Chan * c, int omode)
 } /* end function : cmdopen */
 
 static void
-freeremoteresource(RemResrc * rr)
+freeremoteresource(RemoteResource * rr)
 {
 	int i;
 	char *location;
@@ -866,7 +1083,7 @@ freeremoteresource(RemResrc * rr)
 				rr->remotefiles[i].cfile->name->s);
 			cclose(rr->remotefiles[i].cfile);
 			rr->remotefiles[i].cfile = nil;
-			rr->remotefiles[i].asyncq = nil;
+			rr->remotefiles[i].async_queue = nil;
 
 			/* unbind ??  */
 
@@ -877,10 +1094,10 @@ freeremoteresource(RemResrc * rr)
 }
 
 static void
-freeremotejobs(RemJob * rjob)
+freeremotejobs(RemoteJob * rjob)
 {
 	long i;
-	RemResrc *ppr, *tmp;
+	RemoteResource *ppr, *tmp;
 	if (rjob == nil)
 		return;
 
@@ -898,7 +1115,7 @@ freeremotejobs(RemJob * rjob)
 	}
 
 	for (i = 0; i < Nremchan; ++i) {
-		qfree(rjob->asyncq_list[i]);
+		qfree(rjob->async_queue_list[i]);
 	}
 	rjob->first = nil;
 	rjob->last = nil;
@@ -949,7 +1166,7 @@ static void
 remoteclose(Chan * c, int filetype, int rjcount)
 {
 	Conv *cc;
-	RemResrc *tmprr;
+	RemoteResource *tmprr;
 	int i;
 	int tmpfilec;
 
@@ -1100,54 +1317,62 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 {
 	long ret, i;
 	Conv *c;
-	long jc;
-	long nc,nb;
+	long tmpjc;
+	long ccount, bcount;
 	int filetype;
-	RemResrc *rr;
-	RemFile *rf;
+	RemoteResource *tmprr;
+	RemoteFile *rf;
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
-	jc = getrjobcount(c->rjob);
+
+	tmpjc = getrjobcount(c->rjob);
 	/* making sure that remote resources are allocated */
-	if (jc < 0) {
-		DPRINT(9,"conv %d resources not reserved\n", CONV(ch->qid));
+	if (tmpjc < 0) {
+		DPRINT(9,"resources not reserved\n");
 		error(ENOReservation);
 	}
 	DPRINT(9,"readfromallasync cname [%s]\n", ch->name->s);
-	if(TYPE(ch->qid) == Qdata)
+
+	if (TYPE(ch->qid) == Qdata) {
 		filetype = Qstdout - Qdata;
-	else
+	} else {
 		filetype = TYPE(ch->qid) - Qdata;
-	for(;;) {
+	}
+
+	while (1) {
 		rlock(&c->rjob->l);
-		rr = c->rjob->first;
+		tmprr = c->rjob->first;
 		runlock(&c->rjob->l);
-		nc = 0;
-		nb = 0;
-		for (i = 0; i < jc; i++) {
-			rf = &rr->remotefiles[filetype];
-			if(rf->state == 2)
+
+		ccount = 0;
+		bcount = 0;
+		for (i = 0; i < tmpjc; ++i) {
+			rf = &tmprr->remotefiles[filetype];
+			if (rf->state == 2) {
 				/* This thread is done */
-				nc++;
-			else
-				nb++;
+				++ccount;
+			} else {
+				++bcount;
+			}
 			/*
 			 * FIXME: should I lock following also in read mode
 			 * ??
 			 */
-			rr = rr->next;
+			tmprr = tmprr->next;
 		}
-		ret = qconsume(c->rjob->asyncq_list[filetype], a, n);
-		if (ret >= 0)
+
+		ret = qconsume(c->rjob->async_queue_list[filetype], a, n);
+		if (ret >= 0) {
 			return ret;
-		if (nc >= jc) {
-			DPRINT(9,"----readfromallasync fileclose [%ld]\n", nc);
+		}
+		if (ccount >= tmpjc) {
+			DPRINT(9,"----readfromallasync fileclose [%ld]\n", ccount);
 			/* as all nodes are close, return NOW */
 			return 0;
 		}
-	} 
-}
+	} /* end while : infinite */
+} /* end function : readfromallasync */
 
 static long
 readfromall(Chan * ch, void *a, long n, vlong offset)
@@ -1158,7 +1383,7 @@ readfromall(Chan * ch, void *a, long n, vlong offset)
 	Conv *c;
 	long tmpjc;
 	int filetype;
-	RemResrc *tmprr;
+	RemoteResource *tmprr;
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
@@ -1285,7 +1510,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	case Qstderr:
 		c = cmd.conv[CONV(ch->qid)];
 		if (c->rjob == nil) {
-			DPRINT(9,"conv %ulx read on released conv", CONV(ch->qid));
+			DPRINT(9,"resources released, as clone file closed\n");
 			error(EResourcesReleased);
 		}
 		jc = getrjobcount(c->rjob);
@@ -1301,6 +1526,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			break;
 		}
 		/* getting data locally */
+		DPRINT(9,"reading data locally\n");
 		fd = 1;
 		if (TYPE(ch->qid) == Qstderr)
 			fd = 2;
@@ -1308,17 +1534,17 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		qlock(&c->l);
 		if (c->fd[fd] == -1) {
 			qunlock(&c->l);
-			DPRINT(9,"fd %d is closed\n", fd);
+			DPRINT(9,"file descriptor is closed\n");
 			ret = 0;
 			break;
 		}
 		qunlock(&c->l);
 		osenter();
 		n = read(c->fd[fd], a, n);
-		DPRINT(9, "READ fd %d n %d %.*s\n", c->fd[fd], n, n, a);
 		osleave();
 		if (n < 0)
 			oserror();
+		DPRINT(9,"reading %ld locally done\n", n);
 		ret = n;
 		break;
 
@@ -1394,39 +1620,61 @@ Cmdtab cmdtab[] = {
 static void
 analyseremotenode(RemMount * rmt)
 {
-	char buf[128];
-	char *a[3];
-	char *s, *p;
+	char buf[100];
+	char buf2[100];
 	long offset;
 	long ret;
-	int n;
+	int i, len, j, k;
 	long hn, an;
 
 	initinfo(rmt->info);
-	/* XXX: FIXME! */
-	s = buf;
-	for(;;) {
-		ret = devtab[rmt->status->type]->read(rmt->status, buf, 30, offset);
-		DPRINT(9, "remnode: n %d %.*s\n", n, n, buf);
+
+	offset = 0;
+	while (1) {
+		/* read one line from Chan */
+		ret =
+			devtab[rmt->status->type]->read(rmt->status, buf, 
+			30, offset);
 		if (ret <= 0)
 			return;
-		p = strchr(buf, '\n');
-		if(p == nil)
+		for (i = 0; buf[i] != '\0' && buf[i] != '\n'; ++i);
+		if (buf[i] == '\0')
 			return;
-		*p = 0;
-		n = tokenize(buf, a, 3);
-		if(n != 3)
-			error(EBadstatus);
-		hn = lookup(a[1], oslist, Nos);
-		if(hn == 0)
-			error(EBadstatus);
-		an = lookup(a[2], platformlist, Nplatform);
-		if(an == 0)
-			error(EBadstatus);
-		rmt->info[hn][an] += atol(a[0]);
-		s = p + 1;
-	}
-}
+		if (buf[i] == '\n') {
+			buf[i] = '\0';
+		}
+		len = i;
+
+		/* parse it */
+
+		/* find host type */
+		for (j = 0, k = 0; buf[j] != ' '; ++j, ++k) {
+			buf2[k] = buf[j];
+		}
+		buf2[k] = '\0';
+		hn = lookup(buf2, oslist, Nos);
+
+		/* find arch type */
+		for (++j, k = 0; buf[j] != ' '; ++j, ++k) {
+			buf2[k] = buf[j];
+		}
+		buf2[k] = '\0';
+		an = lookup(buf2, platformlist, Nplatform);
+
+		/* find number of nodes */
+		for (++j, k = 0; buf[j] != '\0'; ++j, ++k) {
+			buf2[k] = buf[j];
+		}
+		buf2[k] = '\0';
+
+		/* update statistics */
+		rmt->info[hn][an] += atol(buf2);
+
+		/* prepare for next line */
+		offset += len + 1;
+
+	} /* end while : infinite */
+} /* end function : analyseremotenode */
 
 /*
  * verifies if specified location is indeed remote resource or not. and
@@ -1434,86 +1682,114 @@ analyseremotenode(RemMount * rmt)
  * responsibility to free the memory of path returned
  */
 static RemMount *
-validrr(char *mnt, char *os, char *arch)
+validaterr(char *location, char *os, char *arch)
 {
-	Dir *dirs;
-	Dir *d, *e;
+	Dir *dr;
+	Dir *tmpDr;
 	int hn, pn;
-	long i, n;
-	char *local = validdir;	/* for validation */
+	long i, count;
+	char *localName = validdir;	/* for validation */
+	char *parentName = parent;	/* for ignoring parent */
 	RemMount *ans;
 	char buf[KNAMELEN * 3];
 
 	if (waserror()) {
-		DPRINT(9,"can't verify %s: %r\n", mnt);
-		free(dirs);
+		DPRINT(9,"Cant verify Dir [%s] \n", location);
+		free(dr);
 		nexterror();
 	}
-	n = lsdir(mnt, &dirs);
-	if(n < 0)
-		error("invalid dir");
-	DPRINT(9,"remote dir[%s]= %ld entries\n", mnt, n);
-	e = d+n;
-	for(d = dirs; d != e; d++) {
-		DPRINT(9,"%ld [%s/%s]\n", d - dirs, mnt, d->name);
-		if (DMDIR & d->mode) {
-			DPRINT(9,"checking for dir[%s]\n", d->name);
-			if (strcmp(d->name, local) == 0)
+	count = lsdir(location, &dr);
+
+	DPRINT(9,"remote dir[%s]= %ld entries\n", location, count);
+	for (i = 0, tmpDr = dr; i < count; ++i, ++tmpDr) {
+		DPRINT(9,"%ld [%s/%s]\n", i, location, tmpDr->name);
+		if (DMDIR & tmpDr->mode) {
+			DPRINT(9,"checking for dir[%s]\n", tmpDr->name);
+			if (strcmp(tmpDr->name, localName) == 0) {
 				break;
-			if (strcmp(d->name, parent) == 0) {
-				DPRINT(9,"%s is parent dir, ignoring\n", d->name);
-					break;
+			}
+			if (strcmp(tmpDr->name, parentName) == 0) {
+				DPRINT(9,"this is parent dir, ignoring\n");
+				break;
 			}
 		}
 	}
-	free(dirs);
+	free(dr);
 
 	ans = (RemMount *) malloc(sizeof(RemMount));
-	n = strlen(mnt)+strlen(local)+1;
-	ans->path = (char *) malloc(n);
-	snprint(ans->path, n,"%s/%s", mnt, local);
+	ans->path = (char *) malloc(strlen(location) + strlen(localName) + 2);
+	snprint(ans->path, (strlen(location) + strlen(localName) + 2),
+		"%s/%s", location, localName);
 
-	if (d == e) {
-		DPRINT(9,"validrr: [%s] not found, returning\n", local);
+	if (i == count) {
+		DPRINT(9,"validaterr: [%s] not found, returning\n", localName);
 		free(ans->path);
 		free(ans);
 		poperror();
 		return nil;
 	}
-	DPRINT(9,"validrr: now  searching for clone file\n");
+	DPRINT(9,"validaterr: now  searching for clone file\n");
 
-	n = lsdir(ans->path, &dirs);
+	count = lsdir(ans->path, &dr);
 	poperror();
 
-	for (i = 0, d = dirs; i < n; i++, d++) {
-		if (d->mode&DMDIR  || strcmp(d->name, "clone") == 0)
-			continue;
-		snprint(buf, sizeof buf, "%s/%s", ans->path, "status");
-		ans->status = namec(buf, Aopen, OREAD, 0);
-		if (os == nil || os[0] == '*')
-			goto Found;	
-		hn = lookup(os, oslist, Nos);
-		if (hn == 0)
-			goto Error;		
-		analyseremotenode(ans);
-		if (arch == nil || arch[0] == '*')
-			for (i = 1; i < Nplatform; i++)
-				if (ans->info[hn][i] > 0)
-					goto Found;
-		pn = lookup(arch, platformlist, Nplatform);
-		if (pn == 0)
-			goto Error;	/* unknown arch */
-		if (ans->info[hn][pn] > 0) /* needed OS and arch type are present */
-			goto Found;
-		goto Error;
-	}
-Found:
-	free(dirs);
-	return ans;
-Error:
+	for (i = 0, tmpDr = dr; i < count; ++i, ++tmpDr) {
+
+		if ((!(DMDIR & tmpDr->mode)) &&
+			(strcmp(tmpDr->name, "clone") == 0)) {
+			/* not directory and name is "clone" */
+
+			/* open channel to status file */
+			snprint(buf, sizeof(buf), "%s/%s", ans->path, "status");
+			ans->status = namec(buf, Aopen, OREAD, 0);
+
+			/* verify if requested platform is available or not */
+
+			/* give priority to OS */
+			if (os == nil) {
+				free(dr);
+				return ans;		/* wildcard match */
+			}
+			if (os[0] == '*') {
+				free(dr);
+				return ans;		/* wildcard match */
+			}
+			hn = lookup(os, oslist, Nos);
+			if (hn == 0)
+				break;			/* unknown os */
+
+			analyseremotenode(ans);
+			if (arch == nil || arch[0] == '*') {
+				/* wild card for architecture */
+				for (i = 1; i < Nplatform; ++i) {
+					if (ans->info[hn][i] > 0) {
+						/*
+						 * needed OS is present for
+						 * some architecture
+						 */
+						free(dr);
+						return ans;
+					}
+				}
+			} /* end if : wildcard for architecture */
+			pn = lookup(arch, platformlist, Nplatform);
+			if (pn == 0)
+				break;			/* unknown arch */
+
+			if (ans->info[hn][pn] > 0) {
+				/* needed OS and arch type are present */
+				free(dr);
+				return ans;
+			}
+			/* needed OS and arch type not present */
+			break;
+		} /* end if : file is clone */
+	} /* end for : each entry in directory */
+
+	/* cleanup */
 	free(ans->path);
 	free(ans);
-	free(dirs);
+	free(dr);
 	return nil;
 }
 
@@ -1522,45 +1798,47 @@ static RemMount **
 findrr(int *validrc, char *os, char *arch)
 {
 	char *path = remmnt;
-	char file[KNAMELEN * 3];
-	RemMount *rm;
-	int n;
-	Dir *dirs;
-	Dir *d, *e;
+	char location[KNAMELEN * 3];
+	RemMount *tmp;
+	long count, i;
+	Dir *dr;
+	Dir *tmpDr;
 	RemMount **allremotenodes;
-	long rc;
+	long tmprc;
 
 	if (waserror()) {
-		DPRINT(9,"%s: %r\n", remmnt);
+		DPRINT(9,"Cant open %s\n", remmnt);
 		*validrc = 0;
-		free(dirs);
+		free(dr);
 		return nil;
 	}
-	n = lsdir(path, &dirs);
+	count = lsdir(path, &dr);
 	poperror();
-	allremotenodes = (RemMount **) malloc(sizeof(RemMount *) * (n + 1));
-	rc = 0;
-	allremotenodes[rc] = nil;
+	allremotenodes =
+		(RemMount **) malloc(sizeof(RemMount *) * (count + 1));
+	tmprc = 0;
+	allremotenodes[tmprc] = nil;
 
-	DPRINT(9,"findrr: remote entries: %ld\n", n);
-	e = dirs + n;
-	for (d = dirs; d != e; d++) {
-		snprint(file, sizeof file, "%s/%s", path, d->name);
-		DPRINT(9,"findrr: remloc %s isdir %d\n", file, d->mode&DMDIR);
+	DPRINT(9,"remote dir has %ld entries\n", count);
+	for (i = 0, tmpDr = dr; i < count; ++i, ++tmpDr) {
+		snprint(location, sizeof(location), "%s/%s", path, tmpDr->name);
+
+		DPRINT(9,"checking for remote location[%s]\n", location);
 		/* entry should be directory and should not be "local" */
-		if(!(d->mode&DMDIR) || strcmp(d->name, validdir) == 0 || strcmp(d->name, parent) == 0)
-			continue;
-		rm = validrr(file, os, arch);
-		if(rm == nil)
-			DPRINT(9, "findrr: invalid %s %s %s\n", file, os, arch);
-		if(rm == nil)
-			continue;
-		allremotenodes[rc++] = rm;
-		DPRINT(9,"findrr: resource [%s]\n", rm->path);
-	}
-	allremotenodes[rc] = nil;
-	*validrc = rc;
-	free(dirs);
+		if ((DMDIR & tmpDr->mode)
+			&& (strcmp(tmpDr->name, validdir) != 0)
+			&& (strcmp(tmpDr->name, parent) != 0)) {
+			tmp = validaterr(location, os, arch);
+			if (tmp != nil) {
+				allremotenodes[tmprc] = tmp;
+				++tmprc;
+				DPRINT(9,"Resource [%s]\n", tmp->path);
+			}
+		}
+	}							/* end for */
+	allremotenodes[tmprc] = nil;
+	*validrc = tmprc;
+	free(dr);
 	return allremotenodes;
 }
 
@@ -1568,98 +1846,99 @@ findrr(int *validrc, char *os, char *arch)
  * allocates single remote resource, can be executed in kproc
  */
 static void
-alloc1rr(void *info)
+allocatesinglerr(void *info)
 {
-	char data[128];
-	char report[16];
+	char data[100];
+	char report[10];
 	int len, ret;
-	RemResrc *rresrc;
-	RemFile *rfile;
-	int nj;
+	RemoteResource *r_resource;
+	RemoteFile *r_file;
+	int jcount;
 	int filetype;
 
 	filetype = Qctl - Qdata;
-	rresrc = (RemResrc *) info;
-	nj = rresrc->subsess;
-	rfile = &rresrc->remotefiles[filetype];
+	r_resource = (RemoteResource *) info;
+	jcount = r_resource->sub_sessions;
+	r_file = &r_resource->remotefiles[filetype];
 
-	report[0] = rfile->lsessid;
+	report[0] = r_file->local_session_id;
 	report[1] = 0;				/* indicates failure */
 	report[2] = 0;				/* indicate end of report */
 
 	if (waserror()) {
-		DPRINT(9,"alloc1rr: error sending res: %r\n");
+		DPRINT(9,"#### error in sending reservation request to remote\n");
 		/* report failure */
-		qwrite(rfile->asyncq, report, 2);
+		incrap();
+		qwrite(r_file->async_queue, report, 2);
 		pexit("", 0);
 	}
 	/* send reservation request */
-	snprint(data, sizeof(data), "res %d", nj);
+	snprint(data, sizeof(data), "res %d", jcount);
 	len = strlen(data);
 
-	ret = devtab[rfile->cfile->type]->write(rfile->cfile, data, len, 0);
+	ret = devtab[r_file->cfile->type]->write(r_file->cfile, data, len, 0);
 	if (ret != len) {
-		DPRINT(9,"alloc1rr: res write size(%d) returned [%d]: %r\n",
+		DPRINT(9,"#### ERR : res write size(%d) returned [%d]\n",
 			len, ret);
 		/* report failure */
-		qwrite(rfile->asyncq, report, 2);
+		incrap();
+		qwrite(r_file->async_queue, report, 2);
 		pexit("", 0);
 	}
 	poperror();
 
-	rfile->state = 1;
-	rresrc->inuse = 1;
+	r_file->state = 1;
+	r_resource->inuse = 1;
 
 	/* report success */
 	report[1] = 1;				/* indicates success */
-	qwrite(rfile->asyncq, report, 2);
-	DPRINT(9,"alloc1rr: done with thread [%d]\n", rfile->lsessid);
+	incrap();
+	qwrite(r_file->async_queue, report, 2);
+	DPRINT(9,"#### done with thread [%d]\n", r_file->local_session_id);
 	pexit("", 0);
 	return;
-} /* end function : alloc1rr */
+} /* end function : allocatesinglerr */
 
-/* allocates memory and initialize the RemResrc */
-RemResrc *
-allocrr(RemJob * rjob, int subsess, int rrn)
+/* allocates memory and initialize the RemoteResource */
+RemoteResource *
+allocate_remote_resource(RemoteJob * rjob, int sub_sessions, int rrnumber)
 {
-	RemResrc *pp;
-	RemFile *f;
+	RemoteResource *pp;
 	int i;
-	pp = malloc(sizeof(RemResrc));
+	pp = malloc(sizeof(RemoteResource));
 	pp->next = nil;
 	for (i = 0; i < Nremchan; ++i) {
-		f = &pp->remotefiles[i];
-		f->cfile = nil;
-		f->asyncq = rjob->asyncq_list[i];
-		f->state = 0;
-		f->lsessid = rrn;
+		pp->remotefiles[i].cfile = nil;
+		pp->remotefiles[i].async_queue = rjob->async_queue_list[i];
+		pp->remotefiles[i].state = 0;
+		pp->remotefiles[i].local_session_id = rrnumber;
 	}
-	pp->lsessid = rrn;
-	pp->rsessid = -1;
-	pp->subsess = subsess;
+	pp->local_session_id = rrnumber;
+	pp->remote_session_id = -1;
+	pp->sub_sessions = sub_sessions;
 	pp->state = 0;
 	return pp;
 }
 
 /* does multiple remote reservation in parallel */
 int
-parallelres(char *localpath, RemMount ** rnodelist, int validrc,
-Conv * c, int nres, int first, int others)
+parallelres(char *localpath, RemMount ** remote_node_list, int validrc,
+Conv * c, int resno, int first, int others)
 {
-	RemJob *rjob;
-	RemResrc *rr;
-	RemResrc *prev;
+	RemoteJob *rjob;
+	RemoteResource *rr;
+	RemoteResource *prev;
 	char *selected;
-	long jc;
-	char buf[128];
-	char lsesspath[KNAMELEN * 3];
-	char remsesspath[KNAMELEN * 3];
-	char rctlpath[KNAMELEN * 3];
+	long tmpjc;
+	char buf[100];
+	char local_session_path[KNAMELEN * 3];
+	char remote_session_path[KNAMELEN * 3];
+	char remote_ctl_path[KNAMELEN * 3];
 	int i;
 	int flag;
 	int filetype;
 	int ret;
-	Block *b;
+	Block *content;
 
 	rjob = c->rjob;
 	/* error checking */
@@ -1667,23 +1946,25 @@ Conv * c, int nres, int first, int others)
 		DPRINT(9,"resources released, as clone file closed\n");
 		error(EResourcesReleased);
 	}
-	DPRINT(9,"parallelres: %s %d %d %d\n", localpath, nres, first, others);
+	DPRINT(9,"parallelres(%s, %d, %d, %d)\n",
+		localpath, resno, first, others);
 
 	/* I think these errors should be checked much before */
-	jc = getrjobcount(rjob);
-	if (jc == -2) {
-		DPRINT(9,"parallelres: resources released, as clone file closed\n");
+	tmpjc = getrjobcount(rjob);
+	if (tmpjc == -2) {
+		DPRINT(9,"resources released, as clone file closed\n");
 		error(EResourcesReleased);
 	}
-	if (jc != -1) {
-		DPRINT(9,"parallelres: already in use\n");
+	if (tmpjc != -1) {
+		DPRINT(9,"already in use\n");
 		error(EResourcesINUse);
 	}
 	/* handle all failures */
 	if (waserror()) {
-		DPRINT(9,"parallelres: could not allocate needed rmt resources\n");
+		DPRINT(9,"Could not allocate needed rmt resources\n");
+
 		rjob->rjobcount = -1;
-		/* TODO: I should also release the RemResrc memory here */
+		/* TODO: I should also release the RemoteResource memory here */
 		wunlock(&rjob->l);
 		qunlock(&c->l);
 		nexterror();
@@ -1698,42 +1979,42 @@ Conv * c, int nres, int first, int others)
 	/* create asynce_queue_list */
 	for (i = 0; i < Nremchan; ++i) {
 		rjob->rcinuse[i] = 0;
-		rjob->asyncq_list[i] = qopen(1024, 0, nil, 0);
+		rjob->async_queue_list[i] = qopen(1024, 0, nil, 0);
 	}
 
-	/* allocate memory and initialize RemResrc */
-	rr = allocrr(rjob, first, 0);
+	/* allocate memory and initialize RemoteResource */
+	rr = allocate_remote_resource(rjob, first, 0);
 	rjob->first = rr;
 	prev = rr;
-	for (i = 1; i < nres; ++i) {
-		rr = allocrr(rjob, others, i);
+	for (i = 1; i < resno; ++i) {
+		rr = allocate_remote_resource(rjob, others, i);
 		prev->next = rr;
 		prev = rr;
 	}
 	rjob->last = rr;
 
 	/* set the remote job count */
-	rjob->rjobcount = nres;
+	rjob->rjobcount = resno;
 
 	filetype = Qctl - Qdata;
 	/* clear any old notifications from queue */
-	qflush(rjob->asyncq_list[filetype]);
+	qflush(rjob->async_queue_list[filetype]);
 	rr = rjob->first;
-	for (i = 0; i < nres; ++i) {
+	for (i = 0; i < resno; ++i) {
 
 		/* find which remote resource to use */
-		if (rnodelist == nil) {
+		if (remote_node_list == nil) {
 			selected = base;
 		} else {
 			lastrrselected = (lastrrselected + 1) % validrc;
-			selected = rnodelist[lastrrselected]->path;
+			selected = remote_node_list[lastrrselected]->path;
 		}
 
-		snprint(lsesspath, sizeof lsesspath, "%s/%d", localpath,
-			rr->lsessid);
-		snprint(rctlpath, sizeof rctlpath, "%s/clone", selected);
+		snprint(local_session_path, sizeof(local_session_path), "%s/%d", localpath,
+			rr->local_session_id);
+		snprint(remote_ctl_path, sizeof(remote_ctl_path), "%s/%s", selected, "clone");
 
-		DPRINT(9,"parallelres: creating session id [%s]\n", lsesspath);
+		DPRINT(9,"creating session id [%s]\n", local_session_path);
 
 		/*
 		 * quickfix as calls like namec and kbind are not working
@@ -1741,63 +2022,63 @@ Conv * c, int nres, int first, int others)
 		 */
 		if (waserror()) {
 			/* FIXME : following warning msg is incorrect */
-			DPRINT(9,"parallelres: namec failed\n");
+			DPRINT(9,"namec failed\n");
 			nexterror();
 		}
-		DPRINT(9,"parallelres: namec %s\n", rctlpath);
-		rr->remotefiles[filetype].cfile = namec(rctlpath, 
+		DPRINT(9,"before namec on [%s]\n", remote_ctl_path);
+		rr->remotefiles[filetype].cfile = namec(remote_ctl_path, 
 			Aopen, ORDWR, 0);
-		DPRINT(9,"parallelres: namec successful\n");
+		DPRINT(9,"namec successful\n");
 		poperror();
 
 		if (waserror()) {
-			DPRINT(9,"parallelres: could not bind remote and local resource\n");
+			DPRINT(9,"could not bind remote and local resource\n");
 			error(ENOReservation);
 		}
-		b = devbread(rr->remotefiles[filetype].cfile, 10, 0);
+		content = devbread(rr->remotefiles[filetype].cfile, 10, 0);
 
-		if (BLEN(b) == 0) {
+		if (BLEN(content) == 0) {
 			error(ENOReservation);
 		}
-		DPRINT(9,"parallelres: clone returned %ld data [%s]\n",
-			BLEN(b), (char *) b->rp);
+		DPRINT(9,"clone returned %ld data [%s]\n",
+			BLEN(content), (char *) content->rp);
 
-		b->rp[BLEN(b)] = 0;
-		rr->rsessid = atol((char *) b->rp);
+		content->rp[BLEN(content)] = 0;
+		rr->remote_session_id = atol((char *) content->rp);
 
 		/* creating remote session paths */
-		snprint(remsesspath, sizeof(remsesspath), "%s/%d", selected,
-			rr->rsessid);
+		snprint(remote_session_path, sizeof(remote_session_path), "%s/%d", selected,
+			rr->remote_session_id);
 
 		/* bind remote resource on local dir. */
-		DPRINT(9,"parallelres: binding r[%s]->l[%s]\n", remsesspath,
-			lsesspath);
-		kbind(remsesspath, lsesspath, MREPL);
+		DPRINT(9,"binding r[%s]->l[%s]\n", remote_session_path,
+			local_session_path);
+		kbind(remote_session_path, local_session_path, MREPL);
 		poperror();
 
-		freeb(b);
+		freeb(content);
 
 		/* create kprocs for each job */
-		snprint(buf, sizeof(buf), "ctlProc_%d__", rr->lsessid);
-		//alloc1rr(pp);
-		kproc(buf, alloc1rr, rr, 0);
+		snprint(buf, sizeof(buf), "ctlProc_%d__", rr->local_session_id);
+		//allocatesinglerr(pp);
+		kproc(buf, allocatesinglerr, rr, 0);
 		rr = rr->next;
-		DPRINT(9,"parallelres: allocated one session [%d]\n", i);
+		DPRINT(9,"allocated one session [%d]\n", i);
 	} /* end for : for each session resource */
 
 	/* ensure that resources are properly allocated */
 	flag = 0;
-	for (i = 0; i < nres; ++i) {
-		ret = qread(rjob->asyncq_list[filetype], buf, 2);
+	for (i = 0; i < resno; ++i) {
+		ret = qread(rjob->async_queue_list[filetype], buf, 2);
 		if (ret != 2) {
 			++flag;
-			DPRINT(9,"parallelres: qread on ctl buf failed\n");
+			DPRINT(9,"qread on ctl buf failed\n");
 		} else {
 			if (buf[1] != 1) {
 				++flag;
-				DPRINT(9,"parallelres: resource allocation for [%d] failed\n", buf[0]);
+				DPRINT(9,"resource allocation for [%d] failed\n", buf[0]);
 			} else {
-				DPRINT(9,"parallelres: resource allocation for [%d] successful\n", buf[0]);
+				DPRINT(9,"resource allocation for [%d] successful\n", buf[0]);
 			}
 		}
 	} /* end for : for each resource */
@@ -1813,12 +2094,12 @@ Conv * c, int nres, int first, int others)
 
 	/* report failure */
 	if (flag > 0) {
-		DPRINT(9,"parallelres: resource allocation failed for [%d] times\n", flag);
+		DPRINT(9,"resource allocation failed for [%d] times\n", flag);
 		/* FIXME: release half allocated resources */
 		error(ERemoteResFail);
 	}
-	return nres;
-}
+	return resno;
+} /* end function : parellelres */
 
 
 /* frees the list of remote mounts */
@@ -2057,7 +2338,7 @@ p_send2one(void *param)
 {
 	long ret;
 	struct parallel_send_wrap *psw;
-	RemFile *rf;
+	RemoteFile *rf;
 	void *a;
 	long n;
 	vlong offset;
@@ -2071,42 +2352,45 @@ p_send2one(void *param)
 	offset = psw->p_offset;
 	free(psw);
 
-	report[0] = rf->lsessid;
+	report[0] = rf->local_session_id;
 	report[1] = 0;				/* indicates failure */
 	report[2] = 0;				/* indicate end of report */
 
 	if (waserror()) {
 		DPRINT(9,"###p_send2one[%d]: error in sending write\n",
-			rf->lsessid);
+			rf->local_session_id);
 		/* report failure */
-		qwrite(rf->asyncq, report, 2);
+		incrap();
+		qwrite(rf->async_queue, report, 2);
 		pexit("", 0);
 	}
 	DPRINT(9,"###p_send2one: started\n");
 	/* FIXME : lock the file to be used */
 
-	DPRINT(9,"###p_send2one[%d]: about to write\n", rf->lsessid);
+	DPRINT(9,"###p_send2one[%d]: about to write\n", rf->local_session_id);
 
 	/* do actual write */
+	incrap();
 	ret = devtab[rf->cfile->type]->write(rf->cfile, a, n, offset);
 
-	DPRINT(9,"###p_send2one[%d]: write done\n", rf->lsessid);
+	DPRINT(9,"###p_send2one[%d]: write done\n", rf->local_session_id);
 
 	if (ret != n) {
 		/* problem: all bytes are not written, report failure */
 		DPRINT(9,"###p_send2one[%d]:wrot %ld instd of %ld bytes\n",
-			rf->lsessid, ret, n);
+			rf->local_session_id, ret, n);
 		/* report failure */
-		qwrite(rf->asyncq, report, 2);
+		incrap();
+		qwrite(rf->async_queue, report, 2);
 		pexit("", 0);
 	}
 	poperror();
 
 	/* report success */
 	report[1] = 1;				/* indicates success */
-	qwrite(rf->asyncq, report, 2);
+	qwrite(rf->async_queue, report, 2);
 	DPRINT(9,"###p_send2one[%d]:  success wrot %ld bytes\n",
-		rf->lsessid, ret);
+		rf->local_session_id, ret);
 	pexit("", 0);
 	return;
 } /* end function : p_send2one */
@@ -2122,7 +2406,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 	int i, ret;
 	Conv *c;
 	long tmpjc;
-	RemResrc *rr;
+	RemoteResource *rr;
 	int filetype;
 	char buf[100];
 	int flag;
@@ -2155,7 +2439,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 	/* data should be sent to all resources */
 	wlock(&c->rjob->l);
 	rr = c->rjob->first;
-	qflush(c->rjob->asyncq_list[filetype]);
+	qflush(c->rjob->async_queue_list[filetype]);
 	wunlock(&c->rjob->l);
 
 	for (i = 0; i < tmpjc; ++i) {
@@ -2169,7 +2453,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 		psw->p_offset = offset;
 
 		/* create kproc to do the write */
-		snprint(buf, sizeof(buf), "send2allProc_%d_%d__", c->x, rr->lsessid);
+		snprint(buf, sizeof(buf), "send2allProc_%d_%d__", c->x, rr->local_session_id);
 		//p_send2one(psw);
 		kproc(buf, p_send2one, psw, 0);
 
@@ -2183,7 +2467,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 	/* FIXME: lock the filetype for remote resources */
 	flag = 0;
 	for (i = 0; i < tmpjc; ++i) {
-		ret = qread(c->rjob->asyncq_list[filetype], buf, 2);
+		ret = qread(c->rjob->async_queue_list[filetype], buf, 2);
 		if (ret != 2) {
 			++flag;
 			DPRINT(9,"qread on ctl buf failed\n");
@@ -2332,7 +2616,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 
 	stime = osusectime (); /* recording start time */
 	USED(offset);
-	DPRINT(9,"cmdwrite: write %s\n", ch->name->s);
+	DPRINT(9,"write in file [%s]\n", ch->name->s);
 	ret = n;				/* for default return value */
 
 	switch (TYPE(ch->qid)) {
@@ -2340,53 +2624,57 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		error(Eperm);
 
 	case Qtopctl:
-		DPRINT(9, "cmdwrite: topctl\n");
+		DPRINT(9, "came here\n");
 		cb = parsecmd(a, n);
-		DPRINT(9, "cmdwrite: cmd arg[%d] done [%s]\n", cb->nf, a);
+		DPRINT(9, "cmd arg[%d] done [%s]\n", cb->nf, a);
 		ct = lookupcmd(cb, ctlcmdtab, nelem(ctlcmdtab));
 		switch (ct->index) {
 		default:
 			error(Eperm);
+
 		case CTLDebug:
 			/* two statements so that atlease one will be shown */
-			DPRINT(9,"cmdwrite: setting debug to %d\n", atoi(cb->f[1]));
+			DPRINT(9,"setting debug to %d\n", atoi(cb->f[1]));
 			vflag = atoi(cb->f[1]);
-			DPRINT(9,"cmdwrite: setting debug to %d\n", vflag);
+			DPRINT(9,"setting debug to %d\n", vflag);
 			break;
-		}
+		} /* end switch : Qtopctl commands  */
 		break;
+
 	case Qctl:
+		/* find no. of remote jobs running */
 		c = cmd.conv[CONV(ch->qid)];
 		jc = getrjobcount(c->rjob);
+
 		if (c->rjob == nil) {
-			DPRINT(9,"cmdwrite: resources released, as clone file closed\n");
+			DPRINT(9,"resources released, as clone file closed\n");
 			error(EResourcesReleased);
 		}
 		s = (char *) a;
 		s[n] = 0;
 		cb = parsecmd(s, n);
 		if (waserror()) {
-			DPRINT(9,"cmdwrite: screw you cmd buffer!: %r\n");
+			DPRINT(9,"screw you cmd buffer!\n");
 			//free(cb);
 			//FIXME:        something bad happening
 			/* send the actual error code back */
 			error("CTL request failed");
 		}
-		DPRINT(1,"cmdwrite: cmd arg[%d] done [%s]\n", cb->nf, a);
+		DPRINT(1,"cmd arg[%d] done [%s]\n", cb->nf, a);
 		ct = lookupcmd(cb, cmdtab, nelem(cmdtab));
 		switch (ct->index) {
 		case CMres:
-			DPRINT(9,"cmdwrite: reserving resources %s \n", cb->f[1]);
+			DPRINT(9,"reserving resources %s \n", cb->f[1]);
 			resNo = atol(cb->f[1]);
-			DPRINT(9,"cmdwrite: reserving resources %s [%ld]\n", cb->f[1], resNo);
+			DPRINT(9,"reserving resources %s [%ld]\n", cb->f[1], resNo);
 
 			if (resNo < 0) {
 				/* negative value for reservation is invalid */
-				DPRINT(9,"cmdwrite: err: negative error value: %r\n");
+				DPRINT(9,"Error: negative error value\n");
 				error(Eperm);
 			}
 			if (jc != -1) {
-				DPRINT(9,"cmdwrite: resource already in use\n");
+				DPRINT(9,"resource already in use\n");
 				error(Einuse);
 			}
 			os = nil;
@@ -2403,18 +2691,18 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				break;
 			}
 			groupres(ch, resNo, os, arch);
-			DPRINT(9,"cmdwrite: reservation done\n");
+			DPRINT(9,"Reservation done\n");
 			break;
 
 		case CMexec:
-			DPRINT(9,"cmdwrite: nremote res [%ld]\n", jc);
+			DPRINT(9,"no of remote res are [%ld]\n", jc);
 			if (jc < -1) {
-				DPRINT(9,"cmdwrite: res failed\n");
+				DPRINT(9,"previous res command failed\n");
 				error(ENOReservation);
 			}
 			/* request for execution of command */
 			if (jc == -1) {
-				DPRINT(9,"cmdwrite: no reservation done\n");
+				DPRINT(9,"No reservation done\n");
 				/* local execution request */
 				preparelocalexecution(c, nil, nil);
 				jc = 0;
@@ -2422,43 +2710,43 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			}
 			if (jc == 0) {
 				/* local execution request */
-				DPRINT(9,"cmdwrite: executing cmd locally\n");
+				DPRINT(9,"executing cmd locally\n");
 				dolocalexecution(c, cb);
 			} else {
-				DPRINT(9,"cmdwrite: executing command remotely\n");
+				DPRINT(9,"executing cammand remotely\n");
 				ret = p_send2all(ch, a, n, offset);
-				DPRINT(9,"cmdwrite: remote command done\n");
+				DPRINT(9,"executing cammand - done\n");
 			}
 			break;
 
 		case CMkillonclose:
 			if (jc < 0) {
-				DPRINT(9,"cmdwrite: no reservation done\n");
+				DPRINT(9,"No reservation done\n");
 				error(ENOReservation);
 				break;
 			}
 			if (jc == 0) {
 				/* local execution request */
-				DPRINT(9,"cmdwrite: locals are kill on close\n");
+				DPRINT(9,"\n");
 				c->killonclose = 1;
 				break;
 			}
 			ret = p_send2all(ch, a, n, offset);
-			DPRINT(9,"cmdwrite: local killonclose done\n");
+			DPRINT(9,"executing cammand - done\n");
 			break;
 
 		case CMkill:
 			if (jc < 0) {
-				DPRINT(9,"cmdwrite: no reservation done\n");
+				DPRINT(9,"No reservation done\n");
 				error(ENOReservation);
 				break;
 			}
 			if (jc == 0) {
 				/* local execution request */
-				DPRINT(9,"cmdwrite: executing kill locally\n");
+				DPRINT(9,"executing kill locally\n");
 				qlock(&c->l);
 				if (waserror()) {
-					DPRINT(9,"cmdwrite: we aren't good killers: %r\n");
+					DPRINT(9,"we aren't good killers\n");
 					qunlock(&c->l);
 					nexterror();
 				}
@@ -2471,17 +2759,17 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				break;
 			}
 			ret = p_send2all(ch, a, n, offset);
-			DPRINT(9,"cmdwrite: kill done\n");
+			DPRINT(9,"executing cammand - done\n");
 			break;
 
 		case CMsplice:
 			if (jc < 0) {
-				DPRINT(9,"cmdwrite: no reservation done\n");
+				DPRINT(9,"No reservation done\n");
 				error(ENOReservation);
 				break;
 			}
 			if (waserror()) {
-				DPRINT(9,"cmdwrite: splice failed: %r\n");
+				DPRINT(9,"splice failed %r\n");
 				nexterror();
 			}
 			/* find the path to stdio file */
@@ -2502,16 +2790,16 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			}
 			if (jc == 0) {
 				/* local execution request */
-				DPRINT(9,"cmdwrite: executing dir locally\n");
+				DPRINT(9,"executing CMdir locally\n");
 				kstrdup(&c->dir, cb->f[1]);
 				break;
 			}
 			ret = p_send2all(ch, a, n, offset);
-			DPRINT(9,"cmdwrite: dir done\n");
+			DPRINT(9,"executing cammand - done\n");
 			break;
 
 		default:
-			DPRINT(9,"cmdwrite: error : wrong command type\n");
+			DPRINT(9,"Error : wrong command type\n");
 			error(Eunknown);
 			break;
 
@@ -2527,11 +2815,11 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		jc = getrjobcount(c->rjob);
 
 		if (c->rjob == nil) {
-			DPRINT(9,"cmdwrite: resources already released\n");
+			DPRINT(9,"resources released, as clone file closed\n");
 			error(EResourcesReleased);
 		}
 		if (jc < 0) {
-			DPRINT(9,"cmdwrite: no reservation\n");
+			DPRINT(9,"No reservation done\n");
 			error(ENOReservation);
 			break;
 		}
@@ -2545,17 +2833,19 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		qlock(&c->l);
 		if (c->fd[0] == -1) {
 			qunlock(&c->l);
-			DPRINT(9, "cmdwrite: can't dial 8675309 %r\n");
-			// this is the proper behavior, but I need to work more on this. 
+			DPRINT(9, "can't dial 8675309 %r\n");
 			error(Ehungup);
 		}
 		qunlock(&c->l);
 		osenter();
+		incrap();
 		ret = write(c->fd[0], a, n);
-		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d %.*s\n", c->fd[0], ret, n, n, a);
+	
+		DPRINT(8,"%d WRITEFD %d ret %d %*s\n", getpid(), c->fd[0], ret, n, a);
+		incrap();
 		osleave();
 		if (ret == 0){
-			DPRINT(9, "cmdwrite: No worry no bytes: %r\n");
+			DPRINT(9, "No worry no bytes\n");
 			error(Ehungup);
 		}
 		if (ret < 0) {
@@ -2563,13 +2853,13 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			 * XXX perhaps should kill writer "write on
 			 * closed pipe" here, 2nd time around?
 			 */
-			 DPRINT(9,"cmdwrite: mr pipes is not happy %d: %r\n", ret);
+			 DPRINT(9,"mr pipes is not happy %d\n", ret);
 			oserror();
 		}
 		break;
-	}
+	} /* end switch : on filename */
 
-	DPRINT(1,"cmdwrite: %s wrote %ld in %uld\n", ch->name->s, ret, timestamp(stime));
+	DPRINT(1,"write on [%s] of [%ld] bytes complete in %uld\n", ch->name->s, ret, timestamp(stime));
 	return ret;
 }
 
@@ -2589,7 +2879,7 @@ cmdwstat(Chan * c, uchar * dp, int n)
 		if (d == nil)
 			error(Enomem);
 		if (waserror()) {
-			DPRINT(9,"cmdwstat: error has errors!\n");
+			DPRINT(9,"error has errors!\n");
 			free(d);
 			nexterror();
 		}
@@ -2660,7 +2950,7 @@ cmdclone(char *user)
 	/*
 	 * allocating structure to store info about remote job resources
 	 */
-	c->rjob = malloc(sizeof(RemJob));
+	c->rjob = malloc(sizeof(RemoteJob));
 	wlock(&c->rjob->l);
 	c->rjob->x = c->x;
 	c->rjob->rjobcount = -1;
@@ -2669,7 +2959,7 @@ cmdclone(char *user)
 	++ccount;
 	wunlock(&c->rjob->l);
 	qunlock(&c->l);
-	DPRINT(9,"cmdclone: success\n");
+	DPRINT(9,"cmdclone successful \n");
 	return c;
 }
 
@@ -2684,9 +2974,9 @@ cmdproc(void *a)
 
 	c = a;
 	qlock(&c->l);
-	DPRINT(9,"cmdproc: f[0]=%q f[1]=%q\n", c->cmd->f[0], c->cmd->f[1]);
+	DPRINT(9,"f[0]=%q f[1]=%q\n", c->cmd->f[0], c->cmd->f[1]);
 	if (waserror()) {
-		DPRINT(9,"cmdproc: failed: %q\n", up->env->errstr);
+		DPRINT(9,"failed: %q\n", up->env->errstr);
 		kstrdup(&c->error, up->env->errstr);
 		//c->state = "Done";
 		c->state = "Fail";
@@ -2888,14 +3178,14 @@ readchandir(Chan * dirChan, Dir ** d)
 long
 lsdir(char *name, Dir ** d)
 {
-	int n;
+	long count;
 	volatile struct {
 		Chan *cc;
 	} 
 	rock;
 
 	if (waserror()) {
-		DPRINT(9,"can't open %s: %r\n", name);
+		DPRINT(9,"Cant open [%s]\n", name);
 		nexterror();
 	}
 	rock.cc = namec(name, Aopen, OREAD, 0);
@@ -2907,13 +3197,13 @@ lsdir(char *name, Dir ** d)
 		nexterror();
 	}
 
-	n = readchandir(rock.cc, d);
+	count = readchandir(rock.cc, d);
 	DPRINT(9,"done readchandir\n");
 	cclose(rock.cc);
 	DPRINT(9,"freed cc\n");
 
 	poperror();
-	return n;
+	return count;
 }
 
 /*
