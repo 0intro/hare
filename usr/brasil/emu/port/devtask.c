@@ -1311,6 +1311,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			qunlock(&c->l);
 			DPRINT(9,"fd %d is closed\n", fd);
 			ret = 0;
+			error ("reading from closed file");
 			break;
 		}
 		qunlock(&c->l);
