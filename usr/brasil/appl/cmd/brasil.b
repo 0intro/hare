@@ -94,7 +94,7 @@ redirectoutput(s : chan of int)
 # Establish a backmount for the host
 # Also serves as an external export right now
 # and blocks?
-backmountexport(mon: int, debug: int)
+backmountexport(srvpath: string, mon: int, debug: int)
 {
 	# export result to host (via srv on Plan 9 or port on UNIX)
 	if(sys->bind("#₪", "/srv", sys->MREPL|sys->MCREATE) < 0) {
@@ -102,8 +102,8 @@ backmountexport(mon: int, debug: int)
 	} else {
 		if(debug)
 			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export / &");
-		sys->fprint(sys->fildes(2), "creating srv export\n");
-		fd := sys->create("/srv/csrv", Sys->ORDWR, 8r600);
+		sys->fprint(sys->fildes(2), "creating srv export %s\n", srvpath);
+		fd := sys->create(srvpath, Sys->ORDWR, 8r600);
 		if(fd == nil)
 			sys->fprint(sys->fildes(2), "creation of srv export failed: %r\n");
 		if(mon) {
@@ -123,6 +123,7 @@ init()
 	logging := 0;
 	mon := 0;
 	debug := 0;
+	srvpath := "/srv/csrv";
  
 	if (sh == nil)
 		sys->fprint(sys->fildes(2), "Couldn't load shell module\n");
@@ -162,6 +163,8 @@ init()
 					mon = 1;
 				'h' =>			# fs export addr
 					fsaddr = arg->arg();
+				'M' =>
+					srvpath = arg->arg();
 				'g' =>			# setup an inbound ssh gateway duct
 					gateway++;	
 				* =>
@@ -205,10 +208,10 @@ init()
 		"csrvlite" =>
 			sys->fprint(sys->fildes(2), "csrvlite\n");
 			sh->system(nil, "/dis/csrv-lite.dis");
-			backmountexport(mon, debug);
+			backmountexport(srvpath, mon, debug);
 		"terminal" =>
 			# TODO: initiate ssh duct to remote system
-			backmountexport(mon, debug);
+			backmountexport(srvpath, mon, debug);
 		* => # unknown mode
 			sys->fprint(sys->fildes(2), "unrecognized mode \n");
 			sys->sleep(30);
