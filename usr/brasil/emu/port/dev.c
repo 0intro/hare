@@ -173,8 +173,9 @@ devwalk(Chan *c, Chan *nc, char **name, int nname, Dirtab *tab, int ntab, Devgen
 			switch((*gen)(nc, n, tab, ntab, i, &dir)){
 			case -1:
 			Notfound:
+#ifdef NOAH
 				iprint("devwalk: %s pc=0x%.8ulx\n", n, getcallerpc(&c));
-
+#endif
 				if(j == 0)
 					error(Enonexist);
 				kstrcpy(up->env->errstr, Enonexist, ERRMAX);
