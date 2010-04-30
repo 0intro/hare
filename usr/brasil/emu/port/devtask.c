@@ -68,7 +68,7 @@ char EResourcesINUse[] = "Resources already in use";
 char EBadstatus[] = "Invalid status";
 char ERemoteError[] = "Invalid status";
 
-static int vflag = 0xff;		/* for debugging messages: control prints */
+static int vflag = 0;		/* for debugging messages: control prints */
 
 void
 _dprint(ulong debuglevel, char *fmt, ...)
@@ -468,10 +468,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 	case Qconvdir:
 		myc = cmd.conv[CONV(c->qid)];
 		//jc = countrjob(myc->rjob);
-		if(myc->rjob == nil)
-			jc = -2;
-		else
-			jc = myc->rjob->rjobcount;
+		jc = myc->rjob->rjobcount;
 		if (s < jc) {
 			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
 			snprint(up->genbuf, sizeof up->genbuf, "%d", s);
@@ -612,8 +609,6 @@ spliceproc(void *param)
 	}
 	DPRINT(9,"spliceproc: closing [%s]->[%s] \n", src->name->s,
 		dst->name->s);
-	/* write nothing to close the pipe */
-	devtab[dst->type]->write(dst, "\0", 0, 0);
 	DPRINT(9,"spliceproc: %s %s complete\n", src->name->s,
 		dst->name->s);	
 	cclose(src);
@@ -631,7 +626,7 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
 	RemFile *rf;
 	char buf[KNAMELEN * 3];
 	Chan *tmpchan;
-	int i;
+	int i, first_time;
 
 	cv = cmd.conv[CONV(c->qid)];
 	wlock(&cv->rjob->l);
@@ -796,6 +791,7 @@ cmdopen(Chan * c, int omode)
 				error(Eperm);
 		}
 		cv->inuse++;
+		DPRINT(9, "cmdopen: c %p inused %d", cv->inuse);
 		if (cv->inuse == 1) {
 			cv->state = "Open";
 			kstrdup(&cv->owner, user);
@@ -947,26 +943,26 @@ closeconv(Conv * c)
 		free(c->rjob);
 		c->rjob = nil;
 	}
-	DPRINT(9,"remote resources released\n");
+	DPRINT(9,"closeconv: remote freed\n");
 	if (c->cmd != nil) {
-		DPRINT(9,"freeing cmd\n");
+		DPRINT(9,"closeconv: freeing cmd\n");
 		free(c->cmd);			/* FIXME: why this fails???? */
-		DPRINT(9,"freeing cmd done\n");
+		DPRINT(9,"closeconv: freeing cmd done\n");
 	}
 	c->cmd = nil;
 	if (c->waitq != nil) {
 		qfree(c->waitq);
 		c->waitq = nil;
 	}
-	DPRINT(9,"free waitq crossed\n");
+	DPRINT(9,"closeconv: free waitq crossed\n");
 	if (c->error != nil) {
-		DPRINT(9,"freeing error\n");
+		DPRINT(9,"closeconv: freeing error\n");
 		free(c->error);
 	}
-	DPRINT(9,"free error crossed\n");
+	DPRINT(9,"closeconv: free error crossed\n");
 	c->error = nil;
 	DPRINT(9,"Conv freed\n");
-	--ccount;
+	ccount--;
 
 }
 
@@ -1020,8 +1016,9 @@ remoteclose(Chan * c, int filetype, int rjcount)
 static void
 cmdfdclose(Conv * c, int fd)
 {
+	DPRINT(9, "cmdfdclose: %s fd %d c->count[fd] %d c %p", c->cmd->f[1], fd, c->count[fd], c);
 	if (--c->count[fd] == 0 && c->fd[fd] != -1) {
-		DPRINT(9,"calling close in cmdfdclose\n");
+		DPRINT(9,"cmdfdclose: %s c %p\n", c->cmd->f[1], c);
 		close(c->fd[fd]);
 		c->fd[fd] = -1;
 	}
@@ -1033,38 +1030,36 @@ cmdclose(Chan * c)
 	Conv *cc;
 	int r;
 	int filetype;
-	int tmpjc;
+	int jc;
 	vlong stime;
 
 	stime = osusectime (); /* recording start time */
 	if ((c->flag & COPEN) == 0)
 		return;
 
-	DPRINT(9,"trying to close file [%s]\n", c->name->s);
+	DPRINT(9,"cmdclose: trying to close file [%s]\n", c->name->s);
 	switch (TYPE(c->qid)) {
 	case Qarch:
 	case Qtopstat:
 	case Qtopctl:
 		break;
-
 	case Qctl:
 	case Qdata:
-		DPRINT(7, "Closing data file\n");
+		DPRINT(7, "cmdclose: closing %s\n", c->name->s);
 	case Qstderr:
 	case Qwait:
 	case Qstatus:
 		cc = cmd.conv[CONV(c->qid)];
-		tmpjc = countrjob(cc->rjob);
+		jc = countrjob(cc->rjob);
 		filetype = TYPE(c->qid) - Qdata;
-
-		DPRINT(9,"rjobcount is [%d]\n", tmpjc);
-		if (tmpjc < 0) {
+		DPRINT(9,"rjobcount is [%d]\n", jc);
+		if (jc < 0) {
 			/*
 			 * FIXME: you can only close status file you cant
 			 * open other files if job count is -1 and if you
 			 * can't open them, you cant close them.
 			 */
-			DPRINT(9,"returning as rjobcount is [%d]\n", tmpjc);
+			DPRINT(9,"returning as rjobcount is [%d]\n", jc);
 		}
 		qlock(&cc->l);
 
@@ -1076,7 +1071,6 @@ cmdclose(Chan * c)
 			
 			if (c->mode == OWRITE || c->mode == ORDWR) {
 				//DPRINT(1, "cmdclose: locking cc->inlock cc %p", cc);
-				
 				qlock(&cc->inlock);
 				cmdfdclose(cc, 0);
 				//DPRINT(1, "cmdclose: unlocking cc->inlock cc %p", cc);
@@ -1087,41 +1081,36 @@ cmdclose(Chan * c)
 				qlock(&cc->outlock);
 				cmdfdclose(cc, 1);
 				//DPRINT(1, "cmdclose: unlocking cc->outlock");
-
 				qunlock(&cc->outlock);
 			}
-			
 		} else if (TYPE(c->qid) == Qstderr) {
 			cmdfdclose(cc, 2);
 		}
-		r = --cc->inuse;
-		DPRINT(9,"r value is [%d] for  [%s]\n", r, c->name->s);
-
-		if (tmpjc > 0) {
+		cc->inuse--;
+		r = cc->inuse;
+		DPRINT(9,"cmdclose: %s inuse %d\n", c->name->s, r);
+		if (jc > 0) {
 			/* close for remote resources also */
-
 			if (TYPE(c->qid) == Qdata) {
 				if (c->mode == OWRITE || c->mode == ORDWR) {
-					DPRINT(9,"actually closing stdin for  [%s]\n", c->name->s);
-					remoteclose(c, (Qstdin - Qdata), tmpjc);
+					DPRINT(9,"cmdclose: closing %s stdin", c->name->s);
+					remoteclose(c, (Qstdin - Qdata), jc);
 				}
 				if (c->mode == OREAD || c->mode == ORDWR) {
-					DPRINT(9,"actually closing stdout for  [%s]\n", c->name->s);
-					remoteclose(c, (Qstdout - Qdata), tmpjc);
+					DPRINT(9,"cmdclose: closing %s stdout", c->name->s);
+					remoteclose(c, (Qstdout - Qdata), jc);
 				}
-			} else {
-				remoteclose(c, filetype, tmpjc);
-			}
+			}else
+				remoteclose(c, filetype, jc);
 		}
 		/* This code is only for CTL file */
 		if (cc->child != nil) {
 			/* its local execution with child */
-			if (!(cc->killed))
+			if (!cc->killed)
 				if (r == 0 || 
 					(cc->killonclose && TYPE(c->qid) == Qctl)) {
 					oscmdkill(cc->child);
-
-					DPRINT(9,"killing clild\n");
+					DPRINT(9,"cmdclose: killed child %s\n", cc->cmd->f[1]);
 					cc->killed = 1;
 				}
 		}
@@ -2165,7 +2154,7 @@ p_send2one(void *param)
 	/* report success */
 	report[1] = 1;				/* indicates success */
 	qwrite(rf->asyncq, report, 2);
-	DPRINT(9,"###p_send2one[%d]:  success wrot %ld bytes\n",
+	DPRINT(9,"###p_send2one[%d]:  success wrote %ld bytes\n",
 		rf->lsessid, ret);
 	pexit("", 0);
 	return;
@@ -2736,7 +2725,7 @@ cmdclone(char *user)
 	c->rjob->rjobcount = -1;
 	c->rjob->first = nil;
 	c->rjob->last = nil;
-	++ccount;
+	ccount++;
 	wunlock(&c->rjob->l);
 	//DPRINT(1, "cmdclone: lock c->inlock c %p\n", c);
 	qlock(&c->inlock);	/* lock writes to stdio until exec */

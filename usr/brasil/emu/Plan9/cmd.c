@@ -30,17 +30,22 @@ fdvec(int pid, int **arg)
 {
 	char fdfile[128];
 	char fdbuf[8192];
+	int fd;
 	int i = 0;
 	int n;
 	int fdvec[MAXNFD];
 	char *s;
 	int *a;
 		
-	snprint(fdfile, 512, "/proc/%d/fd", pid);
-	if(!(n = readfile(fdfile, fdbuf, sizeof fdbuf)))
-		panic("couldn't open our fds");
+	snprint(fdfile, 512, "/proc/%d/fd", getpid());
+	fd = open(fdfile, OREAD);
+	if(fd < 0)
+		error("couldn't open fds");
 	s = fdbuf;
-	s[n]=0;
+	while((n = read(fd, s, 8192-(s-fdbuf))) > 0)
+		s += n;
+	*s=0;
+	s = fdbuf;
 	s = strchr(s, '\n');
 	if(s == 0)
 		panic("bad fd file format");
