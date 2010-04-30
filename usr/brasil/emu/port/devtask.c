@@ -180,6 +180,7 @@ struct Conv {
 	short killed;
 	Rendez startr;
 	RemJob *rjob;		/* path to researved remote resource */
+	QLock io;		/* lock to block reads/writes before exec */
 };
 
 void
@@ -1306,15 +1307,15 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			fd = 2;
 		DPRINT(7, "READ fd %d n %d %.*s\n", c->fd[fd], n, n, a);
 		c = cmd.conv[CONV(ch->qid)];
-		qlock(&c->l);
+		qlock(&c->io);
 		if (c->fd[fd] == -1) {
-			qunlock(&c->l);
+			qunlock(&c->io);
 			DPRINT(9,"fd %d is closed\n", fd);
 			ret = 0;
 			error ("reading from closed file");
 			break;
 		}
-		qunlock(&c->l);
+		qunlock(&c->io);
 		osenter();
 		n = read(c->fd[fd], a, n);
 		DPRINT(7, "READ FINISHED fd %d n %d %.*s\n", c->fd[fd], n, n, a);
@@ -2307,6 +2308,7 @@ dolocalexecution(Conv * c, Cmdbuf * cb)
 	while (waserror())
 		DPRINT(9,"I hate waserror");
 	Sleep(&c->startr, cmdstarted, c);
+	qunlock(&c->io);
 	poperror();
 	if (c->error)
 		error(c->error);
@@ -2542,14 +2544,14 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		/* local data file write request */
 		DPRINT(7, "EVH: Local Qdatawrite: [%d] %s", n, a);
 
-		qlock(&c->l);
+		qlock(&c->io);
 		if (c->fd[0] == -1) {
-			qunlock(&c->l);
+			qunlock(&c->io);
 			DPRINT(9, "cmdwrite: can't dial 8675309 %r\n");
 			// this is the proper behavior, but I need to work more on this. 
 			error(Ehungup);
 		}
-		qunlock(&c->l);
+		qunlock(&c->io);
 		osenter();
 		ret = write(c->fd[0], a, n);
 		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d %.*s\n", c->fd[0], ret, n, n, a);
@@ -2656,6 +2658,7 @@ cmdclone(char *user)
 	c->rjob->last = nil;
 	++ccount;
 	wunlock(&c->rjob->l);
+	canqlock(&c->io);	/* lock io until exec */
 	qunlock(&c->l);
 	DPRINT(9,"cmdclone: success\n");
 	return c;
