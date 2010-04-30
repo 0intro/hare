@@ -26,7 +26,7 @@ extern int readfile(char *, char *, int );
 
 
 void
-fdvec(int pid, int **arg)
+fdvec(int **arg)
 {
 	char fdfile[128];
 	char fdbuf[8192];
@@ -83,7 +83,7 @@ exectramp(Targ *t)
 	t->wfd = open(filename, OWRITE|OCEXEC);
 	/* if it failed, we'll manage */
 //	print("%d %s FD0 %d FD1 %d FD2 %d\n", getpid(), t->args[0], fd[0], fd[1], fd[2]);
-	fdvec(t->pid, &fdv);
+	fdvec(&fdv);
 	for(p=fdv; *p >= 0; p++){
 		i = *p;
 		if(i != fd[0] && i != fd[1] && i != fd[2] && i != t->wfd)

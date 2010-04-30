@@ -1071,10 +1071,9 @@ namec(char *aname, int amode, int omode, ulong perm)
 		   (utfrune("|esDa", r) == nil || r == 's' && up->genbuf[n]!='\0'))
 			error(Enoattach);
 		t = devno(r, 1);
-		if(t == -1) {
-			print("%c", r);
+		if(t == -1)
 			error(Ebadsharp);
-		}
+			
 		c = devtab[t]->attach(up->genbuf+n);
 		break;
 
@@ -1094,7 +1093,7 @@ namec(char *aname, int amode, int omode, ulong perm)
 		free(e.name);
 		free(e.elems);
 		free(e.off);
-		print("namec: %q: %r\n", up->env->errstr);
+		//print("namec: %q: %r\n", up->env->errstr);
 		//dumpmount();
 		nexterror();
 	}
@@ -1126,7 +1125,7 @@ namec(char *aname, int amode, int omode, ulong perm)
 			print("namec %s walk error npath=%d\n", aname, npath);
 			nexterror();
 		}
-		print("namec: error tmperrbuf\n");
+		//print("namec: error tmperrbuf\n");
 		strcpy(tmperrbuf, up->env->errstr);
 	NameError:
 		len = prefix+e.off[npath];

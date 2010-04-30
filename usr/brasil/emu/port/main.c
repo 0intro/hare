@@ -344,16 +344,19 @@ errorf(char *fmt, ...)
 void
 error(char *err)
 {
+#ifdef NOAH
 	if(err != nil)
 		print("%d error: %s pc=0x%.8lux\n", getpid(), err, getcallerpc(&err));
 	else
 		print("%d error: pc=0x%.8lux\n", getpid(), getcallerpc(&err));
-		
+
 	if(strncmp(err, "fail:", 5) == 0){
 		char name[3*KNAMELEN];
 		modstatus(&R, name, sizeof(name));
 		print("%d %s: unhandled exception: %s\n", getpid(), name, err);
 	}
+#endif
+
 	if(err != up->env->errstr && up->env->errstr != nil)
 		kstrcpy(up->env->errstr, err, ERRMAX);
 //	ossetjmp(up->estack[NERR-1]);

@@ -626,7 +626,7 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
 	RemFile *rf;
 	char buf[KNAMELEN * 3];
 	Chan *tmpchan;
-	int i, first_time;
+	int i;
 
 	cv = cmd.conv[CONV(c->qid)];
 	wlock(&cv->rjob->l);

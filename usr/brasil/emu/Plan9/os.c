@@ -174,7 +174,7 @@ readfile(char *path, char *buf, int n)
 	fd = open(path, OREAD);
 	if(fd >= 0) {
 		n = read(fd, buf, n-1);
-		print("readfile: fd %d n %d buf %.*s\n", fd, n, n, buf);
+		//print("readfile: fd %d n %d buf %.*s\n", fd, n, n, buf);
 		if(n > 0)			/* both calls to readfile() have a ``default'' */
 			buf[n] = '\0';
 		close(fd);
