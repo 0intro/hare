@@ -468,7 +468,10 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 	case Qconvdir:
 		myc = cmd.conv[CONV(c->qid)];
 		//jc = countrjob(myc->rjob);
-		jc = myc->rjob->rjobcount;
+		if(myc->rjob == nil)
+			jc = -2;
+		else
+			jc = myc->rjob->rjobcount;
 		if (s < jc) {
 			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
 			snprint(up->genbuf, sizeof up->genbuf, "%d", s);
@@ -628,7 +631,7 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
 	RemFile *rf;
 	char buf[KNAMELEN * 3];
 	Chan *tmpchan;
-	int i, first_time;
+	int i;
 
 	cv = cmd.conv[CONV(c->qid)];
 	wlock(&cv->rjob->l);
