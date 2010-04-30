@@ -1,0 +1,7 @@
+#!/bin/rc
+
+kill xirf|rc
+kill self|rc
+kill cat|rc
+kill mecat|rc
+rm /srv/csrv

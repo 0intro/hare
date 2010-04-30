@@ -173,6 +173,8 @@ devwalk(Chan *c, Chan *nc, char **name, int nname, Dirtab *tab, int ntab, Devgen
 			switch((*gen)(nc, n, tab, ntab, i, &dir)){
 			case -1:
 			Notfound:
+				iprint("devwalk: %s pc=0x%.8ulx\n", n, getcallerpc(&c));
+
 				if(j == 0)
 					error(Enonexist);
 				kstrcpy(up->env->errstr, Enonexist, ERRMAX);
@@ -195,7 +197,6 @@ devwalk(Chan *c, Chan *nc, char **name, int nname, Dirtab *tab, int ntab, Devgen
 	 */
 Done:
 	poperror();
-//	iprint("devwalk: %s pc=0x%.8ulx\n", n, getcallerpc(&c));
 	
 	if(wq->nqid < nname){
 		if(alloc)
