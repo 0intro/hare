@@ -143,7 +143,7 @@ class XCPU3Client:
         print "enabling debugging"
         if self.debugLink.open (name, py9p.ORDWR) is  None:
             raise Exception ("XCPU3: could not open " + name)
-        self.debugLink.write ("debug 1");
+        self.debugLink.write ("debug 9");
         self.debugLink.close ();
         
     def disableDebug (self) :
@@ -292,6 +292,9 @@ class XCPU3Client:
         self.requestReservation(res)
 #        print "experiment, remove it later... 2"
 
+        self.dPrint ( "getting output")
+        self.getOutputAsync()
+
 
         self.dPrint ( "Requesting execution..")
         self.requestExecution(cmd)
@@ -299,8 +302,6 @@ class XCPU3Client:
             self.dPrint ( "sending input")
             self.sendInput (input)
 
-        self.dPrint ( "getting output")
-        self.getOutputAsync()
 
 
         

@@ -183,6 +183,8 @@ struct Conv {
 	short killed;
 	Rendez startr;
 	RemJob *rjob;		/* path to researved remote resource */
+	QLock inlock;		/* lock to block writes before exec */
+	QLock outlock;		/* lock to block reads before exec */
 };
 
 void
@@ -595,8 +597,8 @@ proc_splice(void *param)
 		if (ret <= 0) {
 			break;
 		}
-		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data %.*s\n",
-			src->name->s, dst->name->s, ret, ret, buf);
+		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data \n",
+			src->name->s, dst->name->s, ret, ret);
 		a = buf;
 		while (ret > 0) {
 			r = devtab[dst->type]->write(dst, a, ret, 0);
@@ -1058,10 +1060,18 @@ cmdclose(Chan * c)
 		 * this for remote data files
 		 */
 		if (TYPE(c->qid) == Qdata) {
-			if (c->mode == OWRITE || c->mode == ORDWR)
+			
+			if (c->mode == OWRITE || c->mode == ORDWR) {
+				qlock(&cc->inlock);
 				cmdfdclose(cc, 0);
-			if (c->mode == OREAD || c->mode == ORDWR)
+				qunlock(&cc->inlock);
+			}
+			if (c->mode == OREAD || c->mode == ORDWR) {
+				qlock(&cc->outlock);
 				cmdfdclose(cc, 1);
+				qunlock(&cc->outlock);
+			}
+			
 		} else if (TYPE(c->qid) == Qstderr) {
 			cmdfdclose(cc, 2);
 		}
@@ -1333,22 +1343,22 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		fd = 1;
 		if (TYPE(ch->qid) == Qstderr)
 			fd = 2;
-		DPRINT(7, "READ fd %d n %d %.*s\n", c->fd[fd], n, n, a);
+		DPRINT(7, "READ fd %d n %d\n", c->fd[fd], n, n);
 		c = cmd.conv[CONV(ch->qid)];
-		qlock(&c->l);
+		qlock(&c->outlock);
 		if (c->fd[fd] == -1) {
-			qunlock(&c->l);
-			DPRINT(9,"fd %d is closed\n", fd);
-			error ("Reading from closed file");
-			ret = 0;
-			error ("reading from closed file");
-			break;
+			/* FIXME: check if command is failed */
+			qunlock(&c->outlock);
+			DPRINT(9, "cmd execution not proper\n");
+			error ("Local execution failed");
 		}
-		qunlock(&c->l);
+		
 		osenter();
 		n = read(c->fd[fd], a, n);
-		DPRINT(7, "READ FINISHED fd %d n %d %.*s\n", c->fd[fd], n, n, a);
+		DPRINT(7, "READ FINISHED fd %d n %d\n", c->fd[fd], n, n);
 		osleave();
+		qunlock(&c->outlock);
+		
 		if (n < 0)
 			oserror();
 		ret = n;
@@ -1437,7 +1447,7 @@ analyseremotenode(RemMount * rmt)
 	initinfo(rmt->info);
 	for(;;) {
 		ret = devtab[rmt->status->type]->read(rmt->status, buf, 30, offset);
-		DPRINT(9, "remnode: n %d %.*s\n", n, n, buf);
+		DPRINT(9, "remnode: n %d\n", n, n);
 		if (ret <= 0)
 			return;
 		p = strchr(buf, '\n');
@@ -2457,6 +2467,8 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				ret = p_send2all(ch, a, n, offset);
 				DPRINT(9,"cmdwrite: remote command done\n");
 			}
+			qunlock(&c->inlock);
+			qunlock(&c->outlock);
 			break;
 
 		case CMkillonclose:
@@ -2570,19 +2582,21 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		}
 		/* local data file write request */
 		DPRINT(7, "EVH: Local Qdatawrite: [%d]\n", n );
-
-		qlock(&c->l);
+		
+		qlock(&c->inlock);
 		if (c->fd[0] == -1) {
-			qunlock(&c->l);
-			DPRINT(9, "cmdwrite: can't dial 8675309 %r\n");
-			// this is the proper behavior, but I need to work more on this. 
-			error(Ehungup);
+			/* FIXME: check if command is failed */
+			qunlock(&c->inlock);
+			DPRINT(9, "cmd execution not proper\n");
+			error ("Local execution failed");
 		}
-		qunlock(&c->l);
+		
 		osenter();
 		ret = write(c->fd[0], a, n);
-		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d\n", c->fd[0], ret, n, n);
 		osleave();
+		qunlock(&c->inlock);
+		
+		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d\n", c->fd[0], ret, n, n);
 		break;
 	}
 
@@ -2685,6 +2699,8 @@ cmdclone(char *user)
 	c->rjob->last = nil;
 	++ccount;
 	wunlock(&c->rjob->l);
+	qlock(&c->inlock);	/* lock writes to stdio until exec */
+	qlock(&c->outlock);	/* lock reads from stdio until exec */
 	qunlock(&c->l);
 	DPRINT(9,"cmdclone: success\n");
 	return c;
