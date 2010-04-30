@@ -11,6 +11,8 @@ NOTSYS=sml|dup|.+\..+
 BUGGERED=unix|postscript
 OUTOFDATE=old
 
+CPUS=power
+
 NOMK=$NOTSYS|$BUGGERED|$OUTOFDATE
 
 cpuobjtype=`{sed -n 's/^O=//p' /$cputype/mkfile}

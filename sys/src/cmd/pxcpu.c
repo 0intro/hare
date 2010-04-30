@@ -52,12 +52,12 @@ main(int argc, char **argv)
 	cfd = open(fdfile, ORDWR);
 	n = read(cfd, sess, 64);
 	if(n < 0)
-		sysfatal("couldn't read ctl");
+		sysfatal("couldn't read ctl: %r");
 	sess[n]=0;
 	/* sess stores session ID */
 	in = Bopen("/fd/0", OREAD);
 	if(in == nil)
-		sysfatal("couldn't open stdin");
+		sysfatal("couldn't open stdin: %r");
 	
 	/* Read first line */
 	line = Brdstr(in, '\n', '\n');
@@ -80,7 +80,7 @@ main(int argc, char **argv)
 		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i);
 		resfdctl[i]=open(fdfile, ORDWR);
 		if(resfdctl[i] < 0)
-			sysfatal("couldn't open part of res");
+			sysfatal("couldn't open part of res: %s %s %d %r", mnt, sess, i);
 	}
 
 	/* read remaining lines */

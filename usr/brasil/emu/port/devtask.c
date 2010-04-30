@@ -1532,7 +1532,7 @@ validrr(char *mnt, char *os, char *arch)
 	dirs = nil;
 
 	ans = (RemMount *) malloc(sizeof(RemMount));
-	n = strlen(mnt)+strlen(local)+1;
+	n = strlen(mnt)+strlen(local)+2;
 	ans->path = (char *) malloc(n);
 	snprint(ans->path, n,"%s/%s", mnt, local);
 
