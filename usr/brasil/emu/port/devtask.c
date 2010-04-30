@@ -66,6 +66,7 @@ char ENOReservation[] = "No remote reservation done";
 char EResourcesReleased[] = "Resources already released";
 char EResourcesINUse[] = "Resources already in use";
 char EBadstatus[] = "Invalid status";
+char ERemoteError[] = "Invalid status";
 
 static int vflag = 0;		/* for debugging messages: control prints */
 
@@ -81,7 +82,8 @@ _dprint(ulong debuglevel, char *fmt, ...)
 	if(vflag<debuglevel)
 		return;
 	p = strchr(fmt, '\n');
-	newfmt = smprint("%ld %d %s :%q\n", time(0), getpid(), fmt, up->env->errstr);
+//	newfmt = smprint("%ld %d %s :%q\n", time(0), getpid(), fmt, up->env->errstr);
+	newfmt = smprint("%ld %d %s\n", time(0), getpid(), fmt);
 	if(p != nil){
 		p = strchr(newfmt, '\n');
 		*p = ' ';
@@ -99,6 +101,7 @@ long lastrrselected = 0;
 struct RemFile {
 	int state;
 	int lsessid;
+	QLock l;				/* protects state changes */
 	Chan *cfile;
 	Queue *asyncq;
 };
@@ -534,12 +537,14 @@ procreadremote(void *a)
 	Block *content = nil;
 
 	rf = a;
+	qlock(&rf->l);
 	rf->state = 1;				/* thread running */
 
 	if (waserror()) {
-		DPRINT(9,"PRR:No more data to read\n");
+		DPRINT(9,"PRR:Some error occured..\n");
 		freeb(content);
-		rf->state = 2;			/* thread dead */
+		rf->state = 3;			/* thread dead */
+		qunlock(&rf->l);
 		pexit("", 0);
 		return;
 	}
@@ -562,6 +567,7 @@ procreadremote(void *a)
 	freeb(content);
 	rf->state = 2;				/* thread dead */
 	poperror();
+	qunlock(&rf->l);
 	pexit("", 0);
 	return;
 }				/* end function : procreadremote () */
@@ -618,13 +624,21 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
 	RemFile *rf;
 	char buf[KNAMELEN * 3];
 	Chan *tmpchan;
-	int i;
+	int i, first_time;
 
 	cv = cmd.conv[CONV(c->qid)];
-
-	tmpfileuse = getfileopencount(cv->rjob, filetype);
-
-	if (tmpfileuse < 1) {
+	wlock(&cv->rjob->l);
+	tmpfileuse = cv->rjob->rcinuse[filetype];
+	if (tmpfileuse < 1 ) {
+		cv->rjob->rcinuse[filetype] = 1;
+		tmpfileuse = 1;
+	} else  {
+		cv->rjob->rcinuse[filetype]++;
+		tmpfileuse++;
+	}
+	wunlock(&cv->rjob->l);
+	
+	if (tmpfileuse == 1) {
 		/* opening file for first time */
 		/* open should be done on all resources */
 		DPRINT(9,"opening file for first times[%d]\n",
@@ -653,14 +667,8 @@ remoteopen(Chan * c, int omode, char *fname, int filetype, int resno)
 			tmprr = tmprr->next;	/* this can be RO lock */
 			wunlock(&cv->rjob->l);
 		} /* end for : */
-		wlock(&cv->rjob->l);
-		cv->rjob->rcinuse[filetype] = 1;
-		wunlock(&cv->rjob->l);
 	} else {
 		DPRINT(9,"file is already open for [%d] times\n", tmpfileuse);
-		wlock(&cv->rjob->l);
-		cv->rjob->rcinuse[filetype] += 1;
-		wunlock(&cv->rjob->l);
 	}
 } /* end function : remoteopen */
 
@@ -832,9 +840,11 @@ cmdopen(Chan * c, int omode)
 				/* special case of */
 				if (omode == OWRITE || omode == ORDWR) {
 					/* open stdin part */
+					DPRINT(9,"actually opening stdin for  [%s]\n", c->name->s);
 					remoteopen(c, omode, fname, (Qstdin - Qdata), tmpjc);
 				}
 				if (omode == OREAD || omode == ORDWR) {
+					DPRINT(9,"actually opening stdout for  [%s]\n", c->name->s);
 					remoteopen(c, omode, fname, (Qstdout - Qdata), tmpjc);
 				}
 			} else {
@@ -971,7 +981,10 @@ remoteclose(Chan * c, int filetype, int rjcount)
 		wunlock(&cc->rjob->l);
 		for (i = 0; i < rjcount; ++i) {
 			if (tmprr->remotefiles[filetype].cfile != nil) {
+				
+				qlock(&tmprr->remotefiles[filetype].l);
 				cclose(tmprr->remotefiles[filetype].cfile);
+				qunlock(&tmprr->remotefiles[filetype].l);
 				/* I am not freeing remotechan explicitly */
 
 				wlock(&cc->rjob->l);
@@ -1060,9 +1073,11 @@ cmdclose(Chan * c)
 
 			if (TYPE(c->qid) == Qdata) {
 				if (c->mode == OWRITE || c->mode == ORDWR) {
+					DPRINT(9,"actually closing stdin for  [%s]\n", c->name->s);
 					remoteclose(c, (Qstdin - Qdata), tmpjc);
 				}
 				if (c->mode == OREAD || c->mode == ORDWR) {
+					DPRINT(9,"actually closing stdout for  [%s]\n", c->name->s);
 					remoteclose(c, (Qstdout - Qdata), tmpjc);
 				}
 			} else {
@@ -1102,6 +1117,7 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 	Conv *c;
 	long jc;
 	long nc,nb;
+	int error_state;
 	int filetype;
 	RemResrc *rr;
 	RemFile *rf;
@@ -1125,13 +1141,20 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 		runlock(&c->rjob->l);
 		nc = 0;
 		nb = 0;
+		error_state = 0;
 		for (i = 0; i < jc; i++) {
 			rf = &rr->remotefiles[filetype];
-			if(rf->state == 2)
+			switch ( rf->state ) {
+				case 3: 
+					++error_state;
+					break;
+				case 2:
 				/* This thread is done */
-				nc++;
-			else
-				nb++;
+					nc++;
+					break;
+				default: 
+					nb++;
+				} /* end switch */
 			/*
 			 * FIXME: should I lock following also in read mode
 			 * ??
@@ -1141,6 +1164,12 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 		ret = qconsume(c->rjob->asyncq_list[filetype], a, n);
 		if (ret >= 0)
 			return ret;
+		
+		if (error_state > 0 ) {
+			DPRINT(9,"----readfromallasync remote errors [%ld]\n", error_state);
+			error (ERemoteError);
+		}
+			
 		if (nc >= jc) {
 			DPRINT(9,"----readfromallasync fileclose [%ld]\n", nc);
 			/* as all nodes are close, return NOW */
@@ -1310,6 +1339,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		if (c->fd[fd] == -1) {
 			qunlock(&c->l);
 			DPRINT(9,"fd %d is closed\n", fd);
+			error ("Reading from closed file");
 			ret = 0;
 			error ("reading from closed file");
 			break;
@@ -2112,8 +2142,8 @@ p_send2one(void *param)
 
 
 /*
- * p_send2all : sends write command to all nodes parallelly FIXME: works only
- * for ctl file
+ * p_send2all : sends write command to all nodes parallelly 
+ * 
  */
 static long
 p_send2all(Chan * ch, void *a, long n, vlong offset)
@@ -2134,7 +2164,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 	 * parallel send to all
 	 */
 	if (c->rjob == nil) {
-		DPRINT(9,"resources released, as clone file closed\n");
+		DPRINT(9,"resources released\n");
 		error(EResourcesReleased);
 	}
 	tmpjc = getrjobcount(c->rjob);
@@ -2185,14 +2215,13 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 		ret = qread(c->rjob->asyncq_list[filetype], buf, 2);
 		if (ret != 2) {
 			++flag;
-			DPRINT(9,"qread on ctl buf failed\n");
+			DPRINT(9,"qread failed\n");
 		} else {
 			if (buf[1] != 1) {
 				++flag;
-				DPRINT(9,"resource allocation for [%d] failed\n", buf[0]);
+				DPRINT(9,"failue reported by [%d] thread\n", buf[0]);
 			} else {
-				DPRINT(9,"resource allocation for [%d] successful\n",
-					buf[0]);
+				DPRINT(9,"success reported by [%d] thread\n", buf[0]);
 			}
 		}
 	} /* end for : for each resource */
@@ -2203,7 +2232,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 		DPRINT(9,"write failed for [%d] nodes\n", flag);
 		error(ERemoteResFail);
 	}
-	DPRINT(9,"write to [%ld] res successful of size[%ld]\n", tmpjc, n);
+	DPRINT(9,"write to [%ld] remote nodes successful of size[%ld]\n", tmpjc, n);
 
 	return n;
 } /* end function : p_send2all */
@@ -2535,12 +2564,12 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			break;
 		}
 		if (jc != 0) {
-			DPRINT(7, "EVH: Remote Qdatawrite: [%d] %s", n, a);
+			DPRINT(7, "EVH: Remote Qdatawrite: [%d]\n", n);
 			ret = p_send2all(ch, a, n, offset);
 			break;
 		}
 		/* local data file write request */
-		DPRINT(7, "EVH: Local Qdatawrite: [%d] %s", n, a);
+		DPRINT(7, "EVH: Local Qdatawrite: [%d]\n", n );
 
 		qlock(&c->l);
 		if (c->fd[0] == -1) {
@@ -2552,7 +2581,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		qunlock(&c->l);
 		osenter();
 		ret = write(c->fd[0], a, n);
-		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d %.*s\n", c->fd[0], ret, n, n, a);
+		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d\n", c->fd[0], ret, n, n);
 		osleave();
 		break;
 	}

@@ -45,6 +45,8 @@ import getpass
 import code
 import readline
 import atexit
+import threading
+import thread
 
 # Find the location of py9p
 DEFAULTPY9P = "/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"
@@ -97,6 +99,23 @@ remoteURL = ""
 baseURL = "/csrv/local/"
 #baseURL = "/local/"
 
+
+
+def catAsync (obj, *args):
+    debug = False
+    if debug : print "thread started"
+    while 1:
+        if debug : print "thread reading"
+        buf = obj.read(1)
+        #buf = obj.readline()
+        if debug : print "thread read " + buf
+        if len(buf) <= 0:
+            break
+        sys.stdout.write (buf)
+
+    if debug: print "thread dead"
+    obj.close()
+
 class XCPU3Client:
     
     sessionID = None
@@ -109,9 +128,11 @@ class XCPU3Client:
         self.DEBUG = False
         
         self.extraLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
-        self.IOLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.inputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.ctlLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.outputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.debugLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+
 
     def dPrint (self, msg):
         if (self.DEBUG):
@@ -195,6 +216,7 @@ class XCPU3Client:
             self.startSession()
         param = "exec " + cmd
         self.ctlLink.write(param)
+ 
         
     def sendInput (self, input):
         if self.sessionID is None :
@@ -202,27 +224,60 @@ class XCPU3Client:
 
         if input is None :
             return
-        inf = open(input, "r", 0)
-        
+        if  input == '-' :
+            inf = sys.stdin
+            self.dPrint ("Using stdin for input")
+        else :
+            inf = open(input, "r", 0)
+
         name = baseURL + str(self.sessionID) + "/stdio"
-        if self.IOLink.open(name, py9p.OWRITE) is None:
+        if self.inputLink.open(name, py9p.OWRITE) is None:
             raise Exception("XCPU3: Could not open stdio file " + name)
         
         sz = self.bufSize
         while 1:
-            buf = inf.read(sz)
+            # buf = inf.read(sz)
+            buf = inf.readline()
             if len(buf) <= 0:
                 break
-            self.IOLink.write(buf)
-        self.IOLink.close()
+            self.dPrint ("sending line [" + buf + "]")
+            self.inputLink.write(buf)
+        self.dPrint ("input sent")
+        self.inputLink.close()
         inf.close()
+
+
+    def getOutputAsync (self) :
+
+        if self.sessionID is None :
+            raise Exception("XCPU3: Session not created")
+        
+        name = baseURL + str(self.sessionID) + "/stdio"
+        if self.outputLink.open (name, py9p.OREAD ) is None :
+            raise Exception("XCPU3: Could not open " + name)
+        try:
+        #    catAsync (self.outputLink)
+            threading.Thread(target=catAsync, args=(self.outputLink, 1)).start()
+        except Exception, errtxt:
+            print errtxt
+            raise Exception
+            return
+        self.dPrint ("Thread started ...")
         
     def getOutput (self) :
         if self.sessionID is None :
             raise Exception("XCPU3: Session not created")
         
         name = baseURL + str(self.sessionID) + "/stdio"
-        self.cat (name, self.IOLink )
+        if self.outputLink.open (name, py9p.OREAD ) is None :
+            raise Exception("XCPU3: Could not open " + name)
+        
+        while 1:
+            buf = self.outputLink.read(self.bufSize)
+            if len(buf) <= 0:
+                break
+            sys.stdout.write(buf)
+        self.outputLink.close()
     
     def endSession (self) :
         if self.sessionID is None :
@@ -231,18 +286,24 @@ class XCPU3Client:
         self.ctlLink.close()
         self.sessionID = None
 
-
             
     def runJob (self, cmd, res = None, input = None ):
         self.dPrint ("Requesting reservation..")
         self.requestReservation(res)
+#        print "experiment, remove it later... 2"
+
+
         self.dPrint ( "Requesting execution..")
         self.requestExecution(cmd)
         if input is not None :
             self.dPrint ( "sending input")
             self.sendInput (input)
+
         self.dPrint ( "getting output")
-        self.getOutput()
+        self.getOutputAsync()
+
+
+        
         if self.DEBUG:
             self.dPrint ( "checking session status")
             self.getSessionStatus ()

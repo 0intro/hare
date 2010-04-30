@@ -54,21 +54,27 @@ main(int argc, char **argv)
 	if(n < 0)
 		sysfatal("couldn't read ctl");
 	sess[n]=0;
+	/* sess stores session ID */
 	in = Bopen("/fd/0", OREAD);
 	if(in == nil)
 		sysfatal("couldn't open stdin");
+	
+	/* Read first line */
 	line = Brdstr(in, '\n', '\n');
 	if(line == nil)
 		sysfatal("eof");
 	n = tokenize(line, a, 4);
 	if(n != 2)
 		sysfatal("two fields in a res");
+	/* assumed to be res */
 	if(strcmp("res", a[0]) != 0)
 		sysfatal("need to res in the beginning");
 	fprint(cfd, "%s %s", a[0], a[1]);
 	nres = atoi(a[1]);
 	if(nres <= 0)
 		sysfatal("need >0 res");
+	
+	/* opening ctl files of all childeren */
 	resfdctl = malloc(nres*sizeof(int));
 	for(i = 0; i < nres; i++){
 		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i);
@@ -76,9 +82,13 @@ main(int argc, char **argv)
 		if(resfdctl[i] < 0)
 			sysfatal("couldn't open part of res");
 	}
+
+	/* read remaining lines */
 	while((line = Brdstr(in, '\n', '\n')) != nil){
 		n = getfields(line, a, 4, 1, "\t\r\n ");
+			/* if splice */
 		if(strcmp("splice", a[0]) == 0){
+			/* splice sources_subsesssion_id destination_subsession_id */
 			if(n != 3)
 				sysfatal("splice has 2 args");
 			i = atoi(a[2]);
@@ -92,6 +102,7 @@ main(int argc, char **argv)
 			if(i < 0 || nres <= i)
 				sysfatal("bad splice out res");
 			if(strcmp("filt", a[1]) == 0){
+				/* exec filt cmd dest_subsession args ===> exec xirf/self session_id  */ 
 				i = atoi(a[3]);
 				fprint(resfdctl[i], "exec %s %s %s", a[2], sess, a[3]);
 			}else if(n == 4)
