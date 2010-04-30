@@ -121,6 +121,7 @@ root
 	/dis/os.dis	
 	/dis/sh.dis
 	/dis/styxlisten.dis
+	/dis/styxmon.dis
 	/dis/lib/arg.dis	
 	/dis/lib/attrdb.dis
 	/dis/lib/auth.dis
