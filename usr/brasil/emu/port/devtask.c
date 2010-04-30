@@ -81,7 +81,7 @@ _dprint(ulong debuglevel, char *fmt, ...)
 	if(vflag<debuglevel)
 		return;
 	p = strchr(fmt, '\n');
-	newfmt = smprint("%ld %d %s :%q\n", time(0), getpid(), fmt, up->env->errstr);
+	newfmt = smprint("%ld %d %s\n", time(0), getpid(), fmt);
 	if(p != nil){
 		p = strchr(newfmt, '\n');
 		*p = ' ';
