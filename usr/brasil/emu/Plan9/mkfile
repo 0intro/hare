@@ -37,6 +37,7 @@ $CONF.acid:	$OBJ $CONF.c $CONF.root.h $LIBFILES
 	$CC $CFLAGS -DKERNDATE'='$KERNDATE -a $CONF.c >brasil.acid
 	for(i in $OBJ){
 		stem=`{echo $i | sed 's/\.[0-9a-z]$//'}
+		echo $i
 		if(test -f $stem.c)
 			$CC $CFLAGS -DKERNDATE'='$KERNDATE -a $stem.c >>brasil.acid
 	}

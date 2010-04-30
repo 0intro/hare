@@ -68,7 +68,7 @@ char EResourcesINUse[] = "Resources already in use";
 char EBadstatus[] = "Invalid status";
 char ERemoteError[] = "Invalid status";
 
-static int vflag = 0;		/* for debugging messages: control prints */
+static int vflag = 0xff;		/* for debugging messages: control prints */
 
 void
 _dprint(ulong debuglevel, char *fmt, ...)
@@ -239,7 +239,7 @@ static void cmdproc(void *a);
 static long lookup(char *word, char **wordlist, int len);
 static void initinfo(long info[Nos][Nplatform]);
 static long readstatus(char *a, long n, vlong offset);
-static void proc_splice(void *);
+static void spliceproc(void *);
 
 /* function prototypes from other files */
 long dirpackage(uchar * buf, long ts, Dir ** d);
@@ -251,7 +251,7 @@ timestamp (vlong stime)
 }
 
 static long
-getrjobcount(RemJob * rjob)
+countrjob(RemJob * rjob)
 {
 
 	long temp;
@@ -467,7 +467,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 		return -1;
 	case Qconvdir:
 		myc = cmd.conv[CONV(c->qid)];
-		//jc = getrjobcount(myc->rjob);
+		//jc = countrjob(myc->rjob);
 		jc = myc->rjob->rjobcount;
 		if (s < jc) {
 			mkqid(&q, RQID(s, CONV(c->qid), QLconrdir), 0, QTDIR);
@@ -575,7 +575,7 @@ procreadremote(void *a)
 }				/* end function : procreadremote () */
 
 static void
-proc_splice(void *param)
+spliceproc(void *param)
 {
 	Chan *src;
 	Chan *dst;
@@ -589,32 +589,34 @@ proc_splice(void *param)
 	src = fs->src;
 	dst = fs->dst;
 
-	DPRINT(9,"proc_splice starting [%s]->[%s]\n", src->name->s,
+	DPRINT(9,"spliceproc starting [%s]->[%s]\n", src->name->s,
 		dst->name->s);
 	for(;;) {
 		/* read data from source channel */
+		DPRINT(9, "spliceproc: READING %s", src->name->s);
 		ret = devtab[src->type]->read(src, buf, 512, 0);
-		if (ret <= 0) {
+		DPRINT(9, "spliceproc: READ  %s ret %d %.*s", src->name->s, ret, ret, buf);
+		if (ret <= 0)
 			break;
-		}
-		DPRINT(9,"proc_splice copying [%s]->[%s] %ld data \n",
-			src->name->s, dst->name->s, ret, ret);
-		a = buf;
-		while (ret > 0) {
+		DPRINT(9,"spliceproc: copying [%s]->[%s] %ld data %.*s\n",
+			src->name->s, dst->name->s, ret, ret, buf);
+		for (a = buf; ret > 0; a += r) {
+			DPRINT(9, "spliceproc: WRITING %s ret %d %.*s", dst->name->s, ret, ret, a);
 			r = devtab[dst->type]->write(dst, a, ret, 0);
+			DPRINT(9, "spliceproc: WROTE  %s r %d", dst->name->s, r);
 			ret = ret - r;
-			a = a + r;
 		}
-
-	} /* end while */
-	DPRINT(9,"%ld %d proc_splice closing [%s]->[%s] \n", time(0), getpid(), src->name->s,
+	}
+	DPRINT(9,"spliceproc: closing [%s]->[%s] \n", src->name->s,
 		dst->name->s);
 	/* write nothing to close the pipe */
 	devtab[dst->type]->write(dst, "\0", 0, 0);
+	DPRINT(9,"spliceproc: %s %s complete\n", src->name->s,
+		dst->name->s);	
 	cclose(src);
 	cclose(dst);
-	DPRINT(9,"%ld %d proc_splice complete \n",time(0), getpid());
-} /* end function : proc_splice */
+
+} /* end function : spliceproc */
 
 
 static void
@@ -743,15 +745,19 @@ cmdopen(Chan * c, int omode)
 		break;
 	case Qclonus:
 		/* in case of clone, check if it is locked */
+		//DPRINT(1, "cmdopen: locking cmd.l\n");
 		qlock(&cmd.l);
 		if (waserror()) {
 			DPRINT(9,"cmdopen: bye bye clone\n");
+			//DPRINT(1, "cmdopen: err unlocking cmd.l\n");
+
 			qunlock(&cmd.l);
 			nexterror();
 		}
 		/* opening clone will come here */
 		cv = cmdclone(up->env->user);
 		poperror();
+		//DPRINT(1, "cmdopen: unlocking cmd.l\n");
 		qunlock(&cmd.l);
 		if (cv == 0)
 			error(Enodev);
@@ -767,6 +773,7 @@ cmdopen(Chan * c, int omode)
 
 	case Qdata:
 	case Qctl:
+		//DPRINT(1, "cmdopen: locking cmd.l\n");
 
 		qlock(&cmd.l);
 		cv = cmd.conv[CONV(c->qid)];
@@ -774,6 +781,8 @@ cmdopen(Chan * c, int omode)
 		if (waserror()) {
 			DPRINT(9,"cmdopen: bye byte ctl\n");
 			qunlock(&cv->l);
+			//DPRINT(1, "cmdopen: err unlocking cmd.l\n");
+
 			qunlock(&cmd.l);
 			nexterror();
 		}
@@ -792,9 +801,11 @@ cmdopen(Chan * c, int omode)
 		}
 		poperror();
 		qunlock(&cv->l);
+		//DPRINT(1, "cmdopen:  unlocking cmd.l\n");
+
 		qunlock(&cmd.l);
 
-		tmpjc = getrjobcount(cv->rjob);
+		tmpjc = countrjob(cv->rjob);
 
 		/* making sure that remote resources are allocated */
 		if (TYPE(c->qid) != Qctl && TYPE(c->qid) != Qstatus) {
@@ -854,14 +865,14 @@ cmdopen(Chan * c, int omode)
 			}
 		} /* end if : fname != nil */
 		break;
-	} /* end switch */
+	}
 	c->mode = omode;
 	c->flag |= COPEN;
 	c->offset = 0;
 
-	DPRINT(8,"open for [%s] complete in %uld\n", c->name->s, timestamp(stime));
+	DPRINT(8,"cmdopen: open for [%s] complete in %uld\n", c->name->s, timestamp(stime));
 	return c;
-} /* end function : cmdopen */
+}
 
 static void
 freeremoteresource(RemResrc * rr)
@@ -983,7 +994,6 @@ remoteclose(Chan * c, int filetype, int rjcount)
 		wunlock(&cc->rjob->l);
 		for (i = 0; i < rjcount; ++i) {
 			if (tmprr->remotefiles[filetype].cfile != nil) {
-				
 				qlock(&tmprr->remotefiles[filetype].l);
 				cclose(tmprr->remotefiles[filetype].cfile);
 				qunlock(&tmprr->remotefiles[filetype].l);
@@ -1041,7 +1051,7 @@ cmdclose(Chan * c)
 	case Qwait:
 	case Qstatus:
 		cc = cmd.conv[CONV(c->qid)];
-		tmpjc = getrjobcount(cc->rjob);
+		tmpjc = countrjob(cc->rjob);
 		filetype = TYPE(c->qid) - Qdata;
 
 		DPRINT(9,"rjobcount is [%d]\n", tmpjc);
@@ -1062,13 +1072,19 @@ cmdclose(Chan * c)
 		if (TYPE(c->qid) == Qdata) {
 			
 			if (c->mode == OWRITE || c->mode == ORDWR) {
+				//DPRINT(1, "cmdclose: locking cc->inlock cc %p", cc);
+				
 				qlock(&cc->inlock);
 				cmdfdclose(cc, 0);
+				//DPRINT(1, "cmdclose: unlocking cc->inlock cc %p", cc);
 				qunlock(&cc->inlock);
 			}
 			if (c->mode == OREAD || c->mode == ORDWR) {
+				//DPRINT(1, "cmdclose: locking cc->outlock");
 				qlock(&cc->outlock);
 				cmdfdclose(cc, 1);
+				//DPRINT(1, "cmdclose: unlocking cc->outlock");
+
 				qunlock(&cc->outlock);
 			}
 			
@@ -1134,7 +1150,7 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
-	jc = getrjobcount(c->rjob);
+	jc = countrjob(c->rjob);
 	/* making sure that remote resources are allocated */
 	if (jc < 0) {
 		DPRINT(9,"conv %d resources not reserved\n", CONV(ch->qid));
@@ -1202,7 +1218,7 @@ readfromall(Chan * ch, void *a, long n, vlong offset)
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
 
-	tmpjc = getrjobcount(c->rjob);
+	tmpjc = countrjob(c->rjob);
 	/* making sure that remote resources are allocated */
 	if (tmpjc < 0) {
 		DPRINT(9,"resources not reserved\n");
@@ -1256,7 +1272,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	vlong stime;
 
 	stime = osusectime (); /* recording start time */
-	DPRINT(9,"reading from [%s]\n", ch->name->s);
+	DPRINT(9,"cmdread: %s n %d\n", ch->name->s, n);
 	USED(offset);
 	p = a;
 
@@ -1294,7 +1310,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	case Qstatus:
 		c = cmd.conv[CONV(ch->qid)];
 		DPRINT(9,"came here 1 %d\n", c->x);
-		jc = getrjobcount(c->rjob);
+		jc = countrjob(c->rjob);
 		if (jc > 0) {
 			ret = readfromall(ch, a, n, offset);
 			break;
@@ -1327,7 +1343,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			DPRINT(9,"conv %ulx read on released conv", CONV(ch->qid));
 			error(EResourcesReleased);
 		}
-		jc = getrjobcount(c->rjob);
+		jc = countrjob(c->rjob);
 		if (jc < 0)
 			error(ENOReservation);
 
@@ -1343,20 +1359,23 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		fd = 1;
 		if (TYPE(ch->qid) == Qstderr)
 			fd = 2;
-		DPRINT(7, "READ fd %d n %d\n", c->fd[fd], n, n);
+		DPRINT(7, "READ fd %d n %d\n", c->fd[fd], n);
 		c = cmd.conv[CONV(ch->qid)];
+		//DPRINT(1, "cmdread: locking c->outlock\n");
 		qlock(&c->outlock);
 		if (c->fd[fd] == -1) {
 			/* FIXME: check if command is failed */
+			//DPRINT(1, "cmdread: err unlocking c->outlock\n");
 			qunlock(&c->outlock);
-			DPRINT(9, "cmd execution not proper\n");
+			DPRINT(9, "cmdread: bad cmd exec\n");
 			error ("Local execution failed");
 		}
 		
 		osenter();
 		n = read(c->fd[fd], a, n);
-		DPRINT(7, "READ FINISHED fd %d n %d\n", c->fd[fd], n, n);
+		DPRINT(7, "cmdread: READ FINISHED fd %d n %d\n", c->fd[fd], n);
 		osleave();
+		//DPRINT(1, "cmdread:  unlocking c->outlock\n");
 		qunlock(&c->outlock);
 		
 		if (n < 0)
@@ -1370,10 +1389,9 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			DPRINT(9,"resources released, as clone file closed\n");
 			error(EResourcesReleased);
 		}
-		jc = getrjobcount(c->rjob);
+		jc = countrjob(c->rjob);
 		if (jc < 0)
 			error(ENOReservation);
-
 		if (jc > 0) {
 			/*
 			 * FIXME: decide how exactly you want to implement
@@ -1385,8 +1403,8 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		c = cmd.conv[CONV(ch->qid)];
 		ret = qread(c->waitq, a, n);
 		break;
-	} /* end switch : file-type */
-	DPRINT(8,"read on [%s] of [%ld] bytes complete in %uld\n", ch->name->s, ret, timestamp(stime));
+	}
+	DPRINT(8,"cmdread: read %s ret %ld ts %uld %.*s\n", ch->name->s, ret, timestamp(stime), ret, a);
 	return ret;
 }
 
@@ -1709,7 +1727,7 @@ Conv * c, int nres, int first, int others)
 	DPRINT(9,"parallelres: %s %d %d %d\n", localpath, nres, first, others);
 
 	/* I think these errors should be checked much before */
-	jc = getrjobcount(rjob);
+	jc = countrjob(rjob);
 	if (jc == -2) {
 		DPRINT(9,"parallelres: resources released, as clone file closed\n");
 		error(EResourcesReleased);
@@ -2177,7 +2195,7 @@ p_send2all(Chan * ch, void *a, long n, vlong offset)
 		DPRINT(9,"resources released\n");
 		error(EResourcesReleased);
 	}
-	tmpjc = getrjobcount(c->rjob);
+	tmpjc = countrjob(c->rjob);
 
 	DPRINT(9,"write to [%s] repeating [%ld] times\n", ch->name->s, tmpjc);
 	/* making sure that remote resources are allocated */
@@ -2395,7 +2413,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		break;
 	case Qctl:
 		c = cmd.conv[CONV(ch->qid)];
-		jc = getrjobcount(c->rjob);
+		jc = countrjob(c->rjob);
 		if (c->rjob == nil) {
 			DPRINT(9,"cmdwrite: resources released, as clone file closed\n");
 			error(EResourcesReleased);
@@ -2442,6 +2460,19 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			}
 			groupres(ch, resNo, os, arch);
 			DPRINT(9,"cmdwrite: reservation done\n");
+			/*
+			  * unlock this conversation's inlocks and
+			  * outlocks.  Otherwise when you try to make
+			  * another reservation using the same
+			  * conversation you'll deadlock.
+			  */
+			c = cmd.conv[CONV(ch->qid)];
+			//DPRINT(1, "cmdwrite: unlocking c->inlock");
+			qunlock(&c->inlock);
+			//DPRINT(1, "cmdwrite: unlocking c->outlock");
+			qunlock(&c->outlock);
+			
+
 			break;
 
 		case CMexec:
@@ -2467,7 +2498,10 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				ret = p_send2all(ch, a, n, offset);
 				DPRINT(9,"cmdwrite: remote command done\n");
 			}
+			//DPRINT(1, "cmdwrite: unlocking c->inlock c %p", c);
+	
 			qunlock(&c->inlock);
+			//DPRINT(1, "cmdwrite: unlocking c->outlock\n");
 			qunlock(&c->outlock);
 			break;
 
@@ -2530,7 +2564,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			fs = (struct for_splice *) malloc(sizeof(struct for_splice));
 			fs->dst = namec(buf, Aopen, OWRITE, 0);
 			fs->src = namec(cb->f[1], Aopen, OREAD, 0);
-			kproc("proc_splice", proc_splice, fs, 0);
+			kproc("spliceproc", spliceproc, fs, 0);
 			poperror();
 			break;
 
@@ -2564,7 +2598,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 	case Qdata:
 		/* find no. of remote jobs running */
 		c = cmd.conv[CONV(ch->qid)];
-		jc = getrjobcount(c->rjob);
+		jc = countrjob(c->rjob);
 
 		if (c->rjob == nil) {
 			DPRINT(9,"cmdwrite: resources already released\n");
@@ -2582,10 +2616,11 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		}
 		/* local data file write request */
 		DPRINT(7, "EVH: Local Qdatawrite: [%d]\n", n );
-		
+		//DPRINT(1, "cmdwrite: lock c->inlock c %p", c);	
 		qlock(&c->inlock);
 		if (c->fd[0] == -1) {
 			/* FIXME: check if command is failed */
+			//DPRINT(1, "cmdwrite: err unlock c->inlock c %p", c);
 			qunlock(&c->inlock);
 			DPRINT(9, "cmd execution not proper\n");
 			error ("Local execution failed");
@@ -2594,6 +2629,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		osenter();
 		ret = write(c->fd[0], a, n);
 		osleave();
+		//DPRINT(1, "cmdwrite: unlock c->inlock c %p", c);	
 		qunlock(&c->inlock);
 		
 		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d\n", c->fd[0], ret, n, n);
@@ -2699,7 +2735,9 @@ cmdclone(char *user)
 	c->rjob->last = nil;
 	++ccount;
 	wunlock(&c->rjob->l);
+	//DPRINT(1, "cmdclone: lock c->inlock c %p\n", c);
 	qlock(&c->inlock);	/* lock writes to stdio until exec */
+	//DPRINT(1, "cmdclone: lock c->outlock\n");
 	qlock(&c->outlock);	/* lock reads from stdio until exec */
 	qunlock(&c->l);
 	DPRINT(9,"cmdclone: success\n");
