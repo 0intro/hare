@@ -13,8 +13,8 @@ echo $x
 cat /n/XCPU3/local/$x/status
 rsrc=`{cat /n/XCPU3/local/status}
 echo $rsrc
-echo res 4 >/n/XCPU3/local/$x/ctl
-#cat /n/XCPU3/local/$x/status
+echo res 1 >/n/XCPU3/local/$x/ctl
+#cat /n/XCPU3/local/$x/stdio
 echo exec $cmd >/n/XCPU3/local/$x/ctl
 cat /n/XCPU3/local/$x/stdio 
 }<>/n/XCPU3/local/clone 

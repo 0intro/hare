@@ -21,7 +21,7 @@ static int platix = 0;
 
 enum {
 	Qtopdir,				/* top level directory */
-	Qcmd,					/* "remote" dir */
+	Qcmd,					/* "remote" dir  */
 	Qclonus,
 	Qtopctl,
 	Qlocalfs,				/* local fs mount point */
@@ -92,7 +92,7 @@ _dprint(ulong debuglevel, char *fmt, ...)
 	len += vsnprint(s + len, sizeof s - len, newfmt, args);
 	va_end(args);
 	if (newfmt != nil) free(newfmt);
-	newfmt = nil;
+//	newfmt = nil;
 	
 	print(s, len);
 }
@@ -899,7 +899,7 @@ freeremoteresource(RemResrc * rr)
 
 			DPRINT(9,"umounting [%s]\n", location);
 			if (location !=  nil ) free(location);
-			location = nil;
+//			location = nil;
 		}
 	}
 }
@@ -923,7 +923,7 @@ freeremotejobs(RemJob * rjob)
 		freeremoteresource(ppr);
 		ppr = ppr->next;
 		if (tmp != nil ) free(tmp);
-		tmp = nil;
+//		tmp = nil;
 	}
 
 	for (i = 0; i < Nremchan; ++i) {
@@ -1024,12 +1024,15 @@ remoteclose(Chan * c, int filetype, int rjcount)
 static void
 cmdfdclose(Conv * c, int fd)
 {
-	DPRINT(9, "cmdfdclose: %s fd %d c->count[fd] %d c %p", c->cmd->f[1], fd, c->count[fd], c);
+	DPRINT(3, "cmdfdclose:  1");
+	DPRINT(3, "cmdfdclose: fd %d c->count[fd] %d c %p", fd, c->count[fd], c);
+	DPRINT(3, "cmdfdclose:  1");
 	if (--c->count[fd] == 0 && c->fd[fd] != -1) {
 		DPRINT(9,"cmdfdclose: %s c %p\n", c->cmd->f[1], c);
 		close(c->fd[fd]);
 		c->fd[fd] = -1;
 	}
+	DPRINT(3, "cmdfdclose:  1");
 }
 
 static void
@@ -1078,17 +1081,18 @@ cmdclose(Chan * c)
 		if (TYPE(c->qid) == Qdata) {
 			
 			if (c->mode == OWRITE || c->mode == ORDWR) {
-				//DPRINT(1, "cmdclose: locking cc->inlock cc %p", cc);
+				DPRINT(1, "cmdclose: locking cc->inlock cc %p", cc);
 				qlock(&cc->inlock);
 				cmdfdclose(cc, 0);
-				//DPRINT(1, "cmdclose: unlocking cc->inlock cc %p", cc);
+				DPRINT(1, "cmdclose: unlocking cc->inlock cc %p", cc);
 				qunlock(&cc->inlock);
 			}
 			if (c->mode == OREAD || c->mode == ORDWR) {
-				//DPRINT(1, "cmdclose: locking cc->outlock");
+				DPRINT(1, "cmdclose: locking 1 cc->outlock");
 				qlock(&cc->outlock);
+				DPRINT(1, "cmdclose: locking 2 cc->outlock");
 				cmdfdclose(cc, 1);
-				//DPRINT(1, "cmdclose: unlocking cc->outlock");
+				DPRINT(1, "cmdclose: unlocking 3 cc->outlock");
 				qunlock(&cc->outlock);
 			}
 		} else if (TYPE(c->qid) == Qstderr) {
@@ -1361,7 +1365,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			fd = 2;
 		DPRINT(7, "READ fd %d n %d\n", c->fd[fd], n);
 		c = cmd.conv[CONV(ch->qid)];
-		//DPRINT(1, "cmdread: locking c->outlock\n");
+		DPRINT(1, "cmdread: locking c->outlock\n");
 		qlock(&c->outlock);
 		if (c->fd[fd] == -1) {
 			/* FIXME: check if command is failed */
@@ -1537,7 +1541,7 @@ validrr(char *mnt, char *os, char *arch)
 		if (ans->path != nil) free(ans->path);
 		ans->path = nil;
 		if (ans != nil )free(ans);
-		ans = nil;
+//		ans = nil;
 		poperror();
 		return nil;
 	}
@@ -1576,7 +1580,7 @@ Error:
 	if (ans->path != nil) free(ans->path);
 	ans->path = nil;
 	if (ans != nil ) free(ans);
-	ans = nil;
+//	ans = nil;
 	if (dirs !=  nil) free(dirs);
 	dirs = nil;
 	
@@ -1904,7 +1908,7 @@ freermounts(RemMount ** allremotenodes, int validrc)
 		allremotenodes[i] = nil;
 	}
 	if (allremotenodes !=  nil) free(allremotenodes);
-	allremotenodes = nil;
+//	allremotenodes = nil;
 }
 
 
@@ -2141,7 +2145,7 @@ p_send2one(void *param)
 	n = psw->p_n;
 	offset = psw->p_offset;
 	if (psw != nil) free(psw);
-	psw = nil;
+//	psw = nil;
 
 	report[0] = rf->lsessid;
 	report[1] = 0;				/* indicates failure */
@@ -2481,12 +2485,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			  * another reservation using the same
 			  * conversation you'll deadlock.
 			  */
-			c = cmd.conv[CONV(ch->qid)];
-			//DPRINT(1, "cmdwrite: unlocking c->inlock");
-			qunlock(&c->inlock);
-			//DPRINT(1, "cmdwrite: unlocking c->outlock");
-			qunlock(&c->outlock);
-			
+
 
 			break;
 
@@ -2513,11 +2512,18 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				ret = p_send2all(ch, a, n, offset);
 				DPRINT(9,"cmdwrite: remote command done\n");
 			}
-			//DPRINT(1, "cmdwrite: unlocking c->inlock c %p", c);
-	
+			c = cmd.conv[CONV(ch->qid)];
 			qunlock(&c->inlock);
-			//DPRINT(1, "cmdwrite: unlocking c->outlock\n");
 			qunlock(&c->outlock);
+/*			if (canqlock(&c->inlock)) {
+				DPRINT(1, "cmdwrite: unlocking c->inlock");
+				qunlock(&c->inlock);
+			}
+			if (canqlock(&c->outlock)) {
+				DPRINT(1, "cmdwrite: unlocking c->outlock");
+				qunlock(&c->outlock);
+			}
+*/
 			break;
 
 		case CMkillonclose:
@@ -2673,7 +2679,7 @@ cmdwstat(Chan * c, uchar * dp, int n)
 		if (waserror()) {
 			DPRINT(9,"cmdwstat: error has errors!\n");
 			if (d != nil) free(d);
-			d = nil;
+//			d = nil;
 			
 			nexterror();
 		}
@@ -2689,7 +2695,7 @@ cmdwstat(Chan * c, uchar * dp, int n)
 			cv->perm = d->mode & 0777;
 		poperror();
 		if (d != nil) free(d);
-		d = nil;
+//		d = nil;
 		break;
 	}
 	return n;
@@ -2754,8 +2760,12 @@ cmdclone(char *user)
 	ccount++;
 	wunlock(&c->rjob->l);
 	//DPRINT(1, "cmdclone: lock c->inlock c %p\n", c);
+	canqlock(&c->inlock);
+	qunlock(&c->inlock);
 	qlock(&c->inlock);	/* lock writes to stdio until exec */
 	//DPRINT(1, "cmdclone: lock c->outlock\n");
+	canqlock(&c->outlock);
+	qunlock(&c->outlock);
 	qlock(&c->outlock);	/* lock reads from stdio until exec */
 	qunlock(&c->l);
 	DPRINT(9,"cmdclone: success\n");
@@ -2970,7 +2980,7 @@ readchandir(Chan * dirChan, Dir ** d)
 
 	poperror();
 	if (buf != nil) free(buf);
-	buf = nil;
+//	buf = nil;
 	poperror();
 	return ts;
 }
