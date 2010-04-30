@@ -91,7 +91,9 @@ _dprint(ulong debuglevel, char *fmt, ...)
 	va_start(args, fmt);
 	len += vsnprint(s + len, sizeof s - len, newfmt, args);
 	va_end(args);
-	free(newfmt);
+	if (newfmt != nil) free(newfmt);
+	newfmt = nil;
+	
 	print(s, len);
 }
 #define DPRINT if(vflag)_dprint
@@ -896,7 +898,8 @@ freeremoteresource(RemResrc * rr)
 			/* unbind ??  */
 
 			DPRINT(9,"umounting [%s]\n", location);
-			free(location);
+			if (location !=  nil ) free(location);
+			location = nil;
 		}
 	}
 }
@@ -919,7 +922,8 @@ freeremotejobs(RemJob * rjob)
 		tmp = ppr;
 		freeremoteresource(ppr);
 		ppr = ppr->next;
-		free(tmp);
+		if (tmp != nil ) free(tmp);
+		tmp = nil;
 	}
 
 	for (i = 0; i < Nremchan; ++i) {
@@ -1499,7 +1503,8 @@ validrr(char *mnt, char *os, char *arch)
 
 	if (waserror()) {
 		DPRINT(9,"can't verify %s: %r\n", mnt);
-		free(dirs);
+		if (dirs != nil) free(dirs);
+		dirs = nil;
 		nexterror();
 	}
 	n = lsdir(mnt, &dirs);
@@ -1519,7 +1524,8 @@ validrr(char *mnt, char *os, char *arch)
 			}
 		}
 	}
-	free(dirs);
+	if (dirs != nil) free(dirs);
+	dirs = nil;
 
 	ans = (RemMount *) malloc(sizeof(RemMount));
 	n = strlen(mnt)+strlen(local)+1;
@@ -1528,8 +1534,10 @@ validrr(char *mnt, char *os, char *arch)
 
 	if (d == e) {
 		DPRINT(9,"validrr: [%s] not found, returning\n", local);
-		free(ans->path);
-		free(ans);
+		if (ans->path != nil) free(ans->path);
+		ans->path = nil;
+		if (ans != nil )free(ans);
+		ans = nil;
 		poperror();
 		return nil;
 	}
@@ -1561,12 +1569,17 @@ validrr(char *mnt, char *os, char *arch)
 		goto Error;
 	}
 Found:
-	free(dirs);
+	if (dirs != nil) free(dirs);
+	dirs = nil;
 	return ans;
 Error:
-	free(ans->path);
-	free(ans);
-	free(dirs);
+	if (ans->path != nil) free(ans->path);
+	ans->path = nil;
+	if (ans != nil ) free(ans);
+	ans = nil;
+	if (dirs !=  nil) free(dirs);
+	dirs = nil;
+	
 	return nil;
 }
 
@@ -1586,7 +1599,8 @@ findrr(int *validrc, char *os, char *arch)
 	if (waserror()) {
 		DPRINT(9,"%s: %r\n", remmnt);
 		*validrc = 0;
-		free(dirs);
+		if (dirs != nil)free(dirs);
+		dirs = nil;
 		return nil;
 	}
 	n = lsdir(path, &dirs);
@@ -1613,7 +1627,8 @@ findrr(int *validrc, char *os, char *arch)
 	}
 	allremotenodes[rc] = nil;
 	*validrc = rc;
-	free(dirs);
+	if (dirs != nil) free(dirs);
+	dirs = nil;
 	return allremotenodes;
 }
 
@@ -1881,12 +1896,15 @@ freermounts(RemMount ** allremotenodes, int validrc)
 	int i;
 
 	for (i = 0; i < validrc; ++i) {
-		free(allremotenodes[i]->path);
+		if (allremotenodes[i]->path != nil) free(allremotenodes[i]->path);
+		allremotenodes[i]->path = nil;
 		/* close the status channel */
 		cclose(allremotenodes[i]->status);
-		free(allremotenodes[i]);
+		if (allremotenodes[i] != nil) free(allremotenodes[i]);
+		allremotenodes[i] = nil;
 	}
-	free(allremotenodes);
+	if (allremotenodes !=  nil) free(allremotenodes);
+	allremotenodes = nil;
 }
 
 
@@ -2122,7 +2140,8 @@ p_send2one(void *param)
 	a = psw->p_a;
 	n = psw->p_n;
 	offset = psw->p_offset;
-	free(psw);
+	if (psw != nil) free(psw);
+	psw = nil;
 
 	report[0] = rf->lsessid;
 	report[1] = 0;				/* indicates failure */
@@ -2653,7 +2672,9 @@ cmdwstat(Chan * c, uchar * dp, int n)
 			error(Enomem);
 		if (waserror()) {
 			DPRINT(9,"cmdwstat: error has errors!\n");
-			free(d);
+			if (d != nil) free(d);
+			d = nil;
+			
 			nexterror();
 		}
 		n = convM2D(dp, n, d, (char *) &d[1]);
@@ -2667,7 +2688,8 @@ cmdwstat(Chan * c, uchar * dp, int n)
 		if (d->mode != ~0UL)
 			cv->perm = d->mode & 0777;
 		poperror();
-		free(d);
+		if (d != nil) free(d);
+		d = nil;
 		break;
 	}
 	return n;
@@ -2935,7 +2957,8 @@ readchandir(Chan * dirChan, Dir ** d)
 	if (buf == nil)
 		error(Enomem);
 	if (waserror()) {
-		free(buf);
+		if (buf != nil) free(buf);
+		buf = nil;
 		nexterror();
 	}
 
@@ -2946,7 +2969,8 @@ readchandir(Chan * dirChan, Dir ** d)
 	}
 
 	poperror();
-	free(buf);
+	if (buf != nil) free(buf);
+	buf = nil;
 	poperror();
 	return ts;
 }
