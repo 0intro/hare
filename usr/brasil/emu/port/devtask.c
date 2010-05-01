@@ -601,13 +601,13 @@ spliceproc(void *param)
 		/* read data from source channel */
 		DPRINT(9, "spliceproc: READING %s", src->name->s);
 		ret = devtab[src->type]->read(src, buf, 512, 0);
-		DPRINT(9, "spliceproc: READ  %s ret %d %.*s", src->name->s, ret, ret, buf);
+		DPRINT(9, "spliceproc: READ  %s ret %d\n", src->name->s, ret, ret);
 		if (ret <= 0)
 			break;
-		DPRINT(9,"spliceproc: copying [%s]->[%s] %ld data %.*s\n",
-			src->name->s, dst->name->s, ret, ret, buf);
+		DPRINT(9,"spliceproc: copying [%s]->[%s] %ld data\n",
+			src->name->s, dst->name->s, ret, ret);
 		for (a = buf; ret > 0; a += r) {
-			DPRINT(9, "spliceproc: WRITING %s ret %d %.*s", dst->name->s, ret, ret, a);
+			DPRINT(9, "spliceproc: WRITING %s ret %d", dst->name->s, ret, ret);
 			r = devtab[dst->type]->write(dst, a, ret, 0);
 			DPRINT(9, "spliceproc: WROTE  %s r %d", dst->name->s, r);
 			ret = ret - r;
@@ -1379,7 +1379,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		n = read(c->fd[fd], a, n);
 		DPRINT(7, "cmdread: READ FINISHED fd %d n %d\n", c->fd[fd], n);
 		osleave();
-		//DPRINT(1, "cmdread:  unlocking c->outlock\n");
+		DPRINT(1, "cmdread:  unlocking c->outlock\n");
 		qunlock(&c->outlock);
 		
 		if (n < 0)
@@ -1408,7 +1408,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		ret = qread(c->waitq, a, n);
 		break;
 	}
-	DPRINT(8,"cmdread: read %s ret %ld ts %uld %.*s\n", ch->name->s, ret, timestamp(stime), ret, a);
+	DPRINT(8,"cmdread: read %s ret %ld ts %uld\n", ch->name->s, ret, timestamp(stime), ret);
 	return ret;
 }
 
@@ -2885,14 +2885,16 @@ myunionread(Chan * c, void *va, long n)
 			}
 			DPRINT(9,"myuninrd reading [%s]\n", c->umc->name->s);
 			nr = devtab[c->umc->type]->read(c->umc, a_va, a_n, c->umc->offset);
+			DPRINT(9,"myuninrd read %d\n", nr);
 			if (nr < 0)
 				nr = 0;			/* dev.c can return -1 */
 			c->umc->offset += nr;
 			poperror();
+			DPRINT(9,"myuninrd read--2 %d\n", nr);
 		}						/* end if */
 		if (nr > 0) {
-			DPRINT(9,"myunionread got something out[%s]\n",
-				c->umc->name->s);
+//			DPRINT(9,"myunionread got something out[%s]\n",
+//				c->umc->name->s);
 			/*
 			 * break; *//* commenting so that it will read from
 			 * all chans
