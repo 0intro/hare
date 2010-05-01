@@ -29,7 +29,7 @@ main(int argc, char **argv)
 	
 	prog = argv[0];
 	logfd = open("/tmp/xcpu.log", OWRITE);
-	mnt = "/n/csrv/local";
+	mnt = "/n/csrv/parent/local";
 	ARGBEGIN{
 	default:
 		usage(argv[0]);

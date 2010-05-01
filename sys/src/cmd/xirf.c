@@ -87,7 +87,7 @@ threadmain(int argc, char **argv)
 	if(logfd < 0)
 		sysfatal("couldn't open log");
 	
-	mnt = "/n/csrv/local";
+	mnt = "/n/csrv/parent/local";
 	ARGBEGIN{
 	
 	}ARGEND;

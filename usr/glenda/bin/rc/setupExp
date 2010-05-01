@@ -35,12 +35,12 @@ echo mount tcp!127.1!5670 parent > /n/host1/ctl
 echo mount tcp!127.1!5670 parent > /n/host2/ctl
 
 echo children nodes connected
-echo verifying
-cat /n/csrv/local/status
-echo verifying child host1
-cat /n/host1/local/status
-echo verifying child host2
-cat /n/host2/local/status
+#echo verifying
+#cat /n/csrv/local/status
+#echo verifying child host1
+#cat /n/host1/local/status
+#echo verifying child host2
+#cat /n/host2/local/status
 echo executing simple test
 
 echo 'res 2
