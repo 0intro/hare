@@ -1374,7 +1374,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			DPRINT(9, "cmdread: bad cmd exec\n");
 			error ("Local execution failed");
 		}
-		
+		DPRINT(1, "cmdread: about to read local data\n");
 		osenter();
 		n = read(c->fd[fd], a, n);
 		DPRINT(7, "cmdread: READ FINISHED fd %d n %d\n", c->fd[fd], n);
@@ -2576,15 +2576,18 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				break;
 			}
 			if (waserror()) {
-				DPRINT(9,"cmdwrite: splice failed: %r\n");
+				DPRINT(9,"cmdwrite: splice failed: \n");
 				nexterror();
 			}
 			/* find the path to stdio file */
 			parent_path = fetchparentpath(ch->name->s);
 			snprint(buf, sizeof buf, "%s/stdio", parent_path);
 			fs = (struct for_splice *) malloc(sizeof(struct for_splice));
+			DPRINT(8,"cmdwrite: splice request opening [%s]\n", buf);
 			fs->dst = namec(buf, Aopen, OWRITE, 0);
+			DPRINT(8,"cmdwrite: splice request opening [%s]\n", cb->f[1]);
 			fs->src = namec(cb->f[1], Aopen, OREAD, 0);
+			DPRINT(8,"cmdwrite: splice request open done, going for proc\n");
 			kproc("spliceproc", spliceproc, fs, 0);
 			poperror();
 			break;

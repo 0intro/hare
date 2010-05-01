@@ -1,0 +1,42 @@
+#!/bin/rc
+BrasilPath=../../../brasil/Plan9/386/bin/brasil
+port=5670
+
+cleanbra >[2=1] >/dev/null
+newxlog
+window -r 1000 400 1600 1040 $BrasilPath csrvlite -D -M /srv/csrv -h tcp!*!5670
+window -r 400 400 1000 1040 $BrasilPath csrvlite -D -M /srv/host1 -h tcp!*!5671
+window -r 0  400  400 1040 tail -f /tmp/xcpu.log
+sleep 1
+
+mount -nc /srv/csrv /n/csrv
+mount -nc /srv/host1 /n/host1
+
+echo mounting done
+echo debug 9 > /n/csrv/local/ctl
+echo debug 9 > /n/host1/local/ctl
+
+echo debugging set
+
+echo mount tcp!127.1!5671 host1 > /n/csrv/ctl
+echo mount tcp!127.1!5671 host2 > /n/csrv/ctl
+echo mount tcp!127.1!5671 host3 > /n/csrv/ctl
+echo mount tcp!127.1!5671 host4 > /n/csrv/ctl
+echo mount tcp!127.1!5671 host5 > /n/csrv/ctl
+
+echo children nodes connected
+echo verifying
+cat /n/csrv/local/status
+echo executing simple test
+
+echo 'res 2
+exec 0 fdecho test
+exec 1 mecat
+splice 0 1
+end 1' | pxcpu
+
+echo Done with simple test
+unmount /n/csrv
+unmount /n/host1
+
+#xsdo

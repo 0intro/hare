@@ -77,7 +77,8 @@ main(int argc, char **argv)
 	/* opening ctl files of all childeren */
 	resfdctl = malloc(nres*sizeof(int));
 	for(i = 0; i < nres; i++){
-		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i);
+/*		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i);   */
+		snprint(fdfile, 512, "%s//%d/ctl", mnt,  i);
 		resfdctl[i]=open(fdfile, ORDWR);
 		if(resfdctl[i] < 0)
 			sysfatal("couldn't open part of res: %s %s %d %r", mnt, sess, i);
@@ -94,7 +95,8 @@ main(int argc, char **argv)
 			i = atoi(a[2]);
 			if(i < 0 || nres <= i)
 				sysfatal("bad splice out res");
-			fprint(resfdctl[i], "splice csrv/local/%s/%s/stdio", sess, a[1]);
+/*			fprint(resfdctl[i], "splice /csrv/local/%s/%s/stdio", sess, a[1]); */
+			fprint(resfdctl[i], "splice /csrv/local/%s/stdio",  a[1]);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
