@@ -597,6 +597,10 @@ spliceproc(void *param)
 
 	DPRINT(9,"spliceproc starting [%s]->[%s]\n", src->name->s,
 		dst->name->s);
+	if (waserror()) {
+		DPRINT(9,"spliceproc: something went south - exiting\n");
+		pexit("spliceproc",0);
+	}
 	for(;;) {
 		/* read data from source channel */
 		DPRINT(9, "spliceproc: READING %s", src->name->s);
@@ -610,9 +614,13 @@ spliceproc(void *param)
 			DPRINT(9, "spliceproc: WRITING %s ret %d", dst->name->s, ret, ret);
 			r = devtab[dst->type]->write(dst, a, ret, 0);
 			DPRINT(9, "spliceproc: WROTE  %s r %d", dst->name->s, r);
+			if(r <= 0)
+				goto error;
 			ret = ret - r;
 		}
 	}
+error:
+	poperror();
 	DPRINT(9,"spliceproc: closing [%s]->[%s] \n", src->name->s,
 		dst->name->s);
 	DPRINT(9,"spliceproc: %s %s complete\n", src->name->s,
