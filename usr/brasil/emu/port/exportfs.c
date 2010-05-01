@@ -1043,7 +1043,7 @@ Exread(Export *fs, Fcall *t, Fcall *r)
 		error(Emode);
 	if(c->mode != OREAD && c->mode != ORDWR)
 		error(Eaccess);
-	if(t->count > fs->msize-IOHDRSZ)
+	if(t->count < 0 || t->count > fs->msize-IOHDRSZ)
 		error(Ecount);
 	if(t->offset < 0)
 		error(Enegoff);
@@ -1113,7 +1113,7 @@ Exwrite(Export *fs, Fcall *t, Fcall *r)
 		error(Eaccess);
 	if(c->qid.type & QTDIR)
 		error(Eisdir);
-	if(t->count > fs->msize-IOHDRSZ)
+	if(t->count < 0 || t->count > fs->msize-IOHDRSZ)
 		error(Ecount);
 	if(t->offset < 0)
 		error(Enegoff);

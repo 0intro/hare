@@ -146,7 +146,6 @@ srv9walk(Chan *c, Chan *nc, char **name, int nname)
 			if(d == nil){
 				if(j == 0)
 					error(Enonexist);
-				print("srv9walk: %s pc=0x%.8lux\n", up->genbuf,  getcallerpc(&c));
 				kstrcpy(up->env->errstr, Enonexist, ERRMAX);
 				break;
 			}

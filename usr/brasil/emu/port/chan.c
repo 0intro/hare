@@ -964,43 +964,6 @@ saveregisters(void)
 {
 }
 
-void
-dumpmount(void)		/* DEBUGGING */
-{
-	Pgrp *pg;
-	Mount *t;
-	Mhead **h, **he, *f;
-
-	if(up == nil){
-		print("no process for dumpmount\n");
-		return;
-	}
-	pg = up->env->pgrp;
-
-	if(pg == nil){
-		print("no pgrp for dumpmount\n");
-		return;
-	}
-	rlock(&pg->ns);
-	if(waserror()){
-		runlock(&pg->ns);
-		nexterror();
-	}
-
-	he = &pg->mnthash[MNTHASH];
-	for(h = pg->mnthash; h < he; h++){
-		for(f = *h; f; f = f->hash){
-			print("head: %#p: %s %#llux.%lud %C %lud -> \n", f,
-				f->from->name->s, f->from->qid.path,
-				f->from->qid.vers, devtab[f->from->type]->dc,
-				f->from->dev);
-			for(t = f->mount; t; t = t->next)
-				print("\t%#p: %s (umh %#p) (path %#.8llux dev %C %lud)\n", t, t->to->name->s, t->to->umh, t->to->qid.path, devtab[t->to->type]->dc, t->to->dev);
-		}
-	}
-	poperror();
-	runlock(&pg->ns);
-}
 /*
  * Turn a name into a channel.
  * &name[0] is known to be a valid address.  It may be a kernel address.
@@ -1073,7 +1036,6 @@ namec(char *aname, int amode, int omode, ulong perm)
 		t = devno(r, 1);
 		if(t == -1)
 			error(Ebadsharp);
-			
 		c = devtab[t]->attach(up->genbuf+n);
 		break;
 
@@ -1093,8 +1055,7 @@ namec(char *aname, int amode, int omode, ulong perm)
 		free(e.name);
 		free(e.elems);
 		free(e.off);
-		//print("namec: %q: %r\n", up->env->errstr);
-		//dumpmount();
+//dumpmount();
 		nexterror();
 	}
 
@@ -1125,7 +1086,6 @@ namec(char *aname, int amode, int omode, ulong perm)
 			print("namec %s walk error npath=%d\n", aname, npath);
 			nexterror();
 		}
-		//print("namec: error tmperrbuf\n");
 		strcpy(tmperrbuf, up->env->errstr);
 	NameError:
 		len = prefix+e.off[npath];
@@ -1328,7 +1288,6 @@ if(c->umh != nil){
 			/* save error */
 			createerr = up->env->errstr;
 			up->env->errstr = tmperrbuf;
-			print("namec: createrr %s tmperrbuf %s\n", createerr, tmperrbuf);
 			/* note: we depend that walk does not error */
 			if(walk(&c, e.elems+e.nelems-1, 1, nomount, nil) < 0){
 				up->env->errstr = createerr;
