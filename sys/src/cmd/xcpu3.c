@@ -53,7 +53,7 @@ threadmain(int argc, char **argv)
 		execute date
 	*/
 	
-	n = fprint(cfd, "res 1\n");
+	n = fprint(cfd, "res 64\n");
 	if(n < 0)
 		sysfatal("couldn't send res: %r");	
 	n = fprint(cfd, "exec date\n");
