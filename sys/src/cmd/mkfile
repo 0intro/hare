@@ -3,6 +3,7 @@
 TARG=`{ls *.[cy] | sed '/\.tab\.c$/d;s/..$//'}
 HFILES=/$objtype/include/u.h /sys/include/libc.h /sys/include/bio.h
 BIN=/$objtype/bin
+BGPBIN=/n/9/$objtype/bin
 PROGS=${TARG:%=$O.%}
 LDFLAGS=
 YFLAGS=-d
@@ -58,6 +59,8 @@ all:V:	$PROGS
 
 %.install:V: $BIN/%
 
+%.installbgp:V: $BGPBIN/%
+
 $cpuobjtype._cp:	/bin/cp
 	cp $prereq $target
 
@@ -72,6 +75,9 @@ $cpuobjtype._cp:	/bin/cp
 
 $BIN/%:	$O.% $cpuobjtype._cp
 	$cpuobjtype._cp $O.$stem $BIN/$stem
+	
+$BGPBIN/%:	$O.% $cpuobjtype._cp
+	$cpuobjtype._cp $O.$stem $BGPBIN/$stem
 
 %.directories:V:
 	for(i in $DIRS) @{
@@ -95,6 +101,11 @@ cleanfiles:V:
 install:V:
 	test -e $cpuobjtype._cp || cp /bin/cp $cpuobjtype._cp
 	mk $MKFLAGS $TARG.install
+	#mk $MKFLAGS directories
+	
+installbgp:V:
+	test -e $cpuobjtype._cp || cp /bin/cp $cpuobjtype._cp
+	objtype=power mk $MKFLAGS $TARG.installbgp
 	#mk $MKFLAGS directories
 
 installall:V:
