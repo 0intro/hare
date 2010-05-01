@@ -77,7 +77,7 @@ squidboy(int cpuno, void*)
 	active.machs |= mask;
 	unlock(&active);
 
-	print("cpu%d: %ux %ludMHz\n", m->machno, m->cputype, m->cpumhz);
+	/* print("cpu%d: %ux %ludMHz\n", m->machno, m->cputype, m->cpumhz); */
 
 	/*
 	 * Restrain your octopus! Don't let it go out on the sea!
@@ -121,10 +121,12 @@ fab(int n)
 			break;
 		delay(1);
 	}
+/* DEBUG
 	if((active.machs & n) == n)
 		print("Professor Matic, Robert and Venus are all aboard\n");
 	else
 		print("active.machs %#8.8ux\n", active.machs);
+*/
 }
 
 /*
@@ -244,9 +246,12 @@ main(u32int r3, u32int r4, u32int r5,u32int r6, u32int r7)
 	 */
 	cnsconsole();
 
+	/* DEBUG
 	print("\nPlan 9 BG/P\n");
 	print("cpu%d: %ux %ludMHz\n", m->machno, m->cputype, m->cpumhz);
+		
 	archprint();
+	*/
 	/* 
 	 * EVH: moved this to manual invocation via devarch
 	 * since it triggers service node to try and contact ciod

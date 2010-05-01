@@ -3,7 +3,7 @@
 #
 
 # try to keep this up to date to keep things straight
-/boot/echo Boot Script Version 0.7 03312010
+/boot/echo Boot Script Version 0.7 05012010
 
 cputype=power
 objtype=$cputype
@@ -117,7 +117,7 @@ if(! test -d $rootdir/$rootspec/$cputype){
 
 bind -c $rootdir/$rootspec $rootdir
 rootsrv='#s/'$rootsrv
-echo root is on $rootdir, root is served from $rootsrv
+#echo root is on $rootdir, root is served from $rootsrv
 
 #
 # Finish the namespace setup.
@@ -155,22 +155,22 @@ if(~ $cpunode '0'){
 	bind '#|' /n/output
 
 	# wait for ethernet to come up
-	echo Waiting for turbines to come up to speed
+	#echo Waiting for turbines to come up to speed
 	sleep 30
 	
 	aux/listen -i -t /bin/service.bgp tcp
 	
 	# do we only want to send this from one IO node?
 	if (~$cpunode '0') {
-		echo Initiating Handshake
+		#echo Initiating Handshake
 		echo 0x01 0x1e 0x0 0 0 0 > /dev/ras
 	}
 	
 	# wait for miniciod to do its thing, need better sync	
 	sleep 5
 	times=0
-	while(! ~ $#times 5 && test ! -e '/env/MODE') {
-		echo -n '.'
+	while(! ~ $#times 50 && test ! -e '/env/MODE') {
+		#echo -n '.'
 		times=($times 1)
 		sleep 5
 	}
@@ -190,7 +190,7 @@ fn prefix_log {
 # New FS Backmount Model
 #
 if(test -e '/env/MODE') {
-	echo Mode detected
+	#echo Mode detected
 	mode=(`{cat /env/MODE})
 	if(test -e '/env/BRASIL_ADDR')
 		fsaddr=(`{cat /env/BRASIL_ADDR})
@@ -199,16 +199,16 @@ if(test -e '/env/MODE') {
 
 	if(~ $cpunode '0'){
 		# wait for ethernet to come up
-		echo fsaddr $fsaddr
-		echo Atomic batteries to power
+		#echo fsaddr $fsaddr
+		#echo Atomic batteries to power
 
 		times=0
-		while(! ~ $#times 10 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr brasil /n/brasil) {
-			echo -n '.'
+		while(! ~ $#times 100 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr brasil /n/brasil) {
+			#echo -n '.'
 			times=($times 1)
 			sleep 5
 		}
-		echo done.
+		#echo done.
 	}
 	
 	# frontend host file system is at n/local under brasil
@@ -231,19 +231,19 @@ if(test -e '/env/MODE') {
 	} &
 }
 if not {
-	echo No mode detected
+	#echo No mode detected
 }
 
 if(~ $cpunode '1'){
 	# wait at least 40 before proceeding to let I/O Node Setup
-	echo Waiting for turbines to come up to speed
+	#echo Waiting for turbines to come up to speed
 	# extended sleep to allow for brasil load on io node
 	sleep 60	
 
 	fsaddr='tcp!11.' ^ $xyzip(4) ^ '!564'
 	times=0
-	while(! ~ $#times 12 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr ionode /n/io) {
-		echo -n '.'
+	while(! ~ $#times 100 && ! ~ $fsaddr '' && ! eval srv -q -c -m $fsaddr ionode /n/io) {
+		#echo -n '.'
 		times=($times 1)
 		sleep 5
 	}
@@ -261,7 +261,7 @@ if(~ $cpunode '1'){
 		cat /dev/kmesg /dev/kprint | prefix_log > /n/io/n/error/data
 	}&
 	
-	echo done.
+	#echo done.
 }	
 
 
@@ -271,7 +271,7 @@ if(test -e '/n/home/lib/profile') {
 	. /n/home/lib/profile
 }
 
-echo starting services
+#echo starting services
 bind /boot/rc/bin/service /bin/service
 
 if(test -d /mnt/factotum)
@@ -330,9 +330,9 @@ fn run_app {
 
 # if someone passed us an application to run, then lets run it
 if(~ $cpunode '1'){
-echo cpu node only bits: $mode
+	#echo cpu node only bits: $mode
 	if(~ $mode nompirun) {
-		echo nompirun mode: starting request application
+		#echo nompirun mode: starting request application
 		@{
 			rfork
 			run_app
@@ -341,7 +341,7 @@ echo cpu node only bits: $mode
 		wait
 		# TODO: perhaps send a RAS message signaling job completetion?
 
-		echo done	
+		#echo done	
 	}
 }
 	

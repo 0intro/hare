@@ -2655,8 +2655,15 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 		osleave();
 		//DPRINT(1, "cmdwrite: unlock c->inlock c %p", c);	
 		qunlock(&c->inlock);
-		
 		DPRINT(8,"cmdwrite: WRITEFD %d ret %d n %d\n", c->fd[0], ret, n, n);
+		
+		if(ret == 0)
+			error(Ehungup);
+		if(ret < 0) {
+			/* XXX perhaps should kill writer "write on closed pipe" here, 2nd time around? */
+			oserror();
+		}		
+		
 		break;
 	}
 
