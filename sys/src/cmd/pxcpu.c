@@ -77,8 +77,8 @@ main(int argc, char **argv)
 	/* opening ctl files of all childeren */
 	resfdctl = malloc(nres*sizeof(int));
 	for(i = 0; i < nres; i++){
-/*		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i);   */
-		snprint(fdfile, 512, "%s//%d/ctl", mnt,  i);
+		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i); 
+/*		snprint(fdfile, 512, "%s//%d/ctl", mnt,  i); */
 		resfdctl[i]=open(fdfile, ORDWR);
 		if(resfdctl[i] < 0)
 			sysfatal("couldn't open part of res: %s %s %d %r", mnt, sess, i);
