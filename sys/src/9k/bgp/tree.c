@@ -673,7 +673,7 @@ treenetreset(void)
 	treechaninit(0, p2paddr, sys->ionode);
 	treechaninit(1, p2paddr, sys->ionode);
 
-	print("Tree: p2paddr %#8.8ux\n", p2paddr);
+	/* print("Tree: p2paddr %#8.8ux\n", p2paddr); */
 }
 
 

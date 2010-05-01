@@ -1597,14 +1597,16 @@ init_tx_queue(Torus *t, int group, int index)
 	set_inj_counter_zero_interrupt(group, index, group);
 	tx->incr = &t->dma[group].inj.counter[index].increment;
 
+/*
 	print("torus: allocated tx queue %d:%d: %p (start=%#8.8ux, end=%#8.8ux)\n",
 	    group, index, tx->desc, tx->fifo->start, tx->fifo->end);
+*/
 
 	tx->active++;
 }
 
 static void
-init_rx_queue(Torus *t, int group, int index, int region)
+init_rx_queue(Torus *t, int group, int index, int)
 {
 	RxRing *rx;
 
@@ -1619,9 +1621,10 @@ init_rx_queue(Torus *t, int group, int index, int region)
 
 	/* EVH: This next comment was in the original file */
 	/* XXX: set dma region for rx fifo */
-
+/*
 	print("Torus: allocated rx queue %d:%d: %p (start=%#8.8ux, end=%#8.8ux) region %d\n",
 	     group, index, rx->desc, rx->fifo->start, rx->fifo->end, region);
+*/
 
 	rx->active++;
 }
@@ -1738,7 +1741,7 @@ torusreset(void)
 	if(!(personality->Kernel_Config.NodeConfig & BGP_PERS_ENABLE_Torus))
 		return;
 
-	print("Torus initialization starting\n");
+	/* print("Torus initialization starting\n"); */
 
 	/*
 	 * Extract the configuration from the personality.
@@ -1888,7 +1891,7 @@ torusreset(void)
 
 	imb();
 
-	print("Torus reset complete\n");
+	/* print("Torus reset complete\n"); */
 }
 
 Dev torusdevtab = {
