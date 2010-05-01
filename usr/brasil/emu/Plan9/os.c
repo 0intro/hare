@@ -146,14 +146,12 @@ void
 traphandler(void *reg, char *msg)
 {
 	int intwait;
-	print("traphandler: %d: %s\n", getpid(), msg);
+	
 	intwait = up->intwait;
 	up->intwait = 0;
 	/* Ignore pipe writes from devcmd */
 	if(strstr(msg, "write on closed pipe") != nil)
-		notejmp(reg, crap, 1);
-		//noted(NCONT);
-		//noted(NDFLT);
+		noted(NCONT);
 
 	if(sflag) {
 		if(intwait && strcmp(msg, Eintr) == 0)
