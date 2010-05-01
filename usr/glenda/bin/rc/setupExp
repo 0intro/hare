@@ -4,33 +4,43 @@ port=5670
 
 cleanbra >[2=1] >/dev/null
 newxlog
-window -r 1000 400 1600 1040 $BrasilPath csrvlite -D -M /srv/csrv -h tcp!*!5670
-window -r 400 400 1000 1040 $BrasilPath csrvlite -D -M /srv/host1 -h tcp!*!5671
-window -r 0  400  400 1040 tail -f /tmp/xcpu.log
+window -r 1100 400 1600 1000 $BrasilPath csrvlite -D -M /srv/csrv -h tcp!*!5670
+window -r 600 400 1200 1000 $BrasilPath csrvlite -D -M /srv/host1 -h tcp!*!5671
+window -r 300 400 800 1000 $BrasilPath csrvlite -D -M /srv/host2 -h tcp!*!5672
+window -r 0  400  400 1000 tail -f /tmp/xcpu.log
 sleep 1
 
 mount -nc /srv/csrv /n/csrv
 mount -nc /srv/host1 /n/host1
+mount -nc /srv/host2 /n/host2
 
 echo mounting done
 echo debug 9 > /n/csrv/local/ctl
 echo debug 9 > /n/host1/local/ctl
+echo debug 9 > /n/host2/local/ctl
 
 echo debugging set
 
 echo mount tcp!127.1!5671 host1 > /n/csrv/ctl
-echo mount tcp!127.1!5671 host2 > /n/csrv/ctl
+echo mount tcp!127.1!5672 host2 > /n/csrv/ctl
 echo mount tcp!127.1!5671 host3 > /n/csrv/ctl
-echo mount tcp!127.1!5671 host4 > /n/csrv/ctl
+echo mount tcp!127.1!5672 host4 > /n/csrv/ctl
 echo mount tcp!127.1!5671 host6 > /n/csrv/ctl
-echo mount tcp!127.1!5671 host7 > /n/csrv/ctl
+echo mount tcp!127.1!5672 host7 > /n/csrv/ctl
 echo mount tcp!127.1!5671 host8 > /n/csrv/ctl
-echo mount tcp!127.1!5671 host9 > /n/csrv/ctl
-echo mount tcp!127.1!5671 host10 > /n/csrv/ctl
+echo mount tcp!127.1!5672 host9 > /n/csrv/ctl
+
+echo adding parent links
+echo mount tcp!127.1!5670 parent > /n/host1/ctl
+echo mount tcp!127.1!5670 parent > /n/host2/ctl
 
 echo children nodes connected
 echo verifying
 cat /n/csrv/local/status
+echo verifying child host1
+cat /n/host1/local/status
+echo verifying child host2
+cat /n/host2/local/status
 echo executing simple test
 
 echo 'res 2
@@ -40,6 +50,8 @@ splice 0 1
 end 1' | pxcpu
 
 echo Done with simple test
+
+
 echo Going for big test
 echo 'res 8
 exec 0 fdecho test
@@ -58,5 +70,6 @@ echo Done with big test ...
 
 unmount /n/csrv
 unmount /n/host1
+unmount /n/host2
 
 #xsdo

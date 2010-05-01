@@ -24,6 +24,7 @@ usage(char *me)
 	exits("usage");
 }
 char *mnt;
+char *childmnt;
 char sess[64];
 
 void
@@ -43,6 +44,7 @@ main(int argc, char **argv)
 	
 
 	mnt = "/n/csrv/local";
+	childmnt = "";
 	ARGBEGIN{
 	}ARGEND
 	if(argc != 0)
@@ -96,7 +98,7 @@ main(int argc, char **argv)
 			if(i < 0 || nres <= i)
 				sysfatal("bad splice out res");
 /*			fprint(resfdctl[i], "splice /csrv/local/%s/%s/stdio", sess, a[1]); */
-			fprint(resfdctl[i], "splice /csrv/local/%s/stdio",  a[1]);
+			fprint(resfdctl[i], "splice /csrv/parent/local/%s/%s/stdio", sess,  a[1]);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
