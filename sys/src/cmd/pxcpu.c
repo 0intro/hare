@@ -15,7 +15,9 @@ mount -nc /srv/csrv /n/csrv && xsdo
 #include <libc.h>
 #include <bio.h>
 
-void reader(void*);
+
+
+
 
 void
 usage(char *me)
@@ -24,7 +26,6 @@ usage(char *me)
 	exits("usage");
 }
 char *mnt;
-char *childmnt;
 char sess[64];
 
 void
@@ -32,9 +33,8 @@ main(int argc, char **argv)
 {
 	char *prog;
 	Biobuf *in,*out, *stdout;
-;
 	int pid;
-	int n, i, nres;
+	int n, i, j, subsess, nres, r;
 	int cfd, *resfdctl, nfdctl, fd;
 	char fdfile[512];
 	char buf[8192];
@@ -44,7 +44,6 @@ main(int argc, char **argv)
 	
 
 	mnt = "/n/csrv/local";
-	childmnt = "";
 	ARGBEGIN{
 	}ARGEND
 	if(argc != 0)
@@ -54,51 +53,51 @@ main(int argc, char **argv)
 	cfd = open(fdfile, ORDWR);
 	n = read(cfd, sess, 64);
 	if(n < 0)
-		sysfatal("couldn't read ctl: %r");
+		sysfatal("couldn't read ctl");
 	sess[n]=0;
-	/* sess stores session ID */
+	print("sess %s\n", sess);
 	in = Bopen("/fd/0", OREAD);
 	if(in == nil)
-		sysfatal("couldn't open stdin: %r");
-	
-	/* Read first line */
+		sysfatal("couldn't open stdin");
 	line = Brdstr(in, '\n', '\n');
 	if(line == nil)
 		sysfatal("eof");
 	n = tokenize(line, a, 4);
 	if(n != 2)
 		sysfatal("two fields in a res");
-	/* assumed to be res */
 	if(strcmp("res", a[0]) != 0)
 		sysfatal("need to res in the beginning");
 	fprint(cfd, "%s %s", a[0], a[1]);
 	nres = atoi(a[1]);
 	if(nres <= 0)
 		sysfatal("need >0 res");
-	
-	/* opening ctl files of all childeren */
 	resfdctl = malloc(nres*sizeof(int));
-	for(i = 0; i < nres; i++){
-		snprint(fdfile, 512, "%s/%s/%d/ctl", mnt, sess, i); 
-/*		snprint(fdfile, 512, "%s//%d/ctl", mnt,  i); */
+	subsess = -1; // start from 0.
+	i = 0;
+	r = nres;
+	while(r--){
+		if(i == 0)
+			subsess++;
+		snprint(fdfile, 512, "%s/%s/%d/%d/ctl", mnt, sess, subsess, i%4);
+		print("fdfile %s\n", fdfile);
 		resfdctl[i]=open(fdfile, ORDWR);
 		if(resfdctl[i] < 0)
-			sysfatal("couldn't open part of res: %s %s %d %r", mnt, sess, i);
+			sysfatal("couldn't open part of res %s", fdfile);
+		i = (i + 1) % 4;
 	}
-
-	/* read remaining lines */
 	while((line = Brdstr(in, '\n', '\n')) != nil){
 		n = getfields(line, a, 4, 1, "\t\r\n ");
-			/* if splice */
 		if(strcmp("splice", a[0]) == 0){
-			/* splice sources_subsesssion_id destination_subsession_id */
 			if(n != 3)
 				sysfatal("splice has 2 args");
 			i = atoi(a[2]);
 			if(i < 0 || nres <= i)
-				sysfatal("bad splice out res");
-/*			fprint(resfdctl[i], "splice /csrv/local/%s/%s/stdio", sess, a[1]); */
-			fprint(resfdctl[i], "splice /csrv/parent/local/%s/%s/stdio", sess,  a[1]);
+				sysfatal("invalid reservation %d", i);
+			j = atoi(a[1]);
+			if(j < 0 || nres <= j)
+				sysfatal("invalid splice reservation %d", j);	
+			print("splice csrv/local/%s/%s/stdio", sess, j/4, j%4);
+			fprint(resfdctl[i], "splice csrv/local/%s/%d/%d/stdio", sess, j/4, j%4);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
@@ -106,7 +105,6 @@ main(int argc, char **argv)
 			if(i < 0 || nres <= i)
 				sysfatal("bad splice out res");
 			if(strcmp("filt", a[1]) == 0){
-				/* exec filt cmd dest_subsession args ===> exec xirf/self session_id  */ 
 				i = atoi(a[3]);
 				fprint(resfdctl[i], "exec %s %s %s", a[2], sess, a[3]);
 			}else if(n == 4)
@@ -133,6 +131,8 @@ main(int argc, char **argv)
 		write(1, buf, n);
 		Bflush(stdout);
 	}
+	print("read n %d %.*s\n", n, n, buf);
+	close(fd);
 	Bterm(in);
 	exits(0);
 }

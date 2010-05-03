@@ -1,4 +1,5 @@
-#!/bin/rc
+#!/bin/rc -x
+
 
 cleanbra >[2=1] >/dev/null
 
