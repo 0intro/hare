@@ -20,7 +20,7 @@ window -scroll deployBrasil  /srv/subchild23  5693
 window -scroll deployBrasil  /srv/subchild24  5694
 window -scroll deployBrasil  /srv/subchild25  5695
 
-sleep 1
+sleep 5
 
 echo setting up top level ionode.
 mount -nc /srv/ionode /n/csrv
@@ -136,6 +136,14 @@ unmount /n/csrv
 echo checking how many nodes are available.
 mount -nc /srv/ionode  /n/csrv
 cat /n/csrv/local/status
+
+echo showing topology
+@{
+x=`{cat}
+echo session id is $x
+echo res 16  > /n/csrv/local/$x/ctl
+cat /n/csrv/local/$x/topology
+}<>/n/csrv/local/clone
 
 # now going for tests of Noah
 

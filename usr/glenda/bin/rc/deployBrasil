@@ -7,4 +7,5 @@
 @{
 rfork
 brasil csrvlite -D -M $1 -h tcp!*!$2
+cat > ttt
 }
