@@ -4,10 +4,10 @@ port=5670
 
 cleanbra >[2=1] >/dev/null
 newxlog
-window -r 1100 400 1600 1000 $BrasilPath csrvlite -D -M /srv/csrv -h tcp!*!5670
-window -r 600 400 1200 1000 $BrasilPath csrvlite -D -M /srv/host1 -h tcp!*!5671
-window -r 300 400 800 1000 $BrasilPath csrvlite -D -M /srv/host2 -h tcp!*!5672
-window -r 0  400  400 1000 tail -f /tmp/xcpu.log
+window -scroll -r 1100 400 1600 1000 $BrasilPath csrvlite -D -M /srv/csrv -h tcp!*!5670
+window -scroll -r 600 400 1200 1000 $BrasilPath csrvlite -D -M /srv/host1 -h tcp!*!5671
+window -scroll -r 300 400 800 1000 $BrasilPath csrvlite -D -M /srv/host2 -h tcp!*!5672
+window -scroll -r 0  400  400 1000 tail -f /tmp/xcpu.log
 sleep 1
 
 mount -nc /srv/csrv /n/csrv

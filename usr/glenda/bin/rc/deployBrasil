@@ -1,0 +1,8 @@
+#!/bin/rc
+
+BrasilPath=../../../brasil/Plan9/386/bin/brasil
+echo starting brasil with $1 as servername and $2 as port number
+@{
+rfork
+$BrasilPath csrvlite -D -M $1 -h tcp!*!$2
+}
