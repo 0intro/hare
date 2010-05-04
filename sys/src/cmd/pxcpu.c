@@ -32,7 +32,7 @@ main(int argc, char **argv)
 	char *prog;
 	Biobuf *in,*out, *stdout;
 	int pid;
-	int n, i, nres;
+	int n, i, j, nres;
 	int cfd, *resfdctl, nfdctl, fd;
 	char fdfile[512];
 	char buf[8192];
@@ -65,6 +65,7 @@ main(int argc, char **argv)
 	if(strcmp("res", a[0]) != 0)
 		sysfatal("need to res in the beginning");
 	fprint(cfd, "res %s", a[1]);
+
 	nres = atoi(a[1]);
 	if(nres <= 0)
 		sysfatal("need >0 res");
@@ -93,7 +94,10 @@ main(int argc, char **argv)
 			i = atoi(a[2]);
 			if(i < 0 || nres <= i)
 				sysfatal("bad splice out res");
-			fprint(resfdctl[i], "splice csrv/local/%s/%s/stdio", sess, a[1]);
+			j = atoi(a[1]);
+			if(j < 0 || nres <= j)
+				sysfatal("bad io endpoint");			
+			fprint(resfdctl[i], "splice csrv/parent/parent/local/%s/%s/stdio", sess, topo[j]);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
