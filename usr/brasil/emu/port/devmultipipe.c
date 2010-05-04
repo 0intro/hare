@@ -16,6 +16,16 @@
  *
  * Based in part on devpipe.c
  */
+ 
+ /*
+      TODO:
+          * finish qqkick implementation
+          * add qqkick to reader sections when we empty buffers
+          * replace old qlen with code which reports bytes on top ready to read queue
+          * add code to ensure that writers will never block
+          * add corner cases on close (where data is still on buffers 
+          * add some debug prints to help with verification/test
+  */
 
 #include	"dat.h"
 #include	"fns.h"
@@ -115,6 +125,27 @@ qqdel(Queueq *q, Queueqe *qe)
 		qe->next->prev = qe->prev;
 }
 
+/* a writer is ready, check appropriate writer q and reader q */
+/* we may need to lock the pipe */
+static void
+qqkick(Multipipe *p, int which)
+{
+	/* TODO: go through entire ready to write q and
+	 * transfer to ready to readq */
+	 Queueqe *current = p->writers[which].head;
+	 Queueqe *next;
+	 Block *b;
+	 
+	 while(current != nil) {
+	 	next = current->next;
+	 	qqdel(&p->writers[which], current);
+	 	/* TODO: find reader & remove him from the ready to read list */
+	 	/* TODO: empty writer queue into available reader queue */
+	 	
+	 	current = next;
+	 }
+}
+
 static void
 freepipe(Multipipe *p)
 {
@@ -124,12 +155,6 @@ freepipe(Multipipe *p)
 
 		free(p);
 	}
-}
-
-static void
-multipipeinit(void)
-{
-	/* do nothing? */
 }
 
 /*
@@ -344,7 +369,6 @@ multipipeclose(Chan *c)
 	qlock(&p->l);
 
 	if(c->flag & COPEN){
-		/* TODO: clean up the right q */
 		/*
 		 *  closing either side hangs up the stream
 		 */
@@ -406,7 +430,7 @@ multipiperead(Chan *c, void *va, long n, vlong junk)
 		return devdirread(c, va, n, p->pipedir, nelem(multipipedir), multipipegen);
 	case Qdata0:
 	case Qdata1:
-		if(openq)
+		if(openq) /* TODO: if queue is empty when we are done kick writers */
 			return qread(openq->qeout.q, va, n);
 	default:
 		panic("piperead");
@@ -430,7 +454,8 @@ multipipebread(Chan *c, long n, ulong offset)
 	if(openq) {
 		switch(NETTYPE(c->qid.path)){
 		case Qdata0:
-		case Qdata1:	
+		case Qdata1:
+			/* TODO: if queue is empty when we are done kick writers */
 			return qbread(openq->qeout.q, n);
 		}
 	}
@@ -447,7 +472,9 @@ multipipewrite(Chan *c, void *va, long n, vlong junk)
 {
 	Multipipe *p;
 	Prog *r;
-	Openq *openq;	
+	Openq *openq = nil;
+	long ret;
+	int which = -1;
 
 	USED(junk);
 	if(waserror()) {
@@ -467,21 +494,26 @@ multipipewrite(Chan *c, void *va, long n, vlong junk)
 		p = openq->mp;
 	}
 
-	switch(NETTYPE(c->qid.path)){
-	case Qdata0:
-		/* if 0 then kick */
-		/* if full then error and flush 
-		n = qwrite(p->q[1], va, n);*/
-		break;
-
-	case Qdata1:
-		/* if 0 then kick */
-		/* if full then error and flush 
-		n = qwrite(p->q[0], va, n);*/
-		break;
-
-	default:
-		panic("pipewrite");
+	if(openq) {
+		switch(NETTYPE(c->qid.path)){
+		case Qdata0:
+			which = 0;
+			break;
+		case Qdata1:
+			which = 1;
+			break;
+		default:
+			panic("pipewrite");
+		}
+		if(n == 0) {
+			ret = 0;
+			/* add queue to ready to write queue and kick it */
+			qqadd(&p->writers[which], &openq->qeout);
+			qqkick(p, which);
+		} else {
+			/* TODO: Need to check that we won't block */
+			ret = qwrite(openq->qein.q, va, n);
+		}
 	}
 
 	poperror();
@@ -491,10 +523,12 @@ multipipewrite(Chan *c, void *va, long n, vlong junk)
 static long
 multipipebwrite(Chan *c, Block *bp, ulong junk)
 {
-	long n;
+	long n = 0;
+	long ret = 0;
 	Multipipe *p;
 	Prog *r;
-	Openq *openq;	
+	Openq *openq = nil;
+	int which = -1;
 
 	USED(junk);
 	if(waserror()) {
@@ -514,21 +548,29 @@ multipipebwrite(Chan *c, Block *bp, ulong junk)
 		p = openq->mp;
 	}
 	
-	
-	switch(NETTYPE(c->qid.path)){
-	case Qdata0:
-		/* TODO: if size 0 then kick 
-		n = qbwrite(p->q[1], bp);*/
-		break;
-
-	case Qdata1:
-		/* TODO: if size 0 then kick 
-		n = qbwrite(p->q[0], bp);*/
-		break;
-
-	default:
-		n = 0;
-		panic("pipebwrite");
+	if(openq) {
+		switch(NETTYPE(c->qid.path)){
+		case Qdata0:
+			which = 0;
+			break;
+		case Qdata1:
+			which = 1;
+			break;	
+		default:
+			n = 0;
+			panic("pipebwrite");
+		}
+		
+		n = BLEN(bp);
+		if(n == 0) {
+			ret = 0;
+			/* add queue to ready to write queue and kick it */
+			qqadd(&p->writers [which], &openq->qeout);
+			qqkick(p, which);		
+		} else {
+			/* TODO: Need to check that we won't block */
+			ret = qbwrite(openq->qein.q, bp);
+		}	
 	}
 
 	poperror();
@@ -578,7 +620,7 @@ Dev multipipedevtab = {
 	'<',
 	"multipipe",
 
-	multipipeinit,
+	devinit,
 	multipipeattach,
 	multipipewalk,
 	multipipestat,
