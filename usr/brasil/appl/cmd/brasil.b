@@ -102,7 +102,7 @@ backmountexport(srvpath: string, mon: int, debug: int)
 	} else {
 		if(debug)
 			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export / &");
-		sys->fprint(sys->fildes(2), "creating srv export %s\n", srvpath);
+		#sys->fprint(sys->fildes(2), "creating srv export %s\n", srvpath);
 		fd := sys->create(srvpath, Sys->ORDWR, 8r600);
 		if(fd == nil)
 			sys->fprint(sys->fildes(2), "creation of srv export failed: %r\n");
@@ -206,7 +206,7 @@ init()
 		"simple" =>
 			sh->system(nil, "/dis/styxlisten.dis -A "+fsaddr+" export /");
 		"csrvlite" =>
-			sys->fprint(sys->fildes(2), "csrvlite\n");
+			#sys->fprint(sys->fildes(2), "csrvlite\n");
 			sh->system(nil, "/dis/csrv-lite.dis");
 			backmountexport(srvpath, mon, debug);
 		"terminal" =>

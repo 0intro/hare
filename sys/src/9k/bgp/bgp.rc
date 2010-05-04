@@ -158,7 +158,7 @@ if(~ $cpunode '0'){
 	#echo Waiting for turbines to come up to speed
 	sleep 30
 	
-	aux/listen -i -t /bin/service.bgp tcp
+	aux/listen -i -q -t /bin/service.bgp tcp
 	
 	# do we only want to send this from one IO node?
 	if (~$cpunode '0') {
@@ -277,7 +277,7 @@ bind /boot/rc/bin/service /bin/service
 if(test -d /mnt/factotum)
 	aux/listen -i -q tcp
 if not
-	aux/listen -i -t /bin/service tcp
+	aux/listen -i -q -t /bin/service tcp
 	
 fn runit {
 	if(test -e $1)
