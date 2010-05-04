@@ -28,7 +28,7 @@ void
 main(int argc, char **argv)
 {
 	Biobuf *in, *stdout;
-	int n, i, j, nres;
+	int n, i, j, k, nres;
 	int cfd, *resfdctl, fd;
 	char fdfile[512];
 	char buf[8192], buf2[8192];
@@ -97,8 +97,8 @@ main(int argc, char **argv)
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
-			i = atoi(a[1]);
-			if(i < 0 || nres <= i)
+			k = atoi(a[1]);
+			if(k < 0 || nres <= k)
 				sysfatal("bad splice out res");
 			if(strcmp("filt", a[1]) == 0){
 				n = tokenize(a[3], c, 64);
@@ -110,11 +110,11 @@ main(int argc, char **argv)
 						sysfatal("bad splice out res");
 					s = seprint(s, e, " %s/%s/%s/stdio", mnt, sess, topo[j]);
 				}
-				fprint(resfdctl[i], "exec %s %s", a[2], buf);
+				fprint(resfdctl[k], "exec %s %s", a[2], buf);
 			}else if(n == 4)
-				fprint(resfdctl[i], "exec %s %s", a[2], a[3]);
+				fprint(resfdctl[k], "exec %s %s", a[2], a[3]);
 			else
-				fprint(resfdctl[i], "exec %s", a[2]);
+				fprint(resfdctl[k], "exec %s", a[2]);
 		}else if(strcmp("end", a[0]) == 0){
 			if(n != 2)
 				sysfatal("end needs 1 arg");
