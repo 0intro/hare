@@ -1234,7 +1234,7 @@ static long
 readtopo (Chan * ch, void *a, long n, vlong offset)
 {
 	vlong c_offset;
-	long ret, c_ret,  i, j, k;
+	long ret, c_ret,  i, j;
 	Conv *c;
 	long tmpjc;
 	int filetype;
@@ -1242,11 +1242,12 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 	char *bigbuf;
 	int MAX_PATH_LEN = 127;
 	char *smallbuf;
-	char mysession[10];
 	long bufsize;
-	long endpos;
-	long mslen, bb_i;
+	long startpos;
 	int empty;
+	char separator = ' ';
+	char *current;
+	char *end;
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
@@ -1262,27 +1263,26 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 	bufsize = c->rjob->sessions  * MAX_PATH_LEN;
 	bigbuf = (char *) malloc (sizeof (char) * bufsize  );
 	DPRINT(9,"readtopo cname [%s] bufsize [%ld]\n", ch->name->s, bufsize);
+	current = bigbuf;
+	end = bigbuf + bufsize - 1;
+
 	smallbuf = (char *) malloc (sizeof (char) * MAX_PATH_LEN  );
-
-
 	filetype = TYPE(ch->qid) - Qdata;
-	snprint (mysession, sizeof(mysession), "%d/", c->x );
-	bb_i = 0;
-	bigbuf[bb_i] = '\0';
 	
 	/* read from multiple remote files */
 
 	rlock(&c->rjob->l);
 	tmprr = c->rjob->first;
 	runlock(&c->rjob->l);
-
+	
 	for (i = 0; i < tmpjc; ++i) {
+		if (i != 0 ) {
+			current = seprint (current, end, "%c", separator );
+		}
 		empty = 1;
 		/* create an prepend string */
-		snprint (mysession, sizeof(mysession), "%ld/", i );
-		mslen = strlen (mysession);
-		DPRINT(9, "readtopo mysession is [%s]\n", mysession );
-		endpos = 1;
+		DPRINT(9, "readtopo checking session [%ld]\n", i );
+		startpos = 1;
 
 		/* read entire remote-file */
 		c_offset = 0;
@@ -1298,16 +1298,14 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 
 			/* process the data by prepending it */
 			for ( j = 0 ; j < c_ret ; ++j ) {
-				if (endpos == 1) {
-					endpos = 0;
-					for (k = 0 ; k < mslen; ++k ) {
-						bigbuf[bb_i++] = mysession[k];
-					}
+				if (startpos == 1) {
+					startpos = 0;
+					current = seprint (current, end, "%ld/", i );
 				}
-				bigbuf[bb_i++] = smallbuf[j];
-				if (smallbuf[j] == '\n') {
+				current = seprint (current, end, "%c", smallbuf[j] );
+				if (smallbuf[j] == separator ) {
 					/*add mysession here */
-					endpos = 1;
+					startpos = 1;
 
 				}
 				
@@ -1316,20 +1314,16 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 
 			DPRINT(9, "completed one read of %d\n", c_ret);
 		} while (c_ret > 0 ); /* till end of file */
+
 		DPRINT(9, "completed one remote file of %d\n", i);
 		if (empty == 1) {
-			snprint (smallbuf, 127, "%d\n", i );
-			mslen = strlen(smallbuf);
-			for (k = 0 ; k < mslen; ++k ) {
-				bigbuf[bb_i++] = smallbuf[k];
-			}
+			current = seprint (current, end, "%ld", i );
 		}
 
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
 	} /* for each remote file */
 
-	bigbuf[bb_i] = '\0';
 	
 	ret = readstr(offset, a, n, bigbuf);
 	free (bigbuf);

@@ -135,7 +135,7 @@ unmount /n/csrv
 
 echo checking how many nodes are available.
 mount -nc /srv/ionode  /n/csrv
-cat /n/csrv/local/status
+#cat /n/csrv/local/status
 
 echo showing topology
 @{
@@ -150,15 +150,6 @@ cat /n/csrv/local/$x/topology
 newxlog
 window -r 0  400  400 1000 tail -f /tmp/xcpu.log
 
-echo executing simple test
-
-echo 'res 2
-exec 0 fdecho test
-exec 1 mecat
-splice 0 1
-end 1' | pxcpu
-
-echo Done with simple test
 
 echo Going for big test
 echo 'res 8
