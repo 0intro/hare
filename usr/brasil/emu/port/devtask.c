@@ -1246,6 +1246,7 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 	long bufsize;
 	long endpos;
 	long mslen, bb_i;
+	int empty;
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
@@ -1276,6 +1277,7 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 	runlock(&c->rjob->l);
 
 	for (i = 0; i < tmpjc; ++i) {
+		empty = 1;
 		/* create an prepend string */
 		snprint (mysession, sizeof(mysession), "%ld/", i );
 		mslen = strlen (mysession);
@@ -1290,7 +1292,9 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 				read(tmprr->remotefiles[filetype].cfile, smallbuf, 126, 
 			c_offset);
 			DPRINT(9,"readtopo %ldth read gave another [%ld] data starting from %ld offset\n", i, c_ret, c_offset);
-			
+			if (c_ret > 0 ) {
+				empty = 0;
+			}
 
 			/* process the data by prepending it */
 			for ( j = 0 ; j < c_ret ; ++j ) {
@@ -1307,12 +1311,19 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 
 				}
 				
-			} /* end for : each char in smallbuff */
+			} /* end for : each char in smallbuf */
 			c_offset += c_ret;
 
 			DPRINT(9, "completed one read of %d\n", c_ret);
 		} while (c_ret > 0 ); /* till end of file */
 		DPRINT(9, "completed one remote file of %d\n", i);
+		if (empty == 1) {
+			snprint (smallbuf, 127, "%d\n", i );
+			mslen = strlen(smallbuf);
+			for (k = 0 ; k < mslen; ++k ) {
+				bigbuf[bb_i++] = smallbuf[k];
+			}
+		}
 
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
@@ -1479,12 +1490,11 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 			break;
 		}
 
-		DPRINT(9,"Getting topology locally\n" );
-		/* getting topology locally */
-		snprint(up->genbuf, sizeof(up->genbuf), "%d\n", c->x );
-		DPRINT(9,"Returning [%s] as topo\n", up->genbuf);
-		ret = readstr(offset, p, n, up->genbuf);
+		DPRINT(9,"This is leaf node\n" );
+		ret = 0;
 		break;
+		/* getting topology locally */
+
 
 	case Qdata:
 	case Qstderr:

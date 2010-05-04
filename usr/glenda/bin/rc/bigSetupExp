@@ -141,7 +141,7 @@ echo showing topology
 @{
 x=`{cat}
 echo session id is $x
-echo res 16  > /n/csrv/local/$x/ctl
+echo res 8  > /n/csrv/local/$x/ctl
 cat /n/csrv/local/$x/topology
 }<>/n/csrv/local/clone
 
