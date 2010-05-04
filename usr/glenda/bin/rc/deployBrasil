@@ -5,6 +5,7 @@
 # in your $home/lib/profile that puts it in the right place
 
 @{
+echo node $1 on port $2
 rfork
 brasil csrvlite -D -M $1 -h tcp!*!$2
 }
