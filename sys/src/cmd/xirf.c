@@ -6,6 +6,11 @@
 8c xirf.c &&
 8l -o xirf xirf.8 &&
 cp xirf $home/bin/386
+
+
+9c xirf.c &&
+9l -o xirf xirf.o &&
+cp xirf $HOME/bin
 */
 
 Biobuf *bout;
@@ -100,10 +105,9 @@ threadmain(int argc, char **argv)
 	if(mount(nfd, -1, "/n/csrv", MREPL, "") < 0)
 		sysfatal("no xcpu namespace");	
 	fd = malloc(argc*sizeof(int));
-	for(i = 2; i < argc; i++){
-		snprint(fdfile, 512, "%s/%s/%s/stdio", mnt, argv[0], argv[i]);
-		fprint(logfd, "%ld %d %s opening %s\n",time(0), getpid(), prog,  fdfile);
-		fd[i] = open(fdfile, OREAD);
+	for(i = 0; i < argc; i++){
+		fprint(logfd, "%ld %d %s opening %s\n",time(0), getpid(), prog,  argv[i]);
+		fd[i] = open(argv[i], OREAD);
 		if(fd[i] < 0){
 			fprint(logfd, "%ld %d %s couldn't open arg %s %d\n",time(0), getpid(),  prog, fdfile, i);
 			sysfatal("couldn't open arg %s %d", fdfile, i);

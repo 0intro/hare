@@ -5,11 +5,9 @@
 cp pxcpu $home/bin/386 &&
 mount -nc /srv/csrv /n/csrv && xsdo 
 
-
-&&
-9fs tcp!10.12.0.72!5670 && xcdo 
-
-./pxcpu 
+9c pxcpu.c &&
+9l -o pxcpu pxcpu.o &&
+cp pxcpu $HOME/bin
 */
 #include <u.h>
 #include <libc.h>
@@ -29,16 +27,13 @@ char sess[64];
 void
 main(int argc, char **argv)
 {
-	char *prog;
-	Biobuf *in,*out, *stdout;
-	int pid;
+	Biobuf *in, *stdout;
 	int n, i, j, nres;
-	int cfd, *resfdctl, nfdctl, fd;
+	int cfd, *resfdctl, fd;
 	char fdfile[512];
 	char buf[8192];
-	int qidpath;
-	char *s, *line;
-	char *a[4], *b[2], **topo;
+	char *s, *e, *line;
+	char *a[4], **topo, *c[64];
 	
 
 	mnt = "/n/csrv/local";
@@ -105,8 +100,16 @@ main(int argc, char **argv)
 			if(i < 0 || nres <= i)
 				sysfatal("bad splice out res");
 			if(strcmp("filt", a[1]) == 0){
-				i = atoi(a[3]);
-				fprint(resfdctl[i], "exec %s %s %s", a[2], sess, a[3]);
+				n = tokenize(a[3], c, 64);
+				s = buf;
+				e = buf+8192;
+				for(i = 0; i < n; i++){
+					j = atoi(c[i]);
+					if(j < 0 || nres <= j)
+						sysfatal("bad splice out res");
+					s = seprint(s, e, " %s/%s/%s/stdio", mnt, sess, topo[j]);
+				}
+				fprint(resfdctl[i], "exec %s %s", a[2], s);
 			}else if(n == 4)
 				fprint(resfdctl[i], "exec %s %s", a[2], a[3]);
 			else
