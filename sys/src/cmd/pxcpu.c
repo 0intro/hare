@@ -15,9 +15,7 @@ mount -nc /srv/csrv /n/csrv && xsdo
 #include <libc.h>
 #include <bio.h>
 
-
-
-
+void reader(void*);
 
 void
 usage(char *me)
@@ -34,13 +32,13 @@ main(int argc, char **argv)
 	char *prog;
 	Biobuf *in,*out, *stdout;
 	int pid;
-	int n, i, j, subsess, nres, r;
+	int n, i, nres;
 	int cfd, *resfdctl, nfdctl, fd;
 	char fdfile[512];
 	char buf[8192];
 	int qidpath;
 	char *s, *line;
-	char *a[4], *b[2];
+	char *a[4], *b[2], **topo;
 	
 
 	mnt = "/n/csrv/local";
@@ -55,7 +53,6 @@ main(int argc, char **argv)
 	if(n < 0)
 		sysfatal("couldn't read ctl");
 	sess[n]=0;
-	print("sess %s\n", sess);
 	in = Bopen("/fd/0", OREAD);
 	if(in == nil)
 		sysfatal("couldn't open stdin");
@@ -67,23 +64,26 @@ main(int argc, char **argv)
 		sysfatal("two fields in a res");
 	if(strcmp("res", a[0]) != 0)
 		sysfatal("need to res in the beginning");
-	fprint(cfd, "%s %s", a[0], a[1]);
+	fprint(cfd, "res %s", a[1]);
 	nres = atoi(a[1]);
 	if(nres <= 0)
 		sysfatal("need >0 res");
+	topo = malloc(nres*sizeof(char*));
 	resfdctl = malloc(nres*sizeof(int));
-	subsess = -1; // start from 0.
-	i = 0;
-	r = nres;
-	while(r--){
-		if(i == 0)
-			subsess++;
-		snprint(fdfile, 512, "%s/%s/%d/%d/ctl", mnt, sess, subsess, i%4);
+	snprint(fdfile, 512, "%s/%s/topology", mnt, sess);
+	fd = open(fdfile, OREAD);
+	n = read(fd, buf, 8192);
+	if(n < 0)
+		sysfatal("couldn't read topology");
+	n = tokenize(buf, topo, nres);
+	if(n != nres)
+		sysfatal("topology != nres");
+	for(i = 0; i < nres; i++){
+		snprint(fdfile, 512, "%s/%s/%s/ctl", mnt, sess, topo[i]);
 		print("fdfile %s\n", fdfile);
 		resfdctl[i]=open(fdfile, ORDWR);
 		if(resfdctl[i] < 0)
-			sysfatal("couldn't open part of res %s", fdfile);
-		i = (i + 1) % 4;
+			sysfatal("couldn't open part of res");
 	}
 	while((line = Brdstr(in, '\n', '\n')) != nil){
 		n = getfields(line, a, 4, 1, "\t\r\n ");
@@ -92,12 +92,8 @@ main(int argc, char **argv)
 				sysfatal("splice has 2 args");
 			i = atoi(a[2]);
 			if(i < 0 || nres <= i)
-				sysfatal("invalid reservation %d", i);
-			j = atoi(a[1]);
-			if(j < 0 || nres <= j)
-				sysfatal("invalid splice reservation %d", j);	
-			print("splice csrv/local/%s/%s/stdio", sess, j/4, j%4);
-			fprint(resfdctl[i], "splice csrv/local/%s/%d/%d/stdio", sess, j/4, j%4);
+				sysfatal("bad splice out res");
+			fprint(resfdctl[i], "splice csrv/local/%s/%s/stdio", sess, a[1]);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
@@ -114,7 +110,10 @@ main(int argc, char **argv)
 		}else if(strcmp("end", a[0]) == 0){
 			if(n != 2)
 				sysfatal("end needs 1 arg");
-			snprint(fdfile, 512, "%s/%s/%s/stdio", mnt, sess, a[1]);
+			i = atoi(a[1]);
+			if(i < 0 || nres <= i)
+				sysfatal("bad io endpoint");			
+			snprint(fdfile, 512, "%s/%s/%s/stdio", mnt, sess, topo[i]);
 			print("reading from %s\n", fdfile);
 			fd = open(fdfile, OREAD);
 			if(fd < 0)
