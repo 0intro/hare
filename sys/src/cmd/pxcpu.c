@@ -110,7 +110,7 @@ main(int argc, char **argv)
 						sysfatal("bad splice out res");
 					s = seprint(s, e, " %s/%s/%s/stdio", mnt, sess, topo[j]);
 				}
-				fprint(resfdctl[i], "exec %s %s", a[2], s);
+				fprint(resfdctl[i], "exec %s %s", a[2], buf);
 			}else if(n == 4)
 				fprint(resfdctl[i], "exec %s %s", a[2], a[3]);
 			else
