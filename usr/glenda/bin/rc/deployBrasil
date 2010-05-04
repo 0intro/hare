@@ -1,8 +1,11 @@
 #!/bin/rc
 
-BrasilPath=../../../brasil/Plan9/386/bin/brasil
-echo starting brasil with $1 as servername and $2 as port number
+# in plan9 it's the user's responsibility to bind brasil into their environment. 
+# if you can't find your brasil executable, you should add a bind(1)
+# in your $home/lib/profile that puts it in the right place
+
 @{
 rfork
-$BrasilPath csrvlite -D -M $1 -h tcp!*!$2
+brasil csrvlite -D -M $1 -h tcp!*!$2
+cat > ttt
 }

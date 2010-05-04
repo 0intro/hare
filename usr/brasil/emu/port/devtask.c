@@ -36,6 +36,7 @@ enum {
 	Qstderr,
 	Qctl,
 	Qstatus,
+	Qtopo,
 	Qargs,
 	Qenv,
 	Qstdin,
@@ -125,6 +126,7 @@ typedef struct RemResrc RemResrc;
 struct RemJob {
 	long rjobcount;				/* number of jobs in current session */
 	int x;
+	long sessions;
 	RWlock l;					/* protects state changes */
 	int rcinuse[Nremchan];
 	RWlock perfilelock[Nremchan];
@@ -304,6 +306,10 @@ cmd3gen(Chan * c, int i, Dir * dp)
 	case Qstatus:
 		mkqid(&q, QID(CONV(c->qid), Qstatus), 0, QTFILE);
 		devdir(c, q, "status", 0, cv->owner, 0444, dp);
+		return 1;
+	case Qtopo:
+		mkqid(&q, QID(CONV(c->qid), Qtopo), 0, QTFILE);
+		devdir(c, q, "topology", 0, cv->owner, 0444, dp);
 		return 1;
 	case Qwait:
 		mkqid(&q, QID(CONV(c->qid), Qwait), 0, QTFILE);
@@ -488,6 +494,7 @@ cmdgen(Chan * c, char *name, Dirtab *d, int nd, int s, Dir * dp)
 	case Qstderr:
 	case Qctl:
 	case Qstatus:
+	case Qtopo:
 	case Qwait:
 	case Qstdin:
 	case Qstdout:
@@ -778,6 +785,7 @@ cmdopen(Chan * c, int omode)
 		break;
 
 	case Qstatus:
+	case Qtopo:
 	case Qstderr:
 	case Qwait:
 		if (omode != OREAD)
@@ -851,6 +859,10 @@ cmdopen(Chan * c, int omode)
 			fname = "status";
 			break;
 
+		case Qtopo:
+			fname = "topology";
+			break;
+		
 		case Qwait:
 			fname = nil;
 			if (cv->waitq == nil)
@@ -1068,6 +1080,7 @@ cmdclose(Chan * c)
 	case Qstderr:
 	case Qwait:
 	case Qstatus:
+	case Qtopo:
 		cc = cmd.conv[CONV(c->qid)];
 		jc = countrjob(cc->rjob);
 		filetype = TYPE(c->qid) - Qdata;
@@ -1216,6 +1229,105 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 	} 
 }
 
+
+static long
+readtopo (Chan * ch, void *a, long n, vlong offset)
+{
+	vlong c_offset;
+	long ret, c_ret,  i, j, k;
+	Conv *c;
+	long tmpjc;
+	int filetype;
+	RemResrc *tmprr;
+	char *bigbuf;
+	int MAX_PATH_LEN = 127;
+	char *smallbuf;
+	char mysession[10];
+	long bufsize;
+	long endpos;
+	long mslen, bb_i;
+
+	USED(offset);
+	c = cmd.conv[CONV(ch->qid)];
+
+	tmpjc = countrjob(c->rjob);
+
+	/* making sure that remote resources are allocated */
+	if (tmpjc < 0) {
+		DPRINT(9,"resources not reserved\n");
+		error(ENOReservation);
+	}
+	DPRINT(9,"readtopo remote clients are [%ld] with %d jobs\n",  tmpjc, c->rjob->sessions);
+	bufsize = c->rjob->sessions  * MAX_PATH_LEN;
+	bigbuf = (char *) malloc (sizeof (char) * bufsize  );
+	DPRINT(9,"readtopo cname [%s] bufsize [%ld]\n", ch->name->s, bufsize);
+	smallbuf = (char *) malloc (sizeof (char) * MAX_PATH_LEN  );
+
+
+	filetype = TYPE(ch->qid) - Qdata;
+	snprint (mysession, sizeof(mysession), "%d/", c->x );
+	bb_i = 0;
+	bigbuf[bb_i] = '\0';
+	
+	/* read from multiple remote files */
+
+	rlock(&c->rjob->l);
+	tmprr = c->rjob->first;
+	runlock(&c->rjob->l);
+
+	for (i = 0; i < tmpjc; ++i) {
+		/* create an prepend string */
+		snprint (mysession, sizeof(mysession), "%ld/", i );
+		mslen = strlen (mysession);
+		DPRINT(9, "readtopo mysession is [%s]\n", mysession );
+		endpos = 1;
+
+		/* read entire remote-file */
+		c_offset = 0;
+		do {
+			DPRINT(9, "readtopo about to read\n" );
+			c_ret = devtab[tmprr->remotefiles[filetype].cfile->type]->
+				read(tmprr->remotefiles[filetype].cfile, smallbuf, 126, 
+			c_offset);
+			DPRINT(9,"readtopo %ldth read gave another [%ld] data starting from %ld offset\n", i, c_ret, c_offset);
+			
+
+			/* process the data by prepending it */
+			for ( j = 0 ; j < c_ret ; ++j ) {
+				if (endpos == 1) {
+					endpos = 0;
+					for (k = 0 ; k < mslen; ++k ) {
+						bigbuf[bb_i++] = mysession[k];
+					}
+				}
+				bigbuf[bb_i++] = smallbuf[j];
+				if (smallbuf[j] == '\n') {
+					/*add mysession here */
+					endpos = 1;
+
+				}
+				
+			} /* end for : each char in smallbuff */
+			c_offset += c_ret;
+
+			DPRINT(9, "completed one read of %d\n", c_ret);
+		} while (c_ret > 0 ); /* till end of file */
+		DPRINT(9, "completed one remote file of %d\n", i);
+
+		/* FIXME: should I lock following also in read mode ??  */
+		tmprr = tmprr->next;
+	} /* for each remote file */
+
+	bigbuf[bb_i] = '\0';
+	
+	ret = readstr(offset, a, n, bigbuf);
+	free (bigbuf);
+	free (smallbuf);
+	DPRINT(9,"readtopo [%ld]\n", ret);
+	return ret;
+}
+
+
 static long
 readfromall(Chan * ch, void *a, long n, vlong offset)
 {
@@ -1266,6 +1378,7 @@ readfromall(Chan * ch, void *a, long n, vlong offset)
 		if (c_n <= 0) {
 			break;
 		}
+		ret = ret + c_ret;
 		/* FIXME: should I lock following also in read mode ??  */
 		tmprr = tmprr->next;
 	}
@@ -1284,7 +1397,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	vlong stime;
 
 	stime = osusectime (); /* recording start time */
-	DPRINT(9,"cmdread: %s n %d\n", ch->name->s, n);
+	DPRINT(9,"cmdread: %s n %ld\n", ch->name->s, n);
 	USED(offset);
 	p = a;
 
@@ -1345,6 +1458,31 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 		snprint(up->genbuf, sizeof(up->genbuf), "cmd/%d %d %s %q %q\n",
 			c->x, c->inuse, c->state, c->dir, cmds);
 		DPRINT(9,"came here 5\n");
+		ret = readstr(offset, p, n, up->genbuf);
+		break;
+
+
+	case Qtopo:
+		c = cmd.conv[CONV(ch->qid)];
+		DPRINT(9,"came here 1 %d\n", c->x);
+		jc = countrjob(c->rjob);
+		if (jc > 0) {
+			/* TODO: get answers from each remote node, and pre-pend your session id to it. */
+
+			ret = readtopo(ch, a, n, offset);
+			break;
+		}
+		if (jc < 0) {
+			/* No reservation, no topology */
+			DPRINT(9,"reservation not done, so no topology available\n");
+			ret = 0;
+			break;
+		}
+
+		DPRINT(9,"Getting topology locally\n" );
+		/* getting topology locally */
+		snprint(up->genbuf, sizeof(up->genbuf), "%d\n", c->x );
+		DPRINT(9,"Returning [%s] as topo\n", up->genbuf);
 		ret = readstr(offset, p, n, up->genbuf);
 		break;
 
@@ -2131,6 +2269,9 @@ readstatus(char *a, long n, vlong offset)
 	return readstr(offset, a, n, buf);
 } /* end function : readstatus */
 
+
+
+
 /*
  * function : p_send2one : will send data to one node but this function can
  * be executed parallelly in thread
@@ -2486,6 +2627,7 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 				break;
 			}
 			groupres(ch, resNo, os, arch);
+			c->rjob->sessions = resNo;
 			DPRINT(9,"cmdwrite: reservation done\n");
 			/*
 			  * unlock this conversation's inlocks and
