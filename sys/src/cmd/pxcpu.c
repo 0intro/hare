@@ -119,8 +119,10 @@ main(int argc, char **argv)
 				sysfatal("end needs 1 arg");
 			i = atoi(a[1]);
 			if(i < 0 || nres <= i)
-				sysfatal("bad io endpoint");			
+				sysfatal("bad io endpoint");		
 			snprint(fdfile, 512, "%s/%s/%s/stdio", mnt, sess, topo[i]);
+			print("end fdfile %s\n", fdfile);
+			print("i %d topo[i] %s\n", i, topo[i]);
 			print("reading from %s\n", fdfile);
 			fd = open(fdfile, OREAD);
 			if(fd < 0)
