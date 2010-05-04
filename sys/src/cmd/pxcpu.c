@@ -31,7 +31,7 @@ main(int argc, char **argv)
 	int n, i, j, nres;
 	int cfd, *resfdctl, fd;
 	char fdfile[512];
-	char buf[8192];
+	char buf[8192], buf2[8192];
 	char *s, *e, *line;
 	char *a[4], **topo, *c[64];
 	
@@ -68,11 +68,11 @@ main(int argc, char **argv)
 	resfdctl = malloc(nres*sizeof(int));
 	snprint(fdfile, 512, "%s/%s/topology", mnt, sess);
 	fd = open(fdfile, OREAD);
-	n = read(fd, buf, 8192);
+	n = read(fd, buf2, 8192);
 	if(n < 0)
 		sysfatal("couldn't read topology");
 	buf[n]=0;
-	n = getfields(buf, topo, nres, 1, "\t\r\n ");
+	n = getfields(buf2, topo, nres, 1, "\t\r\n ");
 	if(n != nres)
 		sysfatal("topology != nres");
 	for(i = 0; i < nres; i++){
