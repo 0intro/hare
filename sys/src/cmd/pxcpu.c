@@ -71,7 +71,8 @@ main(int argc, char **argv)
 	n = read(fd, buf, 8192);
 	if(n < 0)
 		sysfatal("couldn't read topology");
-	n = tokenize(buf, topo, nres);
+	buf[n]=0;
+	n = getfields(buf, topo, nres, 1, "\t\r\n ");
 	if(n != nres)
 		sysfatal("topology != nres");
 	for(i = 0; i < nres; i++){
