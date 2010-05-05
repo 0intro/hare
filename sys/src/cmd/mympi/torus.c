@@ -119,6 +119,7 @@ void torusinit(int *pmyproc, const int numprocs)
 	u8int d[3];
 	int n, rank;
 	int i, j = 0, k = 0;
+	int maxprocs;
 
 	if((fd = open("/dev/torusstatus", 0)) < 0)
 		panic("open /dev/torusstatus: %r\n");
@@ -142,8 +143,8 @@ void torusinit(int *pmyproc, const int numprocs)
 	x = d[X];
 	y = d[Y];
 	z = d[Z];
-fprint(2, "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
-fprint(2, "numprocs %d \n", numprocs);
+print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
+print( "numprocs %d \n", numprocs);
 	/* make some tables. Mapping is done as it is to maximally distributed broadcast traffic */
 	xyz = calloc(numprocs, sizeof(*xyz));
 	if (!xyz)
@@ -153,20 +154,30 @@ fprint(2, "numprocs %d \n", numprocs);
 		panic("mpi init ranks");
 
 	/* root node */
+	/* base case -- for all nods, set basic values */
 	xyz[0].x = 0;
-	/* first level */
-	for(rank = 0, i = 1; (i < xsize) && (rank < numprocs); i++, rank++) {
+	ranks[0] = 0;
+	/* base case -- if I am the root node, fill this in */
+	if (x == y == z == 0){
+		*pmyproc = 0;
+		print( "set myproc to %d @ (%d, %d, %d)\n",
+				0, x, y, z);
+	}
+	/* first level -- X axis (1-xsize-1, 0, 0) -- lowest order ranks go on this axis. */
+	/* in all cases, if we match 'me', fill that value in */
+	for(rank = 1, i = 1; (i < xsize) && (rank < numprocs); i++, rank++) {
 		xyz[0].kids++;
 		xyz[rank].x = i;
 		if ((x == i) && (y == j) && (z == k)) {
 			*pmyproc = rank;
-			fprint(2, "set myproc to %d @ (%d, %d, %d)\n",
+			print( "set myproc to %d @ (%d, %d, %d)\n",
 				rank, x, y, z);
 		}
 		ranks[i] = rank;
 	}
 
 	/* second level */
+	/* second level -- X axis (1-xsize-1, 1-ysize-1, 0) -- lowest order ranks go on this axis. */
 	for(i = 1; (i < xsize) && (rank < numprocs); i++) {
 		for(j = 1; (j < ysize) && (rank < numprocs); j++, rank++) {
 			xyz[i].kids++;
@@ -174,7 +185,7 @@ fprint(2, "numprocs %d \n", numprocs);
 			xyz[rank].y = j;
 			if ((x == i) && (y == j) && (z == k)){
 				*pmyproc = rank;
-				fprint(2, "set myproc to %d @ (%d, %d, %d)\n",
+				print( "set myproc to %d @ (%d, %d, %d)\n",
 					rank, x, y, z);
 			}
 			ranks[i + j*ysize] = rank;
@@ -182,6 +193,7 @@ fprint(2, "numprocs %d \n", numprocs);
 	}
 
 	/* third level */
+	/* second level -- X axis (1-xsize-1, 1-ysize-1, 1-zsize-1) -- lowest order ranks go on this axis. */
 	for(i = 1; (i < xsize) && (rank < numprocs); i++) {
 		for(j = 1; (j < ysize) && (rank < numprocs); j++) {
 			for(k = 1; (k < zsize) && (rank < numprocs); k++, rank++) {
@@ -191,7 +203,7 @@ fprint(2, "numprocs %d \n", numprocs);
 				xyz[rank].z = k;
 				if ((x == i) && (y == j) && (z == k)){
 					*pmyproc = rank;
-					fprint(2, "set myproc to %d @ (%d, %d, %d)\n",
+					print( "set myproc to %d @ (%d, %d, %d)\n",
 						rank, x, y, z);
 				}
 				ranks[i + j*ysize + k*xsize*ysize] = rank;

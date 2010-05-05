@@ -1915,7 +1915,6 @@ syscallprint(int syscallno, uintptr *sp)
 		fmtprint(&fmt, "%ld %#llx", sp[3], offset);
 		break;
 	}
-done: 
 	up->syscalltrace = fmtstrflush(&fmt);
 }
 
@@ -1929,7 +1928,6 @@ retprint(int syscallno, uintptr *sp, Ar0 *ar0, uvlong start, uvlong stop)
 	int retval = ar0->i;
 
 	fmtstrinit(&fmt);
-	len = 0;
 	errstrlen = 0;
 	offset = 0;
 	if (retval != -1)
@@ -2035,7 +2033,7 @@ retprint(int syscallno, uintptr *sp, Ar0 *ar0, uvlong start, uvlong stop)
 	if(syscallno == EXEC)
 		fmtprint(&fmt, " = %p %s %#ullx %#ullx\n", ar0->p, errstr, start, stop);
 	else
-		fmtprint(&fmt, " = %ld %s %#ullx %#ullx\n", retval, errstr, start, stop);
+		fmtprint(&fmt, " = %d %s %#ullx %#ullx\n", retval, errstr, start, stop);
 
 	up->syscalltrace = fmtstrflush(&fmt);
 }
