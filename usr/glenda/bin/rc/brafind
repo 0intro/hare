@@ -1,0 +1,5 @@
+#!/bin/rc
+
+for(i in /mnt/wsys/wsys/*)
+	if(~ `{cat $i/label} ionode* child* subchild*)
+		grep $1 $i/text

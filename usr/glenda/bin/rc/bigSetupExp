@@ -1,143 +1,12 @@
 #!/bin/rc -x
-
+# don't add comments saying what you're doing. if a user needs to find out what's going on the proper way is to add a -x to rc
 
 cleanbra >[2=1] >/dev/null
+slay brasil|rc
+coords=`{mktopo  -d 9 1 2 4 >[2=1]}
+echo coords $coords 
+mount -nc /srv/ionode0 /n/csrv
 
-window -scroll deployBrasil  /srv/ionode  5670
-
-window -scroll deployBrasil  /srv/child1  5680
-window -scroll  deployBrasil  /srv/child2  5690
-
-window -scroll deployBrasil  /srv/subchild11  5681
-window -scroll deployBrasil  /srv/subchild12  5682
-window -scroll deployBrasil  /srv/subchild13  5683
-window -scroll deployBrasil  /srv/subchild14  5684
-window -scroll deployBrasil  /srv/subchild15  5685
-
-window -scroll deployBrasil  /srv/subchild21  5691
-window -scroll deployBrasil  /srv/subchild22  5692
-window -scroll deployBrasil  /srv/subchild23  5693
-window -scroll deployBrasil  /srv/subchild24  5694
-window -scroll deployBrasil  /srv/subchild25  5695
-
-sleep 5
-
-echo setting up top level ionode.
-mount -nc /srv/ionode /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!5680 child1 > /n/csrv/ctl
-echo mount tcp!127.1!5690 child2 > /n/csrv/ctl
-unmount /n/csrv
-
-
-echo setting up middle level child1
-mount -nc /srv/child1 /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!5670 parent > /n/csrv/ctl
-echo mount tcp!127.1!5681 subchild11 > /n/csrv/ctl
-echo mount tcp!127.1!5682 subchild12 > /n/csrv/ctl
-echo mount tcp!127.1!5683 subchild13 > /n/csrv/ctl
-echo mount tcp!127.1!5684 subchild14 > /n/csrv/ctl
-echo mount tcp!127.1!5685 subchild15 > /n/csrv/ctl
-unmount /n/csrv
-
-echo setting up middle level child2
-mount -nc /srv/child2 /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!5670 parent > /n/csrv/ctl
-echo mount tcp!127.1!5691 subchild21 > /n/csrv/ctl
-echo mount tcp!127.1!5692 subchild22 > /n/csrv/ctl
-echo mount tcp!127.1!5693 subchild23 > /n/csrv/ctl
-echo mount tcp!127.1!5694 subchild24 > /n/csrv/ctl
-echo mount tcp!127.1!5695 subchild25 > /n/csrv/ctl
-unmount /n/csrv
-
-echo setting up third level sub-children
-nodename=subchild11
-parentport=5680
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-
-nodename=subchild12
-parentport=5680
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild13
-parentport=5680
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild14
-parentport=5680
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild15
-parentport=5680
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild21
-parentport=5690
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild22
-parentport=5690
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild23
-parentport=5690
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild24
-parentport=5690
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-nodename=subchild25
-parentport=5690
-echo setting up $nodename
-mount -nc /srv/$nodename /n/csrv
-echo debug 9 > /n/csrv/local/ctl
-echo mount tcp!127.1!$parentport parent > /n/csrv/ctl
-unmount /n/csrv
-
-echo checking how many nodes are available.
-mount -nc /srv/ionode  /n/csrv
-#cat /n/csrv/local/status
-
-echo showing topology
 @{
 x=`{cat}
 echo session id is $x
@@ -148,10 +17,8 @@ cat /n/csrv/local/$x/topology
 # now going for tests of Noah
 
 newxlog
-window -r 0  400  400 1000 tail -f /tmp/xcpu.log
+window -scroll -r $coords tail -f /tmp/xcpu.log
 
-
-echo Going for big test
 echo 'res 8
 exec 0 fdecho test
 exec filt xirf 1 5 7 4 6
@@ -165,7 +32,5 @@ splice 0 2
 splice 1 3
 end 3 ' | pxcpu
 
-echo Done with big test ...
 unmount /n/csrv
 
-#xsdo

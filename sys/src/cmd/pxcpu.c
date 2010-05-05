@@ -2,8 +2,7 @@
 /* 
 8c pxcpu.c &&
 8l -o pxcpu pxcpu.8 &&
-cp pxcpu $home/bin/386 &&
-mount -nc /srv/csrv /n/csrv && xsdo 
+cp pxcpu $home/bin/386
 
 9c pxcpu.c &&
 9l -o pxcpu pxcpu.o &&
@@ -87,27 +86,34 @@ main(int argc, char **argv)
 		if(strcmp("splice", a[0]) == 0){
 			if(n != 3)
 				sysfatal("splice has 2 args");
-			i = atoi(a[2]);
-			if(i < 0 || nres <= i)
+			k = atoi(a[2]);
+			if(k < 0 || nres <= k)
 				sysfatal("bad splice out res");
 			j = atoi(a[1]);
 			if(j < 0 || nres <= j)
-				sysfatal("bad io endpoint");			
-			fprint(resfdctl[i], "splice csrv/parent/parent/local/%s/%s/stdio", sess, topo[j]);
+				sysfatal("bad io endpoint");
+			n=getfields(s=strdup(topo[j]), c, 64, 1, "/");
+			print("n %d levels in splice\n", n);
+			s = buf;
+			e = buf+8192;
+			for(i=0; i<n; i++)
+				s = seprint(s, e, "%sparent", i>0?"/":"");
+			print("splice csrv/%s/local/%s/%s/stdio", buf, sess, topo[j]);
+			fprint(resfdctl[i], "splice csrv/%s/local/%s/%s/stdio", buf, sess, topo[j]);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
 			k = atoi(a[1]);
 			if(k < 0 || nres <= k)
-				sysfatal("bad splice out res");
+				sysfatal("bad exec out res");
 			if(strcmp("filt", a[1]) == 0){
 				n = tokenize(a[3], c, 64);
 				s = buf;
 				e = buf+8192;
-				for(i = 0; i < n; i++){
+				for(i = 1; i < n; i++){
 					j = atoi(c[i]);
 					if(j < 0 || nres <= j)
-						sysfatal("bad splice out res");
+						sysfatal("bad exec out res");
 					s = seprint(s, e, " %s/%s/%s/stdio", mnt, sess, topo[j]);
 				}
 				fprint(resfdctl[k], "exec %s %s", a[2], buf);

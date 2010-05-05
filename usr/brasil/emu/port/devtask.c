@@ -958,7 +958,7 @@ freeremotejobs(RemJob * rjob)
 static void
 closeconv(Conv * c)
 {
-	DPRINT(9,"releasing [%d] remote resource\n", c->x);
+	DPRINT(9,"closeconv: c %p c->x %p", c, c->x);
 	kstrdup(&c->owner, "cmd");
 	kstrdup(&c->dir, rootdir);
 	c->perm = 0666;
@@ -971,25 +971,25 @@ closeconv(Conv * c)
 		free(c->rjob);
 		c->rjob = nil;
 	}
-	DPRINT(9,"closeconv: remote freed\n");
+	DPRINT(9,"closeconv: remote freed c %p\n", c);
 	if (c->cmd != nil) {
-		DPRINT(9,"closeconv: freeing cmd\n");
+		DPRINT(9,"closeconv: freeing c %p cmd c->cmd %p\n", c, c->cmd);
 		free(c->cmd);			/* FIXME: why this fails???? */
-		DPRINT(9,"closeconv: freeing cmd done\n");
+		DPRINT(9,"closeconv: freed c %p cmd c->cmd %p\n", c, c->cmd);
 	}
 	c->cmd = nil;
 	if (c->waitq != nil) {
 		qfree(c->waitq);
 		c->waitq = nil;
 	}
-	DPRINT(9,"closeconv: free waitq crossed\n");
+	DPRINT(9,"closeconv: free waitq crossed c %p\n", c);
 	if (c->error != nil) {
-		DPRINT(9,"closeconv: freeing error\n");
+		DPRINT(9,"closeconv: freeing error c %p\n", c);
 		free(c->error);
 	}
-	DPRINT(9,"closeconv: free error crossed\n");
+	DPRINT(9,"closeconv: free error crossed c %p\n", c);
 	c->error = nil;
-	DPRINT(9,"Conv freed\n");
+	DPRINT(9,"closeconv: freed c %p\n", c);
 	ccount--;
 
 }
@@ -1002,8 +1002,9 @@ remoteclose(Chan * c, int filetype, int rjcount)
 	int i;
 	int tmpfilec;
 
-	DPRINT(9,"remote closing [%s]\n", c->name->s);
+	DPRINT(9,"remoteclose: %s\n", c->name->s);
 	cc = cmd.conv[CONV(c->qid)];
+	DPRINT(9, "remoteclose: cc %p\n", cc);
 
 	tmpfilec = getfileopencount(cc->rjob, filetype);
 
@@ -1082,6 +1083,7 @@ cmdclose(Chan * c)
 	case Qstatus:
 	case Qtopo:
 		cc = cmd.conv[CONV(c->qid)];
+		DPRINT(9, "cmdclose: cc %p\n", cc);
 		jc = countrjob(cc->rjob);
 		filetype = TYPE(c->qid) - Qdata;
 		DPRINT(9,"rjobcount is [%d]\n", jc);
@@ -1175,6 +1177,7 @@ readfromallasync(Chan * ch, void *a, long n, vlong offset)
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
+	DPRINT(9, "readfromallasync: c %p\n", c);
 	jc = countrjob(c->rjob);
 	/* making sure that remote resources are allocated */
 	if (jc < 0) {
@@ -1251,7 +1254,7 @@ readtopo (Chan * ch, void *a, long n, vlong offset)
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
-
+	DPRINT(9, "readtopo: c %p\n", c);
 	tmpjc = countrjob(c->rjob);
 
 	/* making sure that remote resources are allocated */
@@ -1346,14 +1349,14 @@ readfromall(Chan * ch, void *a, long n, vlong offset)
 
 	USED(offset);
 	c = cmd.conv[CONV(ch->qid)];
-
+	DPRINT(9, "readfromall: c %p\n", c);
 	tmpjc = countrjob(c->rjob);
 	/* making sure that remote resources are allocated */
 	if (tmpjc < 0) {
 		DPRINT(9,"resources not reserved\n");
 		error(ENOReservation);
 	}
-	DPRINT(9,"readfromall cname [%s]\n", ch->name->s);
+	DPRINT(9,"readfromall: cname %s\n", ch->name->s);
 
 	if (TYPE(ch->qid) == Qdata) {
 		filetype = Qstdout - Qdata;
@@ -1439,7 +1442,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 
 	case Qstatus:
 		c = cmd.conv[CONV(ch->qid)];
-		DPRINT(9,"came here 1 %d\n", c->x);
+		DPRINT(9,"cmread: status c %p c->x %d\n",c,  c->x);
 		jc = countrjob(c->rjob);
 		if (jc > 0) {
 			ret = readfromall(ch, a, n, offset);
@@ -1469,7 +1472,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 
 	case Qtopo:
 		c = cmd.conv[CONV(ch->qid)];
-		DPRINT(9,"came here 1 %d\n", c->x);
+		DPRINT(9,"cmdread: topo c %p c->x %d\n", c->x);
 		jc = countrjob(c->rjob);
 		if (jc > 0) {
 			/* TODO: get answers from each remote node, and pre-pend your session id to it. */
@@ -1493,6 +1496,7 @@ cmdread(Chan * ch, void *a, long n, vlong offset)
 	case Qdata:
 	case Qstderr:
 		c = cmd.conv[CONV(ch->qid)];
+		DPRINT(9, "cmdread: data/stderr c %p\n", c);
 		if (c->rjob == nil) {
 			DPRINT(9,"conv %ulx read on released conv", CONV(ch->qid));
 			error(EResourcesReleased);
@@ -2508,8 +2512,8 @@ dolocalexecution(Conv * c, Cmdbuf * cb)
 		nexterror();
 	}
 	if (c->child != nil || c->cmd != nil) {
-		DPRINT(9,"I like using things twice c->child %p c->cmd %p\n",
-			c->child, c->cmd);
+		DPRINT(9,"I like using things twice c %p c->child %p c->cmd %p\n",
+			c, c->child, c->cmd);
 		error(Einuse);
 	}
 	for (i = 0; i < nelem(c->fd); i++)

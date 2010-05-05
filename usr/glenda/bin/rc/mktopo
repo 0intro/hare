@@ -1,0 +1,80 @@
+#!/bin/rc 
+
+fn usage {
+	echo >[1=2] usage: mktopo [-d num] io child subchild
+	exit usage	
+}
+debug=0
+if(~ $1 '-d'){
+	debug=$2
+	if(! ~ $debug [0-9]*)
+		usage
+	shift
+	shift
+}
+
+if(! ~ $#* 3)
+	usage
+
+if(~ $screensize '')
+	screensize=1920x1080x32
+geom=`{echo $screensize | awk -Fx '{print $1,$2}'}
+echo $* | awk -v 'maxx='$geom(1) -v 'maxy='$geom(2) -v 'debug='$debug '
+func nextloc() {
+	rowend+=rowwidth
+	if(rowend > maxy){
+		col=colend
+		colend+=colwidth
+		row=0
+		rowend=rowwidth
+	}
+	ret=col" "row" "colend" "rowend
+	row=rowend
+	return ret
+}
+
+
+func mount(port, src, targ){
+	mnt="/n/"name
+	print "echo mount tcp!127.1!"port" "src" >/n/"targ"/ctl"
+}
+
+func newbrasil(name, port) {
+	print "window -m -scroll -r",nextloc(), "rc -c ''{label "name"; brasil csrvlite -D -M /srv/"name" -h tcp!*!"port"}''"
+	print "sleep 1"
+	print "mount -nc /srv/"name" /n/"name
+	if(debug > 0)
+		print "echo debug "debug" >/n/"name"/local/ctl"
+}
+
+{
+	row=0
+	rowwidth=int(maxy/(($1+$2+$3)))
+	rowend=rowwidth
+	col=0
+	colwidth=500
+	colend=colwidth
+	for(i=0; i<$1; i++){
+		ionodeport=5670+i
+		ionode="ionode"i
+		newbrasil(ionode, ionodeport)
+		for(j=0; j<$2; j++){
+			child="child"i""j
+			childport=5680+int(i""j)
+			newbrasil(child, childport)
+			mount(childport, child, ionode)
+			mount(ionodeport, "parent", child)
+			for(k=0; k<$3; k++){
+				subchild="subchild"i""j""k
+				subchildport=5690+int(i""j""k)
+				newbrasil(subchild, subchildport)
+				mount(subchildport, subchild, child)
+				mount(childport, "parent", subchild)
+			}
+		}
+	}
+}
+END {
+	print nextloc() >"/dev/stderr"	
+}
+'| rc  
