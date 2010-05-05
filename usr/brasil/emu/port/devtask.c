@@ -612,7 +612,7 @@ spliceproc(void *param)
 		/* read data from source channel */
 		DPRINT(9, "spliceproc: READING %s", src->name->s);
 		ret = devtab[src->type]->read(src, buf, 512, 0);
-		DPRINT(9, "spliceproc: READ  %s ret %d %.*s\n", src->name->s, ret, ret, a);
+		DPRINT(9, "spliceproc: READ  %s ret %d\n", src->name->s, ret);
 		if (ret <= 0)
 			break;
 		DPRINT(9,"spliceproc: copying [%s]->[%s] %ld data\n",
@@ -1587,6 +1587,7 @@ Cmdtab ctlcmdtab[] = {
 enum {
 	CMres,
 	CMdir,
+	CMxsplice,
 	CMsplice,
 	CMexec,
 	CMkill,
@@ -1598,6 +1599,7 @@ static
 Cmdtab cmdtab[] = {
 	CMres, "res", 0,
 		CMdir, "dir", 2,
+		CMxsplice, "xsplice", 3,
 		CMsplice, "splice", 2,
 		CMexec, "exec", 0,
 		CMkill, "kill", 1,
@@ -2545,6 +2547,21 @@ dolocalexecution(Conv * c, Cmdbuf * cb)
 }
 
 static long
+forward_ctl_command (char *session_path, char *cmd)
+{
+	long ret;
+	long n;
+	Chan *dst_chan;
+	n = strlen(cmd);
+
+	dst_chan = namec(session_path, Aopen, OWRITE, 0);
+	/* do actual write */
+	ret = devtab[dst_chan->type]->write(dst_chan, cmd, n, 0);
+	cclose(dst_chan);
+	return ret;
+} /* end function :forward_ctl_command */
+
+static long
 cmdwrite(Chan * ch, void *a, long n, vlong offset)
 {
 	int ret;
@@ -2557,9 +2574,16 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 	char *arch;
 	char *parent_path;
 	char buf[512];
+	char session_path[512];
+	char common_path[512];
+	int common;
+	long i;
+	char *src, *dst;
+	long common_child;
 	struct for_splice *fs;
 	char *s;
 	vlong stime;
+	int srclen, dstlen, small_len;
 
 	stime = osusectime (); /* recording start time */
 	USED(offset);
@@ -2672,15 +2696,6 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			c = cmd.conv[CONV(ch->qid)];
 			qunlock(&c->inlock);
 			qunlock(&c->outlock);
-/*			if (canqlock(&c->inlock)) {
-				DPRINT(1, "cmdwrite: unlocking c->inlock");
-				qunlock(&c->inlock);
-			}
-			if (canqlock(&c->outlock)) {
-				DPRINT(1, "cmdwrite: unlocking c->outlock");
-				qunlock(&c->outlock);
-			}
-*/
 			break;
 
 		case CMkillonclose:
@@ -2724,6 +2739,79 @@ cmdwrite(Chan * ch, void *a, long n, vlong offset)
 			}
 			ret = p_send2all(ch, a, n, offset);
 			DPRINT(9,"cmdwrite: kill done\n");
+			break;
+
+		case CMxsplice:
+			if (jc < 0) {
+				DPRINT(9,"cmdwrite: no reservation done\n");
+				error(ENOReservation);
+				break;
+			}
+			if (waserror()) {
+				DPRINT(9,"cmdwrite: xsplice failed: \n");
+				nexterror();
+			}
+			DPRINT(4,"cmdwrite: xsplice: cmd [%s] [%s]\n", cb->f[1], cb->f[2]);
+
+			srclen = strlen (cb->f[1]);
+			dstlen = strlen (cb->f[2]);
+			if (srclen < dstlen ) {
+				small_len = srclen;
+			} else {
+				small_len = dstlen;
+			}
+			
+			common = 1;
+			common_path[0] = 0;
+			for (i=0; i < small_len; ++i) {
+				if (cb->f[1][i] != cb->f[2][i] ) {
+					common = 0;
+					break;
+				}
+				if (cb->f[1][i] == '/' ) {
+					/* matched first part of name */
+					common = 2;
+					break;
+				}
+				common_path[i] = cb->f[1][i];
+			}
+			common_path[i] = 0;
+
+			if (common == 2 && i > 0  )  {
+				/* common path found, forward the request */
+				src = cb->f[1] + (i+1);
+				dst = cb->f[2] + (i+1);
+				snprint(buf, sizeof buf, "xsplice %s %s", src, dst);
+				
+				common_child = atol(common_path);
+				DPRINT(4,"cmdwrite: xsplice: forwarding to child [%ld] [%s] [%s]\n", common_child, src, dst);
+
+				parent_path = fetchparentpath(ch->name->s);
+				snprint(session_path, sizeof session_path, "%s/%ld/ctl", parent_path, common_child);
+
+				/* write modified xplice command into ctl file of common_child */
+				ret = forward_ctl_command (session_path, buf);
+				
+			} else {
+				/* no common path, do splice from here */
+				parent_path = fetchparentpath(ch->name->s);
+				snprint(session_path, sizeof session_path, "%s/%s/ctl", parent_path, cb->f[2]);
+
+				snprint (common_path, sizeof common_path, "csrv/parent/");
+				for (i =0; i<srclen; ++i) {
+					if (cb->f[1][i] == '/' ) {
+						strcat (common_path, "parent/");
+					}
+				}
+				strcat (common_path, "local/");
+				snprint(buf, sizeof buf, "splice %s/%d/%s/stdio", common_path, c->x, cb->f[1]);
+				DPRINT(4,"cmdwrite: xsplice: converting to splice cmd [%s]\n", buf);
+
+				/* write splice command into ctl file of common_child */
+				ret = forward_ctl_command (session_path, buf);
+			}
+			poperror();
+			DPRINT(4,"cmdwrite: xsplice: done\n");
 			break;
 
 		case CMsplice:

@@ -1,0 +1,49 @@
+#!/bin/rc -x
+# don't add comments saying what you're doing. if a user needs to find out what's going on the proper way is to add a -x to rc
+
+cleanbra >[2=1] >/dev/null
+slay brasil|rc
+coords=`{mktopo  -d 9 1 2 4 >[2=1]}
+echo coords $coords 
+sleep 5
+mount -nc /srv/ionode0 /n/csrv
+
+
+child1=0/0
+child2=0/1
+# example of bypass : as path contains common part
+
+@{
+x=`{cat}
+echo session id is $x
+echo res 4  > /n/csrv/local/$x/ctl
+cat /n/csrv/local/$x/topology
+echo exec echo test > /n/csrv/local/$x/$child1/ctl
+echo exec tee > /n/csrv/local/$x/$child2/ctl
+echo xsplice $child1  $child2 > /n/csrv/local/$x/ctl
+#echo splice csrv/parent/parent/local/$x/$child1/stdio > /n/csrv/local/$x/$child2/ctl
+cat /n/csrv/local/$x/$child2/stdio
+}<>/n/csrv/local/clone
+
+
+child1=0/0
+child2=1/0
+# example of no-bypass : as path does not contain any common path
+# 	splice will go through root node.
+
+@{
+x=`{cat}
+echo session id is $x
+echo res 4  > /n/csrv/local/$x/ctl
+cat /n/csrv/local/$x/topology
+echo exec echo test > /n/csrv/local/$x/$child1/ctl
+echo exec tee > /n/csrv/local/$x/$child2/ctl
+echo xsplice $child1  $child2 > /n/csrv/local/$x/ctl
+#echo splice csrv/parent/parent/local/$x/$child1/stdio > /n/csrv/local/$x/$child2/ctl
+cat /n/csrv/local/$x/$child2/stdio
+}<>/n/csrv/local/clone
+
+
+unmount /n/csrv
+
+exit
