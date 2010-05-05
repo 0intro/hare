@@ -612,13 +612,13 @@ spliceproc(void *param)
 		/* read data from source channel */
 		DPRINT(9, "spliceproc: READING %s", src->name->s);
 		ret = devtab[src->type]->read(src, buf, 512, 0);
-		DPRINT(9, "spliceproc: READ  %s ret %d\n", src->name->s, ret, ret);
+		DPRINT(9, "spliceproc: READ  %s ret %d %.*s\n", src->name->s, ret, ret, a);
 		if (ret <= 0)
 			break;
 		DPRINT(9,"spliceproc: copying [%s]->[%s] %ld data\n",
-			src->name->s, dst->name->s, ret, ret);
+			src->name->s, dst->name->s, ret);
 		for (a = buf; ret > 0; a += r) {
-			DPRINT(9, "spliceproc: WRITING %s ret %d", dst->name->s, ret, ret);
+			DPRINT(9, "spliceproc: WRITING %s ret %d %*.s", dst->name->s, ret, ret, a);
 			r = devtab[dst->type]->write(dst, a, ret, 0);
 			DPRINT(9, "spliceproc: WROTE  %s r %d", dst->name->s, r);
 			if(r <= 0)
@@ -634,8 +634,7 @@ error:
 		dst->name->s);	
 	cclose(src);
 	cclose(dst);
-
-} /* end function : spliceproc */
+}
 
 
 static void

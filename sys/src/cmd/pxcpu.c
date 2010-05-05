@@ -99,7 +99,7 @@ main(int argc, char **argv)
 			for(i=0; i<n; i++)
 				s = seprint(s, e, "%sparent", i>0?"/":"");
 			print("splice csrv/%s/local/%s/%s/stdio", buf, sess, topo[j]);
-			fprint(resfdctl[i], "splice csrv/%s/local/%s/%s/stdio", buf, sess, topo[j]);
+			fprint(resfdctl[k], "splice csrv/%s/local/%s/%s/stdio", buf, sess, topo[j]);
 		}else if(strcmp("exec", a[0]) == 0){
 			if(n < 3)
 				sysfatal("exec needs >3 args");
