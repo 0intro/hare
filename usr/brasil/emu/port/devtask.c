@@ -971,8 +971,8 @@ closeconv(Conv * c)
 		free(c->rjob);
 		c->rjob = nil;
 	}
-	DPRINT(9,"closeconv: remote freed c %p\n", c);
-	if (c->cmd != nil) {
+	DPRINT(9,"closeconv: remote freed c %p c->cmd %p\n", c, c->cmd);
+	if(c->cmd != nil){
 		DPRINT(9,"closeconv: freeing c %p cmd c->cmd %p\n", c, c->cmd);
 		free(c->cmd);			/* FIXME: why this fails???? */
 		DPRINT(9,"closeconv: freed c %p cmd c->cmd %p\n", c, c->cmd);

@@ -92,14 +92,13 @@ threadmain(int argc, char **argv)
 	if(logfd < 0)
 		sysfatal("couldn't open log");
 	
-	mnt = "/n/csrv/parent/local";
 	ARGBEGIN{
 	
 	}ARGEND;
 	
 	if(argc == 0)
 		sysfatal("need input fds");
-	nfd = open("/srv/csrv", ORDWR);
+	nfd = open("/srv/ionode0", ORDWR);
 	if(nfd < 0)
 		sysfatal("no /srv/csrv");
 	if(mount(nfd, -1, "/n/csrv", MREPL, "") < 0)

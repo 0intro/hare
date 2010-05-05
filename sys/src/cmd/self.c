@@ -24,18 +24,17 @@ void
 main(int argc, char **argv)
 {
 	int i, fd, *fds;
-	char *mnt, buf[8192];
+	char buf[8192];
 	
 	prog = argv[0];
 	logfd = open("/tmp/xcpu.log", OWRITE);
-	mnt = "/n/csrv/parent/local";
 	ARGBEGIN{
 	default:
 		usage(argv[0]);
 	}ARGEND;
 	if(argc <= 0)
 		usage("self");
-	fd = open("/srv/csrv", ORDWR);
+	fd = open("/srv/ionode0", ORDWR);
 	if(fd < 0)
 		sysfatal("no /srv/csrv");
 	if(mount(fd, -1, "/n/csrv", MREPL, "") < 0)

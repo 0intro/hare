@@ -116,6 +116,9 @@ main(int argc, char **argv)
 						sysfatal("bad exec out res");
 					s = seprint(s, e, " %s/%s/%s/stdio", mnt, sess, topo[j]);
 				}
+				k = atoi(c[0]);
+				if(k < 0 || nres <= k)
+					sysfatal("bad exec out res");
 				fprint(resfdctl[k], "exec %s %s", a[2], buf);
 			}else if(n == 4)
 				fprint(resfdctl[k], "exec %s %s", a[2], a[3]);
