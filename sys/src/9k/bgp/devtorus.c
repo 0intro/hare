@@ -741,7 +741,6 @@ torusfragsend(Block *b, void *arg)
 	poperror();
 	ilock(&t->txlock);
 	torusinject(t, tx, b);
-	tx->np++;
 	iunlock(&t->txlock);
 	qunlock(&tx->rl);
 }
@@ -1668,7 +1667,7 @@ torusattach(char* spec)
 		nexterror();
 	}
 
-	if(t->rcvq == nil && (t->rcvq = qopen(1024*1024, Qmsg, nil, 0)) == nil)
+	if(t->rcvq == nil && (t->rcvq = qopen(16*1024*1024, Qmsg, nil, 0)) == nil)
 		error(Enomem);
 	qreopen(t->rcvq);
 
