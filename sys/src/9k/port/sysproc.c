@@ -696,8 +696,8 @@ sysawait(Ar0* ar0, va_list list)
 
 	/*
 	 * int await(char* s, int n);
-	 * should be
-	 * int await(char* s, usize n);
+	 * should really be
+	 * usize await(char* s, usize n);
 	 */
 	p = va_arg(list, char*);
 	n = va_arg(list, long);
@@ -756,8 +756,9 @@ syserrstr(Ar0* ar0, va_list list)
 
 	/*
 	 * int errstr(char* err, uint nerr);
-	 * should be
-	 * int errstr(char* err, usize nerr);
+	 * should really be
+	 * usize errstr(char* err, usize nerr);
+	 * but errstr always returns 0.
 	 */
 	err = va_arg(list, char*);
 	nerr = va_arg(list, usize);
@@ -1065,6 +1066,11 @@ syssemacquire(Ar0* ar0, va_list list)
 	Segment *s;
 	int *addr, block;
 
+	/*
+	 * int semacquire(long* addr, int block);
+	 * should be (and will be implemented below as) perhaps
+	 * int semacquire(int* addr, int block);
+	 */
 	addr = va_arg(list, int*);
 	addr = validaddr(addr, sizeof(int), 1);
 	evenaddr(PTR2UINT(addr));
@@ -1084,6 +1090,11 @@ syssemrelease(Ar0* ar0, va_list list)
 	Segment *s;
 	int *addr, delta;
 
+	/*
+	 * long semrelease(long* addr, long count);
+	 * should be (and will be implemented below as) perhaps
+	 * int semrelease(int* addr, int count);
+	 */
 	addr = va_arg(list, int*);
 	addr = validaddr(addr, sizeof(int), 1);
 	evenaddr(PTR2UINT(addr));
