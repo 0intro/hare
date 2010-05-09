@@ -107,7 +107,7 @@ def catAsync (obj, *args):
     if debug : print "thread started"
     while 1:
         if debug : print "thread reading"
-        buf = obj.read(2)
+        buf = obj.read(512)
         #buf = obj.readline()
         if debug : print "thread read " + buf
         if len(buf) <= 0:
