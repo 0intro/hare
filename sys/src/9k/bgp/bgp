@@ -122,8 +122,10 @@ port
 	segment
 	swap
 	sysauth
+	syscallfmt
 	sysfile
 	sysproc
 	sysseg
+	systab
 	taslock
 	tod

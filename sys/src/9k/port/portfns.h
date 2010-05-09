@@ -310,6 +310,8 @@ char*		srvname(Chan*);
 int		swapcount(ulong);
 int		swapfull(void);
 void		swapinit(void);
+void		syscallfmt(int, va_list list);
+void		sysretfmt(int, va_list, Ar0*, uvlong, uvlong);
 void		sysrforkchild(Proc*, Proc*);
 void		timeradd(Timer*);
 void		timerdel(Timer*);

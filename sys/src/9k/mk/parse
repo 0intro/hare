@@ -191,8 +191,12 @@ function mkbootconf(				a, n, s, t, u, c, d, p, r){
 }
 
 function mksystab(					a, i, f, n, s, t){
-	s = "#include \"/sys/src/libc/9syscall/sys.h\"\n\n";
-	s = s "typedef void Syscall(Ar0*, va_list);\n\n";
+	s = "#include \"u.h\"\n";
+	s = s "#include \"../port/lib.h\"\n";
+	s = s "#include \"mem.h\"\n";
+	s = s "#include \"dat.h\"\n";
+	s = s "#include \"fns.h\"\n\n";
+	s = s "#include \"/sys/src/libc/9syscall/sys.h\"\n\n";
 
 	t = "";
 	while(getline < "/sys/src/libc/9syscall/sys.h"){
@@ -209,20 +213,26 @@ function mksystab(					a, i, f, n, s, t){
 		else
 			n = substr($2, 1, 1) tolower(substr($2, 2));
 
-		s = s "Syscall " f ";\n";
+		s = s "extern void " f "(Ar0*, va_list);\n";
 		t = t "\t[" $2 "]\t";
 		if(length($2) < 6)
 			t = t "\t";
 		t = t "{ \"" n "\", " f ", ";
 		#
-		# if($1 ~ "(FVERSION|FSTAT|STAT)")
-		#	t = t "{ .u = 0 } },\n";
-		# else
+		# The following should really be defined properly in the
+		# manual and code, but changing Plan 9 now is too awkward.
+		# It will matter more when sizeof(long) != sizeof(int).
 		#
-		if($1 ~ "(BIND|MOUNT|FWSTAT|WSTAT)")
-			t = t "{ .l = 0 } },\n";
-		else if($1 ~ "(EXEC|RENDEZVOUS|SEGBRK|SEGATTACH)")
+		# if($2 ~ "(FVERSION|STAT|FSTAT|WSTAT|FWSTAT|AWAIT)")
+		#	t = t "{ .u = 0 } },\n";
+		#
+		# if($2 ~ "(BIND|_MOUNT|MOUNT)")
+		#	t = t "{ .l = -1 } },\n";
+		#
+		if($2 ~ "(EXEC|SEGBRK|SEGATTACH|RENDEZVOUS)")
 			t = t "{ .v = (void*)-1 } },\n";
+		else if($2 ~ "(ALARM|_READ|_WRITE|PREAD|PWRITE)")
+			t = t "{ .l = -1 } },\n";
 		else
 			t = t "{ .i = -1 } },\n";
 	}
@@ -244,7 +254,7 @@ function mksystab(					a, i, f, n, s, t){
 			t = t "{ \"" n "\", " f ", {" a[2] " },\n";
 		}
 	}
-	s = s "struct {\n\tchar*\tn;\n\tSyscall*f;\n\tAr0\tr;\n}";
+	s = s "struct {\n\tchar*\tn;\n\tvoid (*f)(Ar0*, va_list);\n\tAr0\tr;\n}";
 	s = s " systab[] = {\n" t "};\n\nint nsyscall = nelem(systab);\n";
 
 	return s;
