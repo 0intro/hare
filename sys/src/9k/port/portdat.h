@@ -743,7 +743,7 @@ struct Proc
 
 	Fastcall* fc;
 	int	fcount;
-	char *syscalltrace;
+	char*	syscalltrace;
 
 	/*
 	 *  machine specific fpu, mmu and notify
@@ -789,6 +789,11 @@ extern	uint	qiomaxatomic;
 extern	char*	statename[];
 extern  Image	swapimage;
 extern	char*	sysname;
+extern struct {
+	char*	n;
+	void (*f)(Ar0*, va_list);
+	Ar0	r;
+} systab[];
 
 enum
 {
@@ -968,7 +973,7 @@ enum
 struct Fastcall {
 	int	scnum;
 	Chan*	c;
-	void	(*fun)(Ar0*, Fastcall *);
+	void	(*fun)(Ar0*, Fastcall*);
 	void*	buf;
 	int	n;
 	vlong	offset;

@@ -599,7 +599,7 @@ newproc(void)
 	p->rgrp = 0;
 	p->pdbg = 0;
 	p->kp = 0;
-	if(up && up->procctl == Proc_tracesyscall)
+	if(up != nil && up->procctl == Proc_tracesyscall)
 		p->procctl = Proc_tracesyscall;
 	else
 		p->procctl = 0;
@@ -1011,8 +1011,9 @@ pexit(char *exitstr, int freemem)
 	Chan *dot;
 	void (*pt)(Proc*, int, vlong);
 
-	if(up->syscalltrace)
+	if(up->syscalltrace != nil)
 		free(up->syscalltrace);
+	up->syscalltrace = nil;
 	up->alarm = 0;
 	if (up->tt)
 		timerdel(up);

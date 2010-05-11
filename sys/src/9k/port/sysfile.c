@@ -924,7 +924,7 @@ sysseek(Ar0* ar0, va_list list)
 	whence = va_arg(list, int);
 	*rv = sseek(fd, offset, whence);
 
-	ar0->l = 0;
+	ar0->i = 0;
 }
 
 void
@@ -935,6 +935,8 @@ sysoseek(Ar0* ar0, va_list list)
 
 	/*
 	 * long oseek(int fd, long n, int type);
+	 *
+	 * Deprecated; backwards compatibility only.
 	 */
 	fd = va_arg(list, int);
 	offset = va_arg(list, long);
@@ -996,7 +998,7 @@ sysfstat(Ar0* ar0, va_list list)
 
 	/*
 	 * int fstat(int fd, uchar* edir, int nedir);
-	 * should be
+	 * should really be
 	 * usize fstat(int fd, uchar* edir, usize nedir);
 	 * but returning an unsigned is probably too
 	 * radical.
@@ -1029,7 +1031,7 @@ sysstat(Ar0* ar0, va_list list)
 
 	/*
 	 * int stat(char* name, uchar* edir, int nedir);
-	 * should be
+	 * should really be
 	 * usize stat(char* name, uchar* edir, usize nedir);
 	 * but returning an unsigned is probably too
 	 * radical.
@@ -1379,8 +1381,10 @@ syswstat(Ar0* ar0, va_list list)
 
 	/*
 	 * int wstat(char* name, uchar* edir, int nedir);
-	 * should be
-	 * long wstat(char* name, uchar* edir, usize nedir);
+	 * should really be
+	 * usize wstat(char* name, uchar* edir, usize nedir);
+	 * but returning an unsigned is probably too
+	 * radical.
 	 */
 	aname = va_arg(list, char*);
 	p = va_arg(list, uchar*);
@@ -1403,8 +1407,10 @@ sysfwstat(Ar0* ar0, va_list list)
 
 	/*
 	 * int fwstat(int fd, uchar* edir, int nedir);
-	 * should be
-	 * long wstat(int fd, uchar* edir, usize nedir);
+	 * should really be
+	 * usize wstat(int fd, uchar* edir, usize nedir);
+	 * but returning an unsigned is probably too
+	 * radical.
 	 */
 	fd = va_arg(list, int);
 	p = va_arg(list, uchar*);
@@ -1464,7 +1470,7 @@ sys_stat(Ar0* ar0, va_list list)
 	/*
 	 * int stat(char* name, char* edir);
 	 * should have been
-	 * long stat(char* name, uchar* edir));
+	 * usize stat(char* name, uchar* edir));
 	 *
 	 * Deprecated; backwards compatibility only.
 	 */
@@ -1520,7 +1526,7 @@ sys_fstat(Ar0* ar0, va_list list)
 	/*
 	 * int fstat(int fd, char* edir);
 	 * should have been
-	 * long fstat(int fd, uchar* edir));
+	 * usize fstat(int fd, uchar* edir));
 	 *
 	 * Deprecated; backwards compatibility only.
 	 */

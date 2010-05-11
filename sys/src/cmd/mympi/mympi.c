@@ -53,17 +53,18 @@ MPI_Init(int *argc, char ***argv)
 	extern int x, y, z;
 	char **av = *argv;
 	myname = av[0];
-fprint(2, "myname %s av[1] %s\n", myname, av[1]);
+print( "myname %s av[1] %s\n", myname, av[1]);
 	nproc = strtoul(av[1], 0, 10);
 	*argc = *argc - 2;
 	*argv = av + 2;
 	torusinit(&myproc, nproc);
+print( "x %d y %d z %d myproc %d xyztorank() %d\n", x, y, z, myproc, xyztorank(x,y,z));
 
 	maxrank = nproc - 1;
 
 	/* test */
 	if (myproc != xyztorank(x,y,z)) {
-		fprint(2, "myproc %d != xyztorank %d ", myproc, xyztorank(x,y,z));
+		print( "myproc %d != xyztorank %d ", myproc, xyztorank(x,y,z));
 		panic("bail");
 	}
 	return MPI_SUCCESS;
