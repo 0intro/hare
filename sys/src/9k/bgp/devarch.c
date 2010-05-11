@@ -237,6 +237,19 @@ ioipread(Chan*, void* a, long n, vlong offset)
 }
 
 static long
+psetread(Chan*, void* a, long n, vlong offset)
+{
+	char buf[128];
+
+	/* pset# psetsize# rankinpset# rank# ionoderank# */
+	seprint(buf, &buf[sizeof(buf)], "%d %d %d %d %d\n",
+			sys->pset, sys->psetsz, sys->prank,
+			sys->rank, sys->iorank);
+
+	return readstr(offset, a, n, buf);
+}
+
+static long
 personalityread(Chan*, void *a, long n, vlong offset)
 {
 	char *alloc;
@@ -349,6 +362,7 @@ archinit(void)
 	addarchfile("cputype", 0444, cputyperead, nil);
 	addarchfile("block", 0444, blockidread, nil);
 	addarchfile("xyzip", 0444, xyzipread, nil);
+	addarchfile("pset", 0444, psetread, nil);
 	addarchfile("ioip", 0444, ioipread, nil);
 	addarchfile("personality", 0444, personalityread, nil);
 	addarchfile("cnk", 0644, cnkread, cnkwrite);

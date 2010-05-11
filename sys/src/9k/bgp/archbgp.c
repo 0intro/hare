@@ -93,7 +93,6 @@ archreset(void)
 
 	sys->nx = personality->Network_Config.Xnodes;
 	sys->ny = personality->Network_Config.Ynodes;
-	sys->nz = personality->Network_Config.Znodes;
 
 	sys->yspan = sys->nx;
 	sys->zspan = sys->ny*sys->yspan;
@@ -121,6 +120,14 @@ archreset(void)
 	 */
 	if(sys->ionode || (sys->x == 1 && sys->y == 0 && sys->z == 0))
 		m->chatty = 1;
+		
+	sys->nz = personality->Network_Config.Znodes;
+	
+	sys->rank = personality->Network_Config.Rank;
+	sys->pset = personality->Network_Config.PSetNum;
+	sys->psetsz = personality->Network_Config.PSetSize;
+	sys->prank = personality->Network_Config.RankInPSet;
+	sys->iorank = personality->Network_Config.IOnodeRank;
 
 	fmtinstall('E', eipfmt);
 	fmtinstall('I', eipfmt);
