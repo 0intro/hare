@@ -25,6 +25,7 @@ main(int argc, char **argv)
 		print("%d: Sent a message to rank 0\n", node);
 	} else {
 		int i;
+		torusdebug |= 2;
 		for(i = 1; i < nproc; i++) {
 			MPI_Recv(buf, 	1, MPI_INT, 1, 1, MPI_COMM_WORLD, &status);
 			print("0: Recv'd from %d\n", i);
