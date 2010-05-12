@@ -15,6 +15,9 @@
 	 pipes, collective operations, etc.
  
 	Based in part on devpipe.c
+
+	TODO:
+		* make sure you qlock openq when necessary
  */
 
 #include	"u.h"
@@ -39,10 +42,15 @@ enum
 	
 struct Openq
 {
+	QLock;
+
 	int mode;			/* inactive, reader, writer, or read/write */
 
 	Queue *q;			/* for readers */
 	Rendez r;			/* for a blocked writer */
+
+	ulong remain;		/* remaining bytes in record */
+	int status;			/* -1 for error, 1 for finished, 0 for not finished */
 
 	Openq *writer;		/* who is writing us */
 	Openq *reader;		/* who is reading us */
@@ -195,13 +203,14 @@ mpipewalk(Chan *c, Chan *nc, char **name, int nname)
 
 	wq = devwalk(c, nc, name, nname, mpipedir, NPIPEDIR, mpipegen);
 	if(wq != nil && wq->clone != nil && wq->clone != c){
-		p = c->aux;
-		qlock(p);
-		p->ref++;
 		if(c->flag & COPEN){
-			print("channel open in mpipewalk\n");
+			print("mpipe: channel open in mpipewalk\n");
+		} else {
+			p = c->aux;
+			qlock(p);
+			p->ref++;
+			qunlock(p);
 		}
-		qunlock(p);
 	}
 	return wq;
 }
@@ -210,9 +219,14 @@ static long
 mpipestat(Chan *c, uchar *db, long n)
 {
 	Mpipe *p;
+	Openq *openq;
 	Dir dir;
 
-	p = c->aux;
+	if(c->flag & COPEN){
+		openq = c->aux;
+		p = openq->mp;
+	} else
+		p = c->aux;
 
 	switch(PIPETYPE(c->qid.path)){
 	case Qdir:
@@ -238,7 +252,11 @@ static void
 mpipekick(Mpipe *p, int which, Openq *q)
 {
 	qlock(p);
-	if(p->readers[which].first) {
+	if(q->rnext) {
+		print("mpipekick: already on read queue\n");
+		goto error;
+	}
+	if(p->readers[which].first == nil) {
 		p->readers[which].first = p->readers[which].last = q;
 	
 		/* kick first waiting writer */
@@ -248,6 +266,7 @@ mpipekick(Mpipe *p, int which, Openq *q)
 		p->readers[which].last->rnext = q;
 		p->readers[which].last = q;
 	}
+error:
 	qunlock(p);
 }
 
@@ -321,12 +340,12 @@ mpipeclose(Chan *c)
 		openq = c->aux;
 		p = openq->mp;
 		qlock(p);
-
 		if(openq->mode & Oqreader) {
 			if(openq->writer) {
 				print("mpipe: close: closing an active reader\n");
 				qhangup(openq->q, 0);
 				dirty++;
+				openq->writer->status = -1;
 				openq->writer = nil;
 				/* do we mark reader as having his q closed? */
 			}
@@ -384,43 +403,150 @@ mpipeclose(Chan *c)
 		qunlock(p);
 }
 
-/* TODO: Implement Read & Write */
-
 static long
 mpiperead(Chan *c, void *va, long n, vlong)
 {
+	Openq *openq;
 	Mpipe *p;
-
-	p = c->aux;
+	int which = -1;
 
 	switch(PIPETYPE(c->qid.path)){
 	case Qdir:
 		return devdirread(c, va, n, mpipedir, NPIPEDIR, mpipegen);
 	case Qdata0:
-		return qread(p->q[0], va, n);
+		which = 0;
+		break;
 	case Qdata1:
-		return qread(p->q[1], va, n);
+		which =1;
+		break;
 	default:
 		panic("mpiperead");
 	}
-	return -1;	/* not reached */
+
+	openq = c->aux;
+	p = openq->mp;
+
+	/* if we are empty kick writers */
+	if((!openq->writer)&&(qlen(openq->q) == 0)&&(openq->rnext == nil))
+		mpipekick(p, which, openq);
+
+	if(n > openq->remain) { /* finished reading, wake final write */
+		openq->writer->reader = nil;
+		wakeup(&openq->writer->r);
+		openq->writer = nil;
+	}	
+
+	return qread(openq->q, va, n);
 }
 
 static Block*
-mpipebread(Chan *c, long n, vlong offset)
+mpipebread(Chan *c, long n, vlong)
 {
+	Openq *openq;
 	Mpipe *p;
-
-	p = c->aux;
+	int which = -1;
 
 	switch(PIPETYPE(c->qid.path)){
 	case Qdata0:
-		return qbread(p->q[0], n);
+		which = 0;
+		break;
 	case Qdata1:
-		return qbread(p->q[1], n);
+		which =1;
+		break;
+	default:
+		panic("mpipebread");
 	}
 
-	return devbread(c, n, offset);
+	openq = c->aux;
+	p = openq->mp;
+
+	/* if we are empty kick waiting writers */
+	if((!openq->writer)&&(qlen(openq->q) == 0)&&(openq->rnext == nil))
+		mpipekick(p, which, openq);
+
+	if(n >= openq->remain) { /* finished reading, wake final write*/
+		openq->writer->reader = nil;
+		wakeup(&openq->writer->r);
+		openq->writer = nil;
+	}
+		
+	return qbread(openq->q, n);
+}
+
+static int
+checkfinished(void *arg)
+{
+	Openq *openq = arg;
+	return openq->status;
+}
+
+static void
+writeradd(Mpipe *p, int which, Openq *q)
+{
+	qlock(p);
+	if(q->wnext) {
+		print("mpipe: writeradd: already on list\n");
+		goto error;
+	}
+	if(p->writers[which].first == nil) 
+		p->writers[which].first = p->writers[which].last = q;
+	else {
+		p->writers[which].last->wnext = q;
+		p->writers[which].last = q;
+	}
+error:
+	qunlock(p);
+}
+
+static int
+readersavail(void *arg)
+{
+	return arg != nil;
+}
+
+static void
+findreader(Mpipe *p, int which, Openq *openq)
+{
+	int added = 0;
+
+	while(openq->reader == nil) {   /* select reader */
+		if(!added) {
+			writeradd(p, which, openq);
+			added++;
+		}
+
+		sleep(&openq->r, readersavail, p->readers[which].first);
+
+		qlock(p);
+		if(p->readers[which].first == nil) {
+			qunlock(p);
+			continue;
+		} 	
+		openq->reader = p->readers[which].first;
+		p->readers[which].first = openq->reader->rnext;
+		if(p->readers[which].first == nil)
+			p->readers[which].last = nil;
+		openq->reader->rnext = nil;
+
+		if(p->writers[which].first == openq) {
+			p->writers[which].first = openq->wnext;
+			if(p->writers[which].first == nil)
+				p->writers[which].last = nil;
+		} else {
+			Openq *cq;
+
+			for(cq= p->writers[which].first; cq != nil; cq = cq->wnext) {
+				if(cq->wnext == openq) {
+					cq->wnext = openq->wnext;
+					if(cq->wnext = nil)
+						p->writers[which].last = cq;
+					break;
+				}
+			}
+		}
+		openq->wnext = nil;
+		qunlock(p);
+	}
 }
 
 /*
@@ -431,32 +557,68 @@ static long
 mpipewrite(Chan *c, void *va, long n, vlong)
 {
 	Mpipe *p;
+	Openq *openq;
+	int which = -1;
 
 	if(!islo())
 		print("mpipewrite hi %#p\n", getcallerpc(&c));
-	if(waserror()) {
-		/* avoid notes when mpipe is a mounted queue */
-		if((c->flag & CMSG) == 0)
-			postnote(up, 1, "sys: write on closed mpipe", NUser);
-		nexterror();
-	}
 
-	p = c->aux;
+	openq = c->aux;
+	p = openq->mp;
 
-	switch(PIPETYPE(c->qid.path)){
-	case Qdata0:
-		n = qwrite(p->q[1], va, n);
+	switch(PIPETYPE(c->qid.path)) {
+	case Qdata0:   //n = qwrite(p->q[1], va, n);
+		which = 1;
 		break;
 
-	case Qdata1:
-		n = qwrite(p->q[0], va, n);
+	case Qdata1: // n = qwrite(p->q[0], va, n);
+		which = 0;
 		break;
 
 	default:
 		panic("mpipewrite");
 	}
 
-	poperror();
+	qlock(openq);
+	findreader(p, which, openq);
+	if(openq->remain == 0) {	/* initial write of new record */
+		char *len = malloc(n+1);
+		memmove(len, va, n);
+		len[n] = 0;
+		openq->remain = strtoul(len, nil, 0);
+		if(openq->remain == 0)
+			print("mpipewrite: bad header string %s\n", len);
+		free(len);
+	} else {
+		if(n > openq->remain) {
+			/* TODO: should we take harsher action? or short write sufficient? */
+			print("mpipewrite: write record overflow");
+			n = openq->remain;
+		}
+		if(waserror()) {
+			/* avoid notes when mpipe is a mounted queue */
+			if((c->flag & CMSG) == 0)
+				postnote(up, 1, "sys: write on closed mpipe", NUser);
+			nexterror();
+		}
+		n = qwrite(openq->reader->q, va, n);
+		poperror();
+		if(n>0) {
+			openq->remain = openq->remain-n;
+			if(openq->remain == 0) { 
+				/* last record sent, wait for final read */
+				sleep(&openq->r, checkfinished, openq);
+				if(openq->status < 0) { /* reader closed before reading everything */
+					n = n - qlen(openq->reader->q);
+					openq->reader = nil;
+					qunlock(openq);
+					error(Ehungup);
+					return n;
+				}	
+			}
+		}
+	}
+	qunlock(openq);
 	return n;
 }
 
@@ -465,30 +627,69 @@ mpipebwrite(Chan *c, Block *bp, vlong)
 {
 	long n;
 	Mpipe *p;
+	Openq *openq;
+	int which = -1;
 
-	if(waserror()) {
-		/* avoid notes when mpipe is a mounted queue */
-		if((c->flag & CMSG) == 0)
-			postnote(up, 1, "sys: write on closed mpipe", NUser);
-		nexterror();
-	}
+	openq = c->aux;
+	p = openq->mp;
 
-	p = c->aux;
 	switch(PIPETYPE(c->qid.path)){
 	case Qdata0:
-		n = qbwrite(p->q[1], bp);
+		which = 1;
 		break;
 
 	case Qdata1:
-		n = qbwrite(p->q[0], bp);
+		which = 0;
 		break;
 
 	default:
-		n = 0;
 		panic("mpipebwrite");
 	}
 
-	poperror();
+	n = blocklen(bp);
+	qlock(openq);
+	findreader(p, which, openq);
+	if(openq->remain == 0) {	/* initial write of new record */ 
+		/* assume its a single block */
+		char *len = malloc(n+1);
+		memmove(len, bp->base, n);
+		len[n] = 0;
+		openq->remain = strtoul(len, nil, 0);
+		if(openq->remain == 0)
+			print("mpipewrite: bad header string %s\n", len);
+		free(len);
+		freeb(bp); /* ?? */
+	} else {
+		if(n > openq->remain) {
+			/* TODO: should we take harsher action? or short write sufficient? */
+			print("mpipewrite: write record overflow, truncating");
+			bp = trimblock(bp, 0, openq->remain);
+		}
+		if(waserror()) {
+			/* avoid notes when mpipe is a mounted queue */
+			if((c->flag & CMSG) == 0)
+				postnote(up, 1, "sys: write on closed mpipe", NUser);
+			nexterror();
+		}
+		n = qbwrite(openq->reader->q, bp);
+		poperror();
+		if(n>0) {
+			openq->remain = openq->remain-n;
+			if(openq->remain == 0) { 
+				/* last record sent, wait for final read */
+				sleep(&openq->r, checkfinished, openq);
+				if(openq->status < 0) { /* reader closed before reading everything */
+					n = n - qlen(openq->reader->q);
+					openq->reader = nil;
+					qunlock(openq);
+					error(Ehungup);
+					return n;
+				}	
+			}
+		}		
+	}
+	qunlock(openq);
+	
 	return n;
 }
 
