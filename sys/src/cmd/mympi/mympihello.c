@@ -12,8 +12,7 @@ main(int argc, char **argv)
 	int node, nproc;
 	unsigned int buf[1];
 	MPI_Status status;
-	
-	print("Hello from hello arg %d argv %p\n", argc, argv);
+
 	MPI_Init(&argc,&argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &node);
 	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
@@ -27,12 +26,11 @@ main(int argc, char **argv)
 		int i;
 		torusdebug |= 2;
 		for(i = 1; i < nproc; i++) {
-			MPI_Recv(buf, 	1, MPI_INT, 1, 1, MPI_COMM_WORLD, &status);
+			MPI_Recv(buf, 	1, MPI_INT, i, 1, MPI_COMM_WORLD, &status);
 			print("0: Recv'd from %d\n", i);
 		}
+		print("0: All %d nodes checked in\n", nproc-1);
 	}
 	print("%d: Finalize\n", node);
 	MPI_Finalize();
-	print("%d: wait forever\n", node);
-	while(1);
 }

@@ -187,9 +187,9 @@ void torusinit(int *pmyproc, const int numprocs)
 	z = d[Z];
 
 	*pmyproc = (z << (lx + ly)) + (y << lx) + x;
-print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
-print( "numprocs %d \n", numprocs);
-print("%d/%d %d/%d %d/%d\n", lx, xbits, ly, ybits, lz, zbits);
+//print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
+//print( "numprocs %d \n", numprocs);
+//print("%d/%d %d/%d %d/%d\n", lx, xbits, ly, ybits, lz, zbits);
 	/* make some tables. Mapping is done as it is to maximally distributed broadcast traffic */
 	xyz = calloc(numprocs, sizeof(*xyz));
 	if (!xyz)
@@ -259,7 +259,7 @@ xyztorank(int x, int y, int z)
 {
 	int rank;
 	rank = x + y * ysize + z*ysize*xsize;
-print("xyz(%d, %d, %d) to rank %d\n", x, y, z, rank);
+//print("xyz(%d, %d, %d) to rank %d\n", x, y, z, rank);
 	return rank;
 }
 
@@ -293,46 +293,34 @@ torussend(void *buf, int length, int rank, void *tag, int taglen)
 	free(tpkt);
 }
 
+/* buf is REQUIRED to be long enough to hold any data + tag + Tpkt */
+/* we really need scatter/gather IO */
 int
-torusrecv(MPI_Status **status, void *buf, long, void *tag, long taglen)
+torusrecv(void *buf, long buflen, void *tag, long taglen)
 {
 	int n;
-	Tpkt *tpkt;
-	struct Hdr *h;
-	char b[32];
-	int payloadlen;
-	int bufoff;
 	int total;
-	char *cp = buf;
-
-	n = pread(torusfd, b, sizeof(b), 0);
+	char *m = buf;
+	int mlen;
+//print("TR: buf %p tag %p\n", buf, tag);
+	/* more copies. We can fix this later but we really ought to 
+	 * get scatter/gather in this kernel. And, no, for most apps, 
+	 * requiring users to take a pointer back to the data we read in is 
+	 * NOT an acceptable answer!
+	 */
+	mlen = buflen + taglen + sizeof(Tpkt);
+	n = pread(torusfd, m, mlen, 0);
 	if (n < 32)
 		panic("torus read < 32!");
-	
-	tpkt = (Tpkt *)b;
-	h = (struct Hdr *)tpkt->_8_;
-//print("hdr.len %x %x \n", h->len[0], h->len[1]);
+	//print("hdr.len %x %x \n", h->len[0], h->len[1]);
 
 	/* copy first 'tag' bytes to tag, rest to buf */
 //print("move %p to %p %d bytes\n", b, tag, taglen);
-	memmove(tag, &b[16], taglen);
+	memmove(tag, &m[16], taglen);
 //print("mpve %p to %p %d bytes\n", &b[taglen], cp, 16-taglen);
-	memmove(cp, &b[taglen], 16-taglen);
-	total = 16 - taglen;
+	memmove(m, &m[taglen + 16], n - taglen - sizeof(Tpkt));
+	total = n - taglen - sizeof(Tpkt);
 //print("total is now %d\n", total);
-	payloadlen = 1 + (h->len[0]<<8 | h->len[1]);
-	payloadlen -= 32 ;
-	bufoff = 16 - taglen;
-//print("payloadlen is %d; bufoff %d\n", payloadlen, bufoff);
-	while (payloadlen > 0) {
-		n = pread(torusfd, &cp[bufoff], 32, 0);
-		if (n < 32)
-			panic("buf loop read < 32");
-		total += n;
-		payloadlen -= n;
-	}
-
-	*status = (MPI_Status *) &tag;
-//print("Returning %d \n", total);
+print("Returning %d \n", total);
 	return total;
 }

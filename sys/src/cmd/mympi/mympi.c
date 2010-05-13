@@ -34,7 +34,7 @@ static int torusfd = -1;
 struct bufpacket *buffered = nil;
 
 void torussend(void *buf, int length, int rank, void *tag, int taglen);
-int torusrecv(MPI_Status **status, void *buf, long length, void *tag, long taglen);
+int torusrecv(void *buf, long length, void *tag, long taglen);
 void torusinit(int *pmyproc, const int pnprocs);
 
 void
@@ -53,12 +53,12 @@ MPI_Init(int *argc, char ***argv)
 	extern int x, y, z;
 	char **av = *argv;
 	myname = av[0];
-print( "myname %s av[1] %s\n", myname, av[1]);
+//print( "myname %s av[1] %s\n", myname, av[1]);
 	nproc = strtoul(av[1], 0, 10);
 	*argc = *argc - 2;
 	*argv = av + 2;
 	torusinit(&myproc, nproc);
-print( "x %d y %d z %d myproc %d xyztorank() %d\n", x, y, z, myproc, xyztorank(x,y,z));
+//print( "x %d y %d z %d myproc %d xyztorank() %d\n", x, y, z, myproc, xyztorank(x,y,z));
 
 	maxrank = nproc - 1;
 
@@ -163,7 +163,6 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
               int tag, MPI_Comm comm, MPI_Status *status )
 {
 	unsigned char nbytes = datatype >> 8;
-	MPI_Status *s;
 	int count;
 	int size;
 	count = num * nbytes;
@@ -178,6 +177,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 
 	/* Well, first, let's see if it's here somewhere. */
 	for(b = buffered; b; b = b->next) {
+print("Check %p tag %d source %d\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source))
 			goto got;
 	}
@@ -186,13 +186,14 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 	while (1) {
 		b = calloc(1048576 + 4096, 1);
 		/* for MPI, you pretty much have to take the worst case. It might be Some Other Packet */
-		size = torusrecv(&s, b->data, 1048576, b->tag, sizeof(b->tag));
+print("IR %p\n", b);
+		size = torusrecv(b->data, 1048576, b->tag, sizeof(b->tag));
 ///print("Torusrecv says %d bytes\n", size);
 		if (size < 0)
 			panic("torusrecv -1: %r");
 		/* tag matching. */
 //print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource]);
-		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source))
+		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag  || tag == MPI_ANY_TAG) && (b->tag[TAGsource] == source || source == MPI_ANY_SOURCE))
 			break;
 		b->next = buffered;
 		if (buffered)
@@ -202,7 +203,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		
 
 got:
-print("MPI recv: got it\n");
+//print("MPI recv: got it\n");
 	if (b->next)
 		b->next->prev = b->prev;
 	if (b->prev)
