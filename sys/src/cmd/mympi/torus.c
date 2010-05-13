@@ -22,24 +22,6 @@ enum {
 };
 
 /*
- * Packet header. The hardware requires an 8-byte header
- * of which the last two are reserved (they contain a sequence
- * number and a header checksum inserted by the hardware).
- * The hardware also requires the packet to be aligned on a
- * 128-bit boundary for loading into the HUMMER.
- */
-typedef struct Tpkt Tpkt;
-struct Tpkt {
-	u8int	sk;				/* Skip Checksum Control */
-	u8int	hint;				/* Hint|Dp|Pid0 */
-	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
-	u8int	dst[N];				/* Destination Coordinates */
-	u8int	_6_[2];				/* reserved */
-	u8int	_8_[8];				/* protocol header */
-	u8int	payload[];
-};
-
-/*
  * SKIP is a field in .sk giving the number of 2-bytes
  * to skip from the top of the packet before including
  * the packet bytes into the running checksum.
@@ -70,6 +52,30 @@ enum {
 	Pid1		= 0x10,			/* Destination Group FIFO LSb */
 };
 
+/*
+ * Packet header. The hardware requires an 8-byte header
+ * of which the last two are reserved (they contain a sequence
+ * number and a header checksum inserted by the hardware).
+ * The hardware also requires the packet to be aligned on a
+ * 128-bit boundary for loading into the HUMMER.
+ */
+typedef struct Tpkt Tpkt;
+struct Tpkt {
+	u8int	sk;				/* Skip Checksum Control */
+	u8int	hint;				/* Hint|Dp|Pid0 */
+	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
+	u8int	dst[N];				/* Destination Coordinates */
+	u8int	_6_[2];				/* reserved */
+	u8int	_8_[8];				/* protocol header */
+	u8int	payload[];
+};
+
+struct Hdr {
+	uchar	len[2];	/* byte length - 1 */
+	uchar	off[2];	/* offset adjusted by hardware (12 bits); top 4 bits of sequence */
+	uchar	seq;		/* low order bits of sequence (zero if raw) */
+	uchar	src[3];	/* source node address */
+};
 
 int torusdebug = 0;
 int x, y, z;
@@ -288,27 +294,45 @@ torussend(void *buf, int length, int rank, void *tag, int taglen)
 }
 
 int
-torusrecv(MPI_Status **status, void *buf, long length, void *tag, long taglen)
+torusrecv(MPI_Status **status, void *buf, long, void *tag, long taglen)
 {
 	int n;
-	Tpkt *tpkt, apkt;
-	n = pread(torusfd, &tpkt, sizeof(tpkt), 0);
-	if (n < sizeof(tpkt))
-		panic("torusrecv header");
-	if (torusdebug & 2)
-		dumptpkt(tpkt, 1, 1);
-	/* read and discard header */
-	n = pread(torusfd, tag, taglen, 0);
-	if (n < 0)
-		panic("torusrecv tag");
-	n = pread(torusfd, buf, length, 0);
-	if (n < 0)
-		panic("torusrecv buf");
-	if (n ==0)
-		return n;
+	Tpkt *tpkt;
+	struct Hdr *h;
+	char b[32];
+	int payloadlen;
+	int bufoff;
+	int total;
+	char *cp = buf;
 
-	if (torusdebug & 2)
-		dumptpkt((Tpkt *)buf, 1, 1);
-	*status = (MPI_Status *) ((u8int *)buf + sizeof(Tpkt));
-	return n;
+	n = pread(torusfd, b, sizeof(b), 0);
+	if (n < 32)
+		panic("torus read < 32!");
+	
+	tpkt = (Tpkt *)b;
+	h = (struct Hdr *)tpkt->_8_;
+//print("hdr.len %x %x \n", h->len[0], h->len[1]);
+
+	/* copy first 'tag' bytes to tag, rest to buf */
+//print("move %p to %p %d bytes\n", b, tag, taglen);
+	memmove(tag, &b[16], taglen);
+//print("mpve %p to %p %d bytes\n", &b[taglen], cp, 16-taglen);
+	memmove(cp, &b[taglen], 16-taglen);
+	total = 16 - taglen;
+//print("total is now %d\n", total);
+	payloadlen = 1 + (h->len[0]<<8 | h->len[1]);
+	payloadlen -= 32 ;
+	bufoff = 16 - taglen;
+//print("payloadlen is %d; bufoff %d\n", payloadlen, bufoff);
+	while (payloadlen > 0) {
+		n = pread(torusfd, &cp[bufoff], 32, 0);
+		if (n < 32)
+			panic("buf loop read < 32");
+		total += n;
+		payloadlen -= n;
+	}
+
+	*status = (MPI_Status *) &tag;
+//print("Returning %d \n", total);
+	return total;
 }

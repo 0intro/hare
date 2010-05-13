@@ -181,17 +181,17 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source))
 			goto got;
 	}
-print("GET IT!\n");
+//print("GET IT!\n");
 	/* get it */
 	while (1) {
 		b = calloc(1048576 + 4096, 1);
 		/* for MPI, you pretty much have to take the worst case. It might be Some Other Packet */
 		size = torusrecv(&s, b->data, 1048576, b->tag, sizeof(b->tag));
-print("Torusrecv says %d bytes\n", size);
+///print("Torusrecv says %d bytes\n", size);
 		if (size < 0)
 			panic("torusrecv -1: %r");
 		/* tag matching. */
-print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource]);
+//print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource]);
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source))
 			break;
 		b->next = buffered;

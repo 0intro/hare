@@ -389,6 +389,9 @@ struct Torus {
 	uint	rcvpackets;
 	uint	rcvtoss;
 	uint	rcvqfull;
+	uint	rcvqpass;
+	uint	rcvqbread;
+	uint	rcvqread;
 	uint	rcvpause;
 	uint	rcvresume;
 	uint	injintr;
@@ -841,6 +844,7 @@ torusbread(Chan* c, long n, vlong offset)
 		return devbread(c, n, offset);
 
 	case Qdata:
+		t->rcvqbread++;
 		return qbread(t->rcvq, n);
 	}
 }
@@ -889,6 +893,9 @@ torusread(Chan* c, void *a, long n, vlong off)
 		p = seprint(p, e, "inj: %d\n", t->injpackets);
 		p = seprint(p, e, "rcvtoss: %d\n", t->rcvtoss);
 		p = seprint(p, e, "rcvqfull: %d\n", t->rcvqfull);
+		p = seprint(p, e, "rcvqpass: %d\n", t->rcvqpass);
+		p = seprint(p, e, "rcvqbread: %d\n", t->rcvqbread);
+		p = seprint(p, e, "rcvqread: %d\n", t->rcvqread);
 		//p = seprint(p, e, "rcvpause: %d\n", t->rcvpause);
 		//p = seprint(p, e, "rcvresume: %d\n", t->rcvresume);
 
@@ -920,6 +927,7 @@ torusread(Chan* c, void *a, long n, vlong off)
 		return n;
 
 	case Qdata:
+		t->rcvqread++;
 		return qread(t->rcvq, a, n);
 
 	default:
@@ -1129,6 +1137,8 @@ torus_process_rx(Torus *t, int group)
 						print("torus overrun\n");
 						/* torusrcvpause();  EVH: this would be a very bad thing */
 						t->rcvqfull++;
+					} else {
+						t->rcvqpass++;
 					}
 				}
 				rx->head_idx = NEXT(rx->head_idx, Nrx);
