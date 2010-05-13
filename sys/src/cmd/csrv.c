@@ -37,7 +37,7 @@ static void
 usage(void)
 {
 	fprint(2, "csrv [-D] [mtpt]\n");
-	exits("usage");
+	threadexits("usage");
 }
 
 enum
@@ -144,14 +144,17 @@ ctlworker(void *)
 	Cmdtab *cmd;
 
 	while(1) {
+		memset(ctlbuf, 255, 0);
 		if(recv(ctlchan, ctlbuf) < 0)
 			threadexits("ctlworker rcvchan error");
 		cb = parsecmd(ctlbuf, strlen(ctlbuf));
 		cmd = lookupcmd(cb, ctltab, nelem(ctltab));
 		if(cmd == nil) {
 			send(ctlrespchan, Ebadctl);
+			free(cb);
 			continue;
 		}
+
 		send(ctlrespchan, "\0"); /* success */
 
 		switch(cmd->index){
@@ -169,9 +172,11 @@ ctlworker(void *)
 			unmount(0, newpath);
 			break;
 		case Cexit:
+			free(cb);
 			unmount(0, csrvpath);
 			threadexitsall("exitrequested");
-		}	
+		}
+		free(cb);
 	}
 
 }
@@ -208,5 +213,5 @@ threadmain(int argc, char **argv)
 
 	proccreate(ctlworker, nil, STACK);
 
-	exits(0);
+	threadexits(0);
 }
