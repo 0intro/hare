@@ -31,11 +31,38 @@ struct bufpacket {
 int myproc = -1, nproc = -1, maxrank = -1;
 char *myname = nil;
 static int torusfd = -1;
-struct bufpacket *buffered = nil;
+struct bufpacket buffered = {&buffered, &buffered};
 
 void torussend(void *buf, int length, int rank, void *tag, int taglen);
 int torusrecv(void *buf, long length, void *tag, long taglen);
 void torusinit(int *pmyproc, const int pnprocs);
+
+void
+buf_add(struct bufpacket *new)
+{
+print("Add %p: %p %p %p %p: ", new, buffered.next->prev, buffered.next, &buffered, buffered.next);
+	buffered.next->prev = new;
+	new->next = buffered.next;
+	new->prev = &buffered;
+	buffered.next = new;
+print("Added: %p %p %p %p\n", buffered.next->prev, buffered.next, &buffered, buffered.next);
+}
+
+void
+buf_del(struct bufpacket *r)
+{
+print("DEL: %p, %p %p\n", r, r->next, r->prev);
+print("DEL %p: %p %p: ", r, r->next->prev, r->prev->next);
+	r->next->prev = r->prev;
+	r->prev->next = r->next;
+print(": %p %p\n", r->next->prev, r->prev->next);
+}
+
+int
+buf_empty(void)
+{
+	return buffered.next == &buffered;
+}
 
 void
 panic(char *s)
@@ -176,17 +203,19 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 	}
 
 	/* Well, first, let's see if it's here somewhere. */
-	for(b = buffered; b; b = b->next) {
-print("Check %p tag %d source %d\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
-		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source))
+	for(b = &buffered; b->next != &buffered; b = b->next) {
+//print("Check %p tag %d source %d\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
+		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source)){
+			buf_del(b);
 			goto got;
+			}
 	}
 //print("GET IT!\n");
 	/* get it */
 	while (1) {
 		b = calloc(1048576 + 4096, 1);
 		/* for MPI, you pretty much have to take the worst case. It might be Some Other Packet */
-print("IR %p\n", b);
+//print("IR %p\n", b);
 		size = torusrecv(b->data, 1048576, b->tag, sizeof(b->tag));
 ///print("Torusrecv says %d bytes\n", size);
 		if (size < 0)
@@ -195,19 +224,13 @@ print("IR %p\n", b);
 //print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource]);
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag  || tag == MPI_ANY_TAG) && (b->tag[TAGsource] == source || source == MPI_ANY_SOURCE))
 			break;
-		b->next = buffered;
-		if (buffered)
-			buffered->prev = b;
-		buffered = b;
+		/* for someone else ... */
+		buf_add(b);
 	}
 		
 
 got:
 //print("MPI recv: got it\n");
-	if (b->next)
-		b->next->prev = b->prev;
-	if (b->prev)
-		b->prev->next = b->next;
 	status->count = count;
 	status->cancelled = 0;
 	status->MPI_SOURCE = b->tag[TAGsource];
