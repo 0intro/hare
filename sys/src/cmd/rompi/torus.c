@@ -321,6 +321,6 @@ torusrecv(void *buf, long buflen, void *tag, long taglen)
 	memmove(m, &m[taglen + 16], n - taglen - sizeof(Tpkt));
 	total = n - taglen - sizeof(Tpkt);
 //print("total is now %d\n", total);
-print("Returning %d \n", total);
+//print("Returning %d \n", total);
 	return total;
 }

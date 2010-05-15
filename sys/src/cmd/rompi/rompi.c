@@ -40,22 +40,22 @@ void torusinit(int *pmyproc, const int pnprocs);
 void
 buf_add(struct bufpacket *new)
 {
-print("Add %p: %p %p %p %p: ", new, buffered.next->prev, buffered.next, &buffered, buffered.next);
+//print("Add %p: %p %p %p %p: ", new, buffered.next->prev, buffered.next, &buffered, buffered.next);
 	buffered.next->prev = new;
 	new->next = buffered.next;
 	new->prev = &buffered;
 	buffered.next = new;
-print("Added: %p %p %p %p\n", buffered.next->prev, buffered.next, &buffered, buffered.next);
+//print("Added: %p %p %p %p\n", buffered.next->prev, buffered.next, &buffered, buffered.next);
 }
 
 void
 buf_del(struct bufpacket *r)
 {
-print("DEL: %p, %p %p\n", r, r->next, r->prev);
-print("DEL %p: %p %p: ", r, r->next->prev, r->prev->next);
+//print("DEL: %p, %p %p\n", r, r->next, r->prev);
+//print("DEL %p: %p %p: ", r, r->next->prev, r->prev->next);
 	r->next->prev = r->prev;
 	r->prev->next = r->next;
-print(": %p %p\n", r->next->prev, r->prev->next);
+//print(": %p %p\n", r->next->prev, r->prev->next);
 }
 
 int
@@ -202,8 +202,9 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 			panic("MPI_Recv only implements MPI_COMM_WORLD\n");
 	}
 
+//print("WANT %d, buffer %s\n", source, buf_empty() ? "empty":"");
 	/* Well, first, let's see if it's here somewhere. */
-	for(b = &buffered; b->next != &buffered; b = b->next) {
+	for(b = buffered.next; b != &buffered; b = b->next) {
 //print("Check %p tag %d source %d\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source)){
 			buf_del(b);
@@ -225,6 +226,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag  || tag == MPI_ANY_TAG) && (b->tag[TAGsource] == source || source == MPI_ANY_SOURCE))
 			break;
 		/* for someone else ... */
+//print("Add %d: ", b->tag[TAGsource]);
 		buf_add(b);
 	}
 		

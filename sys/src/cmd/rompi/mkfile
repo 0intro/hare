@@ -3,19 +3,19 @@
 #		programs
 #
 TARG=\
-	mympihello\
+	rompihello\
 
 DIRS=\
 
 OTHEROFILES=\
 	torus.$O\
-	mympi.$O\
+	rompi.$O\
 
 HFILES=mpi.h
 
 LIB=lib.$O.a
 BIN=.
-CLIB=mympi.c torus.c
+CLIB=rompi.c torus.c
 
 UPDATE=\
 	mkfile\
