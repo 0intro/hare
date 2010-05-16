@@ -12,8 +12,12 @@
 		to use as I/O, and overlay those on top of the created pid
 		in the proc table.
 
+	TODO:
+		* none
+		
 	BUGS:
-		* none yet
+		* none
+
 */
 
 #include <u.h>
@@ -30,11 +34,15 @@ char Eoverflow[] = "ctl buffer overflow";
 char Ebadctl[] = "bad ctl message";
 char Eexec[] = "could not exec";
 char Eusage[] = "exec: invalid number of arguments";
+char Edispatch[] = "problems communicating with dispatcher";
+char Ectlchan[] ="problems with command channel to wrapper";
+char Ectlopen[] ="problems with opening command channel to wrapper";
 
 char 	defaultpath[] =	"/proc";
 char *procpath;
-char *tmpfiles;
-Channel *binderchan;
+Channel *dispatchc;
+char basetmp[] ="/tmp/execfs";
+char *srvctl;
 
 static void
 usage(void)
@@ -46,27 +54,16 @@ usage(void)
 enum
 {
 	STACK = (8 * 1024),
+	Xclone = 1,
 };
 
 typedef struct Exec Exec;
 struct Exec 
 {
+	int active;	/* setup=0, executing=1 */
 	int pid;	/* maybe this would be sufficient for above? */
-	int ctlfd;	/* file descriptor of actual fid */
-	/* do we need to keep pipes? */
+	int ctlfd;	/* command and control channel */
 };
-	
-static void
-fsopen(Req *r)
-{
-	Fid *f = r->fid;
-	if(f->aux != nil)
-		threadexitsall("wtf");
-
-	f->aux = emalloc9p(sizeof(Exec));
-	memset(f->aux, 0, sizeof(Exec));
-	respond(r, nil);
-}
 
 enum
 {
@@ -77,108 +74,206 @@ Cmdtab ctltab[]={
 	Cexec,	"exec", 0,
 };
 
-/* global for now */
-Channel *pidc;
-
+/* call the execution wrapper */
 static void
-cmdproc(void *arg)
+cloneproc(void *arg)
 {
-	Cmdbuf *cb = arg;
+	Channel *pidc = arg;
+
+	threadsetname("cloneproc");
+
+	procexecl(pidc, "/bin/execcmd", "/bin/execcmd", srvctl, nil);
+	fprint(2, "cloneproc: could not find execution wrapper\n");
 	
-	if(sendul(binderchan, 1) < 0) { /* bind initial pipes into place */	
-		fprint(2, "cmdproc: can't send to binderchan: %r\n");
-		threadexits("binderchan send failed");
-	}
-	if(recvul(binderchan) != 1) {
-		fprint(2, "cmdproc: can't recv from binderchan: %r\n");
-		threadexits("binderchan response failed");
-	}
-
-	print("cmdproc pid=%d\n", getpid());
-	/* TODO: do the dup thing */
-
-	procexec(pidc, cb->f[1], &cb->f[1]);
+	sendul(pidc, 0); /* failure */
+	threadexits("no exection wrapper");
 }
 
 static void
-binderthread(void *arg)
+unbind(void)
 {
-	Channel *cmds = arg;
-	unsigned long pid;
-	char fname[255];
-
-	while(1) {
-		pid = recvul(cmds);
-		switch(pid) {
-		case -1:
-		case 0:			/* interrupt */
-			threadexits("exit requested");
-			break;
-		case 1:			/* prep initial bind */
-			/* bind pipes in place assuming mntgen is running */
-			if(bind("#|", "/n/stdin", MREPL) < 0)
-				goto nomntgen;
-
-			if(bind("#|", "/n/stdout", MREPL) < 0)
-				goto nomntgen;
-
-			if(bind("#|", "/n/stderr", MREPL) < 0)
-				goto nomntgen;
-			
-			if(sendul(cmds, 1) < 0)
-				threadexits("pipehangup");
-			break;
-		 default:			/* we got a pid */
-			snprint(fname, 255, "%s/stdin", tmpfiles);
-			if(bind("/n/stdin/data", fname, MREPL) < 0)
-				goto bindissues;
-			snprint(fname, 255, "%s/stdout", tmpfiles);
-			if(bind("/n/stdout/data1", fname, MREPL) < 0)
-				goto bindissues;
-			if(bind("/n/stderr/data1", fname, MREPL) < 0)
-				goto bindissues;
-			snprint(fname, 255, "/proc/%lud", pid);
-			print("about to bind %s %s\n", tmpfiles, fname);
-			if(bind(tmpfiles, fname, MAFTER) < 0) {
-				fprint(2, "binderthread: can't bind to proc: %r\n");
-				threadexits("proc bind problems");	
-			}
-			if(sendul(cmds, 1) < 0)
-				threadexits("pipehangup");
-		}
-	}
-
-bindissues:
-	fprint(2, "binderthread: can't bind to piddir: %r\n");
-	threadexits("piddir bind problems");	
-nomntgen:
-	fprint(2, "binderthread: can't bind to /n: %r\n");
-	threadexits("no mntgen");	
+	unmount(0, "/n/stdin");
+	unmount(0, "/n/stdout");
+	unmount(0, "/n/stderr");
 }
 
 static char *
-myexec(Exec *e, Cmdbuf *cb)
+createstdiofiles(char *base, unsigned long pid)
 {
-	char *err = nil;
+	char fname[255];
+	int fd;
+	char *tmpfiles;
+	int len = strlen(base)+10;
 
-	pidc = chancreate(sizeof(ulong), 1);
+	tmpfiles = emalloc9p(len);
+	snprint(tmpfiles, len, "%s/io-%lud", base, pid);
 
-	proccreate(cmdproc, cb, STACK);
-	e->pid = recvul(pidc);
-	if(e->pid < 0)
-		err = estrdup9p(Eexec);
-
-	/* bugger, we need a way to get stdin, stdout, stderr names - this isn't going to work */
-	if(sendul(binderchan, e->pid) < 0) { /* bind over proc */	
-		fprint(2, "myexec: can't send to binderchan: %r\n");
-		threadexits("binderchan send failed");
+	if((fd = create(tmpfiles, OREAD, DMDIR|0777)) < 0) {
+		fprint(2, "couldn't create temporary directory for I/O templates: %s: %r\n", tmpfiles);
+		threadexitsall("no /tmp");
 	}
-	if(recvul(binderchan) != 1) {
-		fprint(2, "myexec: can't recv from binderchan: %r\n");
-		threadexits("binderchan response failed");
-	}	
+	close(fd);
 
-	return err;
+	snprint(fname, 255, "%s/stdin", tmpfiles);
+	close(create(fname, OWRITE, 0222));
+	snprint(fname, 255, "%s/stdout", tmpfiles);
+	close(create(fname, OWRITE, 0444));
+	snprint(fname, 255, "%s/stderr", tmpfiles);
+	close(create(fname, OWRITE, 0444));
+
+	return tmpfiles;
+}
+	
+/* dispatcher thread - handle setup and tear down of children*/
+static void
+dispatcher(void *arg)
+{
+	Channel *c = arg;
+	unsigned long cmd;
+	unsigned long pid;
+	Channel *pidc;
+	char *tmpfiles;
+	char fname[255];
+
+	threadsetname("execfsdispatch");
+
+	while(1) {
+		cmd = recvul(c);
+		switch(cmd) {
+			case ~0:
+				threadexits("exit requested");
+				break;
+			case 0:
+				threadexits("abort");
+				break;
+			case 1:	/* request a clone */
+				pidc = chancreate(sizeof(ulong), 1);
+
+				if(bind("#|", "/n/stdin", MREPL) < 0)
+					goto nomntgen;
+				if(bind("#|", "/n/stdout", MREPL) < 0)
+					goto nomntgen;
+				if(bind("#|", "/n/stderr", MREPL) < 0)
+					goto nomntgen;
+
+				procrfork(cloneproc, pidc, STACK, RFNAMEG|RFCFDG); 
+
+				pid = recvul(pidc);
+				if(pid <= 0) {
+					unbind();
+					sendul(c, 0);
+					continue;
+				}
+
+				assert(pid > 2);	/* assumption for our ctl channels */
+				tmpfiles = createstdiofiles(basetmp, pid);	
+fprint(2, "binding over %s", tmpfiles);
+				snprint(fname, 255, "%s/stdin", tmpfiles);
+				if(bind("/n/stdin/data", fname, MREPL) < 0)
+					goto bindissues;
+				snprint(fname, 255, "%s/stdout", tmpfiles);
+				if(bind("/n/stdout/data1", fname, MREPL) < 0)
+					goto bindissues;
+				snprint(fname, 255, "%s/stderr", tmpfiles);
+				if(bind("/n/stderr/data1", fname, MREPL) < 0)
+					goto bindissues;
+
+				snprint(fname, 255, "/proc/%lud", pid);
+fprint(2, "binding %s AFTER %s", tmpfiles,  fname);
+				if(bind(tmpfiles, fname, MAFTER) < 0) {
+					fprint(2, "dispatch: can't bind to proc: %r\n");
+					threadexits("proc bind problems");	
+				}
+				unbind();
+				free(tmpfiles);
+
+				/* success */
+				if(sendul(c, pid) < 0)
+					threadexits("pipehangup");
+				break;
+			default:	/* cleanup a pid */
+				unbind();
+			
+				if(sendul(c, 1) < 0)
+					threadexits("pipehangup");			
+		}
+	}
+
+nomntgen:
+	fprint(2, "couldn't bind to /n/stdios: %r\n");
+	chanfree(pidc);
+	threadexits("nomntgen");
+
+bindissues:
+	fprint(2, "bind: can't bind to piddr: %r\n");
+	threadexits("procbind");	
+}
+
+static void
+fsopen(Req *r)
+{
+	Fid *f = r->fid;
+	Exec *e;
+	char *err;
+	int n;
+	char ctlbuf[255];	/* error string from wrapper */
+	int p[2];
+	int fd;
+
+	if(f->file->aux != (void *)Xclone) {
+		respond(r, nil);
+		return;
+	}
+
+	e = emalloc9p(sizeof(Exec));
+	memset(e, 0, sizeof(Exec));
+
+	/* setup bootstrap ctlfd */
+	pipe(p);
+         fd = create(srvctl, OWRITE, 0666);
+	if(fd < 0) {
+		err = "couldn't create srv file";
+		goto error;
+	}
+
+         fprint(fd, "%d", p[0]);
+         close(fd);
+         close(p[0]);
+	e->ctlfd = p[1];
+     
+	/* ask for a new child process */
+	if(sendul(dispatchc, 1) < 0) { 
+		err = estrdup9p(Edispatch);
+		goto error;
+	}
+
+	e->pid = recvul(dispatchc);
+	if(e->pid == 0) {
+		err = estrdup9p(Edispatch);
+		goto error;
+	}
+	
+	/* check that wrapper has open and dup'd stdio */
+	n = read(e->ctlfd, ctlbuf, 255);
+	if(n < 0) {
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
+	if(n != 1) {
+		ctlbuf[n] = 0;
+		err = ctlbuf;
+		goto error;
+	}
+
+	f->aux = e;
+	respond(r, nil);
+	return;
+
+error:
+	/* free channel */
+	free(e);
+	f->aux = nil;
+	respond(r, err);
 }
 
 static void
@@ -186,56 +281,53 @@ fswrite(Req *r)
 {
 	Fid *f = r->fid;
 	Exec *e = f->aux;
-	char *ctlbuf;
-	char *err = nil;
-	Cmdbuf *cb;
-	Cmdtab *cmd;
+	char ctlbuf[256];
 	int ret;
+	
+	if(e == 0) {
+		respond(r, "crappy fid\n");
+	}
+	assert(e->ctlfd != -1);
 
-	ctlbuf = emalloc9p(r->ifcall.count+1);
-	strncpy(ctlbuf, r->ifcall.data, r->ifcall.count);
-	ctlbuf[r->ifcall.count] = 0;
+	ret = write(e->ctlfd, r->ifcall.data, r->ifcall.count);
+	if(ret < 0) {
+		responderror(r);
+		return;
+	} else if(e->active) {	/* program already executing */
+		goto success;
+	}
 
-	cb = parsecmd(ctlbuf, strlen(ctlbuf));
-	cmd = lookupcmd(cb, ctltab, nelem(ctltab));
-	if(cmd == nil) {
-		if(e->ctlfd == 0){
-			err = Ebadctl;
-			goto error;
-		}
-		/* pass through unknown commands to actual ctl file */
-		ret = write(e->ctlfd, r->ifcall.data, r->ifcall.count);
-		if(ret < 0) {
-			free(cb);
-			free(ctlbuf);
+	/* not active to read to get response */
+	ret = read(e->ctlfd, ctlbuf, 255);
+	if(ret < 0) {
+		responderror(r);
+		return;
+	}
+
+	if(ret == 0) {		/* other side exec'd - go active */
+		close(e->ctlfd);
+		e->active++;
+		/* reopen ctlfd */
+		snprint(ctlbuf, 255, "/proc/%d/ctl", e->pid);
+		e->ctlfd = open(ctlbuf, OREAD);
+		if(e->ctlfd < 0) {	/* may lead to a confusing error */
+			fprint(2, "fswrite: couldn't open %s: %r\n", ctlbuf);
 			responderror(r);
-			return;	
-		}	
-		if(ret < r->ifcall.count) {
-			r->ofcall.count = ret;
-			goto error;
-		}	
-	}
-
-	switch(cmd->index){
-	case Cexec:
-		if(cb->nf < 2) {
-			err=Eusage;
-			goto error;
+			return;
 		}
-		err = myexec(e, cb);
-		if(err == nil)
-			r->ofcall.count = r->ifcall.count;
-		else 
-			r->ofcall.count = -1;
-		break;
-	/* room for more commands later */
+		goto success;
 	}
 
-error:
-	free(cb);
-	free(ctlbuf);
-	respond(r, err);
+	/* convention: a single byte is sucess, multibyte is an error message */
+	if(ret != 1) {
+		ctlbuf[ret] = 0;
+		respond(r, ctlbuf);
+		return;
+	}
+success:
+	r->ofcall.count = r->ifcall.count;
+	respond(r, nil);
+	return;
 }
 
 static void
@@ -257,45 +349,44 @@ fsread(Req *r)
 static void
 fsclunk(Fid *f)
 {
-	if(f->aux)
-		free(f->aux);
+	char fname[255];
+
+	if(f->aux) {
+		Exec *e = f->aux;
+
+		if(!e->active) {
+			if(e->ctlfd)
+				close(e->ctlfd);
+
+			if(sendul(dispatchc, e->pid) > 0)
+				recvul(dispatchc);
+
+			snprint(fname, 255, "/proc/%lud", e->pid);
+			unmount(0, fname);
+
+			/* if we have an outstanding inactive thread, kill it */
+			postnote(PNPROC, e->pid, "kill");
+			e->pid = -1;
+			e->active = 0;
+		}
+
+		free(e);
+		f->aux = nil;
+	}
 }
 
 static void
-createstdiofiles(void)
+cleantmp(void *)
 {
-	char fname[255];
-	int fd;
+	threadsetname("cleantmp");
 
-	tmpfiles = estrdup9p(tmpnam(nil));
-	if((fd = create(tmpfiles, OREAD, DMDIR|0777)) < 0) {
-		fprint(2, "couldn't create temporary directory for I/O templates: %s: %r\n", tmpfiles);
-		threadexitsall("no /tmp");
-	}
-	close(fd);
-
-	snprint(fname, 255, "%s/stdin", tmpfiles);
-	close(create(fname, OWRITE, 0222));
-	snprint(fname, 255, "%s/stdout", tmpfiles);
-	close(create(fname, OWRITE, 0444));
-	snprint(fname, 255, "%s/stderr", tmpfiles);
-	close(create(fname, OWRITE, 0444));
+	procexecl(0, "/bin/rm", "/bin/rm", "-rf", basetmp, nil);
 }
-
 
 static void
 cleanup(Srv *)
 {
-	char fname[255];
-
-	snprint(fname, 255, "%s/stdin", tmpfiles);
-	remove(fname);
-	snprint(fname, 255, "%s/stdout", tmpfiles);
-	remove(fname);
-	snprint(fname, 255, "%s/stderr", tmpfiles);
-	remove(fname);
-	remove(tmpfiles);
-	free(tmpfiles);
+	proccreate(cleantmp, 0, STACK);
 }
 
 Srv fs=
@@ -326,15 +417,17 @@ threadmain(int argc, char **argv)
 	else
 		procpath = defaultpath;
 
-	createstdiofiles();	/* assumes no one will mess with them */
+	srvctl = smprint("/srv/execfs-%d", getpid());
+
+	close(create(basetmp, OREAD, DMDIR|0777));	/* create base tmp */
 
 	fs.tree = alloctree("execfs", "execfs", DMDIR|0555, nil);
-	closefile(createfile(fs.tree->root, "clone", "execfs", 0666, nil));
+	closefile(createfile(fs.tree->root, "clone", "execfs", 0666, (void *)Xclone));
 
-	binderchan=chancreate(sizeof(unsigned long), 0);
-	proccreate(binderthread, binderchan, STACK);
+	dispatchc=chancreate(sizeof(unsigned long), 0);
+	proccreate(dispatcher, dispatchc, STACK);
 
-	threadpostmountsrv(&fs, nil, procpath, MBEFORE);
+	threadpostmountsrv(&fs, nil, procpath, MAFTER);
 
 	threadexits(0);
 }
