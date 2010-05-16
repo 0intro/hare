@@ -18,6 +18,14 @@
 
 	TODO:
 		* make sure you qlock openq when necessary
+		* fix up debug prints
+		* general code review
+		* test
+		* man page
+		* standard regression tests
+
+	BUGS:
+		* crappy lock problem prevents anything from working
  */
 
 #include	"u.h"
@@ -175,7 +183,6 @@ mpipegen(Chan *c, char*, Dirtab *tab, int ntab, int i, Dir *dp)
 	tab += i;
 	p = c->aux;
 	
-	qlock(p);
 	switch((ulong)tab->qid.path){
 	case Qdata0:
 		len = mpipelen(p, 0);
@@ -187,7 +194,6 @@ mpipegen(Chan *c, char*, Dirtab *tab, int ntab, int i, Dir *dp)
 		len = tab->length;
 		break;
 	}
-	qunlock(p);
 
 	mkqid(&q, PIPEQID(PIPEID(c->qid.path), tab->qid.path), 0, QTFILE);
 	devdir(c, q, tab->name, len, eve, tab->perm, dp);
@@ -327,7 +333,7 @@ mpipeopen(Chan *c, int omode)
 	return c;
 }
 
-/* TODO: prints are debug prints and should be */
+/* TODO: prints are debug prints and should be conditioned or removed */
 static void
 mpipeclose(Chan *c)
 {
@@ -480,6 +486,7 @@ checkfinished(void *arg)
 	return openq->status;
 }
 
+/* no readers available, add us to the writer queue */
 static void
 writeradd(Mpipe *p, int which, Openq *q)
 {
@@ -509,7 +516,8 @@ findreader(Mpipe *p, int which, Openq *openq)
 {
 	int added = 0;
 
-	while(openq->reader == nil) {   /* select reader */
+	/* MAYBE: lock down openq? */
+	while(openq->reader == nil) {   /* no readers available */
 		if(!added) {
 			writeradd(p, which, openq);
 			added++;
@@ -521,13 +529,16 @@ findreader(Mpipe *p, int which, Openq *openq)
 		if(p->readers[which].first == nil) {
 			qunlock(p);
 			continue;
-		} 	
+		} 
+		
+		/* pull reader off queue */
 		openq->reader = p->readers[which].first;
 		p->readers[which].first = openq->reader->rnext;
 		if(p->readers[which].first == nil)
 			p->readers[which].last = nil;
 		openq->reader->rnext = nil;
 
+		/* pull us off the writer queue */
 		if(p->writers[which].first == openq) {
 			p->writers[which].first = openq->wnext;
 			if(p->writers[which].first == nil)
@@ -545,8 +556,40 @@ findreader(Mpipe *p, int which, Openq *openq)
 			}
 		}
 		openq->wnext = nil;
+
 		qunlock(p);
 	}
+}
+
+static int
+adjustwrite(Openq *openq, int n)
+{
+	if(n > openq->remain) { 	/* shouldn't ever happen - print warning */
+		print("mpipe: write: underflow\n");
+		n = openq->remain;
+	}
+	openq->remain = openq->remain-n;
+	if(openq->remain == 0) { 
+		/* last record sent, wait for final read */
+		sleep(&openq->r, checkfinished, openq);
+		if(openq->status < 0) { /* reader closed before reading everything */
+			n = n - qlen(openq->reader->q);
+			openq->reader = nil;
+		}	
+	}
+	return n;
+}
+
+static void
+parseheader(Openq *openq, void *va, long n)
+{
+	char *len = malloc(n+1);
+	memmove(len, va, n);
+	len[n] = 0;
+	openq->remain = strtoul(len, nil, 0);
+	if(openq->remain == 0)
+		print("mpipewrite: bad header string %s\n", len);
+	free(len);
 }
 
 /*
@@ -566,32 +609,19 @@ mpipewrite(Chan *c, void *va, long n, vlong)
 	openq = c->aux;
 	p = openq->mp;
 
-	switch(PIPETYPE(c->qid.path)) {
-	case Qdata0:   //n = qwrite(p->q[1], va, n);
+	if(PIPETYPE(c->qid.path) == Qdata0) 
 		which = 1;
-		break;
-
-	case Qdata1: // n = qwrite(p->q[0], va, n);
+	else if(PIPETYPE(c->qid.path) == Qdata1)
 		which = 0;
-		break;
-
-	default:
+	else
 		panic("mpipewrite");
-	}
 
-	qlock(openq);
 	findreader(p, which, openq);
-	if(openq->remain == 0) {	/* initial write of new record */
-		char *len = malloc(n+1);
-		memmove(len, va, n);
-		len[n] = 0;
-		openq->remain = strtoul(len, nil, 0);
-		if(openq->remain == 0)
-			print("mpipewrite: bad header string %s\n", len);
-		free(len);
+	qlock(openq);
+	if(openq->remain == 0) {	/* initial write of new record, read header */
+		parseheader(openq, va, n);
 	} else {
 		if(n > openq->remain) {
-			/* TODO: should we take harsher action? or short write sufficient? */
 			print("mpipewrite: write record overflow");
 			n = openq->remain;
 		}
@@ -603,20 +633,8 @@ mpipewrite(Chan *c, void *va, long n, vlong)
 		}
 		n = qwrite(openq->reader->q, va, n);
 		poperror();
-		if(n>0) {
-			openq->remain = openq->remain-n;
-			if(openq->remain == 0) { 
-				/* last record sent, wait for final read */
-				sleep(&openq->r, checkfinished, openq);
-				if(openq->status < 0) { /* reader closed before reading everything */
-					n = n - qlen(openq->reader->q);
-					openq->reader = nil;
-					qunlock(openq);
-					error(Ehungup);
-					return n;
-				}	
-			}
-		}
+		if(n > 0)
+			n = adjustwrite(openq, n);
 	}
 	qunlock(openq);
 	return n;
@@ -633,35 +651,23 @@ mpipebwrite(Chan *c, Block *bp, vlong)
 	openq = c->aux;
 	p = openq->mp;
 
-	switch(PIPETYPE(c->qid.path)){
-	case Qdata0:
+	if(PIPETYPE(c->qid.path) == Qdata0) 
 		which = 1;
-		break;
-
-	case Qdata1:
+	else if(PIPETYPE(c->qid.path) == Qdata1)
 		which = 0;
-		break;
-
-	default:
-		panic("mpipebwrite");
-	}
+	else
+		panic("mpipewrite");
 
 	n = blocklen(bp);
-	qlock(openq);
+
 	findreader(p, which, openq);
+	qlock(openq);
 	if(openq->remain == 0) {	/* initial write of new record */ 
 		/* assume its a single block */
-		char *len = malloc(n+1);
-		memmove(len, bp->base, n);
-		len[n] = 0;
-		openq->remain = strtoul(len, nil, 0);
-		if(openq->remain == 0)
-			print("mpipewrite: bad header string %s\n", len);
-		free(len);
-		freeb(bp); /* ?? */
+		parseheader(openq, bp->base, n);
+		freeb(bp); /* ?MAYBE? */
 	} else {
 		if(n > openq->remain) {
-			/* TODO: should we take harsher action? or short write sufficient? */
 			print("mpipewrite: write record overflow, truncating");
 			bp = trimblock(bp, 0, openq->remain);
 		}
@@ -673,20 +679,8 @@ mpipebwrite(Chan *c, Block *bp, vlong)
 		}
 		n = qbwrite(openq->reader->q, bp);
 		poperror();
-		if(n>0) {
-			openq->remain = openq->remain-n;
-			if(openq->remain == 0) { 
-				/* last record sent, wait for final read */
-				sleep(&openq->r, checkfinished, openq);
-				if(openq->status < 0) { /* reader closed before reading everything */
-					n = n - qlen(openq->reader->q);
-					openq->reader = nil;
-					qunlock(openq);
-					error(Ehungup);
-					return n;
-				}	
-			}
-		}		
+		if(n>0)
+			n = adjustwrite(openq, n);
 	}
 	qunlock(openq);
 	
