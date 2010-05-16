@@ -12,9 +12,9 @@
 	TODO:
 		* open our own ctl file so we can pass through commands
 			until we get going.
+		* man page
+		* support for ns configuration prior to exec
 
-	BUGS:
-		* none yet
 */
 
 #include <u.h>

@@ -13,11 +13,10 @@
 		in the proc table.
 
 	TODO:
-		* none
+		* man page
+		* need a better way to clean up after fids
+		* need a better logging mechanism
 		
-	BUGS:
-		* none
-
 */
 
 #include <u.h>
@@ -167,7 +166,6 @@ dispatcher(void *arg)
 
 				assert(pid > 2);	/* assumption for our ctl channels */
 				tmpfiles = createstdiofiles(basetmp, pid);	
-fprint(2, "binding over %s", tmpfiles);
 				snprint(fname, 255, "%s/stdin", tmpfiles);
 				if(bind("/n/stdin/data", fname, MREPL) < 0)
 					goto bindissues;
@@ -179,7 +177,6 @@ fprint(2, "binding over %s", tmpfiles);
 					goto bindissues;
 
 				snprint(fname, 255, "/proc/%lud", pid);
-fprint(2, "binding %s AFTER %s", tmpfiles,  fname);
 				if(bind(tmpfiles, fname, MAFTER) < 0) {
 					fprint(2, "dispatch: can't bind to proc: %r\n");
 					threadexits("proc bind problems");	
@@ -361,7 +358,7 @@ fsclunk(Fid *f)
 			if(sendul(dispatchc, e->pid) > 0)
 				recvul(dispatchc);
 
-			snprint(fname, 255, "/proc/%lud", e->pid);
+			snprint(fname, 255, "/proc/%d", e->pid);
 			unmount(0, fname);
 
 			/* if we have an outstanding inactive thread, kill it */
@@ -387,6 +384,8 @@ static void
 cleanup(Srv *)
 {
 	proccreate(cleantmp, 0, STACK);
+	sleep(10);
+	threadexitsall("done");
 }
 
 Srv fs=
