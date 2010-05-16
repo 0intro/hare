@@ -1,0 +1,2 @@
+#!/bin/rc
+/usr/rminnich/bin/386/scp q.* surveyor.alcf.anl.gov:rompi

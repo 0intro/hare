@@ -27,7 +27,7 @@ main(int argc, char **argv)
 		torusdebug |= 2;
 		for(i = 1; i < nproc; i++) {
 			MPI_Recv(buf, 	1, MPI_INT, i, 1, MPI_COMM_WORLD, &status);
-			print("0: Recv'd from %d\n", i);
+			//print("0: Recv'd from %d\n", i);
 		}
 		print("0: All %d nodes checked in\n", nproc-1);
 	}
