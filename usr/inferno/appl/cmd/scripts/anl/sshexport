@@ -3,7 +3,6 @@ load std
 or {ftest -e /net/cs} {ndb/cs}
 bind -c '#U*' /n/local
 bind -a '#C' /
-/dis/styxlisten -A tcp!*!5670 {export '#U*'} > /dev/null 2> /dev/null
 bind  '#|' /tmp/pipes
 cat /tmp/pipes/data > /dev/hoststdout&
 cat /dev/hoststdin > /tmp/pipes/data&
