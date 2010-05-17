@@ -5,6 +5,7 @@
 TARG=\
 	rompihello\
 	ring \
+	stupidreduce \
 
 DIRS=\
 
