@@ -4,6 +4,7 @@
 #
 TARG=\
 	rompihello\
+	ring \
 
 DIRS=\
 
