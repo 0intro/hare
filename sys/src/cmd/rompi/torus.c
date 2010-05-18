@@ -267,12 +267,11 @@ xyztorank(int x, int y, int z)
 /* failure is not an option */
 /* note this is pretty awful ... copy to here, then copy in kernel!  */
 void
-torussend(void *buf, int length, int rank, void *tag, int taglen)
+torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, int taglen)
 {
 	int n;
 	/* OMG! We're gonna copy AGAIN. Mantra: right then fast. */
 	Tpkt *tpkt;
-	int x, y, z;
 	u8int *packet;
 
 	packet = malloc(length + taglen + sizeof(*tpkt));
@@ -280,10 +279,11 @@ torussend(void *buf, int length, int rank, void *tag, int taglen)
 	memcpy(tpkt->payload, tag, taglen);
 	memcpy(tpkt->payload + taglen, buf, length);
 
-	ranktoxyz(rank, &x, &y, &z);
 	tpkt->dst[X] = x;
 	tpkt->dst[Y] = y;
 	tpkt->dst[Z] = z;
+	if (deposit) 
+		tpkt->hint |= Dp;
 	
 	n = pwrite(torusfd, tpkt, length + taglen + sizeof(*tpkt), 0);
 	if (torusdebug & 1)

@@ -8,7 +8,8 @@
 extern int torusdebug;
 extern int x, y, z, xsize, ysize, zsize; 
 int xyztorank(int x, int y, int z);
-
+int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
+               MPI_Comm comm,  MPI_Status *status);
 void
 main(int argc, char **argv)
 {
@@ -70,7 +71,11 @@ print("%d:(%d,%d,%d) gets %d accum %d\n", node, x, y, z, nsum[0], sum[0]);
 				}
 			}
 		}
-	} 
+	}
+
+	print("Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", node, x, y, z, ((nproc-1)*nproc)/2, sum[0]);
+	/* this was simple before the deposit bit. It gets a tad harder when we use it. */
+	if (0) {
 	if (node == 0) {
 		print("%d:(%d,%d,%d) sends %d\n", node, x, y, z, node);
 		for(i = 1; i < nproc; i++) {
@@ -79,7 +84,9 @@ print("%d:(%d,%d,%d) gets %d accum %d\n", node, x, y, z, nsum[0], sum[0]);
 	} else {
 		MPI_Recv(sum, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 	}
+	} else {
+		reduce_end(sum, 1, MPI_INT, 0, MPI_COMM_WORLD, &status);
+	}
 	print("%d: Finalize\n", node);
 	MPI_Finalize();
-	print("Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", node, x, y, z, ((nproc-1)*nproc)/2, sum[0]);
 }

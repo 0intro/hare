@@ -33,9 +33,12 @@ char *myname = nil;
 static int torusfd = -1;
 struct bufpacket buffered = {&buffered, &buffered};
 
-void torussend(void *buf, int length, int rank, void *tag, int taglen);
+void torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, int taglen);
 int torusrecv(void *buf, long length, void *tag, long taglen);
 void torusinit(int *pmyproc, const int pnprocs);
+void ranktoxyz(int rank, int *x, int *y, int *z);
+int xyztorank(int x, int y, int z);
+extern int x, y, z, xsize, ysize, zsize;
 
 void
 buf_add(struct bufpacket *new)
@@ -169,6 +172,7 @@ MPI_Send( void *buf, int num, MPI_Datatype datatype, int dest,
 	unsigned char nbytes = datatype >> 8;
 	unsigned long torustag[TAG];
 	int count;
+	int x, y, z;
 	count = num * nbytes;
 	switch(comm) {
 		case MPI_COMM_WORLD:
@@ -180,7 +184,8 @@ MPI_Send( void *buf, int num, MPI_Datatype datatype, int dest,
 	torustag[TAGcomm] = comm;
 	torustag[TAGtag] = tag;
 	torustag[TAGsource] = myproc;
-	torussend(buf, count * nbytes, dest, torustag, sizeof(torustag));
+	ranktoxyz(dest, &x, &y, &z);
+	torussend(buf, count * nbytes, x, y, z, 0, torustag, sizeof(torustag));
 
 	return MPI_SUCCESS;
 }
@@ -240,5 +245,84 @@ got:
 	status->MPI_ERROR = 0;
 	memcpy(buf, b->data, count);
 	free(b);
+	return MPI_SUCCESS;
+}
+
+/* the size of an mpi data type is the data type value >> 8 & 0xff. Just assign to u8int after the >> */
+/* ah, MPI
+sendbuf	address of send buffer (choice) 
+count	number of elements in send buffer (integer) 
+datatype	data type of elements of send buffer (handle) 
+op	reduce operation (handle) 
+root	rank of root process (integer) 
+comm	communicator (handle)  */
+int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/, 
+               MPI_Comm comm,  MPI_Status *status)
+{
+
+	unsigned char nbytes = datatype >> 8;
+	unsigned long torustag[TAG];
+	int count;
+	int fromx, fromy, fromz, fromrank;
+	count = num * nbytes;
+	switch(comm) {
+		case MPI_COMM_WORLD:
+			break;
+		default:
+			panic("MPI_Send only implements MPI_COMM_WORLD\n");
+	}
+
+	torustag[TAGcomm] = comm;
+	torustag[TAGtag] = -1;
+	torustag[TAGsource] = myproc;
+
+print("reduce_end: %d(%d, %d, %d)\n", myproc, x, y, z);
+	if (myproc) {
+		/* who we get it from depends on who we are. */
+		/* this shows some bad design. We compute x,y,z, turn it into rank, 
+		 * call mpirecv, it turns our rakn into x,y,z.
+		 */
+		fromz = z;
+		fromy = y;
+		fromx =y;
+		if (z)
+			fromz = 0;
+		else if (y) 
+			fromz = fromy = 0;
+		else if (x)
+			fromz = fromy = fromx = 0;
+		fromrank = xyztorank(fromx, fromy, fromz);
+print("reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", myproc, x, y, z, fromx, fromy, fromz);
+		MPI_Recv(buf, 1, MPI_INT, fromrank, 1, MPI_COMM_WORLD, status);
+print("reduce_end: %d: Got from %d\n", myproc, fromrank);
+	}
+
+	/* OK, we got it, we just need to do one send to our "axis" (of evil?) */
+	/* do me a favor here. You could rewrite this stuff to be "more optimal". 
+	 * optimization is what compilers do. I've made an effort to make this easy for
+	 * someone to read if they come along later. Please avoid any temptation
+	 * to clever-ize this code unless it also makes it easier to follow. 
+	 */
+	if (z) {
+	} else if (y) {
+print("reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", myproc, x, y, z, x, y, zsize-1);
+		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
+	}
+	else if (x) {
+		/* send down BOTH our y and z axis */
+print("reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", myproc, x, y, z, x, ysize-1, 0);
+		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
+print("reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", myproc, x, y, z, x, y, zsize-1);
+		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
+	} else {
+		/* send down x, y, z */
+print("reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", myproc, x, y, z, xsize-1, 0, 0);
+		torussend(buf, count, xsize-1, 0, 0, 1, torustag, sizeof(torustag));
+print("reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", myproc, x, y, z, x, ysize-1, 0);
+		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
+print("reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", myproc, x, y, z, x, y, zsize-1);
+		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
+	}
+
 	return MPI_SUCCESS;
 }
