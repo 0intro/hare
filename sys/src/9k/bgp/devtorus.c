@@ -1238,7 +1238,9 @@ torusinject(Torus *t, TxRing *tx, Block *b)
 	/* force certain header bits, at least for now */
 	memmove(desc->hdrs.src, t->addr, N);
 	desc->hdrs.sk = Sk;	/* was SKIP(4) on BG/L */
-	desc->hdrs.hint = PID0(KernelPid);
+	/* we only let them set Dp */
+	desc->hdrs.hint &= Dp;
+	desc->hdrs.hint |= PID0(KernelPid);
 	desc->hdrs.size = SIZE(7) | PID1(KernelPid)|Dy|Vcd0;
 	/* TO DO: SIZE(7) was SIZE(chunks-1) in BG/L */
 	/* can't change that until the handling of Rx fifo memory is sorted out */

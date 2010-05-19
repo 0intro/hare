@@ -23,13 +23,13 @@ main(int argc, char **argv)
 	MPI_Comm_rank(MPI_COMM_WORLD, &node);
 	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 	
-	print("Hello World from Node %d of %d\n",node, nproc);
+	print("%lld Hello World from Node %d of %d\n", nsec(),node, nproc);
 
 	sum[0] = node;
 	/* if we have a 'z' address, send to (x,y,0) */
 	if (z) {
 		torank = xyztorank(x,y,0);
-		print("%d:(%d,%d,%d) sends %d\n", node, x, y, z, node);
+		print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), node, x, y, z, node);
 		MPI_Send(sum, 1, MPI_INT, torank, 1, MPI_COMM_WORLD);
 	} else {
 		/* gather up all our z >0 data */
@@ -38,13 +38,13 @@ main(int argc, char **argv)
 			MPI_Recv(nsum, 1, MPI_INT, fromrank, 1, MPI_COMM_WORLD, &status);
 			sum[0] += nsum[0];
 		}
-		print("AFTER Z: %d(%d, %d, %d): %d\n", node, x, y, z, sum[0]);
+		print("%lld AFTER Z: %d(%d, %d, %d): %d\n", nsec(), node, x, y, z, sum[0]);
 
 		/* y? y o y? */
 		if (y) {
 			torank = xyztorank(x,0,0);
 			/* send to our parent */
-			print("%d:(%d,%d,%d) sends %d\n", node, x, y, z, sum[0]);
+			print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), node, x, y, z, sum[0]);
 			MPI_Send(sum, 1, MPI_INT, torank, 1, MPI_COMM_WORLD);
 		} else {
 			/* This is the vector along the X axis. All nodes, including (0,0,0), gather up along 
@@ -58,10 +58,10 @@ main(int argc, char **argv)
 				MPI_Recv(nsum, 1, MPI_INT, fromrank, 1, MPI_COMM_WORLD, &status);
 				sum[0] += nsum[0];
 			}
-print("%d:(%d,%d,%d) gets %d accum %d\n", node, x, y, z, nsum[0], sum[0]);
+print("%lld %d:(%d,%d,%d) gets %d accum %d\n", nsec(), node, x, y, z, nsum[0], sum[0]);
 			if (x) {
 				/* send to our parent */
-				print("%d:(%d,%d,%d) sends %d to %d\n", node, x, y, z, sum[0], torank);
+				print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), node, x, y, z, sum[0], torank);
 				MPI_Send(sum, 1, MPI_INT, torank, 1, MPI_COMM_WORLD);
 			} else {
 					/* sum contains the sum from our y axis above */
@@ -73,11 +73,11 @@ print("%d:(%d,%d,%d) gets %d accum %d\n", node, x, y, z, nsum[0], sum[0]);
 		}
 	}
 
-	print("Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", node, x, y, z, ((nproc-1)*nproc)/2, sum[0]);
+	if (! node) print("%lld Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", nsec(), node, x, y, z, ((nproc-1)*nproc)/2, sum[0]);
 	/* this was simple before the deposit bit. It gets a tad harder when we use it. */
 	if (0) {
 	if (node == 0) {
-		print("%d:(%d,%d,%d) sends %d\n", node, x, y, z, node);
+		print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), node, x, y, z, node);
 		for(i = 1; i < nproc; i++) {
 			MPI_Send(sum, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
 		}
@@ -87,6 +87,7 @@ print("%d:(%d,%d,%d) gets %d accum %d\n", node, x, y, z, nsum[0], sum[0]);
 	} else {
 		reduce_end(sum, 1, MPI_INT, 0, MPI_COMM_WORLD, &status);
 	}
-	print("%d: Finalize\n", node);
+	if (node) print("%lld Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", nsec(), node, x, y, z, ((nproc-1)*nproc)/2, sum[0]);
+	print("%lld %d: Finalize\n", nsec(), node);
 	MPI_Finalize();
 }
