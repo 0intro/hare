@@ -29,6 +29,7 @@ struct bufpacket {
 
 
 int myproc = -1, nproc = -1, maxrank = -1;
+int rompidebug = 0; /* 2: recv, 1: send */
 char *myname = nil;
 static int torusfd = -1;
 struct bufpacket buffered = {&buffered, &buffered};
@@ -210,7 +211,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 //print("WANT %d, buffer %s\n", source, buf_empty() ? "empty":"");
 	/* Well, first, let's see if it's here somewhere. */
 	for(b = buffered.next; b != &buffered; b = b->next) {
-//print("Check %p tag %d source %d\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
+		if (rompidebug &2) print("Check %p tag %ld source %ld\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source)){
 			buf_del(b);
 			goto got;
@@ -227,7 +228,11 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		if (size < 0)
 			panic("torusrecv -1: %r");
 		/* tag matching. */
-//print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource]);
+		if (rompidebug &2){
+			int rx, ry, rz;
+			ranktoxyz(source, &rx, &ry, &rz);
+			print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld(%d, %d, %d)\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource], rx, ry, rz);
+		}
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag  || tag == MPI_ANY_TAG) && (b->tag[TAGsource] == source || source == MPI_ANY_SOURCE))
 			break;
 		/* for someone else ... */
@@ -237,7 +242,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		
 
 got:
-//print("MPI recv: got it\n");
+	if (rompidebug &2)print("MPI recv: got it\n");
 	status->count = count;
 	status->cancelled = 0;
 	status->MPI_SOURCE = b->tag[TAGsource];
@@ -293,7 +298,7 @@ print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
 			fromz = fromy = fromx = 0;
 		fromrank = xyztorank(fromx, fromy, fromz);
 print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", nsec(), myproc, x, y, z, fromx, fromy, fromz);
-		MPI_Recv(buf, 1, MPI_INT, fromrank, 1, MPI_COMM_WORLD, status);
+		MPI_Recv(buf, 1, MPI_INT, fromrank, -1, MPI_COMM_WORLD, status);
 print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
 	}
 
@@ -306,10 +311,12 @@ print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
 	if (z) {
 	} else if (y) {
 print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+		torustag[TAGsource] = myproc;
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	}
 	else if (x) {
 		/* send down BOTH our y and z axis */
+		torustag[TAGsource] = myproc;
 print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
 		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
 print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
