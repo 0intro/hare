@@ -270,6 +270,7 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 	int count;
 	int fromx, fromy, fromz, fromrank;
 	count = num * nbytes;
+	int reducetag = 0xaa55;
 	switch(comm) {
 		case MPI_COMM_WORLD:
 			break;
@@ -278,7 +279,7 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 	}
 
 	torustag[TAGcomm] = comm;
-	torustag[TAGtag] = -1;
+	torustag[TAGtag] = reducetag;
 	torustag[TAGsource] = myproc;
 
 print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
@@ -298,7 +299,7 @@ print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
 			fromz = fromy = fromx = 0;
 		fromrank = xyztorank(fromx, fromy, fromz);
 print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", nsec(), myproc, x, y, z, fromx, fromy, fromz);
-		MPI_Recv(buf, 1, MPI_INT, fromrank, -1, MPI_COMM_WORLD, status);
+		MPI_Recv(buf, 1, MPI_INT, fromrank, reducetag, MPI_COMM_WORLD, status);
 print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
 	}
 

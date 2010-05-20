@@ -78,7 +78,7 @@ print("%lld %d:(%d,%d,%d) gets %d accum %d\n", nsec(), node, x, y, z, nsum[0], s
 	if (! node) print("%lld Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", nsec(), node, x, y, z, ((nproc-1)*nproc)/2, sum[0]);
 //	torusstatus(1);
 	/* this was simple before the deposit bit. It gets a tad harder when we use it. */
-	if (1) {
+	if (0) {
 	if (node == 0) {
 		print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), node, x, y, z, node);
 		for(i = 1; i < nproc; i++) {
