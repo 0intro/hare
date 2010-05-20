@@ -230,7 +230,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		/* tag matching. */
 		if (rompidebug &2){
 			int rx, ry, rz;
-			ranktoxyz(source, &rx, &ry, &rz);
+			ranktoxyz(b->tag[TAGsource], &rx, &ry, &rz);
 			print("Want (%x,%d,%d): REcv comm %lx tag %ld source %ld(%d, %d, %d)\n", comm, tag, source, b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource], rx, ry, rz);
 		}
 		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag  || tag == MPI_ANY_TAG) && (b->tag[TAGsource] == source || source == MPI_ANY_SOURCE))
@@ -282,7 +282,7 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 	torustag[TAGtag] = reducetag;
 	torustag[TAGsource] = myproc;
 
-print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
+	if(rompidebug&4) print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
 	if (myproc) {
 		/* who we get it from depends on who we are. */
 		/* this shows some bad design. We compute x,y,z, turn it into rank, 
@@ -290,7 +290,7 @@ print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
 		 */
 		fromz = z;
 		fromy = y;
-		fromx =y;
+		fromx =x;
 		if (z)
 			fromz = 0;
 		else if (y) 
@@ -298,9 +298,9 @@ print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
 		else if (x)
 			fromz = fromy = fromx = 0;
 		fromrank = xyztorank(fromx, fromy, fromz);
-print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", nsec(), myproc, x, y, z, fromx, fromy, fromz);
+	if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", nsec(), myproc, x, y, z, fromx, fromy, fromz);
 		MPI_Recv(buf, 1, MPI_INT, fromrank, reducetag, MPI_COMM_WORLD, status);
-print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
+	if(rompidebug&4) print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
 	}
 
 	/* OK, we got it, we just need to do one send to our "axis" (of evil?) */
@@ -311,24 +311,24 @@ print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
 	 */
 	if (z) {
 	} else if (y) {
-print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
 		torustag[TAGsource] = myproc;
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	}
 	else if (x) {
 		/* send down BOTH our y and z axis */
 		torustag[TAGsource] = myproc;
-print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
 		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
-print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	} else {
 		/* send down x, y, z */
-print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, xsize-1, 0, 0);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, xsize-1, 0, 0);
 		torussend(buf, count, xsize-1, 0, 0, 1, torustag, sizeof(torustag));
-print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
 		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
-print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	}
 
