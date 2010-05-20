@@ -85,6 +85,24 @@ int lx, ly, lz, xbits, ybits, zbits;
 
 void panic(char *s);
 
+void torusstatus(int pfd)
+{
+	char *buf;
+	int amt;
+	int fd = open("/dev/torusstatus", OREAD);
+	if (fd < 0){
+		fprint(pfd, "Could not open torusstatus: %r\n");
+		return;
+	}
+
+	buf = malloc(16384);
+	while ((amt = read(fd, buf, 16384)) > 0){
+		if (write(pfd, buf, amt) < amt)
+			break;
+	}
+	free(buf);
+	close(fd);
+}
 static int
 torusparse(u8int d[3], char* item, char* buf)
 {
@@ -267,23 +285,23 @@ xyztorank(int x, int y, int z)
 /* failure is not an option */
 /* note this is pretty awful ... copy to here, then copy in kernel!  */
 void
-torussend(void *buf, int length, int rank, void *tag, int taglen)
+torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, int taglen)
 {
 	int n;
 	/* OMG! We're gonna copy AGAIN. Mantra: right then fast. */
 	Tpkt *tpkt;
-	int x, y, z;
 	u8int *packet;
 
-	packet = malloc(length + taglen + sizeof(*tpkt));
+	packet = mallocz(length + taglen + sizeof(*tpkt), 1);
 	tpkt = (Tpkt *)packet;
 	memcpy(tpkt->payload, tag, taglen);
 	memcpy(tpkt->payload + taglen, buf, length);
 
-	ranktoxyz(rank, &x, &y, &z);
 	tpkt->dst[X] = x;
 	tpkt->dst[Y] = y;
 	tpkt->dst[Z] = z;
+	if (deposit) 
+		tpkt->hint |= Dp;
 	
 	n = pwrite(torusfd, tpkt, length + taglen + sizeof(*tpkt), 0);
 	if (torusdebug & 1)
@@ -302,7 +320,8 @@ torusrecv(void *buf, long buflen, void *tag, long taglen)
 	int total;
 	char *m = buf;
 	int mlen;
-//print("TR: buf %p tag %p\n", buf, tag);
+	if (torusdebug&2)
+		print("TR: buf %p tag %p\n", buf, tag);
 	/* more copies. We can fix this later but we really ought to 
 	 * get scatter/gather in this kernel. And, no, for most apps, 
 	 * requiring users to take a pointer back to the data we read in is 
@@ -312,7 +331,8 @@ torusrecv(void *buf, long buflen, void *tag, long taglen)
 	n = pread(torusfd, m, mlen, 0);
 	if (n < 32)
 		panic("torus read < 32!");
-	//print("hdr.len %x %x \n", h->len[0], h->len[1]);
+	if (torusdebug&2)
+		print("torusrecv: %d bytes\n", n);
 
 	/* copy first 'tag' bytes to tag, rest to buf */
 //print("move %p to %p %d bytes\n", b, tag, taglen);
