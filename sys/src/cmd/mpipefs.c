@@ -49,7 +49,6 @@ char Ehangup[] = "pipe hang up";
 
 typedef struct Mpipe Mpipe;
 struct Mpipe {
-	int sig;
 	QLock l;
 	int ref;
 
@@ -67,7 +66,6 @@ struct Mpipe {
 
 typedef struct Fidaux Fidaux;
 struct Fidaux {
-	int sig;
 	QLock l;
 	Mpipe *mp;
 	
@@ -92,6 +90,8 @@ usage(void)
 void
 killall(Srv*)
 {
+	chanclose(iochan);
+	chanfree(iochan);
 	threadexitsall("killall");
 }
 
@@ -117,6 +117,30 @@ emalloc9pz(int sz, int zero)
 	return v;
 }
 
+static Mpipe *
+setfidmp(Fid *fid) /* blech */
+{
+	if(fid->qid.type&QTDIR)
+		return fid->aux;
+
+	if(fid->omode == -1)
+		return fid->aux;
+	else
+		return ((Fidaux *)fid->aux)->mp;
+}
+
+static Fidaux *
+setfidaux(Fid *fid) /* blech */
+{
+	if(fid->qid.type&QTDIR)
+		return nil;
+
+	if(fid->omode == -1)
+		return nil;
+	else
+		return fid->aux;
+}
+
 /* MAYBE: eventually pull other parameters from the spec/aname */
 static void
 fsattach(Req *r)
@@ -138,7 +162,6 @@ fsattach(Req *r)
 	r->fid->aux = mp;
 	mp->uid = estrdup9p(getuser());
 	mp->gid = estrdup9p(mp->uid);
-	mp->sig = 0x1111;
 
 	mp->rrchan = chancreate(sizeof(Fid *), 0);
 
@@ -151,7 +174,7 @@ static char*
 fswalk1(Fid *fid, char *name, Qid *qid)
 {
 	ulong path;
-	Mpipe *mp = fid->aux;
+	Mpipe *mp = setfidmp(fid);
 
 	path = fid->qid.path;
 	if(!(fid->qid.type&QTDIR))
@@ -170,7 +193,7 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 static char*
 fsclone(Fid* fid, Fid* newfid)
 {
-	Mpipe *mp = fid->aux;
+	Mpipe *mp = setfidmp(fid);
 
 	newfid->aux = fid->aux;
 	mp->ref++;
@@ -183,7 +206,7 @@ fsopen(Req *r)
 {
 	Fid*	fid = r->fid;
 	Qid q = fid->qid;
-	Mpipe *mp = fid->aux;
+	Mpipe *mp = setfidmp(fid);
 	Fidaux *aux;
 
 	if (q.type&QTDIR){
@@ -199,12 +222,11 @@ fsopen(Req *r)
 	aux = emalloc9pz(sizeof(Fidaux), 1);
 	aux->mp = mp;
 	fid->aux = aux;
-	aux->sig = 0xffff;
 	if((r->ifcall.mode&OMASK) ==  OWRITE)
 		mp->writers++;
 	
 	/* MAYBE: unclear how to assign readers to subgroups */
-	if(r->ifcall.mode&OMASK==0) { /* READER */
+	if((r->ifcall.mode&OMASK)==0) { /* READER */
 		mp->readers++;
 		aux->chan = chancreate(sizeof(Req *), 0);
 	}
@@ -262,21 +284,18 @@ fsread(void *arg)
 {
 	Req *r = arg;
 	Fid*	fid = r->fid;
-	Fidaux *aux;
-	Mpipe *mp;
+	Fidaux *aux = setfidaux(fid);
+	Mpipe *mp = setfidmp(fid);
 	int count;
 	Req *tr;
 	int offset;
 	Qid	q = fid->qid;
 
 	if (q.type&QTDIR) {
-		dirread9p(r, getdirent, fid->aux);
+		dirread9p(r, getdirent, mp);
 		respond(r, nil);
 		threadexits(nil);
 	}
-
-	aux = fid->aux;
-	mp = aux->mp;
 
 	/* If remainder, serve that first */
 	if(aux->r) {
@@ -302,7 +321,7 @@ fsread(void *arg)
 	if(offset == tr->ifcall.count) {
 		tr->aux = 0;
 		aux->r = nil;
-
+		tr->ofcall.count = tr->ifcall.count;
 		respond(tr, nil);
 		respond(r, nil);
 	} else {
@@ -319,8 +338,8 @@ fswrite(void *arg)
 {
 	Req *r = arg;
 	Fid *rfid, *fid = r->fid;
-	Fidaux *raux, *aux = fid->aux;
-	Mpipe *mp = aux->mp;	
+	Fidaux *raux, *aux = setfidaux(fid);
+	Mpipe *mp = setfidmp(fid);	
 	
 	/* MAYBE: lock down mp->len */
 	mp->len += r->ifcall.count;
@@ -330,7 +349,7 @@ fswrite(void *arg)
 		respond(r, Ehangup);
 	else {
 		raux = rfid->aux;
-/* BUG: giving us a bogus chan */
+		assert(raux->chan != 0);
 		if(sendp(raux->chan, r) != 1)
 			respond(r, Ehangup);
 	}
@@ -343,7 +362,7 @@ fsstat(Req* r)
 {
 	Fid*	fid = r->fid;
 	Qid	q = fid->qid;
-	Mpipe *mp = fid->aux;
+	Mpipe *mp = setfidmp(fid);
 	
 	fid = r->fid;
 	q = fid->qid;
@@ -358,18 +377,10 @@ fsstat(Req* r)
 static void
 fsclunk(Fid *fid)
 {
-	Mpipe *mp;
+	Mpipe *mp = setfidmp(fid);
 
 	if(fid->aux) {
-		Fidaux *aux = nil;
-
-		if(fid->qid.type&QTDIR)  {
-			mp = fid->aux;
-		} else {
-			aux = fid->aux;
-			mp = aux->mp;
-		}
-			
+		Fidaux *aux = setfidaux(fid);	
 		mp->ref--;
 	
 		if(mp->ref == 0) { 
@@ -377,10 +388,8 @@ fsclunk(Fid *fid)
 			free(mp->uid);
 			free(mp->gid);
 			if(mp->rrchan) {
-fprint(2, "closing the whole kit and kaboodle\n");
 				chanclose(mp->rrchan);
 				chanfree(mp->rrchan);
-				mp->rrchan = nil;
 			}
 			free(mp);
 		}
@@ -390,21 +399,18 @@ fprint(2, "closing the whole kit and kaboodle\n");
 
 			mp->writers--;
 			if(mp->writers == 0) {
-fprint(2, "closing because no more writers\n");
 				chanclose(mp->rrchan);
-				chanfree(mp->rrchan);
-				mp->rrchan = nil;
 			}
 			free(aux);
 			fid->aux = nil;
 		} 
 
-		if((fid->omode&OMASK == 0)&&(fid->qid.type==QTFILE)) {
+		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
 			mp->readers--;
 			chanclose(aux->chan);
 			chanfree(aux->chan);
 			aux->chan = nil;
-			if(aux->r) {		/* crap! we still have data - return short write */
+			if(aux->r) {/* crap! we still have data - return short write */
 				int offset = (int) aux->r->aux;
 				aux->r->ofcall.count = aux->r->ifcall.count - offset;
 				respond(aux->r, "short write");
@@ -412,7 +418,8 @@ fprint(2, "closing because no more writers\n");
 			}
 			
 			if((mp->writers == 0)&&(mp->readers == 0)) {
-				chaninit(mp->rrchan, 0, sizeof(Fid *));
+				chanfree(mp->rrchan);
+				mp->rrchan = chancreate(sizeof(Fid *), 0);
 			}
 		}
 	}
