@@ -16,6 +16,12 @@
 		mount itself due to nature of instance per
 		attach.
 
+	Bugs:
+		Flushes and interruptions are probably going
+		to break everything right now.  Need to add
+		code to handle such situations in a reasonable
+		fashion.
+
 */
 
 #include <u.h>
@@ -43,6 +49,7 @@ char Ehangup[] = "pipe hang up";
 
 typedef struct Mpipe Mpipe;
 struct Mpipe {
+	int sig;
 	QLock l;
 	int ref;
 
@@ -54,10 +61,19 @@ struct Mpipe {
 
 	int writers;	/* number of writers */
 	int readers;	/* number of readers */
-	Channel *chan;	/* of Reqs */
 
-	/* rendez, qlock? */
-	/* TODO: add channel queues */
+	Channel *rrchan;	/* ready to read */
+};
+
+typedef struct Fidaux Fidaux;
+struct Fidaux {
+	int sig;
+	QLock l;
+	Mpipe *mp;
+	
+	/* only for reader */
+	Req *r;			/* for partial reads */
+	Channel *chan;
 };
 
 static struct
@@ -91,13 +107,22 @@ enum
 
 char MPdefault[] = "data";
 
-/* TODO: eventually pull other parameters from the spec/aname */
+/* tiny helper, why don't we have this generically? */
+static void *
+emalloc9pz(int sz, int zero)
+{
+	void *v = emalloc9p(sz);
+	if(zero)
+		memset(v, 0, sz);
+	return v;
+}
+
+/* MAYBE: eventually pull other parameters from the spec/aname */
 static void
 fsattach(Req *r)
 {
-	Mpipe *mp = emalloc9p(sizeof(Mpipe));
+	Mpipe *mp = emalloc9pz(sizeof(Mpipe), 1);
 	
-	memset(mp, 0, sizeof(Mpipe));
 	if(strlen(r->ifcall.aname) == 0)
 		mp->name = estrdup9p(MPdefault);
 	else
@@ -113,8 +138,9 @@ fsattach(Req *r)
 	r->fid->aux = mp;
 	mp->uid = estrdup9p(getuser());
 	mp->gid = estrdup9p(mp->uid);
+	mp->sig = 0x1111;
 
-	mp->chan = chancreate(sizeof(Req *), 0); /* no buffering for now */
+	mp->rrchan = chancreate(sizeof(Fid *), 0);
 
 	mp->ref++;
 
@@ -156,23 +182,32 @@ static void
 fsopen(Req *r)
 {
 	Fid*	fid = r->fid;
-	Qid	q = fid->qid;
+	Qid q = fid->qid;
 	Mpipe *mp = fid->aux;
+	Fidaux *aux;
 
 	if (q.type&QTDIR){
 		respond(r, nil);
 		return;
 	}
 
-	if((r->ifcall.mode&3) == ORDWR) {
+	if((r->ifcall.mode&OMASK) == ORDWR) {
 		respond(r, Eoneorother);
 		return;
 	}
 
-	if((r->ifcall.mode&0x3) ==  OWRITE)
+	aux = emalloc9pz(sizeof(Fidaux), 1);
+	aux->mp = mp;
+	fid->aux = aux;
+	aux->sig = 0xffff;
+	if((r->ifcall.mode&OMASK) ==  OWRITE)
 		mp->writers++;
-	if(r->ifcall.mode==0)
+	
+	/* MAYBE: unclear how to assign readers to subgroups */
+	if(r->ifcall.mode&OMASK==0) { /* READER */
 		mp->readers++;
+		aux->chan = chancreate(sizeof(Req *), 0);
+	}
 
 	respond(r, nil);
 }
@@ -207,68 +242,99 @@ getdirent(int n, Dir* d, void *aux)
 	return 0;
 }
 
-/*
- * This is oversimplified and won't work if
- * read len isn't greater than or equal to write len
- *
- */
+/* copy from transmitter to receiver */
+static int
+fscopy(Req *tr, Req *r, int offset)
+{
+	int count = tr->ifcall.count - offset;
+	
+	if(count > r->ifcall.count)
+			count = r->ifcall.count;	/* truncate */
+
+	memcpy(r->ofcall.data+offset, tr->ifcall.data, count);
+	r->ofcall.count = count;
+	
+	return count;
+}
+
 static void
 fsread(void *arg)
 {
 	Req *r = arg;
 	Fid*	fid = r->fid;
-	Mpipe *mp = fid->aux;
+	Fidaux *aux;
+	Mpipe *mp;
 	int count;
 	Req *tr;
+	int offset;
 	Qid	q = fid->qid;
 
-	if (q.type&QTDIR){
-		dirread9p(r, getdirent, mp);
+	if (q.type&QTDIR) {
+		dirread9p(r, getdirent, fid->aux);
 		respond(r, nil);
 		threadexits(nil);
 	}
 
-	tr = recvp(mp->chan);
-	if(tr == 0) { /* return with 0 */
-		respond(r, nil);
-		threadexits(nil);
-	}
-	if(tr->ifcall.count > r->ifcall.count) {
-		/* temporary */
-		respond(tr, Eshort);
-		respond(r, Eshort);
-		threadexits(Eshort);
-	}
-	if(r->ifcall.count > tr->ifcall.count)
-		count = tr->ifcall.count;
-	else
-		count = r->ifcall.count; 
+	aux = fid->aux;
+	mp = aux->mp;
 
-	memcpy(r->ofcall.data, tr->ifcall.data, count);
-	tr->ofcall.count = count;
-	r->ofcall.count = count;
+	/* If remainder, serve that first */
+	if(aux->r) {
+		tr = aux->r;
+		offset = (int) aux->r->aux;
+	 } else {
+		if(sendp(mp->rrchan, fid) != 1) {
+			respond(r, nil);
+			threadexits(nil);
+		}
+		tr = recvp(aux->chan);
+		offset = 0;
+		if(tr == nil) {
+			respond(r, nil);
+			threadexits(nil);
+		}	
+	}
+	
+	count = fscopy(tr, r, offset);
 	mp->len -= count;
+	offset += count;
 
-	respond(tr, nil);
-	respond(r, nil);
+	if(offset == tr->ifcall.count) {
+		tr->aux = 0;
+		aux->r = nil;
+
+		respond(tr, nil);
+		respond(r, nil);
+	} else {
+		tr->aux = (void *) offset;
+		aux->r = tr;
+		respond(r, nil);
+	}
+
 	threadexits(nil);
 }
 
-/*
- * This is oversimplified and won't work if
- * read len isn't greater than or equal to write len
- *
- */
 static void
 fswrite(void *arg)
 {
 	Req *r = arg;
-	Fid*	fid = r->fid;
-	Mpipe *mp = fid->aux;
+	Fid *rfid, *fid = r->fid;
+	Fidaux *raux, *aux = fid->aux;
+	Mpipe *mp = aux->mp;	
 	
+	/* MAYBE: lock down mp->len */
 	mp->len += r->ifcall.count;
+	
+	rfid = recvp(mp->rrchan);
+	if(rfid == nil)
+		respond(r, Ehangup);
+	else {
+		raux = rfid->aux;
+/* BUG: giving us a bogus chan */
+		if(sendp(raux->chan, r) != 1)
+			respond(r, Ehangup);
+	}
 
-	sendp(mp->chan, arg);
 	threadexits(nil);
 }
 
@@ -292,31 +358,61 @@ fsstat(Req* r)
 static void
 fsclunk(Fid *fid)
 {
+	Mpipe *mp;
+
 	if(fid->aux) {
-		Mpipe *mp = fid->aux;
+		Fidaux *aux = nil;
+
+		if(fid->qid.type&QTDIR)  {
+			mp = fid->aux;
+		} else {
+			aux = fid->aux;
+			mp = aux->mp;
+		}
+			
 		mp->ref--;
 	
-		if(mp->ref == 0) { /* TODO: probably want to do more here */
+		if(mp->ref == 0) { 
 			free(mp->name);
 			free(mp->uid);
 			free(mp->gid);
-			chanfree(mp->chan);
+			if(mp->rrchan) {
+fprint(2, "closing the whole kit and kaboodle\n");
+				chanclose(mp->rrchan);
+				chanfree(mp->rrchan);
+				mp->rrchan = nil;
+			}
 			free(mp);
 		}
 
-		if((fid->omode&0x3) == OWRITE) {
+		if((fid->omode&OMASK) == OWRITE) {
+			/* MAYBE: mark outstanding requests crap */
+
 			mp->writers--;
 			if(mp->writers == 0) {
-				chanclose(mp->chan);
+fprint(2, "closing because no more writers\n");
+				chanclose(mp->rrchan);
+				chanfree(mp->rrchan);
+				mp->rrchan = nil;
 			}
+			free(aux);
+			fid->aux = nil;
 		} 
 
-		if((fid->omode == 0)&&(fid->qid.type==QTFILE)) {
+		if((fid->omode&OMASK == 0)&&(fid->qid.type==QTFILE)) {
 			mp->readers--;
+			chanclose(aux->chan);
+			chanfree(aux->chan);
+			aux->chan = nil;
+			if(aux->r) {		/* crap! we still have data - return short write */
+				int offset = (int) aux->r->aux;
+				aux->r->ofcall.count = aux->r->ifcall.count - offset;
+				respond(aux->r, "short write");
+				aux->r = nil;
+			}
+			
 			if((mp->writers == 0)&&(mp->readers == 0)) {
-				/* reset pipe */
-				chanfree(mp->chan);
-				mp->chan = chancreate(sizeof(Req *), 0); /* no buffering for now */
+				chaninit(mp->rrchan, 0, sizeof(Fid *));
 			}
 		}
 	}
@@ -334,7 +430,7 @@ iothread(void*)
 	threadsetname("mpipfs-iothread");
 	for(;;) {
 		r = recvp(iochan);
-		if(r == 0)
+		if(r == nil)
 			threadexits("interrupted");
 
 		switch(r->ifcall.type){
@@ -354,7 +450,10 @@ iothread(void*)
 static void
 ioproxy(Req *r)
 {
-	sendp(iochan, r);
+	if(sendp(iochan, r) != 1) {
+		fprint(2, "iochan hungup");
+		threadexits("iochan hungup");
+	}
 }
 
 Srv fs=
