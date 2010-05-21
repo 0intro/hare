@@ -344,6 +344,7 @@ opsum(void *dst, void *src, int)
 	int *is = src;
 	int *id = dst;
 	int tmp = *is;
+	if (rompidebug & 4) print("%lld %d(%d,%d,%d): SUM %d+%d=%d\n", nsec(), myproc, x,y,z,*id, *is, *id+tmp);
 	*id += tmp;
 	return *id;
 }
@@ -384,7 +385,6 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 	int *sum, *nsum; // hack 
 
 	op = findop(iop);
-print("op %p \n", op);
 	if (!iop)
 		panic("Bad op in MPI_Reduce");
 
@@ -397,14 +397,13 @@ print("op %p \n", op);
 	if (z) {
 		torank = xyztorank(x,y,0);
 		if (rompidebug&4)
-			print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), myproc, x, y, z, myproc);
+			print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), myproc, x, y, z, myproc, torank);
 		MPI_Send(tmp, 1, datatype, torank, 1, comm);
 	} else {
 		/* gather up all our z >0 data */
 		for(fromz = 1; fromz < zsize; fromz++){
 			fromrank = xyztorank(x, y, fromz);
 			MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
-print("op %p tmp %p recvbuf %p \n", op, tmp, recvbuf);
 			op(tmp, recvbuf, count);
 		}
 		if (rompidebug&4)
@@ -415,7 +414,7 @@ print("op %p tmp %p recvbuf %p \n", op, tmp, recvbuf);
 			torank = xyztorank(x,0,0);
 			/* send to our parent */
 			if (rompidebug&4)
-				print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), myproc, x, y, z, sum[0]);
+				print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), myproc, x, y, z, sum[0], torank);
 			MPI_Send(tmp, 1, datatype, torank, 1, comm);
 		} else {
 			/* This is the vector along the X axis. All myprocs, including (0,0,0), gather up along 
@@ -448,7 +447,11 @@ print("op %p tmp %p recvbuf %p \n", op, tmp, recvbuf);
 		}
 	}
 
-	if (! myproc)
+	if (! myproc){
 		memmove(recvbuf, tmp, nbytes);
+		if (rompidebug&4)
+			print("%lld reduce: %d(%d,%d,%d): gather done, send SUM %d\n", nsec(), myproc, x, y, z, sum[0]);
+	}
+
 	return reduce_end (recvbuf, count, datatype, root, comm, &status);
 }
