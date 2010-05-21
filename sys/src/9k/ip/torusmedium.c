@@ -19,7 +19,9 @@ enum {
 
 typedef struct Th Th;
 struct Th {
-	u8int	_0_[3];				/* Tpkt: 8 bytes */
+	u8int	_0_[1];				/* Tpkt: 8 bytes */
+	u8int	hint;					/* may be useful some day if we want to broadcast. */
+	u8int	_1_[1];
 	u8int	dst[N];				/* Destination Coordinates */
 	u8int	_6_[2];
 	u8int	_8_[8];				/* Tpkt: padding */
@@ -73,6 +75,7 @@ torusbwrite(Ipifc* ifc, Block* b, int, uchar*)
 	 * (address unreachable)?
 	 */
 	th = (Th*)b->rp;
+	th->hint = 0;
 	th->dst[X] = th->ipv4dst[1];
 	th->dst[Y] = th->ipv4dst[2];
 	th->dst[Z] = th->ipv4dst[3]-1;

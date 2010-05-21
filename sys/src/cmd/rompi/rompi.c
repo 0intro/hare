@@ -334,3 +334,121 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 
 	return MPI_SUCCESS;
 }
+
+typedef int (*mpi_op)(void *, void *, int);
+
+/* int sum -- length matters not */
+int
+opsum(void *dst, void *src, int)
+{
+	int *is = src;
+	int *id = dst;
+	int tmp = *is;
+	*id += tmp;
+	return *id;
+}
+
+mpi_op 
+findop(MPI_Op op)
+{
+	switch((int) op){
+	case MPI_SUM    : return opsum;
+	default: 
+	case MPI_MAX    :
+	case MPI_MIN    :
+	case MPI_PROD   :
+	case MPI_LAND   :
+	case MPI_BAND   :
+	case MPI_LOR    :
+	case MPI_BOR    :
+	case MPI_LXOR   :
+	case MPI_BXOR   :
+	case MPI_MINLOC :
+	case MPI_MAXLOC :
+	case MPI_REPLACE:
+		return nil;
+	}
+}
+
+/* we're careful not to modify sendbuf, though it is unknown if that matters. */
+int MPI_Reduce ( void *sendbuf, void *recvbuf, int count, 
+                MPI_Datatype datatype, MPI_Op iop, int root, MPI_Comm comm )
+{
+	MPI_Status status;
+	unsigned char typesize = datatype >> 8;
+	int i, fromz, fromrank;
+	int torank;
+	mpi_op op;
+	void *tmp;
+	int nbytes = count * typesize;
+	int *sum, *nsum; // hack 
+
+	op = findop(iop);
+print("op %p \n", op);
+	if (!iop)
+		panic("Bad op in MPI_Reduce");
+
+	tmp = malloc(nbytes);
+	sum = tmp;
+	nsum = recvbuf;
+	memmove(tmp, sendbuf, nbytes);
+
+	/* if we have a 'z' address, send to (x,y,0) */
+	if (z) {
+		torank = xyztorank(x,y,0);
+		if (rompidebug&4)
+			print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), myproc, x, y, z, myproc);
+		MPI_Send(tmp, 1, datatype, torank, 1, comm);
+	} else {
+		/* gather up all our z >0 data */
+		for(fromz = 1; fromz < zsize; fromz++){
+			fromrank = xyztorank(x, y, fromz);
+			MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
+print("op %p tmp %p recvbuf %p \n", op, tmp, recvbuf);
+			op(tmp, recvbuf, count);
+		}
+		if (rompidebug&4)
+			print("%lld AFTER Z: %d(%d, %d, %d): %d\n", nsec(), myproc, x, y, z, sum[0]);
+
+		/* y? y o y? */
+		if (y) {
+			torank = xyztorank(x,0,0);
+			/* send to our parent */
+			if (rompidebug&4)
+				print("%lld %d:(%d,%d,%d) sends %d\n", nsec(), myproc, x, y, z, sum[0]);
+			MPI_Send(tmp, 1, datatype, torank, 1, comm);
+		} else {
+			/* This is the vector along the X axis. All myprocs, including (0,0,0), gather up along 
+			 * the y axis 
+			 */
+			int fromrank;
+			int fromy;
+			torank = 0;
+			for(fromy = 1; fromy < ysize; fromy++){
+				fromrank = xyztorank(x, fromy, 0);
+				MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
+				op(tmp, recvbuf, count);
+			}
+			if (rompidebug&4)
+				print("%lld %d:(%d,%d,%d) gets %d accum %d\n", nsec(), myproc, x, y, z, nsum[0], sum[0]);
+			if (x) {
+				/* send to our parent */
+				if (rompidebug&4)
+					print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), myproc, x, y, z, sum[0], torank);
+				MPI_Send(tmp, 1, datatype, torank, 1, comm);
+			} else {
+					/* sum contains the sum from our y axis above */
+					for(i = 1; i < xsize; i++) {
+						MPI_Recv(recvbuf, 1, datatype, i, 1, comm, &status);
+						op(tmp, recvbuf, count);
+						if (rompidebug&4)
+							print("%lld %d:(%d,%d,%d) recv %d to %d\n", nsec(), myproc, x, y, z, sum[0], i);
+				}
+			}
+		}
+	}
+
+	if (! myproc)
+		memmove(recvbuf, tmp, nbytes);
+	return reduce_end (recvbuf, count, datatype, root, comm, &status);
+}
