@@ -22,24 +22,6 @@ enum {
 };
 
 /*
- * Packet header. The hardware requires an 8-byte header
- * of which the last two are reserved (they contain a sequence
- * number and a header checksum inserted by the hardware).
- * The hardware also requires the packet to be aligned on a
- * 128-bit boundary for loading into the HUMMER.
- */
-typedef struct Tpkt Tpkt;
-struct Tpkt {
-	u8int	sk;				/* Skip Checksum Control */
-	u8int	hint;				/* Hint|Dp|Pid0 */
-	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
-	u8int	dst[N];				/* Destination Coordinates */
-	u8int	_6_[2];				/* reserved */
-	u8int	_8_[8];				/* protocol header */
-	u8int	payload[];
-};
-
-/*
  * SKIP is a field in .sk giving the number of 2-bytes
  * to skip from the top of the packet before including
  * the packet bytes into the running checksum.
@@ -70,14 +52,57 @@ enum {
 	Pid1		= 0x10,			/* Destination Group FIFO LSb */
 };
 
+/*
+ * Packet header. The hardware requires an 8-byte header
+ * of which the last two are reserved (they contain a sequence
+ * number and a header checksum inserted by the hardware).
+ * The hardware also requires the packet to be aligned on a
+ * 128-bit boundary for loading into the HUMMER.
+ */
+typedef struct Tpkt Tpkt;
+struct Tpkt {
+	u8int	sk;				/* Skip Checksum Control */
+	u8int	hint;				/* Hint|Dp|Pid0 */
+	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
+	u8int	dst[N];				/* Destination Coordinates */
+	u8int	_6_[2];				/* reserved */
+	u8int	_8_[8];				/* protocol header */
+	u8int	payload[];
+};
 
-int debug = 0;
+struct Hdr {
+	uchar	len[2];	/* byte length - 1 */
+	uchar	off[2];	/* offset adjusted by hardware (12 bits); top 4 bits of sequence */
+	uchar	seq;		/* low order bits of sequence (zero if raw) */
+	uchar	src[3];	/* source node address */
+};
+
+int torusdebug = 0;
 int x, y, z;
 int xsize, ysize, zsize;
 int torusfd = -1;
+int lx, ly, lz, xbits, ybits, zbits;
 
 void panic(char *s);
 
+void torusstatus(int pfd)
+{
+	char *buf;
+	int amt;
+	int fd = open("/dev/torusstatus", OREAD);
+	if (fd < 0){
+		fprint(pfd, "Could not open torusstatus: %r\n");
+		return;
+	}
+
+	buf = malloc(16384);
+	while ((amt = read(fd, buf, 16384)) > 0){
+		if (write(pfd, buf, amt) < amt)
+			break;
+	}
+	free(buf);
+	close(fd);
+}
 static int
 torusparse(u8int d[3], char* item, char* buf)
 {
@@ -110,16 +135,43 @@ struct xyz {
 };
 
 struct xyz *xyz;
-int *ranks;
+
+/* wikipedia */
+
+int floorLog2(unsigned int n) {
+  int pos = 0;
+  if (n >= 1<<16) { n >>= 16; pos += 16; }
+  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
+  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
+  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
+  if (n >= 1<< 1) {           pos +=  1; }
+  return ((n == 0) ? (-1) : pos);
+}
+
+int
+ranktox(int rank)
+{
+	return (rank & xbits);
+}
+
+int ranktoy(int rank)
+{
+	return (rank & ybits) >> lx;
+}
+
+int ranktoz(int rank)
+{
+	return (rank & zbits) >> (lx + ly);
+}
+
 
 void torusinit(int *pmyproc, const int numprocs)
 {
+	int rx, ry, rz;
 	char buf[512];
 	int fd;
 	u8int d[3];
 	int n, rank;
-	int i, j = 0, k = 0;
-	int maxprocs;
 
 	if((fd = open("/dev/torusstatus", 0)) < 0)
 		panic("open /dev/torusstatus: %r\n");
@@ -138,76 +190,49 @@ void torusinit(int *pmyproc, const int numprocs)
 	ysize = d[Y];
 	zsize = d[Z];
 
+	lx = floorLog2(xsize);
+	ly = floorLog2(ysize);
+	lz = floorLog2(zsize);
+
+	xbits = (xsize-1);
+	ybits = (ysize-1)<<lx;
+	zbits = (zsize-1)<<(lx+ly);
+
 	if(torusparse(d, "addr", buf) < 0)
 		panic("parse /dev/torusstatus");
 	x = d[X];
 	y = d[Y];
 	z = d[Z];
-print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
-print( "numprocs %d \n", numprocs);
+
+	*pmyproc = (z << (lx + ly)) + (y << lx) + x;
+//print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
+//print( "numprocs %d \n", numprocs);
+//print("%d/%d %d/%d %d/%d\n", lx, xbits, ly, ybits, lz, zbits);
 	/* make some tables. Mapping is done as it is to maximally distributed broadcast traffic */
 	xyz = calloc(numprocs, sizeof(*xyz));
 	if (!xyz)
 		panic("mpi init xyz");
-	ranks = calloc(numprocs, sizeof(*ranks));
-	if (!ranks)
-		panic("mpi init ranks");
 
-	/* root node */
-	/* base case -- for all nods, set basic values */
-	xyz[0].x = 0;
-	ranks[0] = 0;
-	/* base case -- if I am the root node, fill this in */
-	if (x == y == z == 0){
-		*pmyproc = 0;
-		print( "set myproc to %d @ (%d, %d, %d)\n",
-				0, x, y, z);
-	}
-	/* first level -- X axis (1-xsize-1, 0, 0) -- lowest order ranks go on this axis. */
-	/* in all cases, if we match 'me', fill that value in */
-	for(rank = 1, i = 1; (i < xsize) && (rank < numprocs); i++, rank++) {
-		xyz[0].kids++;
-		xyz[rank].x = i;
-		if ((x == i) && (y == j) && (z == k)) {
-			*pmyproc = rank;
-			print( "set myproc to %d @ (%d, %d, %d)\n",
-				rank, x, y, z);
+	for(rank = 0; rank < numprocs; rank++){
+
+		rx = ranktox(rank);
+		ry = ranktoy(rank);
+		rz = ranktoz(rank);
+
+		xyz[rank].x = rx;
+		xyz[rank].y = ry;
+		xyz[rank].z = rz;
+		if (!rx && !ry && !rz) {
+			xyz[rank].kids = xsize * ysize * zsize - 1;
+			continue;	
 		}
-		ranks[i] = rank;
-	}
-
-	/* second level */
-	/* second level -- X axis (1-xsize-1, 1-ysize-1, 0) -- lowest order ranks go on this axis. */
-	for(i = 1; (i < xsize) && (rank < numprocs); i++) {
-		for(j = 1; (j < ysize) && (rank < numprocs); j++, rank++) {
-			xyz[i].kids++;
-			xyz[rank].x = i;
-			xyz[rank].y = j;
-			if ((x == i) && (y == j) && (z == k)){
-				*pmyproc = rank;
-				print( "set myproc to %d @ (%d, %d, %d)\n",
-					rank, x, y, z);
-			}
-			ranks[i + j*ysize] = rank;
+		if (!ry && !rz){
+			xyz[rank].kids = ysize * zsize - 1;
+			continue;	
 		}
-	}
-
-	/* third level */
-	/* second level -- X axis (1-xsize-1, 1-ysize-1, 1-zsize-1) -- lowest order ranks go on this axis. */
-	for(i = 1; (i < xsize) && (rank < numprocs); i++) {
-		for(j = 1; (j < ysize) && (rank < numprocs); j++) {
-			for(k = 1; (k < zsize) && (rank < numprocs); k++, rank++) {
-				xyz[i*xsize +ysize].kids++;
-				xyz[rank].x = i;
-				xyz[rank].y = j;
-				xyz[rank].z = k;
-				if ((x == i) && (y == j) && (z == k)){
-					*pmyproc = rank;
-					print( "set myproc to %d @ (%d, %d, %d)\n",
-						rank, x, y, z);
-				}
-				ranks[i + j*ysize + k*xsize*ysize] = rank;
-			}
+		if (!rz){
+			xyz[rank].kids = zsize - 1;
+			continue;	
 		}
 	}
 	
@@ -251,7 +276,8 @@ int
 xyztorank(int x, int y, int z)
 {
 	int rank;
-	rank = ranks[x + y * ysize + z*ysize*xsize];
+	rank = x + y * ysize + z*ysize*xsize;
+//print("xyz(%d, %d, %d) to rank %d\n", x, y, z, rank);
 	return rank;
 }
 
@@ -259,49 +285,62 @@ xyztorank(int x, int y, int z)
 /* failure is not an option */
 /* note this is pretty awful ... copy to here, then copy in kernel!  */
 void
-torussend(void *buf, int length, int rank, void *tag, int taglen)
+torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, int taglen)
 {
 	int n;
 	/* OMG! We're gonna copy AGAIN. Mantra: right then fast. */
 	Tpkt *tpkt;
-	int x, y, z;
 	u8int *packet;
 
-	packet = malloc(length + taglen + sizeof(*tpkt));
+	packet = mallocz(length + taglen + sizeof(*tpkt), 1);
 	tpkt = (Tpkt *)packet;
 	memcpy(tpkt->payload, tag, taglen);
 	memcpy(tpkt->payload + taglen, buf, length);
 
-	ranktoxyz(rank, &x, &y, &z);
 	tpkt->dst[X] = x;
 	tpkt->dst[Y] = y;
 	tpkt->dst[Z] = z;
+	if (deposit) 
+		tpkt->hint |= Dp;
 	
 	n = pwrite(torusfd, tpkt, length + taglen + sizeof(*tpkt), 0);
-	if (debug & 1)
+	if (torusdebug & 1)
 		dumptpkt(tpkt, 1, 1);
-	if(n != length)
+	if(n !=  length + taglen + sizeof(*tpkt))
 		panic("write /dev/torus");
 	free(tpkt);
 }
 
+/* buf is REQUIRED to be long enough to hold any data + tag + Tpkt */
+/* we really need scatter/gather IO */
 int
-torusrecv(MPI_Status **status, void *buf, long length, void *tag, long taglen)
+torusrecv(void *buf, long buflen, void *tag, long taglen)
 {
 	int n;
+	int total;
+	char *m = buf;
+	int mlen;
+	if (torusdebug&2)
+		print("TR: buf %p tag %p\n", buf, tag);
+	/* more copies. We can fix this later but we really ought to 
+	 * get scatter/gather in this kernel. And, no, for most apps, 
+	 * requiring users to take a pointer back to the data we read in is 
+	 * NOT an acceptable answer!
+	 */
+	mlen = buflen + taglen + sizeof(Tpkt);
+	n = pread(torusfd, m, mlen, 0);
+	if (n < 32)
+		panic("torus read < 32!");
+	if (torusdebug&2)
+		print("torusrecv: %d bytes\n", n);
 
-	n = pread(torusfd, tag, taglen, 0);
-	if (n < 0)
-		panic("torusrecv tag");
-	n = pread(torusfd, buf, length, 0);
-	if (n < 0)
-		panic("torusrecv buf");
-	if (n ==0)
-		return n;
-
-	if (debug & 1)
-		dumptpkt((Tpkt *)buf, 1, 1);
-
-	*status = (MPI_Status *) ((u8int *)buf + sizeof(Tpkt));
-	return n;
+	/* copy first 'tag' bytes to tag, rest to buf */
+//print("move %p to %p %d bytes\n", b, tag, taglen);
+	memmove(tag, &m[16], taglen);
+//print("mpve %p to %p %d bytes\n", &b[taglen], cp, 16-taglen);
+	memmove(m, &m[taglen + 16], n - taglen - sizeof(Tpkt));
+	total = n - taglen - sizeof(Tpkt);
+//print("total is now %d\n", total);
+//print("Returning %d \n", total);
+	return total;
 }

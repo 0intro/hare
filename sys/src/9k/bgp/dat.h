@@ -252,6 +252,12 @@ struct Sys {					/*  */
 	u8int	ipmask[16];			/* IPNetmask */
 	u8int	ipbcast[16];			/* IPBroadcast */
 	u8int	ipgw[16];			/* IPGateway */
+	
+	u32int	rank;		
+	u32int	pset;		
+	u32int	prank;
+	u32int	psetsz;
+	u32int	iorank;
 
 	uchar	memstart[];
 };
