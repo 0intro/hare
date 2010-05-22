@@ -46,6 +46,9 @@ char Enotfound[] = "directory entry not found";
 char Eoneorother[] = "open read or write, not both";
 char Eshort[] = "short write";
 char Ehangup[] = "pipe hang up";
+char Eremain[] = "new header when bytes still remaining";
+char Eother[] = "Problem with peer";
+
 
 typedef struct Mpipe Mpipe;
 struct Mpipe {
@@ -68,6 +71,10 @@ typedef struct Fidaux Fidaux;
 struct Fidaux {
 	QLock l;
 	Mpipe *mp;
+
+	/* only for writer */
+	Fid *other;		/* peer Fid for long writes */
+	int remain;		/* bytes remaining in multi-block */
 	
 	/* only for reader */
 	Req *r;			/* for partial reads */
@@ -285,6 +292,7 @@ fsread(void *arg)
 	Req *r = arg;
 	Fid*	fid = r->fid;
 	Fidaux *aux = setfidaux(fid);
+	Fidaux *raux;
 	Mpipe *mp = setfidmp(fid);
 	int count;
 	Req *tr;
@@ -302,23 +310,31 @@ fsread(void *arg)
 		tr = aux->r;
 		offset = (int) aux->r->aux;
 	 } else {
-		if(sendp(mp->rrchan, fid) != 1) {
-			respond(r, nil);
-			threadexits(nil);
+		if(aux->other == nil) {
+			if(sendp(mp->rrchan, fid) != 1) {
+				respond(r, nil);
+				threadexits(nil);
+			}
 		}
 		tr = recvp(aux->chan);
 		offset = 0;
 		if(tr == nil) {
 			respond(r, nil);
 			threadexits(nil);
-		}	
+		}
 	}
-	
+	raux = aux->other->aux;
 	count = fscopy(tr, r, offset);
+	raux->remain -= count;
+	if(raux->remain == 0)
 	mp->len -= count;
 	offset += count;
 
 	if(offset == tr->ifcall.count) {
+		if(raux->remain == 0) { /* done for this pkt */
+			raux->other = nil;
+			aux->other = nil;
+		}
 		tr->aux = 0;
 		aux->r = nil;
 		tr->ofcall.count = tr->ifcall.count;
@@ -337,23 +353,50 @@ static void
 fswrite(void *arg)
 {
 	Req *r = arg;
-	Fid *rfid, *fid = r->fid;
+	Fid *fid = r->fid;
 	Fidaux *raux, *aux = setfidaux(fid);
-	Mpipe *mp = setfidmp(fid);	
-	
-	/* MAYBE: lock down mp->len */
-	mp->len += r->ifcall.count;
-	
-	rfid = recvp(mp->rrchan);
-	if(rfid == nil)
-		respond(r, Ehangup);
-	else {
-		raux = rfid->aux;
-		assert(raux->chan != 0);
-		if(sendp(raux->chan, r) != 1)
-			respond(r, Ehangup);
+	Mpipe *mp = setfidmp(fid);
+	ulong hdrtag = ~0;
+
+	if(r->ifcall.offset == hdrtag) {
+		if(aux->remain) {
+			respond(r,Eremain);
+			goto out;
+		}
+		aux->remain = atoi(r->ifcall.data);
+		/* MAYBE: we don't pass this on do we? */
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+		goto out;
+	} else {
+		mp->len += r->ifcall.count;
 	}
 
+	if(aux->other == nil) {
+		aux->other = recvp(mp->rrchan);
+		if(aux->other == nil) {
+			respond(r, Ehangup);
+			goto out;
+		}
+		raux = aux->other->aux;
+		if(raux->other != nil) {
+			respond(r, Eother);
+			goto out;
+		}
+		raux->other = fid;
+	} else {
+		raux = aux->other->aux;
+		if(raux->other != fid) {
+			respond(r, Eother);
+			goto out;
+		}
+	}
+			
+	assert(raux->chan != 0);
+	if(sendp(raux->chan, r) != 1)
+		respond(r, Ehangup);
+
+out:
 	threadexits(nil);
 }
 

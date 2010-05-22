@@ -28,9 +28,12 @@ int
 pipewrite(int fd, char *data, int size)
 {	
 	int n; 
-	/* write size as a string, then write data */
-	/* leaving a space should help make things more readable, and shouldn't hurt anything */
-	n = fprint(fd, "%d        ", size);
+	char hdr[32];
+	ulong tag = ~0;
+
+	/* header byte is at offset ~0 */
+	n = snprint(hdr, 31, "%d", size);
+	n = pwrite(fd, hdr, n+1, tag);
 	if(n <= 0)
 		return n;
 
