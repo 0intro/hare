@@ -1,9 +1,15 @@
 #!/bin/rc
 
-echo Hello, squidboy
-echo I can do anything I want now
+# fire up a cache
+if(~ $cpunode '0') {
+	ramcfs -a $fsaddr -n /n/cache
+	bind /n/cache/n/local /n/frontend
+	bind -c /n/frontend^$fshome /n/home
+	bind -c /n/frontend^$plan9root /n/root
+}
 
 # bind our shit for now
 bind -a /n/root /
 bind -b /n/root/power/bin /bin
 bind -b /n/root/rc/bin /bin
+bind -a /n/root/sys /sys
