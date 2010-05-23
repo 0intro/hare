@@ -24,15 +24,16 @@ prepdata(int size)
 	return buf;
 }
 
+/* TODO: eventually use plumb format headers */
 int
-pipewrite(int fd, char *data, int size)
+pipewrite(int fd, char *data, int size, int count)
 {	
 	int n; 
 	char hdr[32];
 	ulong tag = ~0;
 
 	/* header byte is at offset ~0 */
-	n = snprint(hdr, 31, "%d", size);
+	n = snprint(hdr, 31, "%lud\n%lud\n", size, count);
 	n = pwrite(fd, hdr, n+1, tag);
 	if(n <= 0)
 		return n;
@@ -45,7 +46,7 @@ main(int argc, char *argv[])
 {
 	int times=5;
 	int size=1024;
-	int e=0;
+	int e=1;
 	int count;
 	char *d;
 	int n;
@@ -88,9 +89,7 @@ main(int argc, char *argv[])
 	for(count = 0; count < times; count++) {
 		if(chatty)
 			fprint(2, "writing %d time\n", count);
-		if(e)
-			snprint(d, size, "[time %8.8d] ", count);
-		n = pipewrite(fd, d, size);
+		n = pipewrite(fd, d, size, count);
 		if(n != size) {
 			fprint(2, "pipe write failed: %d: %r\n", n);
 			exits("pipe failed");

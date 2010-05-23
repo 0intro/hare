@@ -64,13 +64,16 @@ struct Mpipe {
 	int writers;	/* number of writers */
 	int readers;	/* number of readers */
 
-	Channel *rrchan;	/* ready to read */
+	int slots;		/* number of enumerations */
+	Channel **rrchan;	/* ready to read */
+	int *numr;
 };
 
 typedef struct Fidaux Fidaux;
 struct Fidaux {
 	QLock l;
 	Mpipe *mp;
+	ulong which;		/* for enumerations */
 
 	/* only for writer */
 	Fid *other;		/* peer Fid for long writes */
@@ -148,16 +151,41 @@ setfidaux(Fid *fid) /* blech */
 		return fid->aux;
 }
 
-/* MAYBE: eventually pull other parameters from the spec/aname */
+/* will probably grow with time */
+#define MAXARGS 8
+
+/* for fucks sake I'm lazy */
+static void
+parsespec(Mpipe *mp, int argc, char **argv)
+{
+	if(argc >= 1) 
+		mp->name = estrdup9p(argv[0]);
+	ARGBEGIN {
+	case 'e':
+		mp->slots = atoi(ARGF());
+		break;
+	default:
+		print(" badflag('%c')", ARGC());
+	}ARGEND
+}
+
 static void
 fsattach(Req *r)
 {
 	Mpipe *mp = emalloc9pz(sizeof(Mpipe), 1);
-	
-	if(strlen(r->ifcall.aname) == 0)
+	char *argv[MAXARGS];
+	int argc;
+	int count;
+
+	/* need to parse aname */
+	argc = tokenize(r->ifcall.aname, argv, MAXARGS);
+	parsespec(mp, argc, argv);
+
+	if(mp->slots == 0)
+		mp->slots = 1;
+	if(mp->name == nil) {
 		mp->name = estrdup9p(MPdefault);
-	else
-		mp->name = estrdup9p(r->ifcall.aname);
+	}
 
 	lock(&pipealloc.l);
 	mp->path = ++pipealloc.path;
@@ -170,7 +198,12 @@ fsattach(Req *r)
 	mp->uid = estrdup9p(getuser());
 	mp->gid = estrdup9p(mp->uid);
 
-	mp->rrchan = chancreate(sizeof(Fid *), 0);
+	mp->rrchan = emalloc9p(sizeof(Channel *)*mp->slots);
+	mp->numr = emalloc9p(sizeof(int)*mp->slots);
+	for(count = 0; count < mp->slots; count++) {
+		mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
+		mp->numr[count] = 0;
+	}
 
 	mp->ref++;
 
@@ -232,12 +265,20 @@ fsopen(Req *r)
 	if((r->ifcall.mode&OMASK) ==  OWRITE)
 		mp->writers++;
 	
-	/* MAYBE: unclear how to assign readers to subgroups */
 	if((r->ifcall.mode&OMASK)==0) { /* READER */
+		int count;
+		int min = mp->numr[0];
+
 		mp->readers++;
+
+		aux->which = 0;
+		for(count=0; count<mp->slots; count++)
+			if(mp->numr[count] < min)
+				aux->which = count;
+
+		mp->numr[aux->which]++;
 		aux->chan = chancreate(sizeof(Req *), 0);
 	}
-
 	respond(r, nil);
 }
 
@@ -311,7 +352,7 @@ fsread(void *arg)
 		offset = (int) aux->r->aux;
 	 } else {
 		if(aux->other == nil) {
-			if(sendp(mp->rrchan, fid) != 1) {
+			if(sendp(mp->rrchan[aux->which], fid) != 1) {
 				respond(r, nil);
 				threadexits(nil);
 			}
@@ -326,13 +367,14 @@ fsread(void *arg)
 	raux = aux->other->aux;
 	count = fscopy(tr, r, offset);
 	raux->remain -= count;
-	if(raux->remain == 0)
+
 	mp->len -= count;
 	offset += count;
 
 	if(offset == tr->ifcall.count) {
 		if(raux->remain == 0) { /* done for this pkt */
 			raux->other = nil;
+			raux->which = 0;
 			aux->other = nil;
 		}
 		tr->aux = 0;
@@ -349,6 +391,8 @@ fsread(void *arg)
 	threadexits(nil);
 }
 
+#define MAXHDRARGS 2
+
 static void
 fswrite(void *arg)
 {
@@ -357,23 +401,34 @@ fswrite(void *arg)
 	Fidaux *raux, *aux = setfidaux(fid);
 	Mpipe *mp = setfidmp(fid);
 	ulong hdrtag = ~0;
-
+	
 	if(r->ifcall.offset == hdrtag) {
+		char *argv[MAXHDRARGS];
+		int n;
+
 		if(aux->remain) {
 			respond(r,Eremain);
 			goto out;
 		}
-		aux->remain = atoi(r->ifcall.data);
+
+		n = tokenize(r->ifcall.data, argv, 2); /* only looking for 2 now */
+
+		if(n>0)
+			aux->remain = atoi(argv[0]);
+		if(n>1)
+			aux->which = atoi(argv[1]) % mp->slots;
+
 		/* MAYBE: we don't pass this on do we? */
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
 		goto out;
 	} else {
+		aux->remain = r->ifcall.count;
 		mp->len += r->ifcall.count;
 	}
 
 	if(aux->other == nil) {
-		aux->other = recvp(mp->rrchan);
+		aux->other = recvp(mp->rrchan[aux->which]);
 		if(aux->other == nil) {
 			respond(r, Ehangup);
 			goto out;
@@ -421,6 +476,7 @@ static void
 fsclunk(Fid *fid)
 {
 	Mpipe *mp = setfidmp(fid);
+	int count;
 
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
@@ -431,18 +487,24 @@ fsclunk(Fid *fid)
 			free(mp->uid);
 			free(mp->gid);
 			if(mp->rrchan) {
-				chanclose(mp->rrchan);
-				chanfree(mp->rrchan);
+				for(count=0;count <  mp->slots; count++) {
+					if(mp->rrchan[count]) {
+						chanclose(mp->rrchan[count]);
+						chanfree(mp->rrchan[count]);
+					}
+				}
+				free(mp->rrchan);
 			}
 			free(mp);
 		}
 
 		if((fid->omode&OMASK) == OWRITE) {
 			/* MAYBE: mark outstanding requests crap */
-
 			mp->writers--;
 			if(mp->writers == 0) {
-				chanclose(mp->rrchan);
+				for(count=0;count <  mp->slots; count++)
+					if(mp->rrchan[count])
+						chanclose(mp->rrchan[count]);
 			}
 			free(aux);
 			fid->aux = nil;
@@ -452,6 +514,7 @@ fsclunk(Fid *fid)
 			mp->readers--;
 			chanclose(aux->chan);
 			chanfree(aux->chan);
+			mp->numr[aux->which]--;
 			aux->chan = nil;
 			if(aux->r) {/* crap! we still have data - return short write */
 				int offset = (int) aux->r->aux;
@@ -461,8 +524,11 @@ fsclunk(Fid *fid)
 			}
 			
 			if((mp->writers == 0)&&(mp->readers == 0)) {
-				chanfree(mp->rrchan);
-				mp->rrchan = chancreate(sizeof(Fid *), 0);
+				for(count=0;count <  mp->slots; count++) {
+					if(mp->rrchan[count])
+						chanfree(mp->rrchan[count]);
+					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
+				}
 			}
 		}
 	}
