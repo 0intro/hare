@@ -35,6 +35,9 @@
 enum
 {
 	STACK = 8192,
+	MSIZE = 8192,
+	MAXARGS = 8,
+	MAXHDRARGS = 4,
 };
 
 Channel *iochan;		/* dispatch channel */
@@ -48,7 +51,6 @@ char Eshort[] = "short write";
 char Ehangup[] = "pipe hang up";
 char Eremain[] = "new header when bytes still remaining";
 char Eother[] = "Problem with peer";
-
 
 typedef struct Mpipe Mpipe;
 struct Mpipe {
@@ -90,6 +92,13 @@ static struct
 	ulong	path;
 } pipealloc;
 
+typedef struct Splicearg Splicearg;
+struct Splicearg {
+	Mpipe *mp;
+	int which;
+	int fd;
+};
+
 static void
 usage(void)
 {
@@ -127,8 +136,28 @@ emalloc9pz(int sz, int zero)
 	return v;
 }
 
+static void
+myrespond(Req *r, char *err)
+{
+	if(r->aux)
+		sendp(r->aux, err);
+	else
+		respond(r, err);
+}
+
+static void
+myresponderror(Req *r)
+{
+	if(r->aux) {
+		char *err = emalloc9p(ERRMAX);
+		snprint(err, ERRMAX, "%r");
+		sendp(r->aux, err);
+	} else
+		responderror(r);
+}
+
 static Mpipe *
-setfidmp(Fid *fid) /* blech */
+setfidmp(Fid *fid)
 {
 	if(fid->qid.type&QTDIR)
 		return fid->aux;
@@ -151,10 +180,6 @@ setfidaux(Fid *fid) /* blech */
 		return fid->aux;
 }
 
-/* will probably grow with time */
-#define MAXARGS 8
-
-/* for fucks sake I'm lazy */
 static void
 parsespec(Mpipe *mp, int argc, char **argv)
 {
@@ -242,6 +267,23 @@ fsclone(Fid* fid, Fid* newfid)
 }
 
 static void
+addnewreader(Mpipe *mp, Fidaux *aux)
+{
+	int count;
+	int min = mp->numr[0];	
+
+	mp->readers++;
+
+	aux->which = 0;
+	for(count=0; count<mp->slots; count++)
+		if(mp->numr[count] < min)
+			aux->which = count;
+
+	mp->numr[aux->which]++;
+	aux->chan = chancreate(sizeof(Req *), 0);
+}
+
+static void
 fsopen(Req *r)
 {
 	Fid*	fid = r->fid;
@@ -265,20 +307,9 @@ fsopen(Req *r)
 	if((r->ifcall.mode&OMASK) ==  OWRITE)
 		mp->writers++;
 	
-	if((r->ifcall.mode&OMASK)==0) { /* READER */
-		int count;
-		int min = mp->numr[0];
+	if((r->ifcall.mode&OMASK)==0) /* READER */
+		addnewreader(mp, aux);
 
-		mp->readers++;
-
-		aux->which = 0;
-		for(count=0; count<mp->slots; count++)
-			if(mp->numr[count] < min)
-				aux->which = count;
-
-		mp->numr[aux->which]++;
-		aux->chan = chancreate(sizeof(Req *), 0);
-	}
 	respond(r, nil);
 }
 
@@ -322,6 +353,7 @@ fscopy(Req *tr, Req *r, int offset)
 			count = r->ifcall.count;	/* truncate */
 
 	memcpy(r->ofcall.data+offset, tr->ifcall.data, count);
+	
 	r->ofcall.count = count;
 	
 	return count;
@@ -349,18 +381,18 @@ fsread(void *arg)
 	/* If remainder, serve that first */
 	if(aux->r) {
 		tr = aux->r;
-		offset = (int) aux->r->aux;
+		offset = tr->ofcall.count;
 	 } else {
 		if(aux->other == nil) {
 			if(sendp(mp->rrchan[aux->which], fid) != 1) {
-				respond(r, nil);
+				myrespond(r, nil);
 				threadexits(nil);
 			}
 		}
 		tr = recvp(aux->chan);
 		offset = 0;
 		if(tr == nil) {
-			respond(r, nil);
+			myrespond(r, nil);
 			threadexits(nil);
 		}
 	}
@@ -377,21 +409,191 @@ fsread(void *arg)
 			raux->which = 0;
 			aux->other = nil;
 		}
-		tr->aux = 0;
 		aux->r = nil;
 		tr->ofcall.count = tr->ifcall.count;
-		respond(tr, nil);
-		respond(r, nil);
+		myrespond(tr, nil);
+		myrespond(r, nil);
 	} else {
-		tr->aux = (void *) offset;
+		tr->ofcall.count = offset;
 		aux->r = tr;
-		respond(r, nil);
+		myrespond(r, nil);
 	}
 
 	threadexits(nil);
 }
 
-#define MAXHDRARGS 2
+/* MAYBE: eliminate duplicate code with fsread */
+static void
+spliceto(void *arg) {
+	Splicearg *sa = arg;
+	Mpipe *mp = sa->mp;
+	Fid dummy;
+	Fidaux daux, *raux;
+	Req *tr;
+
+	/* setup a dummy reader */
+	memset(&dummy, 0, sizeof(Fid));
+	memset(&daux, 0, sizeof(Fidaux));
+
+	dummy.aux = &daux;
+	addnewreader(mp, &daux);
+
+	while(1) {
+		int offset;
+
+		/* put ourselves on rrchan */
+		if(daux.other == nil)
+			if(sendp(mp->rrchan[daux.which], &dummy) != 1) {
+				fprint(2, "spliceto: hungup rrchan\n");
+				goto exit;
+			}
+	
+		/* block on incoming */
+		tr = recvp(daux.chan);
+		if(tr == nil) {
+			fprint(2, "spliceto: hungup daux.chan\n");
+			goto exit;
+		}
+
+		raux = daux.other->aux;
+		offset = 0;
+
+		while(offset < tr->ifcall.count) {
+			int n;
+
+			n = write(sa->fd, tr->ifcall.data+offset, tr->ifcall.count-offset);
+			if(n < 0) {
+				tr->ofcall.count = offset;
+				myresponderror(tr);
+				goto exit;
+			} else {
+				offset += n;
+				raux->remain -= n;
+			}
+		}
+		
+		if(raux->remain == 0) {
+			raux->other = nil;
+			raux->which = 0;
+			daux.other = nil;
+		}
+
+		tr->ofcall.count = offset;
+		myrespond(tr, nil);
+	}
+	/* on error do the right thing */
+exit:
+	free(sa);
+	threadexits(nil);
+}
+
+/* MAYBE: eliminate duplicate code with fswrite */
+static void
+splicefrom(void *arg) {
+	Splicearg *sa = arg;
+	Mpipe *mp = sa->mp;
+	Fid dummy;
+	Fidaux daux, *raux;
+	Req tr;
+	char *err;
+	Channel *reterr;
+
+	/* setup a dummy reader */
+	memset(&dummy, 0, sizeof(Fid));
+	memset(&daux, 0, sizeof(Fidaux));
+	memset(&tr, 0, sizeof(Req));
+
+	dummy.aux = &daux;
+	tr.fid = &dummy;
+	tr.ifcall.data = emalloc9p(MSIZE);
+	reterr = chancreate(sizeof(char *), 0);
+	tr.aux = reterr;
+	
+	while(1) {
+		tr.ifcall.count = MSIZE;
+		daux.which = sa->which;
+		tr.ifcall.count = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
+		
+		/* acquire a reader */
+		daux.other = recvp(mp->rrchan[daux.which]);
+		if(daux.other == nil) {
+			fprint(2, "splicefrom: %s\n", Ehangup);
+			goto exit;
+		}
+		raux = daux.other->aux;
+		if(raux->other != nil) {
+			fprint(2, "splicefrom: %s\n", Eother);
+			goto exit;
+		}
+		raux->other = &dummy;
+		assert(raux->chan != 0);
+		if(sendp(raux->chan, &tr) != 1) {
+			fprint(2, "splicefrom: %s\n", Ehangup);
+			goto exit;
+		}
+		/* wait for completion? */
+		if(err = recvp(reterr)) {
+			fprint(2, "splicefrom: reterr %s\n", Ehangup);
+			goto exit;
+		}
+		if(err) {
+			fprint(2, "spliceform: error: %s\n", err);
+			goto exit;
+		}
+	}
+
+exit:
+	free(sa);
+	threadexits(nil);
+}
+
+static char *
+parseheader(Req *r, Mpipe *mp, Fidaux *aux)
+{
+	char *argv[MAXHDRARGS];
+	char type;
+	int n;
+	Splicearg *sa;
+
+	n = tokenize(r->ifcall.data, argv, MAXHDRARGS);
+	if(n==0)
+		return "problem parsing header";
+	type = argv[0][0];
+
+	switch(type) {
+	case 'p':	/* packet */
+		if(n<3)
+			return "problem parsing pkt header";
+		aux->remain = atoi(argv[1]);
+		aux->which = atoi(argv[2]) % mp->slots;
+		break;
+	case '>':	/* splice to */
+	case '<':	/* splice from */
+		if(n<4)
+			return "problem parsing spliceto header";
+		sa = emalloc9p(sizeof(Splicearg));
+		sa->mp = mp;
+		sa->which = atoi(argv[2]) % mp->slots;
+
+		if(type=='>')
+			sa->fd = open(argv[3], OWRITE);
+		else
+			sa->fd = open(argv[3], OREAD);
+
+		if(sa->fd < 0)
+			return "splice couldnt open target";
+
+		if(type=='>')
+			proccreate(spliceto, sa, STACK);
+		else
+			proccreate(splicefrom, sa, STACK);
+		break;
+	default:
+		return "unknown pkt header";
+	}
+
+	return nil;
+}
 
 static void
 fswrite(void *arg)
@@ -401,26 +603,19 @@ fswrite(void *arg)
 	Fidaux *raux, *aux = setfidaux(fid);
 	Mpipe *mp = setfidmp(fid);
 	ulong hdrtag = ~0;
+	char *err;
 	
 	if(r->ifcall.offset == hdrtag) {
-		char *argv[MAXHDRARGS];
-		int n;
-
 		if(aux->remain) {
 			respond(r,Eremain);
 			goto out;
 		}
-
-		n = tokenize(r->ifcall.data, argv, 2); /* only looking for 2 now */
-
-		if(n>0)
-			aux->remain = atoi(argv[0]);
-		if(n>1)
-			aux->which = atoi(argv[1]) % mp->slots;
-
-		/* MAYBE: we don't pass this on do we? */
-		r->ofcall.count = r->ifcall.count;
-		respond(r, nil);
+		if((err = parseheader(r, mp, aux)) == nil) {
+			r->ofcall.count = r->ifcall.count;
+			respond(r, nil);
+		} else {
+			respond(r, err);
+		}
 		goto out;
 	} else {
 		aux->remain = r->ifcall.count;
@@ -517,8 +712,6 @@ fsclunk(Fid *fid)
 			mp->numr[aux->which]--;
 			aux->chan = nil;
 			if(aux->r) {/* crap! we still have data - return short write */
-				int offset = (int) aux->r->aux;
-				aux->r->ofcall.count = aux->r->ifcall.count - offset;
 				respond(aux->r, "short write");
 				aux->r = nil;
 			}

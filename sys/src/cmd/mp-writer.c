@@ -24,16 +24,53 @@ prepdata(int size)
 	return buf;
 }
 
-/* TODO: eventually use plumb format headers */
+/* pkthdr format:
+	type: char {p, <, >}
+	size: data size {for payload}
+	which: which slot, 0 for don't care
+	path: for streaming
+*/
+	
 int
-pipewrite(int fd, char *data, int size, int count)
-{	
+streamout(int fd, ulong which, char *path)
+{
 	int n; 
-	char hdr[32];
+	char hdr[255];
 	ulong tag = ~0;
+	char pkttype='>';
 
 	/* header byte is at offset ~0 */
-	n = snprint(hdr, 31, "%lud\n%lud\n", size, count);
+	n = snprint(hdr, 31, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
+	n = pwrite(fd, hdr, n+1, tag);
+	
+	return n;
+}
+
+int
+streamin(int fd, ulong which, char *path)
+{
+	int n; 
+	char hdr[255];
+	ulong tag = ~0;
+	char pkttype='<';
+
+	/* header byte is at offset ~0 */
+	n = snprint(hdr, 31, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
+	n = pwrite(fd, hdr, n+1, tag);
+	
+	return n;
+}
+
+int
+pipewrite(int fd, char *data, ulong size, ulong which)
+{	
+	int n; 
+	char hdr[255];
+	ulong tag = ~0;
+	char pkttype='p';
+
+	/* header byte is at offset ~0 */
+	n = snprint(hdr, 31, "%c\n%lud\n%lud\n\n", pkttype, size, which);
 	n = pwrite(fd, hdr, n+1, tag);
 	if(n <= 0)
 		return n;
