@@ -24,11 +24,12 @@ main(int argc, char **argv)
 	print("%lld Hello World from Node %d of %d\n", nsec(),node, nproc);
 
 	sum[0] = node;
+
 	if (0 && node) 
 		rompidebug |= 4;
 	MPI_Reduce (sum, nsum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-	if (node) print("%lld Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", nsec(), node, x, y, z, ((nproc-1)*nproc)/2, nsum[0]);
+	print("%lld Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", nsec(), node, x, y, z, ((nproc-1)*nproc)/2, nsum[0]);
 	print("%lld %d: Finalize\n", nsec(), node);
 	MPI_Finalize();
 }
