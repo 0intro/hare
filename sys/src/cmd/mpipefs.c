@@ -21,10 +21,6 @@
 		to break everything right now.  Need to add
 		code to handle such situations in a reasonable
 		fashion.
-
-		splicefrom doesn't close down remote connection
-		properly such that reader never exits.  spliceto seems
-		to work okay though.
 */
 
 #include <u.h>
@@ -568,24 +564,30 @@ splicefrom(void *arg) {
 	memset(&tr, 0, sizeof(Req));
 	daux->mp = mp;
 	mp->ref++;
+	mp->writers++;
 	dummy->omode = OWRITE;
-
 	dummy->aux = daux;
+
 	tr.fid = dummy;
 	tr.ifcall.data = emalloc9pz(MSIZE, 1);
 	reterr = chancreate(sizeof(char *), 0);
 	tr.aux = reterr;
 	
 	while(1) {
+		int n;
+
 		tr.ifcall.count = MSIZE;
 		daux->which = sa->which;
-		tr.ifcall.count = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
-
-		if(tr.ifcall.count <= 0) {	/* EOF or Error */
+		n = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
+		if(n < 0) { /* Error */
+			fprint(2, "splicefrom: read retuned error: %r\n");
 			close(sa->fd);
 			fsclunk(dummy);
 			goto exit;
+		} else {
+			tr.ifcall.count = n;
 		}
+		daux->remain = n;
 
 		/* acquire a reader */
 		daux->other = recvp(mp->rrchan[daux->which]);
@@ -604,6 +606,7 @@ splicefrom(void *arg) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
 			goto exit;
 		}
+
 		/* wait for completion? */
 		if(err = recvp(reterr)) {
 			fprint(2, "splicefrom: reterr %s\n", Ehangup);
@@ -611,6 +614,12 @@ splicefrom(void *arg) {
 		}
 		if(err) {
 			fprint(2, "spliceform: error: %s\n", err);
+			goto exit;
+		}
+
+		if(tr.ifcall.count == 0) {	/* EOF  - so we are done */
+			close(sa->fd);
+			fsclunk(dummy);
 			goto exit;
 		}
 	}
