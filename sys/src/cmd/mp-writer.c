@@ -83,11 +83,13 @@ main(int argc, char *argv[])
 {
 	int times=5;
 	int size=1024;
-	int e=1;
+	int which=1;
 	int count;
-	char *d;
 	int n;
 	int fd;
+	char *d = nil;
+	char *sin = nil;
+	char *sout = nil;
 
 	ARGBEGIN{
 	case 'D':
@@ -97,10 +99,16 @@ main(int argc, char *argv[])
 		times = atoi(ARGF());
 		break;
 	case 'e':		/* add an enumerator to front of buffer */
-		e++;
+		which = atoi(ARGF());
 		break;
 	case 's':
 		size = atoi(ARGF());
+		break;
+	case 'i':
+		sin = ARGF();
+		break;
+	case 'o':
+		sout = ARGF();
 		break;
 	default:
 		usage();
@@ -121,6 +129,15 @@ main(int argc, char *argv[])
 		exits("open pipe");
 	}
 
+	if(sin) {
+		streamin(fd, which, sin);
+		goto out;
+	}
+	if(sout) {
+		streamout(fd, which, sout);
+		goto out;
+	}
+	
 	d = prepdata(size);
 
 	for(count = 0; count < times; count++) {
@@ -132,7 +149,7 @@ main(int argc, char *argv[])
 			exits("pipe failed");
 		}	
 	}
-
+out:
 	if(chatty)
 		fprint(2, "closing and exiting\n");
 

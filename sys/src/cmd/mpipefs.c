@@ -22,6 +22,9 @@
 		code to handle such situations in a reasonable
 		fashion.
 
+		splicefrom doesn't close down remote connection
+		properly such that reader never exits.  spliceto seems
+		to work okay though.
 */
 
 #include <u.h>
@@ -267,6 +270,68 @@ fsclone(Fid* fid, Fid* newfid)
 }
 
 static void
+fsclunk(Fid *fid)
+{
+	Mpipe *mp = setfidmp(fid);
+	int count;
+
+	if(fid->aux) {
+		Fidaux *aux = setfidaux(fid);	
+		mp->ref--;
+	
+		if(mp->ref == 0) { 
+			free(mp->name);
+			free(mp->uid);
+			free(mp->gid);
+			if(mp->rrchan) {
+				for(count=0;count <  mp->slots; count++) {
+					if(mp->rrchan[count]) {
+						chanclose(mp->rrchan[count]);
+						chanfree(mp->rrchan[count]);
+					}
+				}
+				free(mp->rrchan);
+			}
+			free(mp);
+		}
+
+		if((fid->omode&OMASK) == OWRITE) {
+			/* MAYBE: mark outstanding requests crap */
+			mp->writers--;
+			if(mp->writers == 0) {
+				for(count=0;count <  mp->slots; count++)
+					if(mp->rrchan[count])
+						chanclose(mp->rrchan[count]);
+			}
+			free(aux);
+			fid->aux = nil;
+		} 
+
+		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
+			mp->readers--;
+			chanclose(aux->chan);
+			chanfree(aux->chan);
+			mp->numr[aux->which]--;
+			aux->chan = nil;
+			if(aux->r) {/* crap! we still have data - return short write */
+				respond(aux->r, "short write");
+				aux->r = nil;
+			}
+			
+			if((mp->writers == 0)&&(mp->readers == 0)) {
+				for(count=0;count <  mp->slots; count++) {
+					if(mp->rrchan[count])
+						chanfree(mp->rrchan[count]);
+					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
+				}
+			}
+		}
+	}
+
+	fid->aux = nil;
+}
+
+static void
 addnewreader(Mpipe *mp, Fidaux *aux)
 {
 	int count;
@@ -427,35 +492,35 @@ static void
 spliceto(void *arg) {
 	Splicearg *sa = arg;
 	Mpipe *mp = sa->mp;
-	Fid dummy;
-	Fidaux daux, *raux;
+	Fid *dummy = emalloc9pz(sizeof(Fid), 1);
+	Fidaux *raux, *daux = emalloc9pz(sizeof(Fidaux), 1);
 	Req *tr;
 
 	/* setup a dummy reader */
-	memset(&dummy, 0, sizeof(Fid));
-	memset(&daux, 0, sizeof(Fidaux));
-
-	dummy.aux = &daux;
-	addnewreader(mp, &daux);
+	dummy->omode = OREAD;
+	dummy->aux = daux;
+	addnewreader(mp, daux);
+	daux->mp = mp;
+	mp->ref++;
 
 	while(1) {
 		int offset;
 
 		/* put ourselves on rrchan */
-		if(daux.other == nil)
-			if(sendp(mp->rrchan[daux.which], &dummy) != 1) {
+		if(daux->other == nil)
+			if(sendp(mp->rrchan[daux->which], dummy) != 1) {
 				fprint(2, "spliceto: hungup rrchan\n");
 				goto exit;
 			}
 	
 		/* block on incoming */
-		tr = recvp(daux.chan);
+		tr = recvp(daux->chan);
 		if(tr == nil) {
 			fprint(2, "spliceto: hungup daux.chan\n");
 			goto exit;
 		}
 
-		raux = daux.other->aux;
+		raux = daux->other->aux;
 		offset = 0;
 
 		while(offset < tr->ifcall.count) {
@@ -475,7 +540,7 @@ spliceto(void *arg) {
 		if(raux->remain == 0) {
 			raux->other = nil;
 			raux->which = 0;
-			daux.other = nil;
+			daux->other = nil;
 		}
 
 		tr->ofcall.count = offset;
@@ -483,6 +548,7 @@ spliceto(void *arg) {
 	}
 	/* on error do the right thing */
 exit:
+	fsclunk(dummy);	
 	free(sa);
 	threadexits(nil);
 }
@@ -492,40 +558,47 @@ static void
 splicefrom(void *arg) {
 	Splicearg *sa = arg;
 	Mpipe *mp = sa->mp;
-	Fid dummy;
-	Fidaux daux, *raux;
+	Fid *dummy = emalloc9pz(sizeof(Fid),1);
+	Fidaux *raux, *daux = emalloc9pz(sizeof(Fidaux), 1);
 	Req tr;
 	char *err;
 	Channel *reterr;
 
-	/* setup a dummy reader */
-	memset(&dummy, 0, sizeof(Fid));
-	memset(&daux, 0, sizeof(Fidaux));
+	/* setup a dummy writer */
 	memset(&tr, 0, sizeof(Req));
+	daux->mp = mp;
+	mp->ref++;
+	dummy->omode = OWRITE;
 
-	dummy.aux = &daux;
-	tr.fid = &dummy;
-	tr.ifcall.data = emalloc9p(MSIZE);
+	dummy->aux = daux;
+	tr.fid = dummy;
+	tr.ifcall.data = emalloc9pz(MSIZE, 1);
 	reterr = chancreate(sizeof(char *), 0);
 	tr.aux = reterr;
 	
 	while(1) {
 		tr.ifcall.count = MSIZE;
-		daux.which = sa->which;
+		daux->which = sa->which;
 		tr.ifcall.count = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
-		
+
+		if(tr.ifcall.count <= 0) {	/* EOF or Error */
+			close(sa->fd);
+			fsclunk(dummy);
+			goto exit;
+		}
+
 		/* acquire a reader */
-		daux.other = recvp(mp->rrchan[daux.which]);
-		if(daux.other == nil) {
+		daux->other = recvp(mp->rrchan[daux->which]);
+		if(daux->other == nil) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
 			goto exit;
 		}
-		raux = daux.other->aux;
+		raux = daux->other->aux;
 		if(raux->other != nil) {
 			fprint(2, "splicefrom: %s\n", Eother);
 			goto exit;
 		}
-		raux->other = &dummy;
+		raux->other = dummy;
 		assert(raux->chan != 0);
 		if(sendp(raux->chan, &tr) != 1) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
@@ -665,68 +738,6 @@ fsstat(Req* r)
 		getdirent(q.path, &r->d, mp);
 
 	respond(r, nil);
-}
-
-static void
-fsclunk(Fid *fid)
-{
-	Mpipe *mp = setfidmp(fid);
-	int count;
-
-	if(fid->aux) {
-		Fidaux *aux = setfidaux(fid);	
-		mp->ref--;
-	
-		if(mp->ref == 0) { 
-			free(mp->name);
-			free(mp->uid);
-			free(mp->gid);
-			if(mp->rrchan) {
-				for(count=0;count <  mp->slots; count++) {
-					if(mp->rrchan[count]) {
-						chanclose(mp->rrchan[count]);
-						chanfree(mp->rrchan[count]);
-					}
-				}
-				free(mp->rrchan);
-			}
-			free(mp);
-		}
-
-		if((fid->omode&OMASK) == OWRITE) {
-			/* MAYBE: mark outstanding requests crap */
-			mp->writers--;
-			if(mp->writers == 0) {
-				for(count=0;count <  mp->slots; count++)
-					if(mp->rrchan[count])
-						chanclose(mp->rrchan[count]);
-			}
-			free(aux);
-			fid->aux = nil;
-		} 
-
-		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
-			mp->readers--;
-			chanclose(aux->chan);
-			chanfree(aux->chan);
-			mp->numr[aux->which]--;
-			aux->chan = nil;
-			if(aux->r) {/* crap! we still have data - return short write */
-				respond(aux->r, "short write");
-				aux->r = nil;
-			}
-			
-			if((mp->writers == 0)&&(mp->readers == 0)) {
-				for(count=0;count <  mp->slots; count++) {
-					if(mp->rrchan[count])
-						chanfree(mp->rrchan[count]);
-					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
-				}
-			}
-		}
-	}
-
-	fid->aux = nil;
 }
 
 /* handle potentially blocking ops in their own proc */
