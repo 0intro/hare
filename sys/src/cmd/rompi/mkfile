@@ -13,6 +13,7 @@ DIRS=\
 OTHEROFILES=\
 	torus.$O\
 	rompi.$O\
+	support.$O\
 
 HFILES=mpi.h
 

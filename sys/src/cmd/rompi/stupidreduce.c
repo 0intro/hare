@@ -6,21 +6,14 @@
 
 /* tested may 17 2010 and works */
 extern int torusdebug;
+u64int	tbget(void);
+int node, nproc;
 
 void
-main(int argc, char **argv)
+stupidreduce(unsigned int *sum)
 {
-	int node, nproc;
-	unsigned int sum[1];
 	MPI_Status status;
 	int i;
-
-	MPI_Init(&argc,&argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &node);
-	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
-	
-	print("Hello World from Node %d of %d\n",node, nproc);
-
 	if (node) {
 		sum[0] = node;
 		MPI_Send(sum, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
@@ -36,7 +29,33 @@ main(int argc, char **argv)
 			MPI_Send(sum, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
 		}
 	}
+}
+
+void
+main(int argc, char **argv)
+{
+	unsigned int sum[1];
+	int i;
+	vlong startnsec, stopnsec;
+	int iter = 100;
+
+	MPI_Init(&argc,&argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &node);
+	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+	
+	print("Hello World from Node %d of %d\n",node, nproc);
+
+	for(i = 0; i < iter; i++){
+		if (i == 1)
+			startnsec = tbget();
+		sum[0] = node;
+		stupidreduce(sum);
+	}
+	stopnsec = tbget();
+		
 	print("%d: Finalize\n", node);
+	if (! node) 
+		print("%lld nsec for %d iterations\n", stopnsec-startnsec, iter-1);
 	MPI_Finalize();
 	print("Node %d computes sum as %d and MPI says sum is %d\n", node, ((nproc-1)*nproc)/2, sum[0]);
 }
