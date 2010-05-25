@@ -1,0 +1,102 @@
+.TH MINICIOD 1 
+.SH NAME
+miniciod \- BlueGene control and I/O daemon
+.SH SYNOPSIS
+.B miniciod
+[
+.B -I
+]
+.SH DESCRIPTION
+.PP
+.B miniciod
+is a daemon  intended to be run  from scripts in /rc/bin/service (see 
+.IR listen (8)
+).  It interacts with the BG/P service software and provides two basic
+services.  The first service it provides is a command and control channel
+between the service node and the I/O nodes.  The BG/P infrastructure
+expects to be able to contact all I/O nodes at a well defined TCP/IP
+port (7000) in order to provide this control interaction.
+.PP
+During initial boot handshakes, miniciod will take information such
+as enviornment variables, command to execute, arguments, etc. from
+the front-end infrastructure and provide it via environment variables
+in the
+.I #ec
+environment namespace.  Subsequent scripts and applications can
+query this interface for the appropriate variables.
+.PP
+In particular, we currently provide the following variables:
+.RS
+.TF
+.TP
+.B job_id
+provides the BG/P job id for the session
+.TP
+.B job_mode
+whether the job is running in smp, virtual node or dual mode
+.TP
+.B job_uid
+the UID of the user on the front-end node
+.TP
+.B job_gid
+the effective GID of the user on the front-end node
+.TP
+.B job_umask
+the user's umask on the front-end node
+.TP
+.B job_homedir
+the home dir of the user on the front-end node
+.TP
+.B job_strace
+a job trace flag
+.TP
+.B job_proc_count
+the number of processors request by the job
+.TP
+.B job_flags
+job flags set by the front-end infrastructure
+.TP
+.B job_rankmap
+the rankmap provided by the MPI infrastructure
+.TP
+.B job_argenv
+an array of environment variables provided by the front-end
+.TP
+.B job_args
+arguments provided for the application from the front-end infrastructure
+.TP
+.B HOME
+the user's HOME environment variable
+.TP
+.B BRASIL_ADDR
+user specified address for the inferno instance running on the front-end node
+.TP
+.B PLAN9_ROOT
+user specified path to the Plan 9 root file system on the front-end node
+.RE
+.PD
+.PP
+When run with the
+.B -I
+option miniciod provides an I/O channel to the service node and
+other front-end software.  This is useful to coallesce system console
+information for the purposes of catching errors in the applications
+or system software.  The BG/P infrastructure expects to be able to
+contact all I/O nodes at a well defined TCP/IP port (8000) in order
+to provide this I/O channel.
+.SH BUGS
+.PP
+While the interfaces and protocol handling for standard-input
+are implemented, it does not currently manifest itself on the
+Plan 9 side.
+.PP
+Only a small subset of the ciod commands are implemented.  In
+particular we don't currently handle shutdown and cleanup commands
+properly.
+.SH ACKNOWLEDGEMENT
+Our miniciod code was based on the miniciod code included with
+the ZeptoOS infrastructure for BG/P.
+.SH "SEE ALSO"
+.IR listen (8)
+.SH SOURCE
+.B /sys/src/9k/root/miniciod.c
