@@ -40,6 +40,7 @@ void torusinit(int *pmyproc, const int pnprocs);
 void ranktoxyz(int rank, int *x, int *y, int *z);
 int xyztorank(int x, int y, int z);
 extern int x, y, z, xsize, ysize, zsize;
+u64int	tbget(void);
 
 void
 buf_add(struct bufpacket *new)
@@ -282,7 +283,7 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 	torustag[TAGtag] = reducetag;
 	torustag[TAGsource] = myproc;
 
-	if(rompidebug&4) print("%lld reduce_end: %d(%d, %d, %d)\n", nsec(), myproc, x, y, z);
+	if(rompidebug&4) print("%lld reduce_end: %d(%d, %d, %d)\n", tbget(), myproc, x, y, z);
 	if (myproc) {
 		/* who we get it from depends on who we are. */
 		/* this shows some bad design. We compute x,y,z, turn it into rank, 
@@ -298,9 +299,9 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 		else if (x)
 			fromz = fromy = fromx = 0;
 		fromrank = xyztorank(fromx, fromy, fromz);
-	if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", nsec(), myproc, x, y, z, fromx, fromy, fromz);
+	if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", tbget(), myproc, x, y, z, fromx, fromy, fromz);
 		MPI_Recv(buf, 1, MPI_INT, fromrank, reducetag, MPI_COMM_WORLD, status);
-	if(rompidebug&4) print("%lld reduce_end: %d: Got from %d\n", nsec(), myproc, fromrank);
+	if(rompidebug&4) print("%lld reduce_end: %d: Got from %d\n", tbget(), myproc, fromrank);
 	}
 
 	/* OK, we got it, we just need to do one send to our "axis" (of evil?) */
@@ -311,24 +312,24 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 	 */
 	if (z) {
 	} else if (y) {
-	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, y, zsize-1);
 		torustag[TAGsource] = myproc;
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	}
 	else if (x) {
 		/* send down BOTH our y and z axis */
 		torustag[TAGsource] = myproc;
-	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, ysize-1, 0);
 		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
-	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, y, zsize-1);
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	} else {
 		/* send down x, y, z */
-	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, xsize-1, 0, 0);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, xsize-1, 0, 0);
 		torussend(buf, count, xsize-1, 0, 0, 1, torustag, sizeof(torustag));
-	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, ysize-1, 0);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, ysize-1, 0);
 		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
-	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", nsec(), myproc, x, y, z, x, y, zsize-1);
+	if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, y, zsize-1);
 		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
 	}
 
@@ -344,7 +345,7 @@ opsum(void *dst, void *src, int)
 	int *is = src;
 	int *id = dst;
 	int tmp = *is;
-	if (rompidebug & 4) print("%lld %d(%d,%d,%d): SUM %d+%d=%d\n", nsec(), myproc, x,y,z,*id, *is, *id+tmp);
+	if (rompidebug & 4) print("%lld %d(%d,%d,%d): SUM %d+%d=%d\n", tbget(), myproc, x,y,z,*id, *is, *id+tmp);
 	*id += tmp;
 	return *id;
 }
@@ -397,7 +398,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 	if (z) {
 		torank = xyztorank(x,y,0);
 		if (rompidebug&4)
-			print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), myproc, x, y, z, myproc, torank);
+			print("%lld %d:(%d,%d,%d) sends %d to %d\n", tbget(), myproc, x, y, z, myproc, torank);
 		MPI_Send(tmp, 1, datatype, torank, 1, comm);
 	} else {
 		/* gather up all our z >0 data */
@@ -407,14 +408,14 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 			op(tmp, recvbuf, count);
 		}
 		if (rompidebug&4)
-			print("%lld AFTER Z: %d(%d, %d, %d): %d\n", nsec(), myproc, x, y, z, sum[0]);
+			print("%lld AFTER Z: %d(%d, %d, %d): %d\n", tbget(), myproc, x, y, z, sum[0]);
 
 		/* y? y o y? */
 		if (y) {
 			torank = xyztorank(x,0,0);
 			/* send to our parent */
 			if (rompidebug&4)
-				print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), myproc, x, y, z, sum[0], torank);
+				print("%lld %d:(%d,%d,%d) sends %d to %d\n", tbget(), myproc, x, y, z, sum[0], torank);
 			MPI_Send(tmp, 1, datatype, torank, 1, comm);
 		} else {
 			/* This is the vector along the X axis. All myprocs, including (0,0,0), gather up along 
@@ -429,11 +430,11 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 				op(tmp, recvbuf, count);
 			}
 			if (rompidebug&4)
-				print("%lld %d:(%d,%d,%d) gets %d accum %d\n", nsec(), myproc, x, y, z, nsum[0], sum[0]);
+				print("%lld %d:(%d,%d,%d) gets %d accum %d\n", tbget(), myproc, x, y, z, nsum[0], sum[0]);
 			if (x) {
 				/* send to our parent */
 				if (rompidebug&4)
-					print("%lld %d:(%d,%d,%d) sends %d to %d\n", nsec(), myproc, x, y, z, sum[0], torank);
+					print("%lld %d:(%d,%d,%d) sends %d to %d\n", tbget(), myproc, x, y, z, sum[0], torank);
 				MPI_Send(tmp, 1, datatype, torank, 1, comm);
 			} else {
 					/* sum contains the sum from our y axis above */
@@ -441,7 +442,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 						MPI_Recv(recvbuf, 1, datatype, i, 1, comm, &status);
 						op(tmp, recvbuf, count);
 						if (rompidebug&4)
-							print("%lld %d:(%d,%d,%d) recv %d to %d\n", nsec(), myproc, x, y, z, sum[0], i);
+							print("%lld %d:(%d,%d,%d) recv %d to %d\n", tbget(), myproc, x, y, z, sum[0], i);
 				}
 			}
 		}
@@ -450,7 +451,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 	if (! myproc){
 		memmove(recvbuf, tmp, nbytes);
 		if (rompidebug&4)
-			print("%lld reduce: %d(%d,%d,%d): gather done, send SUM %d\n", nsec(), myproc, x, y, z, sum[0]);
+			print("%lld reduce: %d(%d,%d,%d): gather done, send SUM %d\n", tbget(), myproc, x, y, z, sum[0]);
 	}
 
 	return reduce_end (recvbuf, count, datatype, root, comm, &status);
