@@ -14,7 +14,7 @@ mpipefs, mp-writer \- one-way many to many communication
 .I mnt
 ]
 
-.B bind
+.B mount
 .I /srv/service
 .I dir
 [
@@ -30,9 +30,6 @@ spec = '[
 [
 .I -b
 ]'
-.nf
-.IB dir /name
-.fi
 
 .B mp-writer
 [
