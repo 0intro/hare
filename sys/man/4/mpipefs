@@ -215,4 +215,5 @@ not supported and probably should be.
 .IR taskfs (4)
 .SH SOURCE
 .B /sys/src/cmd/mpipefs.c
+.nf
 .B /sys/src/cmd/mp-writer.c
