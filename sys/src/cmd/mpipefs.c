@@ -1,5 +1,5 @@
 /*
-	pipefs - userspace multipipe implementation
+	mpipefs - userspace multipipe implementation
 
 	Copyright (C) 2010, IBM Corporation, 
  		Eric Van Hensbergen (bergevan@us.ibm.com)
@@ -191,6 +191,7 @@ setfidaux(Fid *fid) /* blech */
 		return fid->aux;
 }
 
+/* MAYBE: allow splice-to to specify which by setting aux->which */
 static void
 addnewreader(Mpipe *mp, Fidaux *aux)
 {
