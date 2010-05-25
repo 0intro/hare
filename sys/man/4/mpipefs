@@ -1,0 +1,175 @@
+.TH MPIPEFS 4 
+.SH NAME
+mpipefs \- one-way many to many communication
+.SH SYNOPSIS
+.B mpipefs
+[
+.B -D
+]
+[
+.B -s
+.I service
+]
+[
+.I mnt
+]
+
+.B bind
+.I /srv/service
+.I dir
+[
+.I spec
+]
+
+spec = '[
+.I name
+]
+[
+.I -e num-slots
+]
+[
+.I -b
+]'
+.nf
+
+.IB dir /name
+.fi
+.SH DESCRIPTION
+.PP
+An
+.IR attach (5)
+of this device allocates a new  I/O stream whose name
+can be specified as part of the 
+.I spec
+arguments.
+.PP
+For normal read and write operations, behavior is
+identical to the
+.IR pipe(3) , 
+except that the multipipes are unidirectional and only a single file is 
+provided per attach. Attempting to open the pipe
+.I ORDWR
+will fail, writers must open with
+.I OWRITE
+and readers must open with
+.I OREAD.
+Also, there isn't any implicit buffering in the mpipe, so writers
+will block until a reader becomes available and vice versa.
+Similar to 
+.IR pipe(3) ,
+when all writers of a pipe close, it is marked as hungup, and readers
+receive an EOF.  When all readers and writers close, the pipe is reset
+and may be re-used.  When the pipe is reset, any special flags (broadcasts,
+enumerations) will persist.
+.PP
+The name of the file being provided by the device can
+be specified as an attach parameter using the mount
+.I spec.
+If no name is given, it will default to 
+.I data.
+.PP
+The mpipe can also be created as a broadcast pipe, by providing
+the -b option as part of the 
+.I spec.
+When a broadcast pipe is used, all readers will receive a copy of what
+was written.  A failure on any reader will trigger the write to fail.  At the
+moment, a partial read is treated as a failure.  Also, while in broadcast
+most, a write with no readers will deposit data in the bit bucket.
+.SS Header Control Blocks
+.PP
+In additon to normal reads and writes, writers may inject header control
+blocks into the pipe which can either act as control messages or describe the
+data following the header.  Header control blocks are marked by being at offset
+.I (ulong)~0 
+and follow a similar convention to plumbing messages in that they use
+newline separated fields as arguments.  The fields, in order, are:
+.RS
+.TF ndata
+.TP
+.B type
+header type (single byte)
+.TP
+.B size
+size of message (in bytes)
+.TP
+.B which
+destination pipe enumeration (numeric)
+.TP
+.B path
+destination for splice command (full filesystem path)
+.RE 
+Not all fields are used by all header types.
+.PD
+.PP
+At the moment three types of header packets are supported:
+.RS
+.TF ndata
+.TP
+.B 'p'
+specifies a packet which can be used for long messages or enumerated pipes.
+.TP
+.B '>'
+specifies a splice-to control block
+.TP
+.B '<'
+specifies a splice-from control block
+.RE
+.PD
+.SS Long Messages
+.PP
+Long messages, those intended for a single reader but with a size
+greater than the atomic I/O capable from the pipe can be accomodated
+by using a header control block with the size field specifying the total size of
+the message.  The writer will be linked to a particular reader until that
+many bytes have been sent as data messages.
+.SS Enumerated Pipes
+.PP
+Enumerated pipes allow the writer to specify a designated reader for 
+any particular message (including long messages as mentioned above).
+The only effective way to use enumerated pipes is to specify the number
+of reader enumerations as part of the initial mount
+.I spec
+for the pipe, using the -e 
+.I spec
+argument.  This will create the specified number of slots for enumerations
+as part of the pipes.  New readers will be assigned round-robin to these slots
+as they open the pipe.  An attempt to backfill readers to underpopulated slots
+is made in order to balance the readers among the available slots and allow
+new readers to fill in gaps left by old readers.
+.PP
+If a reader for a particular enumeration is not yet available, the writer will 
+block.
+.SS Splicing
+.PP
+Splicing can be used to link mpipes together or to tether mpipes to normal pipes
+or even to normal files.  The 
+.B splice-to
+control block will start a thread which will act as a reader write anything it
+reads to to the target path specified in the header control block.
+The 
+.B splice-from
+control block will start a thread which will act as a writer, reading new
+data from the target path specified in the header control block.
+Either thread will exit on receiving EOF or an error from their target.
+Niether currently makes use of the 
+.I size
+or 
+.I which
+field in the header control block.
+ 
+.SH BUGS
+.PP
+The broadcast mode probably needs to be made more consistent
+with respect to the behavior of the other modes and be integreated
+with splicing.
+.PP
+Also, flushing outstanding requests against the mpipe is currently
+not supported and probably should be.
+
+.SH "SEE ALSO"
+.IR pipe (2)
+.IR push (1)
+.IR execfs (4)
+.IR taskfs (4)
+.SH SOURCE
+.B /sys/src/cmd/mpipefs.c
