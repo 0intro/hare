@@ -1,0 +1,48 @@
+.TH DEPLOYBRASIL 8
+.SH NAME
+deploybrasil.sh \- wrapper script to start Inferno front-end for BG/P
+.SH SYNOPSIS
+.B deployBrasil.sh
+[
+.B -p port
+]
+[
+.B -l path-to-hare-release
+]
+[
+.B -f
+]
+.SH DESCRIPTION
+This starts an Inferno instance which has been setup to provide file service access
+to the front-end node from BG/P.  It must be run and provided with a per-user unique
+port prior to dispatching any jobs to BG/P.
+.PP
+the
+.I -p
+argument specifies the user's unique port number.  The convention of using the user's
+uid on the front-end system systems to work and provide uniqueness.
+.PP
+The
+.I -I
+argument specifies the path to the rest of the HARE binary distribution.  If no alternative
+argument is given, the latest release stored in the argonne profiles directory is used.
+.PP
+The
+.I -f
+flag specifies starting inferno in the foreground instead of just running it as a daemon.
+.SH BUGS
+There is currently no automated cleanup of the Inferno processes on logout.  I'm in the habit
+of running killall5 instead of just logging out which cleans up any outstanding processes I'm
+running on the BG/P front-end node.
+.PP
+Its a good idea to restart Inferno between login sessions as a matter of housekeeping.
+Depending on the size of the run, lots of file descriptors and other bits can consumed and
+you start running into ulimits.  This should be something we can fix within Inferno (or
+the way we are using it), but this hasn't been a priority.
+.SH "SEE ALSO"
+.IR nompirun (8)
+.IR bgp-intro (8)
+.SH FILES
+.B /bgsys/argonne-utils/profiles/plan9/bin/deployBrasil.sh
+.SH SOURCE
+.B /usr/glenda/bin/bash/deploy/deployBrasil.sh

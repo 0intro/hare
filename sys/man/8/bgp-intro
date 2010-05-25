@@ -1,0 +1,53 @@
+.TH BGP-INTRO 8
+.SH NAME
+bgp-intro \- Plan 9 on BG/P introduction
+.SH SYNOPSIS
+.B "export BRASIL_PORT=`id -u`"
+.NF
+.B deployBrasil.sh
+.NF
+.B wrapnompirun
+.NF
+.SH DESCRIPTION
+The BG/P boot enviornment for Plan 9 at Argonne National
+Labs consists of a few different parts.  It requires a kernel profile
+which specifies (among other things) the kernel to boot on the
+nodes, a front-end file server to allow access to user files, the root
+file system, and application binaries, and a set of scripts which
+help configure the Plan 9 instance running on the BG/P for a user
+or application infrastructure.
+.PP
+The current convention is to keep binaries and scripts relating
+to the execution of BG/P in a release directory stored with the
+default Plan 9 kernel profile (/bgsys/argonne-utils/profiles/plan9).
+A user may use the latest version of the scripts by putting the
+profile's bin directory in their path.
+.PP
+In order to support private root file systems, each user is required
+to have their own file server port.  The current convention is to use
+the numeric user-id on the fornt-end node.  Once the port is
+assigned and an Inferno file server started on the front-end node,
+the user can request execution of Plan 9 jobs using the 
+.IR nompirun (8) 
+or wrapnompirun commands.
+.PP
+During boot, all nodes will execute a profile script from the user's
+home directory on surveyor ($HOME/lib/profile).  This profile script
+should contain default namespace setup for whatever enviornment
+the user (or the application) desires.  A good example can be found
+in the hare/usr/glenda/lib/profile script which attaches a caching
+layer for the root file system and mounts binaries and the user's
+home directory in standard locations.
+
+.SH "SEE ALSO"
+.IR nompirun (8)
+.IR deploybrasil (8)
+
+.SH FILES
+.B /bgsys/argonne-utils/profiles/plan9/bin
+.SH SOURCE
+.B hare/usr/glenda/bin/
+.NF
+.B hare/usr/glenda/lib/profile
+.NF
+.B hare/sys/src/cmd

@@ -1,0 +1,114 @@
+.TH NOMPIRUN 8
+.SH NAME
+nompirun \- wrapper script for running Plan 9 on BG/P
+.SH SYNOPSIS
+.B nompirun
+[
+.B -A cobalt_account
+]
+[
+.B -h brasil_host
+]
+[
+.B -h brasil_port
+]
+[
+.B -e key=value
+]...
+[
+.B -n num_nodes
+]
+[
+.B -t time
+]
+[
+.B -k kernel_profile
+]
+[
+.B -r root_path
+]
+.I cmd
+.I args...
+
+.B wrapnompirun
+[
+.B -A cobalt_account
+]
+[
+.B -h brasil_host
+]
+[
+.B -h brasil_port
+]
+[
+.B -e key=value
+]...
+[
+.B -n num_cpu_nodes
+]
+[
+.B -t time
+]
+[
+.B -k kernel_profile
+]
+[
+.B -r root_path
+]
+.I cmd
+.I args...
+
+.SH DESCRIPTION
+.PP
+.B nompirun
+and
+.B wrapnompirun
+are BASH wrapper scripts which can be run on the BG/P front-end nodes
+to request execution of a new Plan 9 job.  The current environment expects either
+an Inferno or Brasil instance to be serving a Plan 9 root file system from the front-end
+nodes.  See
+.IR deploybrasil (8)
+and
+.IR bgp-intro (8)
+for more information on configuring your BG/P environment.
+
+.PP
+.B wrapnompirun
+is a simple wrapper around
+.B nompirun
+which waits for execution of the job to begin and then relays
+stdout and stderr from job execution.  stdout is typically the
+output from the application while stderr is typically the output
+from the various system consoles.
+.PP
+Since these scripts only provide an interface to the underlying cobalt job submission
+system, there may be some delay prior to job execution depending on scheduling
+priorities and the number of jobs pending execution on the machine at any given
+time.
+.PP
+For more information on the BG/P infrastructure including the cobalt job
+scheduling system please see https://wiki.alcf.anl.gov/index.php/Using_the_ALCF_BG/P_System
+
+.SH EXAMPLES
+
+.RS
+.I "nompirun -n 64 -t 30 testprog"
+.RE
+would schedule testprog to run 64 compute nodes for 30 minutes.
+
+.RS
+.I "wrapnompirun -n 64 -t 30 testprog"
+.RE
+would run testprog on 64 compute nodes for 30 minutes and print stdout and
+stderr to the shell, blocking until the application gets scheduled.
+.SH "SEE ALSO"
+.IR deploybrasil (8)
+.IR bgp-intro (8)
+.NF
+https://wiki.alcf.anl.gov/index.php/Using_the_ALCF_BG/P_System
+.SH FILES
+.B $HOME/lib/profile
+.SH SOURCE
+.B /usr/glenda/bin/bash/nompirun
+.NF
+.B /usr/glenda/bin/bash/wrapnompirun
