@@ -21,10 +21,6 @@
 		to break everything right now.  Need to add
 		code to handle such situations in a reasonable
 		fashion.
-
-		splicefrom doesn't close down remote connection
-		properly such that reader never exits.  spliceto seems
-		to work okay though.
 */
 
 #include <u.h>
@@ -44,7 +40,7 @@ enum
 };
 
 Channel *iochan;		/* dispatch channel */
-
+typedef struct Fidaux Fidaux;
 char defaultsrvpath[] = "mpipe";
 
 char Enotdir[] = "walk in non-directory";
@@ -54,11 +50,20 @@ char Eshort[] = "short write";
 char Ehangup[] = "pipe hang up";
 char Eremain[] = "new header when bytes still remaining";
 char Eother[] = "Problem with peer";
+char Ebcastoverflow[] = "broadcast read underflow";
+char Ebcast[] = "broadcast failed (perhaps partially)";
+
+enum {
+	MPTnormal = 1,	/* strictly a normal pipe */
+	MPTbcast=2,		/* enumerated pipe */
+};
 
 typedef struct Mpipe Mpipe;
 struct Mpipe {
 	QLock l;
 	int ref;
+
+	int mode;		/* pipe type */
 
 	ulong path;
 	char *name;
@@ -72,9 +77,9 @@ struct Mpipe {
 	int slots;		/* number of enumerations */
 	Channel **rrchan;	/* ready to read */
 	int *numr;
+	Fidaux *bcastr;		/* broadcast readers */
 };
 
-typedef struct Fidaux Fidaux;
 struct Fidaux {
 	QLock l;
 	Mpipe *mp;
@@ -87,6 +92,9 @@ struct Fidaux {
 	/* only for reader */
 	Req *r;			/* for partial reads */
 	Channel *chan;
+
+	/* for bcast */
+	Fidaux *next;
 };
 
 static struct
@@ -184,6 +192,58 @@ setfidaux(Fid *fid) /* blech */
 }
 
 static void
+addnewreader(Mpipe *mp, Fidaux *aux)
+{
+	int count;
+	int min = mp->numr[0];
+
+	mp->readers++;
+
+	aux->which = 0;
+	for(count=0; count<mp->slots; count++)
+		if(mp->numr[count] < min)
+			aux->which = count;
+
+	mp->numr[aux->which]++;
+	aux->chan = chancreate(sizeof(Req *), 0);
+	
+	qlock(&mp->l);
+	if(mp->mode == MPTbcast) {
+		aux->next=mp->bcastr;
+		mp->bcastr=aux;
+	}
+	qunlock(&mp->l);
+}
+
+static void
+rmreader(Mpipe *mp, Fidaux *aux)
+{
+	Fidaux *c;
+	
+	qlock(&mp->l);
+	if(mp->bcastr == aux)
+		mp->bcastr = aux->next;
+	else {
+		for(c = mp->bcastr; c != nil; c=c->next) {
+			if(c->next = aux) {
+				c->next = aux->next;
+				break;
+			}
+		}
+	}
+	aux->next = nil;
+	qunlock(&mp->l);
+}
+
+static void
+closebcasts(Mpipe *mp)
+{
+	Fidaux *c;
+	for(c=mp->bcastr; c != nil; c=c->next)
+		chanclose(c->chan);
+}
+
+static void
 parsespec(Mpipe *mp, int argc, char **argv)
 {
 	if(argc >= 1) 
@@ -191,6 +251,9 @@ parsespec(Mpipe *mp, int argc, char **argv)
 	ARGBEGIN {
 	case 'e':
 		mp->slots = atoi(ARGF());
+		break;
+	case 'b':
+		mp->mode = MPTbcast;
 		break;
 	default:
 		print(" badflag('%c')", ARGC());
@@ -303,12 +366,17 @@ fsclunk(Fid *fid)
 					if(mp->rrchan[count])
 						chanclose(mp->rrchan[count]);
 			}
+			if(mp->mode == MPTbcast)
+				closebcasts(mp);
+
 			free(aux);
 			fid->aux = nil;
 		} 
 
 		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
 			mp->readers--;
+			if(mp->mode == MPTbcast)
+				rmreader(mp, aux);
 			chanclose(aux->chan);
 			chanfree(aux->chan);
 			mp->numr[aux->which]--;
@@ -329,23 +397,6 @@ fsclunk(Fid *fid)
 	}
 
 	fid->aux = nil;
-}
-
-static void
-addnewreader(Mpipe *mp, Fidaux *aux)
-{
-	int count;
-	int min = mp->numr[0];	
-
-	mp->readers++;
-
-	aux->which = 0;
-	for(count=0; count<mp->slots; count++)
-		if(mp->numr[count] < min)
-			aux->which = count;
-
-	mp->numr[aux->which]++;
-	aux->chan = chancreate(sizeof(Req *), 0);
 }
 
 static void
@@ -443,12 +494,11 @@ fsread(void *arg)
 		threadexits(nil);
 	}
 
-	/* If remainder, serve that first */
-	if(aux->r) {
+	if(aux->r) {	/* If remainder, serve that first */
 		tr = aux->r;
 		offset = tr->ofcall.count;
 	 } else {
-		if(aux->other == nil) {
+		if((mp->mode != MPTbcast) && (aux->other == nil)) {
 			if(sendp(mp->rrchan[aux->which], fid) != 1) {
 				myrespond(r, nil);
 				threadexits(nil);
@@ -461,29 +511,40 @@ fsread(void *arg)
 			threadexits(nil);
 		}
 	}
-	raux = aux->other->aux;
+	
 	count = fscopy(tr, r, offset);
-	raux->remain -= count;
 
-	mp->len -= count;
-	offset += count;
+	if(mp->mode != MPTbcast) {
+		raux = aux->other->aux;
+		raux->remain -= count;
 
-	if(offset == tr->ifcall.count) {
-		if(raux->remain == 0) { /* done for this pkt */
-			raux->other = nil;
-			raux->which = 0;
-			aux->other = nil;
+		mp->len -= count;
+		offset += count;
+
+		if(offset == tr->ifcall.count) {
+			if(raux->remain == 0) { /* done for this pkt */
+				raux->other = nil;
+				raux->which = 0;
+				aux->other = nil;
+			}
+			aux->r = nil;
+			tr->ofcall.count = tr->ifcall.count;
+			myrespond(tr, nil);
+			myrespond(r, nil);
+		} else {
+			tr->ofcall.count = offset;
+			aux->r = tr;
+			myrespond(r, nil);
 		}
-		aux->r = nil;
-		tr->ofcall.count = tr->ifcall.count;
-		myrespond(tr, nil);
-		myrespond(r, nil);
 	} else {
-		tr->ofcall.count = offset;
-		aux->r = tr;
+		if(count != tr->ifcall.count)
+			myrespond(tr, Ebcastoverflow);
+		else
+			myrespond(tr, nil);
+		
+		r->ofcall.count = count;
 		myrespond(r, nil);
 	}
-
 	threadexits(nil);
 }
 
@@ -568,24 +629,30 @@ splicefrom(void *arg) {
 	memset(&tr, 0, sizeof(Req));
 	daux->mp = mp;
 	mp->ref++;
+	mp->writers++;
 	dummy->omode = OWRITE;
-
 	dummy->aux = daux;
+
 	tr.fid = dummy;
 	tr.ifcall.data = emalloc9pz(MSIZE, 1);
 	reterr = chancreate(sizeof(char *), 0);
 	tr.aux = reterr;
 	
 	while(1) {
+		int n;
+
 		tr.ifcall.count = MSIZE;
 		daux->which = sa->which;
-		tr.ifcall.count = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
-
-		if(tr.ifcall.count <= 0) {	/* EOF or Error */
+		n = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
+		if(n < 0) { /* Error */
+			fprint(2, "splicefrom: read retuned error: %r\n");
 			close(sa->fd);
 			fsclunk(dummy);
 			goto exit;
+		} else {
+			tr.ifcall.count = n;
 		}
+		daux->remain = n;
 
 		/* acquire a reader */
 		daux->other = recvp(mp->rrchan[daux->which]);
@@ -604,6 +671,7 @@ splicefrom(void *arg) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
 			goto exit;
 		}
+
 		/* wait for completion? */
 		if(err = recvp(reterr)) {
 			fprint(2, "splicefrom: reterr %s\n", Ehangup);
@@ -611,6 +679,12 @@ splicefrom(void *arg) {
 		}
 		if(err) {
 			fprint(2, "spliceform: error: %s\n", err);
+			goto exit;
+		}
+
+		if(tr.ifcall.count == 0) {	/* EOF  - so we are done */
+			close(sa->fd);
+			fsclunk(dummy);
 			goto exit;
 		}
 	}
@@ -668,6 +742,61 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 	return nil;
 }
 
+typedef struct Bcastr Bcastr;
+struct Bcastr {
+	Channel *chan;
+	Req *r;
+};
+
+static void
+bcastsend(void *arg)
+{
+	Bcastr *br = arg;
+
+	if(sendp(br->chan, br->r) != 1)
+		sendp(br->r->aux, Ebcast);
+
+	free(br);
+}
+
+static void
+fsbcast(Req *r, Mpipe *mp)
+{
+	Fidaux *c;
+	Channel *reterr = chancreate(sizeof(char *), 0);
+	char *err = nil;
+
+	r->aux = reterr;
+
+	qlock(&mp->l);
+	for(c=mp->bcastr; c != nil; c=c->next) {
+		Bcastr *br = emalloc9p(sizeof(Bcastr));
+		br->chan = c->chan;
+		br->r = r;
+		threadcreate(bcastsend, br, STACK);
+	}
+	qunlock(&mp->l);
+
+	/* gather responses */
+	for(c=mp->bcastr; c != nil; c=c->next) {
+		char *e;
+		if(e = recvp(reterr)) {
+			err = e;
+			fprint(2, "fsbcast: %s\n", err);
+		}
+	}
+
+	if(err)
+		respond(r, err);
+	else {
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+	}
+	
+	chanclose(reterr);
+	chanfree(reterr);
+}
+
 static void
 fswrite(void *arg)
 {
@@ -693,6 +822,11 @@ fswrite(void *arg)
 	} else {
 		aux->remain = r->ifcall.count;
 		mp->len += r->ifcall.count;
+	}
+
+	if(mp->mode == MPTbcast) {
+		fsbcast(r, mp);
+		goto out;
 	}
 
 	if(aux->other == nil) {
