@@ -1,6 +1,6 @@
 .TH MPIPEFS 4 
 .SH NAME
-mpipefs \- one-way many to many communication
+mpipefs, mp-writer \- one-way many to many communication
 .SH SYNOPSIS
 .B mpipefs
 [
@@ -31,9 +31,35 @@ spec = '[
 .I -b
 ]'
 .nf
-
 .IB dir /name
 .fi
+
+.B mp-writer
+[
+.B -D
+]
+[
+.B -n
+.I num-times
+]
+[
+.B -s
+.I message-size
+]
+[
+.B -e
+.I num-enum-slots
+]
+[
+.B -i
+.I stream-from-path
+]
+[
+.B -o
+.I stream-to-path
+]
+.I pipe-path
+
 .SH DESCRIPTION
 .PP
 An
@@ -156,6 +182,25 @@ Niether currently makes use of the
 or 
 .I which
 field in the header control block.
+.SS mp-writer
+.PP
+.B mp-writer
+is a test application which can be used to test writing different types
+of control blocks to the pipe. Using the 
+.I -D
+flag will make things very chatty so you can see what's going on
+from a protocol perspective.  The
+.I -n
+flags will specify the total number of messages to send
+while the
+.I -s
+flag allows you to specify the size of messages (to test large packets).
+The
+.I -i
+and 
+.I -o
+let you specify splice-in and splice-out instructions.  They are
+mutually exclusive with the other options.
  
 .SH BUGS
 .PP
@@ -173,3 +218,4 @@ not supported and probably should be.
 .IR taskfs (4)
 .SH SOURCE
 .B /sys/src/cmd/mpipefs.c
+.B /sys/src/cmd/mp-writer.c
