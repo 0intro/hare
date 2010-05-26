@@ -1,8 +1,8 @@
 
 /* 
-8c list-res.c &&
-8l -o list-res list-res.8 &&
-cp list-res $home/bin/386 &&
+8c stop-res.c &&
+8l -o stop-res stop-res.8 &&
+cp stop-res $home/bin/386 &&
 8.out
 */
 #include <u.h>
@@ -55,13 +55,11 @@ main(int argc, char *argv[])
 	if ( session_id < 0) {
 		sysfatal ("getting invalid session id %d [%s]: %r", session_id, buf);
 	}
-
 	snprint (buf, sizeof(buf), "dir /home/ericvh" );
 	n = write (clonefd, buf, strlen(buf));
 	if (n < 0 ) {
 		sysfatal ("write failed : %r");
 	}
-
 	snprint (buf, sizeof(buf), "exec %s", CMD );
 	for (i = 1 ; i < argc ; ++i ) {
 		strcat (buf, " ");
@@ -71,6 +69,7 @@ main(int argc, char *argv[])
 	if (n < 0 ) {
 		sysfatal ("write failed : %r");
 	}
+
 	
 	/* read and display the content of stdio file */
 

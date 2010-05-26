@@ -1,4 +1,4 @@
 #!/bin/rc
-# This script connects to survaour gateway
+# This script connects to Surveyor gateway
 srv tcp!9.3.45.4!1127 anl-uplink
 mount /srv/anl-uplink /n/anl
