@@ -98,7 +98,7 @@ void	putsdr1(u32int);
 void	puttcr(u32int);
 void	puttsr(u32int);
 u32int	pvrget(void);
-void sendRAS(int, int, int, int, int, int);
+void 	sendRAS(int, int, int, int, int, int);
 void	spldone(void);
 Mreg	splhi(void);
 Mreg	spllo(void);
