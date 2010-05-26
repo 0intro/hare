@@ -32,8 +32,6 @@
 #include "bgcns.h"
 #include "io.h"
 
-
-
 #define ALIGNED(p, a)	(!(((uintptr)(p)) & ((a)-1)))
 
 #define TXBITUSE	0
@@ -673,7 +671,7 @@ treenetreset(void)
 	treechaninit(0, p2paddr, sys->ionode);
 	treechaninit(1, p2paddr, sys->ionode);
 
-	/* print("Tree: p2paddr %#8.8ux\n", p2paddr); */
+	DBG("Tree: p2paddr %#8.8ux\n", p2paddr);
 }
 
 

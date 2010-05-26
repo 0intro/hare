@@ -10,7 +10,6 @@
  * All rights reserved
  *
  */
-
 #include "u.h"
 #include "../port/lib.h"
 #include "mem.h"
@@ -38,8 +37,8 @@ static Dirtab archdir[Qmax] = {
 	".",		{ Qdir, 0, QTDIR },	0,	0555,
 };
 
-Lock archwlock;	/* the lock is only for changing archdir */
-int narchdir = Qbase;
+static Lock archwlock;		/* the lock is only for changing archdir */
+static int narchdir = Qbase;
 
 /*
  * Add a file to the #P listing.  Once added, you can't delete it.
@@ -48,7 +47,7 @@ int narchdir = Qbase;
  * like change the Qid version.  Changing the Qid path is disallowed.
  */
 Dirtab*
-addarchfile(char *name, int perm, Rdwrfn *rdfn, Rdwrfn *wrfn)
+addarchfile(char* name, int perm, Rdwrfn* rdfn, Rdwrfn* wrfn)
 {
 	int i;
 	Dirtab d;
@@ -86,8 +85,8 @@ archattach(char* spec)
 	return devattach('P', spec);
 }
 
-Walkqid*
-archwalk(Chan* c, Chan *nc, char** name, int nname)
+static Walkqid*
+archwalk(Chan* c, Chan* nc, char** name, int nname)
 {
 	return devwalk(c, nc, name, nname, archdir, narchdir, devgen);
 }
@@ -109,17 +108,12 @@ archclose(Chan*)
 {
 }
 
-enum
-{
-	Linelen= 31,
-};
-
 static long
-archread(Chan *c, void *a, long n, vlong offset)
+archread(Chan* c, void* a, long n, vlong offset)
 {
 	Rdwrfn *fn;
 
-	switch((ulong)c->qid.path){
+	switch((uint)c->qid.path){
 	case Qdir:
 		return devdirread(c, a, n, archdir, narchdir, devgen);
 
@@ -134,7 +128,7 @@ archread(Chan *c, void *a, long n, vlong offset)
 }
 
 static long
-archwrite(Chan *c, void *a, long n, vlong offset)
+archwrite(Chan* c, void* a, long n, vlong offset)
 {
 	Rdwrfn *fn;
 
@@ -145,31 +139,8 @@ archwrite(Chan *c, void *a, long n, vlong offset)
 	return 0;
 }
 
-void archinit(void);
-
-Dev archdevtab = {
-	'P',
-	"arch",
-
-	devreset,
-	archinit,
-	devshutdown,
-	archattach,
-	archwalk,
-	archstat,
-	archopen,
-	devcreate,
-	archclose,
-	archread,
-	devbread,
-	archwrite,
-	devbwrite,
-	devremove,
-	devwstat,
-};
-
 static long
-cputyperead(Chan*, void *a, long n, vlong offset)
+cputyperead(Chan*, void* a, long n, vlong offset)
 {
 	char str[32];
 
@@ -180,7 +151,7 @@ cputyperead(Chan*, void *a, long n, vlong offset)
 }
 
 static long
-blockidread(Chan*, void *a, long n, vlong offset)
+blockidread(Chan*, void* a, long n, vlong offset)
 {
 	char buf[32];
 
@@ -190,7 +161,7 @@ blockidread(Chan*, void *a, long n, vlong offset)
 }
 
 static long
-xyzipread(Chan*, void *a, long n, vlong offset)
+xyzipread(Chan*, void* a, long n, vlong offset)
 {
 	u8int z;
 	char buf[128];
@@ -237,6 +208,19 @@ ioipread(Chan*, void* a, long n, vlong offset)
 }
 
 static long
+personalityread(Chan*, void* a, long n, vlong offset)
+{
+	char *alloc;
+
+	alloc = malloc(2*READSTR);
+	archpersonalityfmt(alloc, alloc+2*READSTR);
+	n = readstr(offset, a, n, alloc);
+	free(alloc);
+
+	return n;
+}
+
+static long
 psetread(Chan*, void* a, long n, vlong offset)
 {
 	char buf[128];
@@ -250,19 +234,6 @@ psetread(Chan*, void* a, long n, vlong offset)
 }
 
 static long
-personalityread(Chan*, void *a, long n, vlong offset)
-{
-	char *alloc;
-
-	alloc = malloc(2*READSTR);
-	archpersonalityfmt(alloc, alloc+READSTR);
-	n = readstr(offset, a, n, alloc);
-	free(alloc);
-
-	return n;
-}
-
-static long
 cnkread(Chan*, void* a, long n, vlong offset)
 {
 	char str[32];
@@ -270,34 +241,6 @@ cnkread(Chan*, void* a, long n, vlong offset)
 	snprint(str, sizeof(str), "cnkexec %d cnk %d", up->cnkexec, up->cnk);
 
 	return readstr(offset, a, n, str);
-}
-
-static long
-raswrite(Chan*, void*v, long n, vlong)
-{
-	char *args = v;
-	int ret = n;
-	int a[6];
-	int count = 0;
-	
-	USED(ret);
-	USED(count);
-	
-	Cmdbuf *cb = parsecmd(args, n);
-	
-	if(cb->nf != 6) {
-		ret = -1;
-		goto free_and_ret;
-	}
-	
-	for(count = 0; count < cb->nf; count++) 
-		a[count] = atoi(cb->f[count]);
-		
-	sendRAS(a[0], a[1], a[2], a[3], a[4], a[5]);
-	
-free_and_ret:
-	free(cb);
-	return ret;
 }
 
 static long
@@ -325,6 +268,49 @@ cnkwrite(Chan*, void* a, long, vlong offset)
 	return 1;
 }
 
+extern void intrstats(char *buf, int size);
+
+static long
+bicread(Chan*, void* a, long n, vlong offset)
+{
+	char buf[1024];
+
+	intrstats(buf, 1024);
+	
+	return readstr(offset, a, n, buf);
+}
+
+static long
+raswrite(Chan*, void* v, long n, vlong)
+{
+	Cmdbuf *cb;
+	int a[6], count;
+
+	cb = parsecmd(v, n);
+	if(waserror()){
+		free(cb);
+		nexterror();
+	}
+	if(cb->nf != 6)
+		error(Ebadarg);
+
+	print("Hello Squidboy: %d\n", cb->nf);
+	for(count = 0; count < cb->nf; count++)
+		print("   %s\n", cb->f[count]);
+
+	for(count = 0; count < cb->nf; count++) 
+		a[count] = atoi(cb->f[count]);
+
+	print("%x %x %x %x %x %x\n", a[0], a[1], a[2], a[3], a[4], a[5]);
+
+	sendRAS(a[0], a[1], a[2], a[3], a[4], a[5]);
+
+	poperror();
+	free(cb);
+
+	return n;
+}
+
 /* Maybe eventually this moves to console? */
 
 static long
@@ -344,29 +330,38 @@ verread(Chan *, void *a, long n, vlong offset)
 	return readstr(offset, a, n, buf);
 }
 
-extern void intrstats(char *buf, int size);
-
-static long
-bicread(Chan *, void *a, long n, vlong offset)
-{
-	char buf[1024];
-
-	intrstats(buf, 1024);
-	
-	return readstr(offset, a, n, buf);
-}
-
-void
+static void
 archinit(void)
 {
 	addarchfile("cputype", 0444, cputyperead, nil);
 	addarchfile("block", 0444, blockidread, nil);
 	addarchfile("xyzip", 0444, xyzipread, nil);
-	addarchfile("pset", 0444, psetread, nil);
 	addarchfile("ioip", 0444, ioipread, nil);
 	addarchfile("personality", 0444, personalityread, nil);
+	addarchfile("pset", 0444, psetread, nil);
 	addarchfile("cnk", 0644, cnkread, cnkwrite);
 	addarchfile("version",0444, verread, nil);
 	addarchfile("bic", 0444, bicread, nil);
 	addarchfile("ras",0222, nil, raswrite);
 }
+
+Dev archdevtab = {
+	'P',
+	"arch",
+
+	devreset,
+	archinit,
+	devshutdown,
+	archattach,
+	archwalk,
+	archstat,
+	archopen,
+	devcreate,
+	archclose,
+	archread,
+	devbread,
+	archwrite,
+	devbwrite,
+	devremove,
+	devwstat,
+};

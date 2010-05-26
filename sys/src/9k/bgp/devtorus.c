@@ -389,9 +389,6 @@ struct Torus {
 	uint	rcvpackets;
 	uint	rcvtoss;
 	uint	rcvqfull;
-	uint	rcvqpass;
-	uint	rcvqbread;
-	uint	rcvqread;
 	uint	rcvpause;
 	uint	rcvresume;
 	uint	injintr;
@@ -744,6 +741,7 @@ torusfragsend(Block *b, void *arg)
 	poperror();
 	ilock(&t->txlock);
 	torusinject(t, tx, b);
+	tx->np++;
 	iunlock(&t->txlock);
 	qunlock(&tx->rl);
 }
@@ -844,7 +842,6 @@ torusbread(Chan* c, long n, vlong offset)
 		return devbread(c, n, offset);
 
 	case Qdata:
-		t->rcvqbread++;
 		return qbread(t->rcvq, n);
 	}
 }
@@ -893,9 +890,6 @@ torusread(Chan* c, void *a, long n, vlong off)
 		p = seprint(p, e, "inj: %d\n", t->injpackets);
 		p = seprint(p, e, "rcvtoss: %d\n", t->rcvtoss);
 		p = seprint(p, e, "rcvqfull: %d\n", t->rcvqfull);
-		p = seprint(p, e, "rcvqpass: %d\n", t->rcvqpass);
-		p = seprint(p, e, "rcvqbread: %d\n", t->rcvqbread);
-		p = seprint(p, e, "rcvqread: %d\n", t->rcvqread);
 		//p = seprint(p, e, "rcvpause: %d\n", t->rcvpause);
 		//p = seprint(p, e, "rcvresume: %d\n", t->rcvresume);
 
@@ -927,7 +921,6 @@ torusread(Chan* c, void *a, long n, vlong off)
 		return n;
 
 	case Qdata:
-		t->rcvqread++;
 		return qread(t->rcvq, a, n);
 
 	default:
@@ -1137,8 +1130,6 @@ torus_process_rx(Torus *t, int group)
 						print("torus overrun\n");
 						/* torusrcvpause();  EVH: this would be a very bad thing */
 						t->rcvqfull++;
-					} else {
-						t->rcvqpass++;
 					}
 				}
 				rx->head_idx = NEXT(rx->head_idx, Nrx);
@@ -1238,9 +1229,7 @@ torusinject(Torus *t, TxRing *tx, Block *b)
 	/* force certain header bits, at least for now */
 	memmove(desc->hdrs.src, t->addr, N);
 	desc->hdrs.sk = Sk;	/* was SKIP(4) on BG/L */
-	/* we only let them set Dp */
-	desc->hdrs.hint &= Dp;
-	desc->hdrs.hint |= PID0(KernelPid);
+	desc->hdrs.hint = PID0(KernelPid);
 	desc->hdrs.size = SIZE(7) | PID1(KernelPid)|Dy|Vcd0;
 	/* TO DO: SIZE(7) was SIZE(chunks-1) in BG/L */
 	/* can't change that until the handling of Rx fifo memory is sorted out */
@@ -1608,16 +1597,15 @@ init_tx_queue(Torus *t, int group, int index)
 	set_inj_counter_zero_interrupt(group, index, group);
 	tx->incr = &t->dma[group].inj.counter[index].increment;
 
-/*
-	print("torus: allocated tx queue %d:%d: %p (start=%#8.8ux, end=%#8.8ux)\n",
-	    group, index, tx->desc, tx->fifo->start, tx->fifo->end);
-*/
+	if(debug_torus & DbgSetup)
+		print("torus: allocated tx queue %d:%d: %p (start=%#8.8ux, end=%#8.8ux)\n",
+		    group, index, tx->desc, tx->fifo->start, tx->fifo->end);
 
 	tx->active++;
 }
 
 static void
-init_rx_queue(Torus *t, int group, int index, int)
+init_rx_queue(Torus *t, int group, int index, int region)
 {
 	RxRing *rx;
 
@@ -1632,10 +1620,9 @@ init_rx_queue(Torus *t, int group, int index, int)
 
 	/* EVH: This next comment was in the original file */
 	/* XXX: set dma region for rx fifo */
-/*
-	print("Torus: allocated rx queue %d:%d: %p (start=%#8.8ux, end=%#8.8ux) region %d\n",
-	     group, index, rx->desc, rx->fifo->start, rx->fifo->end, region);
-*/
+	if(debug_torus & DbgSetup)
+		print("Torus: allocated rx queue %d:%d: %p (start=%#8.8ux, end=%#8.8ux) region %d\n",
+		     group, index, rx->desc, rx->fifo->start, rx->fifo->end, region);
 
 	rx->active++;
 }
@@ -1679,7 +1666,7 @@ torusattach(char* spec)
 		nexterror();
 	}
 
-	if(t->rcvq == nil && (t->rcvq = qopen(16*1024*1024, Qmsg, nil, 0)) == nil)
+	if(t->rcvq == nil && (t->rcvq = qopen(1024*1024, Qmsg, nil, 0)) == nil)
 		error(Enomem);
 	qreopen(t->rcvq);
 
@@ -1752,7 +1739,8 @@ torusreset(void)
 	if(!(personality->Kernel_Config.NodeConfig & BGP_PERS_ENABLE_Torus))
 		return;
 
-	/* print("Torus initialization starting\n"); */
+	if(debug_torus & DbgSetup)
+		print("Torus initialization starting\n");
 
 	/*
 	 * Extract the configuration from the personality.
@@ -1901,8 +1889,8 @@ torusreset(void)
 	dcrput(Dbasectl, Rusedma|RL3burst|Rinjenable|Rrcvenable|Rimfuenable|Rrmfuenable);
 
 	imb();
-
-	/* print("Torus reset complete\n"); */
+	if(debug_torus & DbgSetup)
+		print("Torus reset complete\n");
 }
 
 Dev torusdevtab = {
