@@ -294,14 +294,8 @@ raswrite(Chan*, void* v, long n, vlong)
 	if(cb->nf != 6)
 		error(Ebadarg);
 
-	print("Hello Squidboy: %d\n", cb->nf);
-	for(count = 0; count < cb->nf; count++)
-		print("   %s\n", cb->f[count]);
-
 	for(count = 0; count < cb->nf; count++) 
 		a[count] = atoi(cb->f[count]);
-
-	print("%x %x %x %x %x %x\n", a[0], a[1], a[2], a[3], a[4], a[5]);
 
 	sendRAS(a[0], a[1], a[2], a[3], a[4], a[5]);
 

@@ -237,18 +237,18 @@ xyztop2p(u8int x, u8int y, u8int z)
 void
 archprint(void)
 {
-	print("\n\nBG/P Personality\n");
-	print("Clock: %udMHz\n", sys->mhz);
-	print("Memory Size: %udMB\n", sys->mb);
-	print("Block: %#8.8ux\n", sys->block);
-	print("Config: %#ux\n", sys->config);
+	DBG("\n\nBG/P Personality\n");
+	DBG("Clock: %udMHz\n", sys->mhz);
+	DBG("Memory Size: %udMB\n", sys->mb);
+	DBG("Block: %#8.8ux\n", sys->block);
+	DBG("Config: %#ux\n", sys->config);
 	if(!sys->ionode){
-		print("Compute Node Addr: x %d y %d z %d\n",
+		DBG("Compute Node Addr: x %d y %d z %d\n",
 			sys->x, sys->y, sys->z);
 	}
 	else{
-		print("I/O Node MAC Address: %E\n", sys->ea);
-		print("Assigned IP Address: %I\n", sys->ipaddr);
+		DBG("I/O Node MAC Address: %E\n", sys->ea);
+		DBG("Assigned IP Address: %I\n", sys->ipaddr);
 	}
 }
 

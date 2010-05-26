@@ -3,7 +3,7 @@
 #
 
 # try to keep this up to date to keep things straight
-/boot/echo Boot Script Version 0.7 05012010
+#/boot/echo Boot Script Version 0.7 05012010
 
 cputype=power
 objtype=$cputype
@@ -83,7 +83,7 @@ i=`{cat /net/ipifc/clone}
 echo bind tree /dev/vc1 > /net/ipifc/$i/ctl
 echo add 11.$treeip $xyzip(2) 11.$xyzip(3) > /net/ipifc/$i/ctl
 echo add 12.$treeip $xyzip(2) 12.$xyzip(3) > /net/ipifc/$i/ctl
-echo Tree: I am '1[12]'.$treeip^, pset I/O node 11.$xyzip(4)
+#echo Tree: I am '1[12]'.$treeip^, pset I/O node 11.$xyzip(4)
 
 i=`{cat /net/ipifc/clone}
 echo bind loopback /dev/null > /net/ipifc/$i/ctl
