@@ -79,7 +79,8 @@ is a simple wrapper around
 which waits for execution of the job to begin and then relays
 stdout and stderr from job execution.  stdout is typically the
 output from the application while stderr is typically the output
-from the various system consoles.
+from the various system consoles.  It doesn't do any special
+checking for job termination, so you'll have to ^C it when finished.
 .PP
 Since these scripts only provide an interface to the underlying cobalt job submission
 system, there may be some delay prior to job execution depending on scheduling

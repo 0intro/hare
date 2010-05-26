@@ -204,8 +204,10 @@ qmalloc(usize nbytes)
 	Header *p, *q;
 	uint nunits, n;
 
+	/* until we fix the swapper
 	if(nbytes == 0)
-		return nil;
+		return nil; 
+	*/
 
 	qstats[0]++;
 	nunits = NUNITS(nbytes);
