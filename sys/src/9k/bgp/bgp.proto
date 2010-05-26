@@ -51,7 +51,6 @@ rc d775 sys sys /tmp/empty
 			tcp564 775 sys sys ../root/tcp564
 			tcp23 775 sys sys ../root/tcp23			
 		service.bgp d775 sys sys /tmp/empty
-			tcp23 775 sys sys ../root/tcp23
 			tcp7000 775 sys sys ../root/tcp7000
 			tcp8000 775 sys sys ../root/tcp8000		
 		kill 775 sys sys
