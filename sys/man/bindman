@@ -1,0 +1,5 @@
+#!/bin/rc
+
+bind -a 1 /sys/man/1
+bind -a 4 /sys/man/4
+bind -a 8 /sys/man/8

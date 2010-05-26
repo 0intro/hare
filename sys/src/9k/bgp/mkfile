@@ -58,7 +58,7 @@ etherx.$O:	../port/error.h ../port/ethermii.h ../port/netif.h etherif.h io.h
 fpu.$O:		/$objtype/include/ureg.h
 frag.$O:	../port/error.h ../ip/ip.h frag.h
 main.$O:	/sys/include/pool.h /sys/include/tos.h init.h
-syscall.$O:	../port/error.h ../port/systab.h
+syscall.$O:	../port/error.h /sys/src/libc/9syscall/sys.h
 syscall.$O:	/sys/include/tos.h /$objtype/include/ureg.h
 toe.$O:		io.h
 trap.$O:	/sys/include/tos.h /$objtype/include/ureg.h io.h
