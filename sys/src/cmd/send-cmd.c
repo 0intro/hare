@@ -1,15 +1,15 @@
 
 /* 
-8c list-res.c &&
-8l -o list-res list-res.8 &&
-cp list-res $home/bin/386 &&
+8c send-cmd.c &&
+8l -o send-cmd send-cmd.8 &&
+cp send-cmd $home/bin/386 &&
 8.out
 */
 #include <u.h>
 #include <libc.h>
 
 char *MPOINT = "/n/anl/";
-char *CMD = "qstat";
+char *CMD = "rc";
 
 void
 cat(int f, char *s)
@@ -50,6 +50,7 @@ main(int argc, char *argv[])
 	if ( n <= 0) {
 		sysfatal ("can't read from clone file :%r");
 	}
+
 	buf[n] = 0;
 	session_id = atoi (buf);
 	if ( session_id < 0) {
@@ -58,11 +59,12 @@ main(int argc, char *argv[])
 
 	snprint (buf, sizeof(buf), "dir /home/ericvh" );
 	n = write (clonefd, buf, strlen(buf));
+
 	if (n < 0 ) {
 		sysfatal ("write failed : %r");
 	}
-
-	snprint (buf, sizeof(buf), "exec %s", CMD );
+	
+	snprint (buf, sizeof(buf), "exec" );
 	for (i = 1 ; i < argc ; ++i ) {
 		strcat (buf, " ");
 		strcat (buf, argv[i]);
@@ -71,7 +73,7 @@ main(int argc, char *argv[])
 	if (n < 0 ) {
 		sysfatal ("write failed : %r");
 	}
-	
+
 	/* read and display the content of stdio file */
 
 	snprint (path, sizeof(path), "%s/cmd/%d/data", MPOINT, session_id );

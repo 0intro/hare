@@ -1,15 +1,15 @@
 
 /* 
-8c list-res.c &&
-8l -o list-res list-res.8 &&
-cp list-res $home/bin/386 &&
+8c start-res.c &&
+8l -o start-res start-res.8 &&
+cp start-res $home/bin/386 &&
 8.out
 */
 #include <u.h>
 #include <libc.h>
 
 char *MPOINT = "/n/anl/";
-char *CMD = "qstat";
+char *CMD = "wrapnompirun";
 
 void
 cat(int f, char *s)
