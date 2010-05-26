@@ -3,11 +3,13 @@
 bgp-intro \- Plan 9 on BG/P introduction
 .SH SYNOPSIS
 .B "export BRASIL_PORT=`id -u`"
-.NF
+.nf
+.B "export PATH=$PATH:/bgsys/argonne-utils/profiles/plan9/bin
+.nf
 .B deployBrasil.sh
-.NF
+.nf
 .B wrapnompirun
-.NF
+.nf
 .SH DESCRIPTION
 The BG/P boot enviornment for Plan 9 at Argonne National
 Labs consists of a few different parts.  It requires a kernel profile
@@ -25,7 +27,7 @@ profile's bin directory in their path.
 .PP
 In order to support private root file systems, each user is required
 to have their own file server port.  The current convention is to use
-the numeric user-id on the fornt-end node.  Once the port is
+the numeric user-id on the front-end node.  Once the port is
 assigned and an Inferno file server started on the front-end node,
 the user can request execution of Plan 9 jobs using the 
 .IR nompirun (8) 
@@ -47,7 +49,7 @@ home directory in standard locations.
 .B /bgsys/argonne-utils/profiles/plan9/bin
 .SH SOURCE
 .B hare/usr/glenda/bin/
-.NF
+.nf
 .B hare/usr/glenda/lib/profile
-.NF
+.nf
 .B hare/sys/src/cmd
