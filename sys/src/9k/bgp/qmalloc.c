@@ -204,8 +204,10 @@ qmalloc(usize nbytes)
 	Header *p, *q;
 	uint nunits, n;
 
+/* FIXME: (ignore for now)
 	if(nbytes == 0)
 		return nil;
+*/
 
 	qstats[0]++;
 	nunits = NUNITS(nbytes);
