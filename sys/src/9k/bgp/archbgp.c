@@ -77,7 +77,6 @@ archreset(void)
 
 	sys->mhz = personality->Kernel_Config.FreqMHz;
 	sys->mb = personality->DDR_Config.DDRSizeMB;
-	sys->mb = 1024;
 	sys->block = personality->Network_Config.BlockID;
 	sys->config = personality->Kernel_Config.NodeConfig;
 
@@ -253,10 +252,9 @@ archprint(void)
 }
 
 /*
-	handshake is 0x01, 0x1e, 0x0, 0,0,0
-	node exit is 0x01, 0x1e, 0x15, 0,0,0
-*/
-
+ * handshake is 0x01, 0x1e, 0x00, 0,0,0
+ * node exit is 0x01, 0x1e, 0x15, 0,0,0
+ */
 void
 sendRAS(int a1, int a2, int a3, int x1, int x2, int x3)
 {
@@ -274,9 +272,10 @@ meminit(unsigned cnsbase)
 {
 	unsigned n;
 
+#define TMFM	(64)					/* Too Many F'ing MiB */
 	/*
 	 * BG/P has 2 or 4 GiB. Low-level boot only sets up a
-	 * single 48MiB of TLB entries, let's stick with that for now.
+	 * single TMFM*MiB of TLB entries, let's stick with that for now.
 	 * For each GiB of memory, it takes almost 16MiB to allocate
 	 * the Page structures. There must be a better way.
 	 *
@@ -291,11 +290,11 @@ meminit(unsigned cnsbase)
 
 	sys->tom = n/MiB;
 
-	/* was 48, try 48 */
+	/* was 48, try 64 */
 	conf.mem[0].base = PGROUND(PADDR(sys->memstart));
-	conf.mem[0].npage = (48*MiB - conf.mem[0].base)/BY2PG;
-	conf.mem[1].base = 48*MiB;
-	conf.mem[1].npage = (n - 48*MiB)/BY2PG;
+	conf.mem[0].npage = (TMFM*MiB - conf.mem[0].base)/BY2PG;
+	conf.mem[1].base = TMFM*MiB;
+	conf.mem[1].npage = (n - TMFM*MiB)/BY2PG;
 }
 
 int

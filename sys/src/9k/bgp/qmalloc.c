@@ -204,10 +204,8 @@ qmalloc(usize nbytes)
 	Header *p, *q;
 	uint nunits, n;
 
-	/* until we fix the swapper
 	if(nbytes == 0)
-		return nil; 
-	*/
+		return nil;
 
 	qstats[0]++;
 	nunits = NUNITS(nbytes);
@@ -533,15 +531,27 @@ realloc(void* ap, ulong size)
 	 * Slightly harder:
 	 * if this allocation abuts the tail, try to just
 	 * adjust the tailptr.
+	 */
 	MLOCK;
 	if(tailptr != nil && p+ounits == tailptr){
+		if(ounits > nunits){
+			p->s.size = nunits;
+			tailsize += ounits-nunits;
+			MUNLOCK;
+			return ap;
+		}
+		if(tailsize >= nunits-ounits){
+			p->s.size = nunits;
+			tailsize -= nunits-ounits;
+			MUNLOCK;
+			return ap;
+		}
 	}
 	MUNLOCK;
-	 */
-	USED(nunits);
 
 	/*
 	 * Worth doing if it's a small reduction?
+	 * Do it anyway if <= NQUICK?
 	if((ounits-nunits) < 2)
 		return ap;
 	 */
