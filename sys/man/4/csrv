@@ -1,0 +1,67 @@
+.TH CSRV 4 
+.SH NAME
+csrv \- central services file system
+.SH SYNOPSIS
+.B csrv
+[
+.B -D
+]
+[
+.I mnt
+]
+
+.SH DESCRIPTION
+.PP
+This sets up the per-node mount hierarchy for aggregated
+distributed services.  Since name space operations are 
+performed in the context of the root namespace they
+are reflected in all subsequent mounts and exports.  The 
+.I -D
+option makes the file service chatty.
+.PP
+The csrv file system runs as a management layer over a
+conventional
+.IR mntgen (4) file system.  Commands send to csrv's
+.I ctl
+file will execute in the root namespace of the application
+(which can then be exported to other nodes forming
+the hierarchy).
+.PP
+The ctl file accepts the following commands:
+.RS
+.TF
+.TP
+.B "mount $addr $name"
+which will mount a namespace from $addr to /csrv/$name
+.TP
+.B "bind $path $name"
+which will bind a namespace already mounted at $path to /csrv/$name
+.TP
+.B "unmount $name"
+which will unmount a previously bound namespace
+.TP
+.B "exit"
+will attempt to cleanup and shutdown csrv
+.RE
+.PD
+
+.SH BUGS
+.PP
+Control operations are currently single threaded and tend to hang on errors.
+Mount is particularly brittle in this regard.  Cleanup usually misses cleaning up
+the underlying
+.IR mntgen (4)
+.PP
+As underlying services go away (due to failure or other reasons), their
+mounts stay in /csrv and will block up subsequent requests.  It would be better
+if names disappeared from /csrv when the service went away.
+.PP
+Potentially this should all just be done with Local plumbing.
+
+.SH "SEE ALSO"
+.IR mntgen (4)
+.IR push (1)
+.IR execfs (4)
+.IR taskfs (4)
+.SH SOURCE
+.B /sys/src/cmd/csrv.c
