@@ -1,0 +1,56 @@
+.TH MPIPEFS 4 
+.SH NAME
+execfs \- execution initiation mechanism for proc 
+.SH SYNOPSIS
+.B execfs
+[
+.B -D
+]
+[
+.I mnt
+]
+
+.B execcmd
+[
+.I srv-ctl
+]
+
+.SH DESCRIPTION
+.PP
+execfs provides a clone file for the node's proc file system to
+enable you to start applications via the file system namespace
+(and therefor from remote nodes).
+.PP
+Every time the
+.I clone
+file is opened a new process is started and pipes for stdin, stdout and
+stderr are bound into its
+.IR proc (3)
+entry.
+It will snoop control messages sent to the open clone file descriptor
+for commands it recognizes and pass others on to the ctl file of 
+the placeholder process in 
+.IR proc (3).
+
+There is currently only a single command supported by 
+.I execfs:
+.RS
+.TP
+.B "exec $cmd $args"
+will execute $cmd with $args as its arguments.
+.RE
+In the future additional commands may be added.
+.PP
+.I execcmd
+is the proxy command initially run when the user opens clone.
+It is passed a path to a pipe which has been posted in
+.IR srv (3),
+which is used to control commands form the initially opened
+clone file.  It is not intended to be used in a stand-alone fashion.
+.SH "SEE ALSO"
+.IR proc (3)
+.IR srv (3)
+.SH SOURCE
+.B /sys/src/cmd/execfs.c
+.nf
+.B /sys/src/cmd/execcmd.c
