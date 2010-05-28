@@ -25,6 +25,7 @@
 #	BRASIL_PORT - port running brasil daemon (should be unique)
 #	PLAN9_ROOT - local path to Plan 9 root file system
 #	COBALT_ACCOUNT - cobalt account
+#	HARE_RELEASE - path to HARE release files
 #
 # TODO:
 #	- Add namespace control files
@@ -37,11 +38,12 @@
 
 # ENVIRONMENTAL DEFAULTS
 
-kflag=$USER
+kflag=plan9
 pflag=$BRASIL_PORT
 rflag=$PLAN9_ROOT
 hflag=$BRASIL_HOST
 aflag=$COBALT_ACCOUNT
+release=$HARE_RELEASE
 Dflag=
 oflag=
 
@@ -110,8 +112,12 @@ then
 fi
 if [ -z $pflag ]
 then
-	printf "\nWARNING: using default port (5670)\nPlease set using BRASIL_PORT environment variable or -p command line argument\n\n"
+	#printf "\nWARNING: using default port (5670)\nPlease set using BRASIL_PORT environment variable or -p command line argument\n\n"
 	pflag=5670
+fi
+if [ -z $release ]
+then
+	release=/bgsys/argonne-utils/profiles/plan9/release/LATEST
 fi
 
 eflag+=":HOME=$HOME:BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag"
@@ -144,30 +150,14 @@ do
 	esac
 done
 
+#
+# Check for lib profile
+#
+if [ ! -e $HOME/lib/profile ]
+then
+	mkdir -p $HOME/lib
+	cp $release/lib/profile  $HOME/lib/profile
+fi
+
 JOBID=`qsub -A $aflag -t $tflag -n $nflag --kernel $kflag --env $eflag $COMMAND`
 echo $JOBID
-
-#
-#echo     Waiting for job start....
-#BLOCK_ID=None
-#while [ $BLOCK_ID = "None" ];
-#do
-#	sleep 5
-#	BLOCK_ID=`qstat --header Location $JOBID | tail -n 1`
-#done
-#echo Block ID: $BLOCK_ID
-#
-##read_io_log &
-#
-## FIFO output aggregation hack
-#mkfifo /tmp/$JOBID.stdout-pipe
-##mkfifo /tmp/$JOBID.log-pipe
-#cat /tmp/$JOBID.stdout-pipe | tee -a $JOBID.output
-##tail -f /tmp/$JOBID.log-pipe >> $JOBID.log
-## Use the one below for lots of debug on stdout
-##cat /tmp/$JOBID.log-pipe | tee -a $JOBID.log
-## this version doesn't cleanup to elimnate possible race conditions
-#rm /tmp/$JOBID.stdout-pipe
-##rm /tmp/$JOBID.log-pipe
-#
-##TODO: a better job of cleanup!
