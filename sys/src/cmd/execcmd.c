@@ -10,9 +10,7 @@
 		clone semantics.
 
 	TODO:
-		* open our own ctl file so we can pass through commands
-			until we get going.
-		* man page
+		* fork namespace after mounting mpipes
 		* support for ns configuration prior to exec
 
 */
@@ -40,12 +38,17 @@ Cmdtab ctltab[]={
 void
 main(int argc, char **argv)
 {
-	int stdinfd, stdoutfd, stderrfd, ctlfd;
+	int stdinfd = -1;
+	int stdoutfd = -1;
+	int stderrfd = -1;
+	int ctlfd;
 	int ret;
 	char ctlbuf[255];
 	Cmdbuf *cb;
 	Cmdtab *cmd;
 	char *srvctl;
+	char fname[255];
+	int pid = getpid();
 
 	assert(argc == 2);
 	srvctl = argv[1];
@@ -55,9 +58,25 @@ main(int argc, char **argv)
 	assert(ctlfd>= 0);
 	remove(srvctl);
 
-	stdinfd = open("/n/stdin/data1", OREAD);
-	stdoutfd = open("/n/stdout/data", OWRITE);
-	stderrfd = open("/n/stderr/data", OWRITE);
+	ret = read(ctlfd, ctlbuf, 255);
+	if(ret <= 0) {
+		goto error;
+	}
+
+	/* need to open our bit */
+	snprint(fname, 255, "/proc/%d/stdin", pid);
+	fprint(2, "just a test you see - [%s]\n", fname);
+	stdinfd = open(fname, OREAD);
+	if(stdinfd < 0)
+		fprint(2, "opening stdin failed: %r\n");
+	snprint(fname, 255, "/proc/%d/stdout", pid);
+	stdoutfd = open(fname, OWRITE);
+	if(stdoutfd < 0)
+		fprint(2, "opening stdout failed: %r\n");
+	snprint(fname, 255, "/proc/%d/stderr", pid);
+	stderrfd = open(fname, OWRITE);
+	if(stderrfd < 0)
+		fprint(2, "opening stderr failed: %r\n");
 
 	if((stdinfd < 0)||(stdoutfd < 0)||(stderrfd < 0)) {
 		write(ctlfd, Estdios, strlen(Estdios));
