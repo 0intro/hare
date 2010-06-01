@@ -13,7 +13,6 @@ static void	pagepte(int, Page**);
 static void	pager(void*);
 
 	Image 	swapimage;
-static 	int	swopen;
 static	Page	**iolist;
 static	int	ioptr;
 
@@ -408,10 +407,4 @@ setswapchan(Chan *c)
 	}
 
 	swapimage.c = c;
-}
-
-int
-swapfull(void)
-{
-	return swapalloc.free < conf.nswap/10;
 }

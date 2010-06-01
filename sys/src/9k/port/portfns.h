@@ -308,7 +308,6 @@ void		sleep(Rendez*, int (*)(void*), void*);
 void*		smalloc(ulong);
 char*		srvname(Chan*);
 int		swapcount(ulong);
-int		swapfull(void);
 void		swapinit(void);
 void		syscallfmt(int, va_list list);
 void		sysretfmt(int, va_list, Ar0*, uvlong, uvlong);

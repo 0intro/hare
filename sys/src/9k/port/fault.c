@@ -136,12 +136,6 @@ fixfault(Segment *s, uintptr addr, int read, int dommuput)
 		if(ref > 1) {
 			unlock(lkp);
 
-			if(swapfull()){
-				qunlock(&s->lk);
-				pprint("swap space full\n");
-				faulterror(Enoswap, nil, 1);
-			}
-
 			new = newpage(0, &s, addr);
 			if(s == 0)
 				return -1;
@@ -151,7 +145,7 @@ fixfault(Segment *s, uintptr addr, int read, int dommuput)
 		}
 		else {
 			/* save a copy of the original for the image cache */
-			if(lkp->image && !swapfull())
+			if(lkp->image != nil)
 				duppage(lkp);
 
 			unlock(lkp);
