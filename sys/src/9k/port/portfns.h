@@ -336,7 +336,6 @@ void		uartrecv(Uart*, char);
 int		uartstageoutput(Uart*);
 void		unbreak(Proc*);
 void		uncachepage(Page*);
-long		unionread(Chan*, void*, long);
 void		unlock(Lock*);
 void		userinit(void);
 uintptr		userpc(Ureg*);
