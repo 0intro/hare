@@ -39,7 +39,6 @@ char Empipe[] = "problems with mpipe";
 
 char 	defaultpath[] =	"/proc";
 char *procpath;
-char basetmp[] ="/tmp/execfs";
 char *srvctl;
 Channel *iochan;
 
@@ -293,18 +292,8 @@ fsclunk(Fid *f)
 }
 
 static void
-cleantmp(void *)
-{
-	threadsetname("cleantmp");
-
-	procexecl(0, "/bin/rm", "/bin/rm", "-rf", basetmp, nil);
-}
-
-static void
 cleanup(Srv *)
 {
-	proccreate(cleantmp, 0, STACK);
-	sleep(10);
 	threadexitsall("done");
 }
 
@@ -372,8 +361,6 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	srvctl = smprint("/srv/execfs-%d", getpid());
-
-	close(create(basetmp, OREAD, DMDIR|0777));	/* create base tmp */
 
 	fs.tree = alloctree("execfs", "execfs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "execfs", 0666, (void *)Xclone));
