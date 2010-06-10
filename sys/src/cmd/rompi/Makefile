@@ -1,12 +1,38 @@
-CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
-all: mympihello
+#
+#		programs
+#
+TARG=\
+	rompihello\
+	ring \
+	stupidreduce \
+	reduce \
 
-mympihello: mympihello.o mympilib.a
-	$(CC) -I . -o mympihello mympihello.o mympilib.a
-	cp mympihello ~/emu
+DIRS=\
 
-mympilib.a: torus.o mympi.o
-	ar r mympilib.a torus.o mympi.o
+OTHEROFILES=\
+	torus.$O\
+	rompi.$O\
+	support.$O\
 
-clean: 
-	rm *.a *.o 
+HFILES=mpi.h
+
+LIB=lib.$O.a
+BIN=.
+CLIB=rompi.c torus.c
+
+UPDATE=\
+	mkfile\
+	$HFILES\
+	${OTHEROFILES:%.$O=%.c}\
+	${TARG:%=%.c}\
+
+clean:V:
+	rm -f *.[$OS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG
+
+nuke:V:
+	rm -f *.[$OS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG *.acid
+
+$O.%: lib.$O.a
+
+${LIB}: ${OTHEROFILES}
+	ar r $LIB $OTHEROFILES
