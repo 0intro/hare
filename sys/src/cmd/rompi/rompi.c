@@ -1,10 +1,4 @@
-/*#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-*/
-#include <u.h>
-#include <libc.h>
-#include "mpi.h"
+#include "rompi.h"
 
 enum {
 	TAGcomm = 0,

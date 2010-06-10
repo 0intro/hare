@@ -1,8 +1,5 @@
 /*The Parallel Hello World Program*/
-/*#include <stdio.h>*/
-#include <u.h>
-#include <libc.h>
-#include "mpi.h"
+#include "rompi.h"
 
 extern int torusdebug;
 

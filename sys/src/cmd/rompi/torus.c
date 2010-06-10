@@ -1,10 +1,5 @@
-/*#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-*/
-#include <u.h>
-#include <libc.h>
-#include "mpi.h"
+#include "rompi.h"
+
 #define F(v, o, w)	(((v) & ((1<<(w))-1))<<(o))
 typedef unsigned char u8int;
 typedef unsigned long long u64int;
