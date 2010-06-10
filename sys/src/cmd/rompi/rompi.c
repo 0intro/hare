@@ -213,7 +213,7 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 	/* Well, first, let's see if it's here somewhere. */
 	for(b = buffered.next; b != &buffered; b = b->next) {
 		if (rompidebug &2) print("Check %p tag %ld source %ld\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
-		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag) && (b->tag[TAGsource] == source)){
+		if ((b->tag[TAGcomm] == comm) && (b->tag[TAGtag] == tag  || tag == MPI_ANY_TAG) && (b->tag[TAGsource] == source || source == MPI_ANY_SOURCE)){
 			buf_del(b);
 			goto got;
 			}
@@ -298,7 +298,7 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/,
 			fromz = fromy = 0;
 		else if (x)
 			fromz = fromy = fromx = 0;
-		fromrank = xyztorank(fromx, fromy, fromz);
+			fromrank = MPI_ANY_SOURCE; //xyztorank(x, y, fromz);
 	if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", tbget(), myproc, x, y, z, fromx, fromy, fromz);
 		MPI_Recv(buf, 1, MPI_INT, fromrank, reducetag, MPI_COMM_WORLD, status);
 	if(rompidebug&4) print("%lld reduce_end: %d: Got from %d\n", tbget(), myproc, fromrank);
@@ -403,8 +403,8 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 	} else {
 		/* gather up all our z >0 data */
 		for(fromz = 1; fromz < zsize; fromz++){
-			fromrank = xyztorank(x, y, fromz);
-			MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
+			fromrank = MPI_ANY_SOURCE; //xyztorank(x, y, fromz);
+			MPI_Recv(recvbuf, 1, datatype, MPI_ANY_SOURCE, 1, comm, &status);
 			op(tmp, recvbuf, count);
 		}
 		if (rompidebug&4)
@@ -425,7 +425,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 			int fromy;
 			torank = 0;
 			for(fromy = 1; fromy < ysize; fromy++){
-				fromrank = xyztorank(x, fromy, 0);
+				fromrank = MPI_ANY_SOURCE; //xyztorank(x, y, fromz);
 				MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
 				op(tmp, recvbuf, count);
 			}
