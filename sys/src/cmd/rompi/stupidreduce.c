@@ -10,7 +10,7 @@ u64int	tbget(void);
 int node, nproc;
 
 void
-stupidreduce(unsigned int *sum)
+reallystupidreduce(unsigned int *sum)
 {
 	MPI_Status status;
 	int i;
@@ -23,6 +23,28 @@ stupidreduce(unsigned int *sum)
 		sum[0] = 0;
 		for(i = 1; i < nproc; i++) {
 			MPI_Recv(nodeval, 1, MPI_INT, i, 1, MPI_COMM_WORLD, &status);
+			sum[0] += nodeval[0];
+		}
+		for(i = 1; i < nproc; i++) {
+			MPI_Send(sum, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+		}
+	}
+}
+
+void
+stupidreduce(unsigned int *sum)
+{
+	MPI_Status status;
+	int i;
+	if (node) {
+		sum[0] = node;
+		MPI_Send(sum, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+		MPI_Recv(sum, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+	} else {
+		int nodeval[1];
+		sum[0] = 0;
+		for(i = 1; i < nproc; i++) {
+			MPI_Recv(nodeval, 1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
 			sum[0] += nodeval[0];
 		}
 		for(i = 1; i < nproc; i++) {
