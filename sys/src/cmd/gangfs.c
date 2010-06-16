@@ -29,8 +29,7 @@ char 	defaultpath[] =	"/proc";
 char *procpath;
 char *srvctl;
 Channel *iochan;
-int numsess = 1;
-int numsubsess = 5;
+int numsubsess = 0;
 
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
@@ -50,6 +49,17 @@ enum
 #define CONV(x) 	 ((((ulong) (x)->path >> 16)&0xffff) -1)
 #define CONVQIDP(c, y) (((c+1) << 16)|(y))
 
+typedef struct Gang Gang;
+struct Gang
+{
+	int id;			/* gang id */
+	int numsub;		/* number of subsessions */
+};
+
+Gang *gang;
+int numgangs = 0;
+int maxgangs = 16;
+
 typedef struct Dirtab Dirtab;
 struct Dirtab
 {
@@ -58,7 +68,6 @@ struct Dirtab
 	long perm;
 };
 
-/* TODO: review and see what we need and what we don't */
 enum
 {
 	Qroot = 0,
@@ -162,7 +171,7 @@ dirgen(int n, Dir *d, void *aux)
 		dt = rootdir;
 		ne = Qrootend-1;
 		s = n-ne;
-		if((s >= 0) && (s < numsess)) {
+		if((s >= 0) && (s < numgangs)) {
 			d->qid.path=CONVQIDP(s, Qconv);
 			d->qid.type=QTDIR;
 			d->mode = 0555|DMDIR;
@@ -244,7 +253,7 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 			}
 		if( (name[0] == 'g') && (isanumber(name+1))) { /* session directory */
 			int s = atoi(name+1);
-			if(s < numsess) {
+			if(s < numgangs) {
 				qid->path = CONVQIDP(s, Qconv);
 				qid->vers = 0;
 				qid->type = QTDIR;
@@ -392,6 +401,12 @@ threadmain(int argc, char **argv)
 		procpath = argv[0];
 	else
 		procpath = defaultpath;
+
+	/* setup accounting */
+	maxgangs = 16;
+	gang = calloc(maxgangs, sizeof(Gang));
+	if(gang == 0)
+		threadexits("out of memory");
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
