@@ -3,7 +3,7 @@
 
 extern int torusdebug;
 
-void
+int
 main(int argc, char **argv)
 {
 	int node, nproc;
@@ -30,4 +30,5 @@ main(int argc, char **argv)
 	}
 	print("%d: Finalize\n", node);
 	MPI_Finalize();
+	return 0;
 }

@@ -181,7 +181,7 @@ MPI_Send( void *buf, int num, MPI_Datatype datatype, int dest,
 	torustag[TAGtag] = tag;
 	torustag[TAGsource] = myproc;
 	ranktoxyz(dest, &x, &y, &z);
-	torussend(buf, count * nbytes, x, y, z, 0, torustag, sizeof(torustag));
+	torussend(buf, count, x, y, z, 0, torustag, sizeof(torustag));
 
 	return MPI_SUCCESS;
 }
@@ -256,7 +256,7 @@ datatype	data type of elements of send buffer (handle)
 op	reduce operation (handle) 
 root	rank of root process (integer) 
 comm	communicator (handle)  */
-int reduce_end ( void *buf, int num, MPI_Datatype datatype, int /*root*/, 
+int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
                MPI_Comm comm,  MPI_Status *status)
 {
 
@@ -334,7 +334,7 @@ typedef int (*mpi_op)(void *, void *, int);
 
 /* int sum -- length matters not */
 int
-opsum(void *dst, void *src, int)
+opsum(void *dst, void *src, int len)
 {
 	int *is = src;
 	int *id = dst;
