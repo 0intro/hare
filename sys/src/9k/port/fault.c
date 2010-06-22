@@ -136,12 +136,6 @@ fixfault(Segment *s, uintptr addr, int read, int dommuput)
 		if(ref > 1) {
 			unlock(lkp);
 
-			if(swapfull()){
-				qunlock(&s->lk);
-				pprint("swap space full\n");
-				faulterror(Enoswap, nil, 1);
-			}
-
 			new = newpage(0, &s, addr);
 			if(s == 0)
 				return -1;
@@ -151,7 +145,7 @@ fixfault(Segment *s, uintptr addr, int read, int dommuput)
 		}
 		else {
 			/* save a copy of the original for the image cache */
-			if(lkp->image && !swapfull())
+			if(lkp->image != nil)
 				duppage(lkp);
 
 			unlock(lkp);
@@ -199,13 +193,18 @@ pio(Segment *s, uintptr addr, ulong soff, Page **p)
 
 retry:
 	loadrec = *p;
-	if(loadrec == 0) {	/* from a text/data image */
+	if(loadrec == nil) {	/* from a text/data image */
 		daddr = s->fstart+soff;
 		new = lookpage(s->image, daddr);
 		if(new != nil) {
 			*p = new;
 			return;
 		}
+
+		c = s->image->c;
+		ask = s->flen-soff;
+		if(ask > BY2PG)
+			ask = BY2PG;
 	}
 	else {			/* from a swap image */
 		daddr = swapaddr(loadrec);
@@ -215,44 +214,40 @@ retry:
 			*p = new;
 			return;
 		}
+
+		c = swapimage.c;
+		ask = BY2PG;
 	}
-
-
 	qunlock(&s->lk);
 
 	new = newpage(0, 0, addr);
 	k = kmap(new);
 	kaddr = (char*)VA(k);
 
-	if(loadrec == 0) {			/* This is demand load */
-		c = s->image->c;
-		while(waserror()) {
-			if(strcmp(up->errstr, Eintr) == 0)
-				continue;
-			kunmap(k);
-			putpage(new);
-			faulterror("sys: demand load I/O error", c, 0);
-		}
-
-		ask = s->flen-soff;
-		if(ask > BY2PG)
-			ask = BY2PG;
-
-		n = c->dev->read(c, kaddr, ask, daddr);
-		if(n != ask)
-			faulterror(Eioload, c, 0);
-		if(ask < BY2PG)
-			memset(kaddr+ask, 0, BY2PG-ask);
-
-		poperror();
+	while(waserror()) {
+		if(strcmp(up->errstr, Eintr) == 0)
+			continue;
 		kunmap(k);
-		qlock(&s->lk);
+		putpage(new);
+		faulterror(Eioload, c, 0);
+	}
 
+	n = c->dev->read(c, kaddr, ask, daddr);
+	if(n != ask)
+		faulterror(Eioload, c, 0);
+	if(ask < BY2PG)
+		memset(kaddr+ask, 0, BY2PG-ask);
+
+	poperror();
+	kunmap(k);
+
+	qlock(&s->lk);
+	if(loadrec == nil) {	/* This is demand load */
 		/*
 		 *  race, another proc may have gotten here first while
 		 *  s->lk was unlocked
 		 */
-		if(*p == 0) {
+		if(*p == nil) {
 			new->daddr = daddr;
 			cachepage(new, s->image);
 			*p = new;
@@ -260,24 +255,7 @@ retry:
 		else
 			putpage(new);
 	}
-	else {				/* This is paged out */
-		c = swapimage.c;
-		if(waserror()) {
-			kunmap(k);
-			putpage(new);
-			qlock(&s->lk);
-			qunlock(&s->lk);
-			faulterror("sys: page in I/O error", c, 0);
-		}
-
-		n = c->dev->read(c, kaddr, BY2PG, daddr);
-		if(n != BY2PG)
-			faulterror(Eioload, c, 0);
-
-		poperror();
-		kunmap(k);
-		qlock(&s->lk);
-
+	else {			/* This is paged out */
 		/*
 		 *  race, another proc may have gotten here first
 		 *  (and the pager may have run on that page) while

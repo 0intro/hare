@@ -120,7 +120,7 @@ port
 	qlock
 	rebootcmd
 	segment
-	swap
+	noswap
 	sysauth
 	syscallfmt
 	sysfile
