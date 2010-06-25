@@ -1,13 +1,32 @@
 /*The Parallel Hello World Program*/
-/*#include <stdio.h>*/
-#include <u.h>
-#include <libc.h>
-#include "mpi.h"
+#include "rompi.h"
 
 /* tested may 17 2010 and works */
 extern int torusdebug;
 u64int	tbget(void);
 int node, nproc;
+
+void
+reallystupidreduce(unsigned int *sum)
+{
+	MPI_Status status;
+	int i;
+	if (node) {
+		sum[0] = node;
+		MPI_Send(sum, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+		MPI_Recv(sum, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+	} else {
+		int nodeval[1];
+		sum[0] = 0;
+		for(i = 1; i < nproc; i++) {
+			MPI_Recv(nodeval, 1, MPI_INT, i, 1, MPI_COMM_WORLD, &status);
+			sum[0] += nodeval[0];
+		}
+		for(i = 1; i < nproc; i++) {
+			MPI_Send(sum, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+		}
+	}
+}
 
 void
 stupidreduce(unsigned int *sum)
@@ -22,7 +41,7 @@ stupidreduce(unsigned int *sum)
 		int nodeval[1];
 		sum[0] = 0;
 		for(i = 1; i < nproc; i++) {
-			MPI_Recv(nodeval, 1, MPI_INT, i, 1, MPI_COMM_WORLD, &status);
+			MPI_Recv(nodeval, 1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
 			sum[0] += nodeval[0];
 		}
 		for(i = 1; i < nproc; i++) {

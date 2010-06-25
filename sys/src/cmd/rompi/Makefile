@@ -1,12 +1,56 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
-all: mympihello
+CLIB=rompi.c torus.c
+CFLAGS=-Dcnk
+all: rompihello
 
-mympihello: mympihello.o mympilib.a
-	$(CC) -I . -o mympihello mympihello.o mympilib.a
-	cp mympihello ~/emu
+rompihello: rompihello.o rompilib.a
+	$(CC) -I . -o rompihello rompihello.o rompilib.a
+	cp rompihello ~/emu
 
-mympilib.a: torus.o mympi.o
-	ar r mympilib.a torus.o mympi.o
+rompilib.a: rompi.o torus.o linux.o
+	ar r rompilib.a rompi.o torus.o linux.o
 
 clean: 
 	rm *.a *.o 
+#
+##
+##		programs
+##
+#all: ${TARG}
+#
+#TARG=\
+#	rompihello\
+#	ring \
+#	stupidreduce \
+#	reduce \
+#
+#DIRS=\
+#
+#OTHEROFILES=\
+#	torus.o\
+#	rompi.o\
+#	support.o\
+#
+#HFILES=mpi.h
+#
+#LIB=lib.a
+#BIN=.
+#
+##UPDATE=\
+##	mkfile\
+##	$HFILES\
+##	${OTHEROFILES}\
+##	${TARGc}\
+#
+#clean:
+#	rm -f *.[oS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG
+#
+#nuke:
+#	rm -f *.[oS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG *.acid
+#
+#o.o: lib.a
+#
+#${LIB}: ${OTHEROFILES}
+#	ar r $LIB oTHEROFILES
+#
+#

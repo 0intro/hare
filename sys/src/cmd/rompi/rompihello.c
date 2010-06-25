@@ -1,12 +1,9 @@
 /*The Parallel Hello World Program*/
-/*#include <stdio.h>*/
-#include <u.h>
-#include <libc.h>
-#include "mpi.h"
+#include "rompi.h"
 
 extern int torusdebug;
 
-void
+int
 main(int argc, char **argv)
 {
 	int node, nproc;
@@ -33,4 +30,5 @@ main(int argc, char **argv)
 	}
 	print("%d: Finalize\n", node);
 	MPI_Finalize();
+	return 0;
 }

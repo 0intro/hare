@@ -1,13 +1,6 @@
-/*#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-*/
-#include <u.h>
-#include <libc.h>
-#include "mpi.h"
+#include "rompi.h"
+
 #define F(v, o, w)	(((v) & ((1<<(w))-1))<<(o))
-typedef unsigned char u8int;
-typedef unsigned long long u64int;
 enum {
 	X		= 0,			/* dimension */
 	Y		= 1,
@@ -293,6 +286,7 @@ torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, in
 	/* OMG! We're gonna copy AGAIN. Mantra: right then fast. */
 	Tpkt *tpkt;
 	u8int *packet;
+	int want;
 
 	packet = mallocz(length + taglen + sizeof(*tpkt), 1);
 	tpkt = (Tpkt *)packet;
@@ -305,11 +299,15 @@ torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, in
 	if (deposit) 
 		tpkt->hint |= Dp;
 	
-	n = pwrite(torusfd, tpkt, length + taglen + sizeof(*tpkt), 0);
+	want = length + taglen + sizeof(*tpkt);
+	n = pwrite(torusfd, tpkt, want, 0);
 	if (torusdebug & 1)
 		dumptpkt(tpkt, 1, 1);
-	if(n !=  length + taglen + sizeof(*tpkt))
+	if(n !=  want) {
+		fprint(2, "Tried to write (%d+%d+%d) to torus, got %d\n", 
+			length, taglen, sizeof(*tpkt), n);
 		panic("write /dev/torus");
+	}
 	free(tpkt);
 }
 
