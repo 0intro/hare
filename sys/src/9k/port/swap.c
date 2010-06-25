@@ -5,6 +5,12 @@
 #include	"fns.h"
 #include	"../port/error.h"
 
+/*
+ * Note: object types and sizes used herein are not consistent
+ * with other parts of the system (e.g. the on-disc address is
+ * a ulong, which is passed as the vlong-typed offset argument
+ * to a device read/write function). Probably needs work.
+ */
 static int	canflush(Proc*, Segment*);
 static void	executeio(void);
 static int	needpages(void*);
@@ -13,7 +19,6 @@ static void	pagepte(int, Page**);
 static void	pager(void*);
 
 	Image 	swapimage;
-static 	int	swopen;
 static	Page	**iolist;
 static	int	ioptr;
 
@@ -32,7 +37,7 @@ swapinit(void)
 	swapimage.notext = 1;
 }
 
-ulong
+static ulong
 newswap(void)
 {
 	uchar *look;
@@ -408,10 +413,4 @@ setswapchan(Chan *c)
 	}
 
 	swapimage.c = c;
-}
-
-int
-swapfull(void)
-{
-	return swapalloc.free < conf.nswap/10;
 }

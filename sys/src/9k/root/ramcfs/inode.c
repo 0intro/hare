@@ -7,6 +7,8 @@
 #include "inode.h"
 #include "stats.h"
 
+extern int readonly;
+
 /*
  *  read the inode blocks and make sure they
  *  haven't been trashed.
@@ -190,9 +192,11 @@ iget(Icache *ic, Qid qid)
 	 */
 	for(m = ic->map, me = &ic->map[ic->nino]; m < me; m++)
 		if(m->inuse && m->qid.path==qid.path){
-			if(m->qid.vers != qid.vers){
+			if((m->qid.vers != qid.vers || qid.vers == 0)
+			    && !readonly){
 				/*
-				 *  our info is old, forget it
+				 *  our info is old or this is likely
+				 *  a synthetic file, so forget it
 				 */
 				DPRINT(2, "updating old file %llud.%lud\n",
 					qid.path, qid.vers);

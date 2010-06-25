@@ -289,7 +289,7 @@ extern register Proc*	up;			/* R29 */
 #define DBGFLG		(0)
 #endif /* _DBGC_ */
 
-#define DBG(...)	if(DBGFLG) dbgprint(__VA_ARGS__)
+#define DBG(...)	if(!DBGFLG){}else dbgprint(__VA_ARGS__)
 
 int vflag;
 extern char dbgflg[256];

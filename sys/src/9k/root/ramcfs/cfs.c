@@ -32,6 +32,7 @@ struct Mfile
 Mfile	mfile[Nfid];
 Icache	ic;
 int	debug, statson, noauth, openserver;
+int	readonly;	/* flag: tree being cached is expected to not change */
 
 struct P9fs
 {
@@ -121,8 +122,8 @@ char *mname[]={
 void
 usage(void)
 {
-	fprint(2, "usage:\t%s -s [-dknrS] [-f partition]\n", argv0);
-	fprint(2, "\t%s [-a netaddr | -F srv] [-dknrS] [-f partition] [mntpt]\n",
+	fprint(2, "usage:\t%s -s [-dnrS] [-m size]\n", argv0);
+	fprint(2, "\t%s [-a netaddr | -F srv] [-dnrS] [-m size] [mntpt]\n",
 		argv0);
 	exits("usage");
 }
@@ -156,6 +157,9 @@ main(int argc, char *argv[])
 		break;
 	case 'n':
 		noauth = 1;
+		break;
+	case 'r':
+		readonly = 1;
 		break;
 	case 'S':
 		statson = 1;

@@ -14,8 +14,6 @@ newseg(int type, uintptr base, usize size)
 	if(size > (SEGMAPSIZE*PTEPERTAB))
 		error(Enovmem);
 
-	if(swapfull())
-		error(Enoswap);
 	s = smalloc(sizeof(Segment));
 	s->ref = 1;
 	s->type = type;

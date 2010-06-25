@@ -93,11 +93,6 @@ ibrk(uintptr addr, int seg)
 		return newtop;
 	}
 
-	if(swapfull()){
-		qunlock(&s->lk);
-		error(Enoswap);
-	}
-
 	for(i = 0; i < NSEG; i++) {
 		ns = up->seg[i];
 		if(ns == 0 || ns == s)
