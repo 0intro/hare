@@ -10,12 +10,14 @@ def showUsage () :
 USAGE: runJob.py [-l hare_location] [-9 py9p_location]  
                 [-h brasil_host] [-p brasil_port] 
                 [-n numnodes] [-o os_type] [-a architecture_type]
+                [-D] [-t]
                 "cmd arg1 arg2 ..." </path/to/inputfile>
  
 ARGUMENTS:
     -l: hare_location default value ["/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"]
     -9: py9p_loation (specify only if py9p is installed separately)
     -D: debug mode
+    -t: Show time taken in each step (for performance evaluation)
     -h: host running brasil daemon (defaults to current host)
     -p: port running brasil daemon (default: 5670)
     -n: number of cpu nodes to provision (mandetory)
@@ -47,6 +49,7 @@ import readline
 import atexit
 import threading
 import thread
+import time
 
 # Find the location of py9p
 DEFAULTPY9P = "/bgsys/argonne-utils/profiles/plan9/LATEST/bin/"
@@ -100,7 +103,6 @@ baseURL = "/csrv/local/"
 #baseURL = "/local/"
 
 
-
 def catAsync (obj, *args):
     debug = False
     if debug : print "thread started"
@@ -121,11 +123,14 @@ class XCPU3Client:
     sessionID = None
     DEBUG = False
     bufsize = 512
+    RECORD_TIME = False
     
     def __init__(self, srv, port, authmode='none', user='', passwd=None, authsrv=None, chatty=0, key=None):
+        self.start_time = time.time()
         self.sessionID = None
         self.bufSize = 512
         self.DEBUG = False
+        self.RECORD_TIME = False
         
         self.extraLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.inputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
@@ -289,27 +294,55 @@ class XCPU3Client:
             
     def runJob (self, cmd, res = None, input = None ):
         self.dPrint ("Requesting reservation..")
+        st = time.time()
         self.requestReservation(res)
-#        print "experiment, remove it later... 2"
-
-        self.dPrint ( "getting output")
-        self.getOutputAsync()
+        et = time.time()
+        tt = et - st
+        if self.RECORD_TIME :
+            print "RES ", tt
+        
+#        self.dPrint ( "getting output")
+#        self.getOutputAsync()
 
 
         self.dPrint ( "Requesting execution..")
+        st = time.time()
         self.requestExecution(cmd)
+        et = time.time()
+        tt = et - st        
+        if self.RECORD_TIME :
+            print "EXEC ", tt
         if input is not None :
             self.dPrint ( "sending input")
+            st = time.time()
             self.sendInput (input)
+            et = time.time()
+            tt = et - st
+            if self.RECORD_TIME :
+                print "INPUT ", tt
 
 
+        self.dPrint ( "getting output")
+        st = time.time()
+        self.getOutput()
+        et = time.time()
+        tt = et - st
+        if self.RECORD_TIME :
+            print "OUTPUT ", tt
 
         
         if self.DEBUG:
             self.dPrint ( "checking session status")
             self.getSessionStatus ()
+            
         self.dPrint ( "Closing session")
+        st = time.time()
         self.endSession ()
+        et = time.time()
+        tt = et - st        
+        if self.RECORD_TIME :
+            print "END ", tt
+        
         self.dPrint ( "Done..")
     
     def myPipe (self, inputFile, outputFile) :
@@ -375,7 +408,7 @@ def main ():
     osType = None
     archType = None
     debug = False
-    
+    RECORD_TIME = False
     # Overriding the values from environment variables
     if 'BRASIL_HOST' in os.environ:
         brasilHost = os.environ['BRASIL_HOST']
@@ -384,7 +417,7 @@ def main ():
         brasilPort = int (os.environ['BRASIL_PORT'])
 
     try:
-        opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
+        opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:t")
         for o,a in opts:
             if o == "-h" :
                 brasilHost = a
@@ -396,6 +429,8 @@ def main ():
                 osType = a
             elif o == "-a" :
                 archType = a
+            elif o == "-t":
+                RECORD_TIME = True
             elif o  == "-D" :
                 debug = True
             elif ( o in ( "-9", "-l" ) ) :
@@ -453,13 +488,18 @@ def main ():
         print "Top statistics is"
         mycpu.topStat()
     
+    mycpu.RECORD_TIME = RECORD_TIME
     #mycpu.pipelineCmds ()
-    
+    st = time.time()
     mycpu.runJob (command, resReq, inFile)
-
+    et = time.time()
+    tt = et - st
+    if RECORD_TIME :
+        print "RUNJOB ", tt
+        
     if mycpu.DEBUG :
         mycpu.disableDebug()
     
 if __name__ == "__main__" :
     main ()
-        
+    
