@@ -27,7 +27,6 @@ Syscall cnkcga;
 Syscall getrusage;
 
 extern Syscall sys_write;
-extern Syscall syspwrite;
 extern Syscall sys_read;
 extern Syscall sysopen;
 extern Syscall syspread;
@@ -230,8 +229,8 @@ struct syscall cnksystab[] = {
 	[176]	{"STUBrt_sigtimedwait", returnok, 1, {.i = 0}},
 	[177]	{"STUBrt_sigqueueinfo", returnok, 1, {.i = 0}},
 	[178]	{"STUBrt_sigsuspend", returnok, 1, {.i = 0}},
-	[179]	{"pread64", syspread, 5, {.i = -1}},
-	[180]	{"pwrite64", syspwrite, 5, {.i = -1}},
+	[179]	{"pread64", syspread, 5, {.i = 0}},
+	[180]	{"STUBpwrite64", returnok, 1, {.i = 0}},
 	[181]	{"STUBchown", returnok, 1, {.i = 0}},
 	[182]	{"STUBgetcwd", returnok, 1, {.i = 0}},
 	[183]	{"STUBcapget", returnok, 1, {.i = 0}},
