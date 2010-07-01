@@ -1,3 +1,3 @@
-char *kernbuilduser="ericvh";
-char *kernbuildhost="vampira";
+char *kernbuilduser="rminnich";
+char *kernbuildhost="go";
 char *kernbuildver="Unknown";

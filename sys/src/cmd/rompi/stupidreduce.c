@@ -68,7 +68,7 @@ main(int argc, char **argv)
 		if (i == 1)
 			startnsec = tbget();
 		sum[0] = node;
-		stupidreduce(sum);
+		reallystupidreduce(sum);
 	}
 	stopnsec = tbget();
 		
