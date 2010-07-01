@@ -10,7 +10,7 @@ def showUsage () :
 USAGE: runJob.py [-l hare_location] [-9 py9p_location]  
                 [-h brasil_host] [-p brasil_port] 
                 [-n numnodes] [-o os_type] [-a architecture_type]
-                [-D] [-t]
+                [-D] [-t] [-x]
                 "cmd arg1 arg2 ..." </path/to/inputfile>
  
 ARGUMENTS:
@@ -18,6 +18,7 @@ ARGUMENTS:
     -9: py9p_loation (specify only if py9p is installed separately)
     -D: debug mode
     -t: Show time taken in each step (for performance evaluation)
+    -x: Execute and return (Do not read output)
     -h: host running brasil daemon (defaults to current host)
     -p: port running brasil daemon (default: 5670)
     -n: number of cpu nodes to provision (mandetory)
@@ -62,7 +63,7 @@ if 'HARE_PATH' in os.environ:
     pathSource = "Environment Variable HARE_PATH ["  + os.environ['HARE_PATH'] + "] "
 
 try:
-    opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:")
+    opts, args = getopt.getopt (sys.argv[1:],"Dl:x1:9:h:p:n:o:a:t")
     for o,a in opts:
         if o == "-l" :
             py9pPath = a + "/py9p/"
@@ -124,6 +125,7 @@ class XCPU3Client:
     DEBUG = False
     bufsize = 512
     RECORD_TIME = False
+    no_out = False
     
     def __init__(self, srv, port, authmode='none', user='', passwd=None, authsrv=None, chatty=0, key=None):
         self.start_time = time.time()
@@ -131,12 +133,14 @@ class XCPU3Client:
         self.bufSize = 512
         self.DEBUG = False
         self.RECORD_TIME = False
+        self.no_out = False
         
         self.extraLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.inputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.ctlLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.outputLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
         self.debugLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
+        self.waitLink = self.get9pClient(srv, port, authmode, user, passwd, authsrv, chatty, key)
 
 
     def dPrint (self, msg):
@@ -268,6 +272,17 @@ class XCPU3Client:
             raise Exception
             return
         self.dPrint ("Thread started ...")
+    
+    def readWait (self):
+        if self.sessionID is None :
+            raise Exception("XCPU3: Session not created")
+        
+        name = baseURL + str(self.sessionID) + "/wait"
+        if self.waitLink.open (name, py9p.OREAD ) is None :
+            raise Exception("XCPU3: Could not open " + name)
+        
+        buf = self.waitLink.read(1)
+        self.waitLink.close()
         
     def getOutput (self) :
         if self.sessionID is None :
@@ -321,14 +336,18 @@ class XCPU3Client:
             if self.RECORD_TIME :
                 print "INPUT ", tt
 
-
-        self.dPrint ( "getting output")
-        st = time.time()
-        self.getOutput()
-        et = time.time()
-        tt = et - st
-        if self.RECORD_TIME :
-            print "OUTPUT ", tt
+    
+        if self.no_out :
+            self.dPrint ("Reading from wait")
+            self.readWait()
+        else :
+            self.dPrint ( "getting output")
+            st = time.time()
+            self.getOutput()
+            et = time.time()
+            tt = et - st
+            if self.RECORD_TIME :
+                print "OUTPUT ", tt
 
         
         if self.DEBUG:
@@ -408,6 +427,7 @@ def main ():
     osType = None
     archType = None
     debug = False
+    no_out = False
     RECORD_TIME = False
     # Overriding the values from environment variables
     if 'BRASIL_HOST' in os.environ:
@@ -417,7 +437,7 @@ def main ():
         brasilPort = int (os.environ['BRASIL_PORT'])
 
     try:
-        opts, args = getopt.getopt (sys.argv[1:],"Dl:9:h:p:n:o:a:t")
+        opts, args = getopt.getopt (sys.argv[1:],"Dl:x1:9:h:p:n:o:a:t")
         for o,a in opts:
             if o == "-h" :
                 brasilHost = a
@@ -433,6 +453,8 @@ def main ():
                 RECORD_TIME = True
             elif o  == "-D" :
                 debug = True
+            elif o == "-x" :
+                no_out = True
             elif ( o in ( "-9", "-l" ) ) :
                 a = 1 + 1
             else :
@@ -489,6 +511,7 @@ def main ():
         mycpu.topStat()
     
     mycpu.RECORD_TIME = RECORD_TIME
+    mycpu.no_out = no_out
     #mycpu.pipelineCmds ()
     st = time.time()
     mycpu.runJob (command, resReq, inFile)
