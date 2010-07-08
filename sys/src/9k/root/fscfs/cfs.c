@@ -288,8 +288,11 @@ rauth(Fcall *t)
 	if(delegate(t, mf, nil) == 0){
 		mf->qid = s.rhdr.aqid;
 		mf->mode = ORDWR;
-	}else
+	}else{
+		freesfid(mf->opened);	/* free, don't clunk: failed to establish */
+		mf->opened = nil;
 		putfid(mf);
+	}
 }
 
 void
@@ -328,8 +331,11 @@ rattach(Fcall *t)
 			statson++;
 			rootqid = mf->qid;
 		}
-	}else
+	}else{
+		freesfid(mf->path->sfid);	/* free, don't clunk: failed to establish */
+		mf->path->sfid = nil;
 		putfid(mf);
+	}
 }
 
 void
@@ -1803,10 +1809,9 @@ cacheread(File *file, void *buf, vlong offset, int nbytes)
 	DPRINT(2, "file %lld length %lld\n", file->qid.path, file->clength);
 	p = buf;
 	while(nbytes > 0){
-		d = finddata(file, offset);
+		d = finddata(file, offset, &o);
 		if(d == nil)
 			break;
-		o = offset & (d->size-1);
 		if(o < d->min){
 			if(p == (char*)buf)
 				return -(d->min-o);	/* fill the gap */
@@ -1835,10 +1840,9 @@ cachewrite(File *file, void *buf, vlong offset, int nbytes)
 
 	p = buf;
 	while(nbytes > 0){
-		d = storedata(file, offset);
+		d = storedata(file, offset, &o);
 		if(d == nil)
 			break;
-		o = offset & (d->size-1);
 		n = nbytes;
 		if(n > d->size-o)
 			n = d->size-o;
@@ -1895,7 +1899,7 @@ cacheinval(File *file)
 }
 
 Data*
-finddata(File *file, uvlong offset)
+finddata(File *file, uvlong offset, int *blkoff)
 {
 	int r, x;
 	uvlong base, o;
@@ -1909,6 +1913,7 @@ finddata(File *file, uvlong offset)
 			o += x;
 			if(o >= file->ndata)
 				break;
+			*blkoff = (offset-base) & ((1<<radix[r])-1);
 			return file->cached[(int)o];
 		}
 		base += range[r]<<radix[r];
@@ -1918,9 +1923,9 @@ finddata(File *file, uvlong offset)
 }
 
 Data*
-storedata(File *file, uvlong offset)
+storedata(File *file, uvlong offset, int *blkoff)
 {
-	int r, x, v;
+	int r, x, v, size;
 	uvlong base, o;
 	Data **p;
 
@@ -1943,10 +1948,12 @@ storedata(File *file, uvlong offset)
 				memset(file->cached+file->ndata, 0, (v-file->ndata)*sizeof(*file->cached));
 				file->ndata = v;
 			}
-			DPRINT(2, "	-> %d %d\n", (int)o, 1<<radix[r]);
+			size = 1 << radix[r];
+			DPRINT(2, "	-> %d %d\n", (int)o, size);
+			*blkoff = (offset-base) & (size-1);
 			p = &file->cached[(int)o];
 			if(*p == nil)
-				*p = allocdata(file, (int)o, 1<<radix[r]);
+				*p = allocdata(file, (int)o, size);
 			else
 				usedata(*p);
 			return *p;
