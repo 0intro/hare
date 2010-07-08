@@ -741,7 +741,6 @@ torusfragsend(Block *b, void *arg)
 	poperror();
 	ilock(&t->txlock);
 	torusinject(t, tx, b);
-	tx->np++;
 	iunlock(&t->txlock);
 	qunlock(&tx->rl);
 }
