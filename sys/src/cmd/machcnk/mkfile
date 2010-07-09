@@ -1,0 +1,12 @@
+</$objtype/mkfile
+
+TARG=machcnk
+OFILES= \
+	callcnk.$O\
+
+LIB=libmach/libmach.a  \
+
+HFILES=
+
+BIN=/mnt/term/tmp
+</sys/src/cmd/mkmany
