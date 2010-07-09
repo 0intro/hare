@@ -1,6 +1,6 @@
 </$objtype/mkfile
 
-LIB=/$objtype/lib/libmach.a
+LIB=libmach.a
 FILES=\
 	executable\
 	map\
