@@ -18,7 +18,7 @@ ARGUMENTS:
     -9: py9p_loation (specify only if py9p is installed separately)
     -D: debug mode
     -t: Show time taken in each step (for performance evaluation)
-    -x: Execute and return (Do not read output)
+    -x: Execute and return (Do not read output) (not functional yet)
     -h: host running brasil daemon (defaults to current host)
     -p: port running brasil daemon (default: 5670)
     -n: number of cpu nodes to provision (mandetory)

@@ -1,0 +1,112 @@
+.TH runJob 1
+.SH NAME
+runJob.py \- Script to submit the jobs to the running brasil node.
+.SH SYNOPSIS
+.B runJob.py
+[
+.B -l path-to-hare-release
+]
+[
+.B -9 path-to-py9p-library-location
+]
+[
+.B -h brasil-host
+]
+[
+.B -p brasil-port
+]
+[
+.B -n number-of-nodes-to-reserve
+]
+[
+.B -o os-type
+]
+[
+.B -a architecture-type
+]
+[
+.B -D
+]
+[
+.B -t
+]
+[
+.B cmd
+]
+[
+.B /path/to/inputfile
+]
+.SH DESCRIPTION
+This command submits the requested executable to the specified brasil node for execution.
+This command can control most aspects of the XCPU3 based remote execution.
+
+.PP
+The
+.I -I
+argument specifies the path to the rest of the HARE binary distribution.  If no alternative
+argument is given, the latest release stored in the argonne profiles directory is used.
+
+
+.PP
+The
+.I -9
+argument specifies the path to the py9p library location.   If no alternative
+argument is given, the default location within the HARE binary distribution tree is used.
+
+.PP
+the
+.I -h
+argument specifies the network address of the location where brasil is running.  
+By default the localhost is used as brasil location.
+
+.PP
+the
+.I -p
+argument specifies the port number where brasil is listening for requests.
+By default 5670 is used as brasil port.
+
+.PP
+the
+.I -n
+argument specifies the number of nodes to be reserved.  This is mandatory argument
+and some value must be provided.
+
+.PP
+the
+.I -o
+argument specifies the operating system that should be running on the nodes to be reserved.  
+This is optional argument and by default any operating system is allowed.
+
+.PP
+the
+.I -a
+argument specifies the hardware architecture of the nodes to be reserved. 
+This is optional argument and by default any architecture is allowed.
+
+.PP
+the
+.I -D
+flag specifies to generate more debugging output.  By default debugging
+will be off.
+
+.PP
+the
+.I -t
+flag specifies to generate the timing information about how long was taken by each stage.
+By default, timing information will be off.
+
+
+.PP
+The runJob.py is simple script and we encourgage users to edit it to suit their requirements.
+
+.SH BUGS
+The inbuilt help in command is more up-to-date, and it can be used by invokin runJob.py
+command without any arguments.
+
+.SH "SEE ALSO"
+.IR deploybrasil (8)
+
+.SH FILES
+.B /bgsys/argonne-utils/profiles/plan9/bin/runJob.py
+.SH SOURCE
+.B /usr/glenda/bin/bash/deploy/runJob.py
