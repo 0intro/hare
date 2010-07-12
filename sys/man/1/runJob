@@ -105,8 +105,10 @@ command without any arguments.
 
 .SH "SEE ALSO"
 .IR deploybrasil (8)
+.IR installHelp (1)
 
 .SH FILES
 .B /bgsys/argonne-utils/profiles/plan9/bin/runJob.py
 .SH SOURCE
 .B /usr/glenda/bin/bash/deploy/runJob.py
+.B /usr/glenda/bin/bash/deploy/README.txt

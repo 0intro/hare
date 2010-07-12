@@ -42,7 +42,11 @@ the way we are using it), but this hasn't been a priority.
 .SH "SEE ALSO"
 .IR nompirun (8)
 .IR bgp-intro (8)
+.IR runJob (1)
+.IR installHelp (1)
+
 .SH FILES
 .B /bgsys/argonne-utils/profiles/plan9/bin/deployBrasil.sh
 .SH SOURCE
 .B /usr/glenda/bin/bash/deploy/deployBrasil.sh
+.B /usr/glenda/bin/bash/deploy/README.txt
