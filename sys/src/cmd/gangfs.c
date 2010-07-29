@@ -13,7 +13,13 @@
 	Based in part on Pravin Shinde's devtask.c
 
 	TODO:
-		* lots
+		* subsession creation, destruction and accounting
+		* reservation & binding of subsessions
+		* aggregated ctl via multipipes
+		* aggregated io via multipipes
+		* aggregated status via multipipes
+		* aggregated wait via multipipe barrier (todo in multipipe)
+		* garbage collection on close
 */
 
 #include <u.h>
@@ -46,19 +52,22 @@ enum
 	[CONV(16)][TYPE(16)] where low 00ff bytes are type
 */
 #define TYPE(x) 	 ((ulong) (x).path & 0xff)
+#define CONVP(x) 	 ((((ulong) (x).path >> 16)&0xffff) -1)
 #define CONV(x) 	 ((((ulong) (x)->path >> 16)&0xffff) -1)
 #define CONVQIDP(c, y) (((c+1) << 16)|(y))
 
 typedef struct Gang Gang;
 struct Gang
 {
-	int id;			/* gang id */
+	int index;			/* gang id */
 	int numsub;		/* number of subsessions */
+
+	int refcount;		/* reference count */
+	Gang *next;		/* primary linked list */
 };
 
-Gang *gang;
-int numgangs = 0;
-int maxgangs = 16;
+RWLock glock; 
+Gang *glist;
 
 typedef struct Dirtab Dirtab;
 struct Dirtab
@@ -90,7 +99,7 @@ enum
 
 /* these dirtab entries form the base */
 static Dirtab rootdir[] = {
-	"clone", 	{Qclone},				0666,
+	"gclone", 	{Qclone},				0666,
 	"status",	{Qgstat},				0666,
 };
 
@@ -111,6 +120,102 @@ usage(void)
 {
 	fprint(2, "gangfs [-D] [mtpt]\n");
 	exits("usage");
+}
+
+static Gang *
+newgang(void) 
+{
+	Gang *mygang = emalloc9p(sizeof(Gang));
+	if(mygang == nil)
+		return nil;
+	memset(mygang, 0, sizeof(Gang));
+
+	wlock(&glock);
+	if(glist == nil) {
+		glist = mygang;
+		mygang->index = 0;
+	} else {
+		int last = -1;
+		Gang *current;
+		for(current=glist; current->next != nil; current = current->next) {
+			if(current->index != last+1) {
+				break;
+			}
+			last++;
+		}
+		mygang->next = current->next;
+		current->next = mygang;
+		mygang->index = current->index+1;
+	}
+	mygang->refcount++;
+	wunlock(&glock);
+
+	return mygang;
+}
+
+static Gang *
+findgang(int index)
+{
+	Gang *current = nil;
+
+	rlock(&glock);
+	if(glist == nil) {
+		goto out;
+	} else {
+		for(current=glist; current != nil; current = current->next) {
+			if(current->index == index) {
+				current->refcount++;
+				goto out;
+			}
+		}
+	}
+out:
+	runlock(&glock);
+	return current;
+}
+
+static Gang *
+findgangnum(int which)
+{
+	Gang *current = nil;
+	rlock(&glock);
+	if(glist == nil) {
+		goto out;
+	} else {
+		int count = 0;
+		for(current=glist; current != nil; current = current->next) {
+			if(count == which) {
+				current->refcount++;
+				goto out;
+			}
+			count++;
+		}
+	}
+out:
+	runlock(&glock);
+	return current;
+}
+
+static void
+releasegang(Gang *g)
+{
+	wlock(&glock);
+	g->refcount--;
+	if(g->refcount == 0) {	/* clean up */
+		Gang *current;
+		if(glist == nil) {
+			goto out;
+		}
+		for(current=glist; current->next != g; current = current->next) {
+			if(current == nil) {
+				goto out;
+			}
+		}
+		current->next = g->next;
+		free(g);
+	}
+out:
+	wunlock(&glock);
 }
 
 static void
@@ -162,26 +267,32 @@ dirgen(int n, Dir *d, void *aux)
 			d->qid.path=CONVQIDP(CONV(q), Qconv);
 			d->qid.type=QTDIR;
 			d->mode = 0555|DMDIR;
-			d->name = smprint("g%lud", CONV(q));
+			d->name = smprint("g%lud", CONV(q)); /* TODO: this isn't going to line up */
 			return 0;			
 		}
 	}
 
 	if(CONV(q) == -1) { /* root directory */
+		Gang *g;
 		dt = rootdir;
 		ne = Qrootend-1;
 		s = n-ne;
-		if((s >= 0) && (s < numgangs)) {
-			d->qid.path=CONVQIDP(s, Qconv);
-			d->qid.type=QTDIR;
-			d->mode = 0555|DMDIR;
-			d->name = smprint("g%d", n-ne);
-			return 0;
+		if(s >= 0) {
+			g = findgangnum(s);
+			if(g != nil) {
+				d->qid.path=CONVQIDP(g->index, Qconv);
+				d->qid.type=QTDIR;
+				d->mode = 0555|DMDIR; /* FUTURE: per-session perms */
+				d->name = smprint("g%d", g->index);
+				releasegang(g);
+				return 0;
+			}
 		}
 	} else {				/* session directory */
 		dt = convdir;
 		ne = Qconvend-1;
 		s = n-ne;
+
 		if((s >= 0) && (s < numsubsess)) {
 			d->qid.path=CONVQIDP(CONV(q), Qsubses+s);
 			d->qid.vers=0;
@@ -253,8 +364,9 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 			}
 		if( (name[0] == 'g') && (isanumber(name+1))) { /* session directory */
 			int s = atoi(name+1);
-			if(s < numgangs) {
-				qid->path = CONVQIDP(s, Qconv);
+			Gang *g = findgang(s);
+			if(g != nil) {
+				qid->path = CONVQIDP(g->index, Qconv);
 				qid->vers = 0;
 				qid->type = QTDIR;
 				qidcopy(qid, &fid->qid);
@@ -288,8 +400,10 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 static void
 fsopen(Req *r)
 {
+	ulong path;
 	Fid *fid = r->fid;
 	Qid *q = &fid->qid;
+	Gang *mygang;
 
 	if(TYPE(fid->qid) >= Qsubses) {
 		respond(r, Eperm);
@@ -300,8 +414,24 @@ fsopen(Req *r)
 		return;
 	}
 
-	/* TODO: much, much more */
-	respond(r, "not yet");
+	if(TYPE(fid->qid) != Qclone) {
+		/* FUTURE: probably need better ref count here */
+		respond(r, nil);
+		return;
+	}
+
+	/* insert new session at the end of the list & assign index*/
+	mygang = newgang();
+	if(mygang == nil) {
+		respond(r, "out of resources");
+		return;
+	}
+	
+	path = CONVQIDP(mygang->index, Qctl);
+	r->fid->qid.path = path;
+	r->ofcall.qid.path = path;
+
+	respond(r, nil);
 }
 
 static void
@@ -312,6 +442,15 @@ fsread(Req *r)
 
 	if (q->type&QTDIR) {
 		dirread9p(r, dirgen, q);
+		respond(r, nil);
+		return;
+	}
+
+	if(TYPE(fid->qid) == Qctl) {
+		char buf[NAMELEN];
+
+		sprint(buf, "%lud\n", CONVP(fid->qid));
+		readstr(r, buf);
 		respond(r, nil);
 		return;
 	}
@@ -401,12 +540,6 @@ threadmain(int argc, char **argv)
 		procpath = argv[0];
 	else
 		procpath = defaultpath;
-
-	/* setup accounting */
-	maxgangs = 16;
-	gang = calloc(maxgangs, sizeof(Gang));
-	if(gang == 0)
-		threadexits("out of memory");
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
