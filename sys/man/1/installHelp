@@ -1,0 +1,46 @@
+.TH installHelp 1
+.SH NAME
+installHelp.sh \- Script copy all needed executables in proper place.
+.SH SYNOPSIS
+.B installHelp.sh
+[
+.B -l path-to-hare-release
+]
+.SH DESCRIPTION
+Script installHelp.sh will copy the binaries/scripts in proper location,
+so that executions of subsequent deployBrasil.sh and runJob.py are
+location independent.  This script should be executed only once, and
+can be considered as equivalent of  running make install
+
+.PP
+The
+.I -I
+argument specifies the path where the HARE binary distribution should be copied.  By default
+/bgsys/argonne-utils/profiles/plan9/LATEST/bin/ path is used.  This path can be over-ridden
+by either environment variable HARE_LOCATION or  command line argument -l.  The hare-path 
+used in this command should be used as hare-path for commands deployBrasil and runJob.
+
+
+.PP
+installHelp copies the brasil, deployBrasil and runJob commands.  It should be executed after 
+every succuessful compilation of the brasil or after modifications in deployBrasil.sh or runJob.py
+scripts.
+
+.PP
+installHelp command should be executed from the same directory where the command is found
+it the source code tree.  It relies on source code tree hierarchy for finding out other files.
+If it is executed from other locations, it will not work.
+
+
+.SH BUGS
+installHelp is new command and may contain bugs.  Please report bugs if you find them.
+
+.SH "SEE ALSO"
+.IR deploybrasil (8)
+.IR runJob (1)
+
+
+.SH SOURCE
+.B /usr/glenda/bin/bash/deploy/installHelp.sh
+.B /usr/glenda/bin/bash/deploy/README.txt
+
