@@ -416,6 +416,7 @@ struct Segment
 	Pte	*ssegmap[SSEGMAPSIZE];
 	Lock	semalock;
 	Sema	sema;
+	int nozfod;	/* do not zero fill on demand */
 };
 
 enum

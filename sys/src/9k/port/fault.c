@@ -103,6 +103,8 @@ fixfault(Segment *s, uintptr addr, int read, int dommuput)
 	case SG_SHARED:			/* Zero fill on demand */
 	case SG_STACK:
 		if(*pg == 0) {
+			if (s->nozfod)
+				return -1;
 			new = newpage(1, &s, addr);
 			if(s == 0)
 				return -1;

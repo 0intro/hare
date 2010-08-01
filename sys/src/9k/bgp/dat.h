@@ -105,6 +105,8 @@ struct PMMU
 	int	cnk;				/* CNK emulation */
 	int	cnkexec;
 	void*	cnkenv;
+	/* Segments don't exist here */
+	void *heapseg;
 };
 
 /*

@@ -102,39 +102,35 @@ cnkgetpersonality(Ar0*ar, va_list list)
 
 /* this was in port/sysseg.c and was copied here. */
 /* There are a few special bits for CNK needs. */
+/* called with HIGHEST address needed for sbrk */
 void
-cnksbrk(Ar0* ar0, va_list list)
+cnksbrk(Ar0* ar0, uintptr addr, int allocate)
 {
-	uintptr addr;
 	uintptr ibrk(uintptr addr, int seg);
-	extern Segment *heapseg;
+	Segment *heapseg;
+	uintptr oldtop;
 	int i;
 
-	addr = PTR2UINT(va_arg(list, void*));
+	heapseg = up->heapseg;
 
 	if (! heapseg){
 		print("cnksbrk: no heap set up yet\n");
 		error("No heap set up yet");
 	}
 
+	oldtop = heapseg->top;
+
 	if(addr == 0){
-		ar0->p = heapseg->top;
+		ar0->p = oldtop;
 		return;
 	}
 
-	if (addr < heapseg->top){
+	if (addr < oldtop){
 		print("cnksbrk: can't shrink heap\n");
 		error("can't shrink heap");
 	}
 
-	/* now this is a hack ... but we're going to assume this thing is not
-	 * only mapped but the TLB is set up for it. 
-	 *
-	heapseg->top = addr;
-	ar0->p = heapseg->top;
-	return;
-	*/
-
+	/* FIX ME -- up->heapseg should be up->heapindex -- but up->seg[i] is set in a strange way */
 	/* find the index of the heap segment; call ibrk with that segment. */
 	/* consider flagging heapseg by base address or p==v, but it's too soon to know 
 	 * if that is a universal test and I hate to do a strcmp on each cnksbrk
@@ -143,11 +139,24 @@ cnksbrk(Ar0* ar0, va_list list)
 		if (heapseg == up->seg[i])
 			break;
 	}
-	/* isn't life grand? The heap is already mapped. So just grow the end of heap pointer but no need to 
-	 * allocate a page. 
+	/* isn't life grand? The heap is already mapped. So just grow the end of heap pointer 
+	 * and we need to allocate pages, since you're not allowed to fault on the heap. 
 	 */
+	print("CNKSBRK: brk to %#ulx\n", addr);
 	if (i < NSEG)
 		ar0->p = ibrk(addr, i);
+	/* now we might need to fault in all the pages by hand */
+	if (allocate) {
+		print("PRE-fault %#ulx to %#ulx\n", oldtop, addr);
+		for(;oldtop < addr; oldtop += BY2PG) {
+			/* heap is always writeable */
+			print("Fault in %#ulx\n", oldtop);
+			/* oh wow this is so gross */
+			heapseg->nozfod = 0;
+			fault(oldtop, 0);
+			heapseg->nozfod = 1;
+		}
+	}
 	if (up->cnk & 128) print("%d:cnksbrk for %p returns %p\n", up->pid, addr, ar0->p);
 }
 
@@ -156,17 +165,15 @@ cnksbrk(Ar0* ar0, va_list list)
 void
 cnkbrk(Ar0* ar0, va_list list)
 {
-	void *arg[1];
-	void cnksbrk(Ar0* ar0, va_list list);
-	void *va;
-	va = va_arg(list, void *);
-	if (up->cnk & 128) print("%d:cnkbrk va %p\n", up->pid, va);
-	arg[0] = va;
+	uintptr addr;
+	addr = va_arg(list, uintptr);
+
+	if (up->cnk & 128) print("%d:cnkbrk va %#ulx\n", up->pid, addr);
 	
-	cnksbrk(ar0, (va_list) arg);
+	cnksbrk(ar0, addr, 1);
 	/* it is possible, though unlikely, that libc wants exactly the value it asked for. Plan 9 is returning rounded-up-to-next-page values. */
-	if (va)	
-		ar0->v = va;
+	if (addr)	
+		ar0->i = addr;
 
 }
 
@@ -318,14 +325,12 @@ returnok(Ar0*, va_list)
 
 /* void  *  mmap(void *start, size_t length, int prot , int flags, int fd,
        off_t offset); */
-/* They are using this as a poor man's malloc. */
 
 void cnkmmap(Ar0 *ar0, va_list list)
 {
 	void *v;
 	int length, prot, flags, fd;
 	ulong offset;
-	void cnksbrk(Ar0* ar0, va_list list);
 	v = va_arg(list, void *);
 	length = va_arg(list, int);
 	prot = va_arg(list, int);
@@ -333,25 +338,47 @@ void cnkmmap(Ar0 *ar0, va_list list)
 	fd = va_arg(list, int);
 	offset = va_arg(list, ulong);
 	if (up->cnk & 128) print("%d:CNK: mmap %p %#x %#x %#x %d %#ulx\n", up->pid, v, length, prot, flags, fd, offset);
+	/* TODO: in the case that it is 1M in size, go ahead an 1M align it and
+	 * find pages that are physically contiguous
+	 */
 	if (fd == -1){
-		unsigned char *newv, *oldv;
-		uintptr args[1];
-		args[0] = 0;
-		cnksbrk(ar0, (va_list) args);
+		Segment *heapseg = up->heapseg;
+ 		unsigned char *newv, *oldv;
+		uintptr arg;
+		arg = PGROUND(heapseg->top);
+		cnksbrk(ar0, arg, 0);
 		if (up->cnk & 128) print("%d:mmap anon: current is %p\n", up->pid, ar0->v);
 		oldv =ar0->v;
-		newv =  ((unsigned char *)oldv) + length;
+		arg += length;
+		arg = PGROUND(arg);
+		newv =  (uchar *)arg;
 		if (up->cnk & 128) print("%d:mmap anon: ask for %p\n", up->pid, newv);
-		args[0] = (uintptr) newv;
-		cnksbrk(ar0, (va_list) args);
+		cnksbrk(ar0, arg, 1);
 		if (up->cnk & 128) print("%d:mmap anon: new is %p\n", up->pid, ar0->v);
-		/* success means "return the old pointer" ... */
-		ar0->v = oldv;
+ 		/* success means "return the old pointer" ... */
+ 		ar0->v = oldv;
+ 	}
+	
+}
+
+/* but it's really a no op. And a storage leak. Sorry. */
+void cnkmunmap(Ar0 *ar0, va_list list)
+{
+	u8int *v;
+	int length;
+	uintptr arg;
+	Segment *heapseg = up->heapseg;
+	v = va_arg(list, void *);
+	length = va_arg(list, int);
+	arg = PTR2UINT(v);
+	if (up->cnk & 128) print("%d:CNK: munmap %p %#x\n", up->pid, v, length);
+
+	if (arg < heapseg->base || arg + length > heapseg->top){
+		print("%d: munmap %p %#x: outsize the range of the heap\n", up->pid, v, length);
 		return;
 	}
-		
-	ar0->i = -1;
-	
+
+	ar0->i = 0;
 }
 
 /*

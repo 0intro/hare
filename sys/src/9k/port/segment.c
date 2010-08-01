@@ -20,6 +20,7 @@ newseg(int type, uintptr base, usize size)
 	s->base = base;
 	s->top = base+(size*BY2PG);
 	s->size = size;
+	s->nozfod = 0;
 	s->sema.prev = &s->sema;
 	s->sema.next = &s->sema;
 

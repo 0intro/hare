@@ -8,6 +8,7 @@ Syscall cnkwritev;
 Syscall cnksocketcall;
 Syscall cnkgeteuid;
 Syscall cnkmmap;
+Syscall cnkmunmap;
 Syscall cnkexit;
 Syscall cnksettid;
 Syscall sigaction;
@@ -143,7 +144,7 @@ struct syscall cnksystab[] = {
 	[88]	{"STUBreboot", returnok, 1, {.i = 0}},
 	[89]	{"STUBreaddir", returnok, 1, {.i = 0}},
 
-	[91]	{"STUBmunmap", returnok, 1, {.i = 0}},
+	[91]	{"cnkmunmap", cnkmunmap, 2, {.i = -1}},
 	[92]	{"STUBtruncate", returnok, 1, {.i = 0}},
 	[93]	{"STUBftruncate", returnok, 1, {.i = 0}},
 	[94]	{"STUBfchmod", returnok, 1, {.i = 0}},

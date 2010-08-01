@@ -25,7 +25,6 @@ enum
 #define PATH(s, t) 	( ((s)<<3) | (t) )
 
 typedef struct Globalseg Globalseg;
-Segment *heapseg = nil;
 struct Globalseg
 {
 	Ref;
@@ -85,8 +84,6 @@ putgseg(Globalseg *g)
 {
 	if(decref(g) > 0)
 		return;
-	if (g->s == heapseg)
-		heapseg = nil;
 	if(g->s != nil)
 		putseg(g->s);
 	if(g->kproc)
@@ -380,16 +377,21 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 			if(len == 0)
 				error("len is zero");
 			g->s = newseg(SG_SHARED, va, len);
-		} else 
-		if(strcmp(cb->f[0], "heap") == 0){
+		} else if(strcmp(cb->f[0], "heap") == 0){
+			int i;
 			if (!g)
 				error("no globalseg");
 			if (!g->s)
 				error("no segment");
-			if (heapseg)
+			if (up->heapseg)
 				error("heap already set");
 			else
-				heapseg = g->s;
+				up->heapseg = g->s;
+			/* pre-fault the pages in */
+			for(i = 0; i < g->s->size; i++) {
+				print("Pre-fault %#ulx\n", g->s->base + i*BY2PG);
+				fault(g->s->base + i*BY2PG, 0);
+			}
 		} else
 			error(Ebadctl);
 		break;

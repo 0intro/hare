@@ -4,6 +4,13 @@
 #include <mach.h>
 #include "elf.h"
 
+enum {
+	DumpCall = 16,		/* dump args and return (including errors) */
+	DumpUregsBefore = 32,	/* dump uregs before system call */
+	DumpUregsAfter = 64,	/* dump uregs after system call */
+	PersyscallInfo = 128,	/* print per-system-call info for CNK-only system calls */
+};
+
 #define RND(size,up) (((size)+(up)-1) & ~((up)-1))
 #define RNDM(size) ((size+0xfffff)&0xfff00000)
 int
@@ -141,12 +148,13 @@ main(int argc, char *argv[])
 
 	ARGBEGIN{
 	case 'b':	breakpoint = strtoul(EARGF(usage()), 0, 0); break;
+	/* weird. No longer in the code? */
 	case 'f':	cnk |= 4; break;
 	case 'F':	cnk |= 8; break;
-	case 's':	cnk |= 16; break;
-	case 'u':	cnk |= 32; break;
-	case 'U':	cnk |= 64; break;
-	case 'a':	cnk |= 128; break;
+	case 's':	cnk |= DumpCall; break;
+	case 'u':	cnk |= DumpUregsBefore; break;
+	case 'U':	cnk |= DumpUregsAfter; break;
+	case 'a':	cnk |= PersyscallInfo; break;
 	case 'A':	cnk |= 0xfc; break;
 	default:	usage(); break;
 	}ARGEND
@@ -227,6 +235,7 @@ main(int argc, char *argv[])
 	i++;
 	av[i++] = nil;
 	av[i++] = "LANG=C";
+	av[i++] = "MALLOC_MMAP_MAX_=0";
 	av[i++] = nil;
 	/* now just copy the aux array over av */
 	memcpy(&av[i], aux, sizeof(aux));
