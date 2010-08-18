@@ -16,7 +16,7 @@ main(int argc, char **argv)
 	unsigned int sum[1], nsum[1];
 	int i;
 	vlong startnsec, stopnsec;
-	int iter = 100;
+	int iter = 1;
 
 	MPI_Init(&argc,&argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &node);
@@ -24,8 +24,23 @@ main(int argc, char **argv)
 	
 	print("%lld Hello World from Node %d of %d\n", tbget(),node, nproc);
 
-	if (0 && node) 
+	if (1)
+		rompidebug |= 128;
+	if (1)
 		rompidebug |= 4;
+	if (0)
+		rompidebug |= 12;
+	if (0)
+		torusdebug |= 2;
+	if (0 && (rompidebug & 128) && (! node)) {
+		int x, y, z;
+		printf("DOT:%lld digraph mpi {\n", tbget());
+		for (i = 0; i < nproc; i++) {
+			ranktoxyz(i, &x, &y, &z);
+			print("DOT:%lld a%d [label=\"(%d,%d,%d)\"];\n", tbget(), i, x, y, z);
+			print("DOT:%lld b%d [label=\"(%d,%d,%d)\"];\n", tbget(), i, x, y, z);
+		}
+	}
 	for (i = 0; i < iter; i++){
 		if (i == 1)
 			startnsec = tbget();
@@ -39,6 +54,10 @@ main(int argc, char **argv)
 	print("%lld Node %d (%d, %d, %d) computes sum as %d and MPI says sum is %d\n", tbget(), node, x, y, z, ((nproc-1)*nproc)/2, nsum[0]);
 	if (! node) 
 		print("%lld nsec for %d iterations\n", stopnsec-startnsec, iter);
-	print("%lld %d: Finalize\n", nsec(), node);
+	print("%lld %d: Finalize\n", tbget(), node);
 	MPI_Finalize();
+	if (0 && (rompidebug & 128) && (! node))
+		printf("DOT:%lld }\n", tbget());
+	while (1);
+	exits("All done");
 }

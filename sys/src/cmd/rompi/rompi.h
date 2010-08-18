@@ -13,6 +13,8 @@
 typedef unsigned char u8int;
 typedef unsigned char uchar;
 typedef unsigned long long u64int;
+typedef long long vlong;
+typedef unsigned long long uvlong;
 char *smprint(const char *fmt, ...);
 void fprint(int fd, const char *fmt, ...);
 void print(const char *fmt, ...);

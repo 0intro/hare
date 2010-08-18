@@ -199,9 +199,9 @@ void torusinit(int *pmyproc, const int numprocs)
 
 	*pmyproc = (z << (lx + ly)) + (y << lx) + x;
 
-	print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
-	print( "numprocs %d \n", numprocs);
-	print("%d/%d %d/%d %d/%d\n", lx, xbits, ly, ybits, lz, zbits);
+	//print( "%d/%d %d/%d %d/%d\n", x, xsize, y, ysize, z, zsize);
+	//print( "numprocs %d \n", numprocs);
+	//print("%d/%d %d/%d %d/%d\n", lx, xbits, ly, ybits, lz, zbits);
 
 	/* make some tables. Mapping is done as it is to maximally distributed broadcast traffic */
 	xyz = calloc(numprocs, sizeof(*xyz));

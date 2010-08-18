@@ -1,11 +1,23 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
 CLIB=rompi.c torus.c
 CFLAGS=-Dcnk
-all: rompihello
+all: rompihello stupidreduce testmalloc reduce
+
+reduce: reduce.o rompilib.a
+	$(CC) -I . -o reduce reduce.o rompilib.a
+	cp reduce ~/rompi
+
+stupidreduce: stupidreduce.o rompilib.a
+	$(CC) -I . -o stupidreduce stupidreduce.o rompilib.a
+	cp stupidreduce ~/rompi
 
 rompihello: rompihello.o rompilib.a
 	$(CC) -I . -o rompihello rompihello.o rompilib.a
-	cp rompihello ~/emu
+	cp rompihello ~/rompi
+
+testmalloc: testmalloc.o rompilib.a
+	$(CC) -I . -o testmalloc testmalloc.o rompilib.a
+	cp testmalloc ~/rompi
 
 rompilib.a: rompi.o torus.o linux.o
 	ar r rompilib.a rompi.o torus.o linux.o

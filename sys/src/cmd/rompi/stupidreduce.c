@@ -2,7 +2,7 @@
 #include "rompi.h"
 
 /* tested may 17 2010 and works */
-extern int torusdebug;
+extern int torusdebug, rompidebug;
 u64int	tbget(void);
 int node, nproc;
 
@@ -50,7 +50,7 @@ stupidreduce(unsigned int *sum)
 	}
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	unsigned int sum[1];
@@ -68,7 +68,8 @@ main(int argc, char **argv)
 		if (i == 1)
 			startnsec = tbget();
 		sum[0] = node;
-		reallystupidreduce(sum);
+		//reallystupidreduce(sum);
+		stupidreduce(sum);
 	}
 	stopnsec = tbget();
 		
@@ -77,4 +78,5 @@ main(int argc, char **argv)
 		print("%lld nsec for %d iterations\n", stopnsec-startnsec, iter-1);
 	MPI_Finalize();
 	print("Node %d computes sum as %d and MPI says sum is %d\n", node, ((nproc-1)*nproc)/2, sum[0]);
+	return 0;
 }
