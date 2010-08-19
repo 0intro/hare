@@ -357,9 +357,24 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root,
 
 	if(rompidebug&8) print("%lld reduce_end: %d(%d, %d, %d)\n", tbget(), myproc, x, y, z);
 
-	if (! x) {
-		for(tox = 1; tox < xsize; toy++){
+	/* the easy cases: z > 0 and the origin */
+	if (z) {
+		/* get the sum from rank x,y,0 */
+		fromrank = xyztorank(x,y,0);
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, x, 0, 0);
+		if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
+		MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
+	} else if (! myproc) {
+		for(tox = 1; tox < xsize; tox++){
 			torank = xyztorank(tox, 0, 0);
+			MPI_Send(buf, num, datatype, torank, 1, comm);
+		}
+		for(toy = 1; toy < ysize; toy++){
+			torank = xyztorank(0, toy, 0);
+			MPI_Send(buf, num, datatype, torank, 1, comm);
+		}
+		for(toz = 1; toz < zsize; toz++){
+			torank = xyztorank(0, 0, toz);
 			MPI_Send(buf, num, datatype, torank, 1, comm);
 		}
 	} else {
@@ -374,22 +389,20 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root,
 				torank = xyztorank(x, toy, 0);
 				MPI_Send(buf, num, datatype, torank, 1, comm);
 			}
+			for(toz = 1; toz < zsize; toz++){
+				torank = xyztorank(x, 0, toz);
+				MPI_Send(buf, num, datatype, torank, 1, comm);
+			}
 		} else {
-			if (! z) {
-				/* get the sum from rank x,0,0 */
-				if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, x, 0, 0);
-				if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
-				MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
-				/* send out our y >0 data */
-				for(toz = 1; toz < zsize; toz++){
-					torank = xyztorank(x, toy, 0);
-					MPI_Send(buf, num, datatype, torank, 1, comm);
-				}
-			} else {
-				/* get the sum from rank x,y,0 */
-				if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, x, 0, 0);
-				if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
-				MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
+			/* get the sum from rank x,0,0 */
+			fromrank=xyztorank(x,0,0);
+			if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, x, 0, 0);
+			if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
+			MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
+			/* send out our z >0 data */
+			for(toz = 1; toz < zsize; toz++){
+				torank = xyztorank(x, y, toz);
+				MPI_Send(buf, num, datatype, torank, 1, comm);
 			}
 		}
 	}
