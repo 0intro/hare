@@ -70,6 +70,8 @@ struct Gang
 	int size;		/* number of subsessions */
 	Session *sess;	/* array of subsessions */
 
+	Channel *chan;	/* channel for sync/error reporting */
+
 	int refcount;		/* reference count */
 	Gang *next;		/* primary linked list */
 };
@@ -137,6 +139,7 @@ newgang(void)
 	if(mygang == nil)
 		return nil;
 	memset(mygang, 0, sizeof(Gang));
+	mygang->chan = chancreate(sizeof(void *), 0);
 
 	wlock(&glock);
 	if(glist == nil) {
@@ -233,6 +236,7 @@ releasegang(Gang *g)
 		}
 		current->next = g->next;
 		releasesessions(g);
+		chanfree(g->chan);
 		free(g);
 	}
 out:
@@ -516,9 +520,10 @@ cmdres(Req *r, int num, int argc, char **argv)
 	int c;
 	Fid *f = r->fid;
 	Gang *g = f->aux;
+	void *resp = nil;
 
 	USED(argv);
-	fprint(2, "DEBUG: cmdres: %d argc: %d\n", num, argc);
+
 	for(c=0; c< argc; c++)
 		fprint(2, "DEBUG arg %d: [%s]\n", c, argv[c]);
 
@@ -528,7 +533,6 @@ cmdres(Req *r, int num, int argc, char **argv)
 		return;
 	} 
 
-	fprint(2, "DEBUG: gang index: %d\n", g->index);
 	if(g->size > 0) {
 		respond(r, "gang already has subsessions reserved");
 		return;
@@ -541,10 +545,19 @@ cmdres(Req *r, int num, int argc, char **argv)
 		threadexits("bindchan hungup");
 	}
 
-	/* TODO: some sort of redez with bindchan */
+	if(recv(g->chan, &resp) < 0) {
+		/* channel failure.... */
+		respond(r, "unknown problem on binder thread");
+		return;
+	}
 
-	r->ofcall.count = r->ifcall.count;
-	respond(r, nil);	
+	if(resp == nil) {
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+	} else {
+		respond(r, resp);
+		free(resp);
+	}	
 }
 
 /* this should probably be a generic function somewhere */
@@ -702,20 +715,22 @@ bindthread(void *)
 			threadexits("interrupted");
 		
 		/* FUTURE: do we want to refork for every new request? */
-		/* allocate a subsess tracking array of structs */
 		g->sess = emalloc9p(sizeof(Session)*g->size);
 		for(count = 0; count < g->size; count++) {
 			path = findexecfs();
 			snprint(buf, 255, "%s/clone", path);
 			g->sess->fd = open(buf, ORDWR);
 			if(g->sess->fd < 0) {
-				fprint(2, "couldn't open session ctl %s/clone: %r\n", path);
-				/* TODO: need to feedback error */
+				sendp(g->chan, 
+				  smprint("couldn't open session ctl %s/clone: %r\n", path));
+				goto error;
 			}
 			n = read(g->sess->fd, buf, 255);
 			if(n < 0) {
-				fprint(2, "couldn't read from session ctl %s/clone: %r\n", path);
-				/* TODO: need to feedback error */
+				sendp(g->chan,
+				  smprint("couldn't read from session ctl %s/clone: %r\n", 
+						path));
+				goto error;
 			}
 			n = atoi(buf); /* convert to local execs session number */
 			snprint(buf, 255, "%s/%d", path, n);
@@ -723,13 +738,14 @@ bindthread(void *)
 			snprint(dest, 255, "/proc/g%d/%d", g->index, count);
 			n = bind(buf, dest, MREPL);
 			if(n < 0) {
-				fprint(2, "couldn't bind %s %s: %r\n", buf, dest);
-				/* TODO: need to feedback error */
+				sendp(g->chan,
+				   smprint("couldn't bind %s %s: %r\n", buf, dest));
+				goto error;
 			}
 		}
-
-		/* TODO: feedback some form of success? */
-		/* QUESTION: do we just do everything with multipipe except for bind? */
+		send(g->chan, nil);
+error:
+		;
 	}
 }
 
