@@ -35,7 +35,7 @@ char 	defaultpath[] =	"/proc";
 char *procpath;
 char *srvctl;
 Channel *iochan;
-int numsubsess = 0;
+Channel *bindchan;
 
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
@@ -56,11 +56,21 @@ enum
 #define CONV(x) 	 ((((ulong) (x)->path >> 16)&0xffff) -1)
 #define CONVQIDP(c, y) (((c+1) << 16)|(y))
 
+typedef struct Session Session;
 typedef struct Gang Gang;
+struct Session
+{
+	Gang *g;		/* gang? necessary? */
+	int fd;		/* fd to ctl file */
+};
+
 struct Gang
 {
 	int index;			/* gang id */
-	int numsub;		/* number of subsessions */
+	int size;		/* number of subsessions */
+	Session *sess;	/* array of subsessions */
+
+	Channel *chan;	/* channel for sync/error reporting */
 
 	int refcount;		/* reference count */
 	Gang *next;		/* primary linked list */
@@ -129,6 +139,7 @@ newgang(void)
 	if(mygang == nil)
 		return nil;
 	memset(mygang, 0, sizeof(Gang));
+	mygang->chan = chancreate(sizeof(void *), 0);
 
 	wlock(&glock);
 	if(glist == nil) {
@@ -197,6 +208,18 @@ out:
 }
 
 static void
+releasesessions(Gang *g)
+{
+/* TODO: Remove if we don't need it
+	int count;
+	
+	for(count = 0; count < g->size; count++)
+		free(g->sess[count].path;
+*/
+	free(g->sess);
+}
+
+static void
 releasegang(Gang *g)
 {
 	wlock(&glock);
@@ -212,6 +235,8 @@ releasegang(Gang *g)
 			}
 		}
 		current->next = g->next;
+		releasesessions(g);
+		chanfree(g->chan);
 		free(g);
 	}
 out:
@@ -241,7 +266,9 @@ fsattach(Req *r)
 static int
 dirgen(int n, Dir *d, void *aux)
 {
-	Qid *q = aux;
+	Fid *f = aux;
+	Gang *g = f->aux;
+	Qid *q = &f->qid;
 	Dirtab *dt;
 	int ne = 0;
 	int s = 0;
@@ -267,13 +294,12 @@ dirgen(int n, Dir *d, void *aux)
 			d->qid.path=CONVQIDP(CONV(q), Qconv);
 			d->qid.type=QTDIR;
 			d->mode = 0555|DMDIR;
-			d->name = smprint("g%lud", CONV(q)); /* TODO: this isn't going to line up */
+			d->name = smprint("g%lud", CONV(q)); /* TODO: this isn't going to line up? */
 			return 0;			
 		}
 	}
 
 	if(CONV(q) == -1) { /* root directory */
-		Gang *g;
 		dt = rootdir;
 		ne = Qrootend-1;
 		s = n-ne;
@@ -282,7 +308,7 @@ dirgen(int n, Dir *d, void *aux)
 			if(g != nil) {
 				d->qid.path=CONVQIDP(g->index, Qconv);
 				d->qid.type=QTDIR;
-				d->mode = 0555|DMDIR; /* FUTURE: per-session perms */
+				d->mode = 0555|DMDIR; /* FUTURE: set perms */
 				d->name = smprint("g%d", g->index);
 				releasegang(g);
 				return 0;
@@ -293,7 +319,7 @@ dirgen(int n, Dir *d, void *aux)
 		ne = Qconvend-1;
 		s = n-ne;
 
-		if((s >= 0) && (s < numsubsess)) {
+		if(g && (s >= 0) && (s < g->size)) {
 			d->qid.path=CONVQIDP(CONV(q), Qsubses+s);
 			d->qid.vers=0;
 			d->qid.type=QTDIR;
@@ -335,6 +361,7 @@ static char*
 fswalk1(Fid *fid, char *name, Qid *qid)
 {
 	Dirtab *dt;
+	Gang *g = fid->aux;
 	int j;
 
 	if(!(fid->qid.type&QTDIR))
@@ -362,7 +389,7 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 				qidcopy(qid, &fid->qid);
 				return nil;
 			}
-		if( (name[0] == 'g') && (isanumber(name+1))) { /* session directory */
+		if( (name[0] == 'g') && (isanumber(name+1))) { /* session  */
 			int s = atoi(name+1);
 			Gang *g = findgang(s);
 			if(g != nil) {
@@ -370,6 +397,7 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 				qid->vers = 0;
 				qid->type = QTDIR;
 				qidcopy(qid, &fid->qid);
+				fid->aux = g;
 				return nil;
 			}
 		}
@@ -384,7 +412,7 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 			}
 		if(isanumber(name)) {
 			int s = atoi(name);
-			if(s < numsubsess) {
+			if(g && (s < g->size)) {
 				qid->path = CONVQIDP(CONV(&fid->qid), s+Qsubses);
 				qid->vers = 0;
 				qid->type = QTDIR;
@@ -395,6 +423,24 @@ fswalk1(Fid *fid, char *name, Qid *qid)
 	}
 		
 	return Enotfound;
+}
+
+static char *
+fsclone(Fid *oldfid, Fid *newfid)
+{
+	Gang *g;
+
+	if(oldfid->aux == nil)
+		return nil;
+	if(newfid->aux != nil) {
+		fprint(2, "newfid->aux is nil when oldfid->aux was not\n");
+		return nil;
+	}
+	/* this will only work if only sessions use aux */
+	g = newfid->aux;
+	g->refcount++;
+
+	return nil;
 }
 
 static void
@@ -426,6 +472,7 @@ fsopen(Req *r)
 		respond(r, "out of resources");
 		return;
 	}
+	fid->aux = mygang;
 	
 	path = CONVQIDP(mygang->index, Qctl);
 	r->fid->qid.path = path;
@@ -441,7 +488,7 @@ fsread(Req *r)
 	Qid *q = &fid->qid;
 
 	if (q->type&QTDIR) {
-		dirread9p(r, dirgen, q);
+		dirread9p(r, dirgen, fid);
 		respond(r, nil);
 		return;
 	}
@@ -458,11 +505,136 @@ fsread(Req *r)
 	respond(r, "not yet");
 }
 
+enum
+{
+	CMres,
+};
+
+Cmdtab ctlcmdtab[]={
+	CMres, "res", 0,
+};
+
+static void
+cmdres(Req *r, int num, int argc, char **argv)
+{
+	int c;
+	Fid *f = r->fid;
+	Gang *g = f->aux;
+	void *resp = nil;
+
+	USED(argv);
+
+	for(c=0; c< argc; c++)
+		fprint(2, "DEBUG arg %d: [%s]\n", c, argv[c]);
+
+	/* okay - by this point we should have gang embedded */
+	if(g == nil) {
+		respond(r, "ctl file has no gang");
+		return;
+	} 
+
+	if(g->size > 0) {
+		respond(r, "gang already has subsessions reserved");
+		return;
+	}
+
+	g->size = num;
+
+	if(sendp(bindchan, g) != 1) {
+		fprint(2, "bindchan hungup");
+		threadexits("bindchan hungup");
+	}
+
+	if(recv(g->chan, &resp) < 0) {
+		/* channel failure.... */
+		respond(r, "unknown problem on binder thread");
+		return;
+	}
+
+	if(resp == nil) {
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+	} else {
+		respond(r, resp);
+		free(resp);
+	}	
+}
+
+/* this should probably be a generic function somewhere */
+static char *
+cleanupcb(char *buf, int count)
+{
+	int c;
+	char *nbuf;
+	/* check last few bytes for crap */
+	for(c = count-1; c < count-3; c--) {
+		if((buf[c] < ' ')||(c>'~'))
+			buf[c] = 0;
+	}
+	
+	nbuf = emalloc9p(count+1);
+	memmove(nbuf, buf, count);
+	nbuf[count] = 0;
+	return nbuf;
+}
+
+static void
+fswrite(Req *r)
+{
+	Fid *f = r->fid;
+	Qid *q = &f->qid;
+	char e[ERRMAX];
+	char *buf;
+	Cmdbuf *cb;
+	Cmdtab *cmd;
+	int num;
+
+	switch(TYPE(*q)) {
+	default:
+		snprint(e, sizeof e, "bug in gangfs path=%llux\n", q->path);
+		respond(r, e);
+		break;
+
+	case Qctl:
+		if(r->ifcall.count >= 1024) {
+			respond(r, "ctl message too long");
+			return;
+		}
+		
+		buf = cleanupcb(r->ifcall.data, r->ifcall.count);
+		cb = parsecmd(buf, strlen(buf));
+		cmd = lookupcmd(cb, ctlcmdtab, nelem(ctlcmdtab));
+		if(cmd == nil) {
+			respondcmderror(r, cb, "%r");
+		} else {
+			switch(cmd->index) {
+			default:
+				respondcmderror(r, cb, "unimplemented");
+				break;
+			case CMres:	/* reservation */	
+				if(cb->nf < 2) {
+					respondcmderror(r, cb, "insufficient args %d", cb->nf);
+					break;
+				}
+				num = atol(cb->f[1]);
+				if(num < 0) {
+					respondcmderror(r, cb, "bad arguments: %d", num);
+				} else {
+					cmdres(r, num, cb->nf-2, &cb->f[2]);
+				}
+				break;				
+			};
+		}
+		free(cb);
+		free(buf);
+		break;		
+	};
+}
+
 static void
 fsstat(Req* r)
 {
 	Fid *fid = r->fid;
-	Qid *q = &fid->qid;
 	int n = TYPE(fid->qid) - 1;
 
 	if(TYPE(fid->qid) >= Qsubses) {
@@ -470,10 +642,22 @@ fsstat(Req* r)
 		return;
 	}
 
-	if (dirgen(n, &r->d, q) < 0)
+	if (dirgen(n, &r->d, fid) < 0)
 		respond(r, Enotfound);
 	else
 		respond(r, nil);
+}
+
+static void
+fsclunk(Fid *f)
+{
+	Gang *g;
+
+	/* TODO: get rid of 0 */
+	if((0)&&(f->aux != nil)) {
+		g = f->aux;
+		releasegang(g);
+	}
 }
 
 /* handle certain ops in a separate thread in original namespace */
@@ -495,10 +679,73 @@ iothread(void*)
 		case Tread:
 			fsread(r);			
 			break;
+		case	Twrite:
+			fswrite(r);
+			break;
 		default:
 			fprint(2, "unrecognized io op %d\n", r->ifcall.type);
 			break;
 		}
+	}
+}
+
+/* find the execfs to allocate next session from */
+/* right now we just return local execfs */
+static char *
+findexecfs(void)
+{
+	return "/proc";
+}
+
+/* handle exec binding in a separate thread in original namespace*/
+static void
+bindthread(void *)
+{
+	Gang *g;
+	int n;
+	int count;
+	char buf[255];
+	char dest[255];
+	char *path;
+
+	threadsetname("gangfs-bindthread");
+	for(;;) {
+		g = recvp(bindchan);
+		if(g == nil)
+			threadexits("interrupted");
+		
+		/* FUTURE: do we want to refork for every new request? */
+		g->sess = emalloc9p(sizeof(Session)*g->size);
+		for(count = 0; count < g->size; count++) {
+			path = findexecfs();
+			snprint(buf, 255, "%s/clone", path);
+			g->sess->fd = open(buf, ORDWR);
+			if(g->sess->fd < 0) {
+				sendp(g->chan, 
+				  smprint("couldn't open session ctl %s/clone: %r\n", path));
+				goto error;
+			}
+			n = read(g->sess->fd, buf, 255);
+			if(n < 0) {
+				sendp(g->chan,
+				  smprint("couldn't read from session ctl %s/clone: %r\n", 
+						path));
+				goto error;
+			}
+			n = atoi(buf); /* convert to local execs session number */
+			snprint(buf, 255, "%s/%d", path, n);
+			/* of course we''l need another buf for our local fs ? */
+			snprint(dest, 255, "/proc/g%d/%d", g->index, count);
+			n = bind(buf, dest, MREPL);
+			if(n < 0) {
+				sendp(g->chan,
+				   smprint("couldn't bind %s %s: %r\n", buf, dest));
+				goto error;
+			}
+		}
+		send(g->chan, nil);
+error:
+		;
 	}
 }
 
@@ -515,10 +762,12 @@ Srv fs=
 {
 	.attach=	fsattach,
 	.walk1=	fswalk1,
+	.clone=	fsclone,
 	.open=	ioproxy,
 	.write=	ioproxy,
 	.read=	ioproxy,
 	.stat	=	fsstat,
+	.destroyfid =	fsclunk,
 	.end=	cleanup,
 };
 
@@ -544,6 +793,10 @@ threadmain(int argc, char **argv)
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
+
+	/* spawn off a bind thread */
+	bindchan = chancreate(sizeof(void *), 0);
+	proccreate(bindthread, nil, STACK);
 
 	threadpostmountsrv(&fs, nil, procpath, MAFTER);
 	threadexits(0);
