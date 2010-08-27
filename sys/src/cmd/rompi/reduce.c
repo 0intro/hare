@@ -58,5 +58,6 @@ main(int argc, char **argv)
 	MPI_Finalize();
 	if (0 && (rompidebug & 128) && (! node))
 		printf("DOT:%lld }\n", tbget());
+	while (1);
 	exits("All done");
 }
