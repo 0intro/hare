@@ -126,8 +126,12 @@ cnksbrk(Ar0* ar0, uintptr addr, int allocate)
 	}
 
 	if (addr < oldtop){
+		/* just ignore it *
 		print("cnksbrk: can't shrink heap\n");
 		error("can't shrink heap");
+		 */
+		ar0->p = oldtop;
+		return;
 	}
 
 	/* FIX ME -- up->heapseg should be up->heapindex -- but up->seg[i] is set in a strange way */
@@ -142,15 +146,15 @@ cnksbrk(Ar0* ar0, uintptr addr, int allocate)
 	/* isn't life grand? The heap is already mapped. So just grow the end of heap pointer 
 	 * and we need to allocate pages, since you're not allowed to fault on the heap. 
 	 */
-	print("CNKSBRK: brk to %#ulx\n", addr);
+	//print("CNKSBRK: brk to %#ulx\n", addr);
 	if (i < NSEG)
 		ar0->p = ibrk(addr, i);
 	/* now we might need to fault in all the pages by hand */
 	if (allocate) {
-		print("PRE-fault %#ulx to %#ulx\n", oldtop, addr);
+		//print("PRE-fault %#ulx to %#ulx\n", oldtop, addr);
 		for(;oldtop < addr; oldtop += BY2PG) {
 			/* heap is always writeable */
-			print("Fault in %#ulx\n", oldtop);
+			//print("Fault in %#ulx\n", oldtop);
 			/* oh wow this is so gross */
 			heapseg->nozfod = 0;
 			fault(oldtop, 0);

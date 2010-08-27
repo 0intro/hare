@@ -1239,7 +1239,11 @@ torusinject(Torus *t, TxRing *tx, Block *b)
 	memmove(desc->hdrs.src, t->addr, N);
 	desc->hdrs.sk = Sk;	/* was SKIP(4) on BG/L */
 	/* we only let them set Dp */
-	desc->hdrs.hint &= Dp;
+	/* oh let them hang themselves. 
+	if (desc->hdrs.hint & Dp) {
+		desc->hdrs.hint = Dp | Hxp | Hyp | Hzp;
+	}
+	*/
 	desc->hdrs.hint |= PID0(KernelPid);
 	desc->hdrs.size = SIZE(7) | PID1(KernelPid)|Dy|Vcd0;
 	/* TO DO: SIZE(7) was SIZE(chunks-1) in BG/L */
