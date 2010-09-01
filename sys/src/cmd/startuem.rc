@@ -1,0 +1,13 @@
+#!/bin/rc
+
+./resetuem.rc
+
+echo ------------ > /tmp/mpipe.log
+echo ------------ > /tmp/execfs.log
+echo ------------ > /tmp/gangfs.log
+
+mpipefs -D >[2] /tmp/mpipe.log
+execfs -D >[2] /tmp/execfs.log
+gangfs -D >[2] /tmp/gangfs.log
+
+rc -i
