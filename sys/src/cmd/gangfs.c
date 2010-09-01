@@ -72,6 +72,8 @@ struct Gang
 
 	Channel *chan;	/* channel for sync/error reporting */
 
+	int ctlmp;		/* handle to ctl multipipe */
+
 	int refcount;		/* reference count */
 	Gang *next;		/* primary linked list */
 };
@@ -132,10 +134,26 @@ usage(void)
 	exits("usage");
 }
 
+static int
+mpipe(char *path, char *name)
+{
+	int fd, ret;
+	fd = open("/srv/mpipe", ORDWR);
+	if(fd<0) {
+		fprint(2, "couldn't open /srv/mpipe: %r\n");
+		return -1;
+	}
+	
+	ret = mount(fd, -1, path, MBEFORE, name);
+	close(fd);
+	return ret;
+}
+
 static Gang *
 newgang(void) 
 {
 	Gang *mygang = emalloc9p(sizeof(Gang));
+
 	if(mygang == nil)
 		return nil;
 	memset(mygang, 0, sizeof(Gang));
@@ -430,15 +448,24 @@ fsclone(Fid *oldfid, Fid *newfid)
 {
 	Gang *g;
 
+
+	if((oldfid == nil)||(newfid==nil)) {
+		fprint(2, "fsclone: bad fids\n");
+		return nil;
+	}
+
 	if(oldfid->aux == nil)
 		return nil;
 	if(newfid->aux != nil) {
-		fprint(2, "newfid->aux is nil when oldfid->aux was not\n");
+		fprint(2, "newfid->aux is bit nil when oldfid->aux was not\n");
 		return nil;
 	}
 	/* this will only work if only sessions use aux */
-	g = newfid->aux;
-	g->refcount++;
+	g = oldfid->aux;
+	if(g) {
+		newfid->aux = oldfid->aux;
+		g->refcount++;
+	}
 
 	return nil;
 }
@@ -450,6 +477,7 @@ fsopen(Req *r)
 	Fid *fid = r->fid;
 	Qid *q = &fid->qid;
 	Gang *mygang;
+	void *resp;
 
 	if(TYPE(fid->qid) >= Qsubses) {
 		respond(r, Eperm);
@@ -478,7 +506,22 @@ fsopen(Req *r)
 	r->fid->qid.path = path;
 	r->ofcall.qid.path = path;
 
-	respond(r, nil);
+	/* bind multipipes into place */	
+	if(sendp(bindchan, mygang) != 1) {
+		fprint(2, "bindchan hungup");
+		threadexits("bindchan hungup");
+	}
+
+	if(recv(mygang->chan, &resp) < 0) {
+		respond(r, "unknown problem on binder thread");
+	} else {
+		if(resp == nil) {
+			respond(r, nil);
+		} else {
+			respond(r, resp);
+			free(resp);
+		}
+	}
 }
 
 static void
@@ -523,9 +566,6 @@ cmdres(Req *r, int num, int argc, char **argv)
 	void *resp = nil;
 
 	USED(argv);
-
-	for(c=0; c< argc; c++)
-		fprint(2, "DEBUG arg %d: [%s]\n", c, argv[c]);
 
 	/* okay - by this point we should have gang embedded */
 	if(g == nil) {
@@ -651,13 +691,15 @@ fsstat(Req* r)
 static void
 fsclunk(Fid *f)
 {
+	USED(f);
+	/*  
 	Gang *g;
 
-	/* TODO: get rid of 0 */
 	if((0)&&(f->aux != nil)) {
 		g = f->aux;
 		releasegang(g);
 	}
+	*/
 }
 
 /* handle certain ops in a separate thread in original namespace */
@@ -679,7 +721,7 @@ iothread(void*)
 		case Tread:
 			fsread(r);			
 			break;
-		case	Twrite:
+		case Twrite:
 			fswrite(r);
 			break;
 		default:
@@ -713,7 +755,20 @@ bindthread(void *)
 		g = recvp(bindchan);
 		if(g == nil)
 			threadexits("interrupted");
-		
+
+		if(g->size == 0) { /* bind multipipes into place */
+			snprint(buf, 255, "/proc/g%d", g->index);
+			if(mpipe(buf, "ctl") < 0) {
+				sendp(g->chan, smprint("couldn't bind ctl multipipe\n"));
+				continue;
+			} else {
+				snprint(buf, 255, "/proc/g%d/ctl", g->index);
+				g->ctlmp = open(buf, OWRITE);
+			}
+			send(g->chan, nil);
+			continue;
+		}
+
 		/* FUTURE: do we want to refork for every new request? */
 		g->sess = emalloc9p(sizeof(Session)*g->size);
 		for(count = 0; count < g->size; count++) {
@@ -794,10 +849,10 @@ threadmain(int argc, char **argv)
 	iochan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
 
+	threadpostmountsrv(&fs, nil, procpath, MAFTER);
+
 	/* spawn off a bind thread */
 	bindchan = chancreate(sizeof(void *), 0);
 	proccreate(bindthread, nil, STACK);
-
-	threadpostmountsrv(&fs, nil, procpath, MAFTER);
 	threadexits(0);
 }
