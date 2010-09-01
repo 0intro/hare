@@ -1,6 +1,27 @@
 #include "rompi.h"
 
 enum {
+	Sk		= 0x01,			/* Skip Checksum */
+
+	Pid0		= 0x01,			/* Destination Group FIFO MSb */
+	Dp		= 0x02,			/* Multicast Deposit */
+	Hzm		= 0x04,			/* Z- Hint */
+	Hzp		= 0x08,			/* Z+ Hint */
+	Hym		= 0x10,			/* Y- Hint */
+	Hyp		= 0x20,			/* Y+ Hint */
+	Hxm		= 0x40,			/* X- Hint */
+	Hxp		= 0x80,			/* X+ Hint */
+
+	Vcd0		= 0x00,			/* Dynamic 0 VC */
+	Vcd1		= 0x01,			/* Dynamic 1 VC */
+	Vcbn		= 0x02,			/* Deterministic Bubble VC */
+	Vcbp		= 0x03,			/* Deterministic Priority VC */
+	Dy		= 0x04,			/* Dynamic Routing */
+	Dm		= 0x08,			/* DMA Mode */
+	Pid1		= 0x10,			/* Destination Group FIFO LSb */
+};
+
+enum {
 	TAGcomm = 0,
 	TAGtag,
 	TAGsource,
@@ -161,6 +182,31 @@ MPI_Wtime(void)
 }
 
 /* the size of an mpi data type is the data type value >> 8 & 0xff. Just assign to u8int after the >> */
+
+/* if we like this function merge it in with the one below later. */
+int
+MPI_Sendxyz( void *buf, int num, MPI_Datatype datatype, int x, int y, int z, int hint,
+              int tag, MPI_Comm comm )
+{
+	unsigned char nbytes = datatype >> 8;
+	unsigned long torustag[TAG];
+	int count;
+	count = num * nbytes;
+	switch(comm) {
+		case MPI_COMM_WORLD:
+			break;
+		default:
+			panic("MPI_Send only implements MPI_COMM_WORLD\n");
+	}
+
+	torustag[TAGcomm] = comm;
+	torustag[TAGtag] = tag;
+	torustag[TAGsource] = myproc;
+	torussend(buf, count, x, y, z, hint, torustag, sizeof(torustag));
+
+	return MPI_SUCCESS;
+}
+
 int
 MPI_Send( void *buf, int num, MPI_Datatype datatype, int dest, 
               int tag, MPI_Comm comm )
@@ -259,88 +305,7 @@ datatype	data type of elements of send buffer (handle)
 op	reduce operation (handle) 
 root	rank of root process (integer) 
 comm	communicator (handle)  */
-#if 0
-int deposit_reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
-               MPI_Comm comm,  MPI_Status *status)
-{
-
-	unsigned char nbytes = datatype >> 8;
-	unsigned long torustag[TAG];
-	int count;
-	int fromx, fromy, fromz, fromrank;
-	count = num * nbytes;
-	int reducetag = 0xaa55;
-	switch(comm) {
-		case MPI_COMM_WORLD:
-			break;
-		default:
-			panic("MPI_Send only implements MPI_COMM_WORLD\n");
-	}
-
-	torustag[TAGcomm] = comm;
-	torustag[TAGtag] = reducetag;
-	torustag[TAGsource] = myproc;
-
-	if(rompidebug&8) print("%lld reduce_end: %d(%d, %d, %d)\n", tbget(), myproc, x, y, z);
-	if (myproc) {
-		/* who we get it from depends on who we are. */
-		/* this shows some bad design. We compute x,y,z, turn it into rank, 
-		 * call mpirecv, it turns our rank into x,y,z.
-		 */
-		fromz = z;
-		fromy = y;
-		fromx =x;
-		if (z)
-			fromz = 0;
-		else if (y) 
-			fromz = fromy = 0;
-		else if (x)
-			fromz = fromy = fromx = 0;
-		fromrank = xyztorank(fromxx, fromy, fromz);
-		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from (%d, %d, %d)\n", tbget(), myproc, x, y, z, fromx, fromy, fromz);
-		if (rompidebug&128) print("DOT:%lld R%d->R%d;\n", tbget(), fromrank, myproc);
-		MPI_Recv(buf, 1, MPI_INT, fromrank, reducetag, MPI_COMM_WORLD, status);
-		if(rompidebug&4) print("%lld reduce_end: %d: Got from %d\n", tbget(), myproc, fromrank);
-	}
-
-	/* OK, we got it, we just need to do one send to our "axis" (of evil?) */
-	/* do me a favor here. You could rewrite this stuff to be "more optimal". 
-	 * optimization is what compilers do. I've made an effort to make this easy for
-	 * someone to read if they come along later. Please avoid any temptation
-	 * to clever-ize this code unless it also makes it easier to follow. 
-	 */
-	if (z) {
-	} else if (y) {
-		if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, xyztorank(x,y,zsize-1), x, y, zsize-1);
-		if (rompidebug&128) print("DOT:%lld c%d->c%d;\n", tbget(), myproc, xyztorank(x,y,zsize-1));
-		torustag[TAGsource] = myproc;
-		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
-	}
-	else if (x) {
-		/* send down BOTH our y and z axis */
-		torustag[TAGsource] = myproc;
-		if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, ysize-1, 0);
-		if (rompidebug&128) print("DOT:%lld c%d->c%d;\n", tbget(), myproc, xyztorank(x,ysize-1, 0));
-		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
-		if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, y, zsize-1);
-		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
-	} else {
-		/* send down x, y, z */
-		if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, xsize-1, 0, 0);
-		if (rompidebug&128) print("DOT:%lld c%d->c%d;\n", tbget(), myproc, xyztorank(xsize-1, 0, 0));
-		torussend(buf, count, xsize-1, 0, 0, 1, torustag, sizeof(torustag));
-		if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, ysize-1, 0);
-		if (rompidebug&128) print("DOT:%lld c%d->c%d;\n", tbget(), myproc, xyztorank(x, ysize-1, 0));
-		torussend(buf, count, x, ysize-1, 0, 1, torustag, sizeof(torustag));
-		if(rompidebug&4) print("%lld reduce_end %d(%d, %d, %d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, y, zsize-1);
-		torussend(buf, count, x, y, zsize-1, 1, torustag, sizeof(torustag));
-	}
-
-	if(rompidebug&8) print("%lld reduce_end: %d(%d, %d, %d) DONE\n", tbget(), myproc, x, y, z);
-	return MPI_SUCCESS;
-}
-#endif
-int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
+int reduce_end_slow ( void *buf, int num, MPI_Datatype datatype, int root, 
                MPI_Comm comm,  MPI_Status *status)
 {
 	unsigned char typesize = datatype >> 8;
@@ -404,6 +369,63 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root,
 				torank = xyztorank(x, y, toz);
 				MPI_Send(buf, num, datatype, torank, 1, comm);
 			}
+		}
+	}
+
+}
+int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
+               MPI_Comm comm,  MPI_Status *status)
+{
+	unsigned char typesize = datatype >> 8;
+	int i, tox, toy, toz;
+	int torank, fromrank;
+	void *tmp;
+	int *sum, *nsum; // hack 
+	unsigned long torustag[TAG];
+	int reducetag = 1;
+
+	torustag[TAGcomm] = comm;
+	torustag[TAGtag] = reducetag;
+	torustag[TAGsource] = myproc;
+
+	if(rompidebug&8) print("%lld reduce_end: %d(%d, %d, %d)\n", tbget(), myproc, x, y, z);
+
+	rompidebug |= 2;
+	/* the easy cases: z > 0 and the origin */
+	if (z) {
+		/* get the sum from rank x,y,0 */
+		fromrank = xyztorank(x,y,0);
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, x, 0, 0);
+		if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
+		MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
+	} else if (! myproc) {
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, xsize-1, 0, 0);
+		MPI_Sendxyz(buf, num, datatype, xsize-1, 0, 0, Hxp|Dp, 1, comm);
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, 0, ysize-1, 0);
+		MPI_Sendxyz(buf, num, datatype, 0, ysize-1, 0, Hyp|Dp, 1, comm);
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, 0, 0, zsize-1);
+		MPI_Sendxyz(buf, num, datatype, 0, 0, zsize-1, Hzp|Dp, 1, comm);
+	} else {
+		if (! y) {
+			/* get the sum from rank 0 */
+			fromrank=xyztorank(0,0,0);
+			if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, 0, 0, 0);
+			if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
+			MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
+			/* send out our y >0 data */
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, ysize-1, 0);
+			MPI_Sendxyz(buf, num, datatype, x, ysize-1, 0, Hyp|Dp, 1, comm);
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, 0, zsize-1);
+			MPI_Sendxyz(buf, num, datatype, x, 0, zsize-1, Hzp|Dp, 1, comm);
+		} else {
+			/* get the sum from rank x,0,0 */
+			fromrank=xyztorank(x,0,0);
+			if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): wait from %d(%d, %d, %d)\n", tbget(), myproc, x, y, z, fromrank, x, 0, 0);
+			if (rompidebug&128) print("DOT:%lld b%d->b%d;\n", tbget(), fromrank, myproc);
+			MPI_Recv(buf, num, datatype, fromrank, reducetag, MPI_COMM_WORLD, status);
+			/* send out our z >0 data */
+		if(rompidebug&4) print("%lld reduce_end: %d(%d,%d,%d): send to (%d, %d, %d)\n", tbget(), myproc, x, y, z, x, y, zsize-1);
+			MPI_Sendxyz(buf, num, datatype, x, y, zsize-1, Hzp|Dp, 1, comm);
 		}
 	}
 
