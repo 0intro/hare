@@ -1,0 +1,143 @@
+%input macros (i.e. write your own macros file called MacroFile1.tex)
+%\include{Macros/MacroFile1}
+
+\documentclass[oneside,12pt]{Classes/CUEDthesisPSnPDF}
+
+\ifpdf
+	\pdfinfo { 
+		/Title  (VU MS Thesis Classes)
+		/Creator (TeX)
+		/Producer (pdfTeX)
+		/Author (Pravin Shinde pse2200@few.vu.nl)
+		/CreationDate (D:20100602000000)  %format D:YYYYMMDDhhmmss
+		/ModDate (D:20100602000000)
+		/Subject (XCPU3: Workload Distribution and Aggregation)
+		/Keywords (MS, Thesis)
+	}
+    \pdfcatalog { 
+		/PageMode (/UseOutlines)
+		/OpenAction (fitbh)  
+	}
+\fi
+
+\title{XCPU3: Workload Distribution and Aggregation}
+
+\ifpdf
+	\author{\href{http://www.few.vu.nl/~pse220}{Pravin Shinde}}
+	\renewcommand{\studentnumber}{Student Number: 1824368}
+	\collegeordept{\href{http://www.cs.vu.nl}{Department of Computer Science}}
+	\university{\href{http://www.vu.nl}{Vrije Universiteit, Amsterdam}}
+	\crest{\includegraphics[width=30mm]{vu_logo}}
+\else
+	\author{Pravin Shinde}
+	\renewcommand{\studentnumber}{Student Number: 1824368}
+	\collegeordept{Department of Computer Science, Amsterdam}
+	\university{Vrije Universiteit}
+	\crest{\includegraphics[bb = 0 0 292 336, width=30mm]{vu_logo}}
+\fi
+%
+% insert below the file name that contains the crest in-place of 'UnivShield'
+% \crest{\IncludeGraphicsW{UnivShield}{40mm}{14 14 73 81}}
+%
+
+%\renewcommand{\submittedtext}{change the default text here if needed}
+\degree{\href{http://pdcs.vu.nl}{Master in parallel and distributed systems}}
+\degreedate{July 2010}
+
+\renewcommand{\supervisors}{Supervisors: \\ 
+\href{https://researcher.ibm.com/researcher/view.php?person=us-ericvanhensbergen}{Eric Van Hensbergen} \\ 
+\href{http://www.cs.vu.nl/~herbertb/}{Prof. dr. Herbert Bos}
+}
+
+% turn of those nasty overfull and underfull hboxes
+\hbadness=10000
+\hfuzz=50pt
+
+% Put all the style files you want in the directory StyleFiles and usepackage like this:
+\usepackage{StyleFiles/watermark}
+
+
+\begin{document}
+
+%\language{english}
+
+\renewcommand\baselinestretch{1.2}
+\baselineskip=18pt plus1pt
+
+% A page with the abstract on including title and author etc may be
+% required to be handed in separately. If this is not so, then comment
+% the below 3 lines (between '\begin{abstractseparte}' and 
+% 'end{abstractseparate}'), normally like a declaration ... needs some more
+% work, mind as environment abstracts creates a new page!
+% \begin{abstractseparate}
+%   \input{Abstract/abstract}
+% \end{abstractseparate}
+
+% Using the watermark package which is in StyleFiles/
+% and to remove DRAFT COPY ONLY appearing on the top of all pages comment out below line
+%\watermark{DRAFT COPY ONLY}
+
+\maketitle
+
+%set the number of sectioning levels that get number and appear in the contents
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+
+\frontmatter
+%\include{Dedication/dedication}
+%\include{Acknowledgement/acknowledgement}
+\include{Abstract/abstract}
+
+\tableofcontents
+\listoffigures
+
+% TODO Fix nomenclature
+%\printglossary  %% Print the nomenclature
+%\addcontentsline{toc}{chapter}{Nomenclature}
+
+\mainmatter
+
+\include{Introduction/introduction}
+
+% Background (about XCPU and XCPU2)
+\include{Chapter1/chapter1}
+
+% Design desicions
+\include{Chapter2/chapter2}
+
+% implementation, Filesystem interface
+\include{Chapter3/chapter3}
+
+% Evaluation   
+\include{Chapter4/chapter4}
+
+% Future work
+%\include{Chapter6/chapter6}
+
+
+
+% Related Work
+\include{Chapter5/chapter5}
+
+% Future work and Conclusions
+\include{Conclusions/conclusions}
+
+\appendix
+%\include{AppendixA/appendixA}
+%\include{Appendix2/appendix2}
+
+% NOTE: There is some problem with table references. If we are adding more
+% tables, then cross check legends of all referred tables.
+
+% TODO Also add control management information (appendix)
+
+%\bibliographystyle{Classes/jmb} % bibliography style
+%\bibliographystyle{Classes/CUEDbiblio}
+%\bibliographystyle{Classes/jmb}
+%\bibliographystyle{plainnat} %this works with package natbib
+\bibliographystyle{alpha} % bibliography style
+\renewcommand{\bibname}{References} % changes default name Bibliography to References
+\bibliography{References/references} % References file
+\addcontentsline{toc}{chapter}{References} %adds References to contents page
+
+\end{document}

@@ -1,0 +1,39 @@
+% Thesis Abstract -----------------------------------------------------
+
+%\begin{abstractslong}    %uncommenting this line, gives a different abstract heading
+\begin{abstracts}        %this creates the heading for the abstract page
+
+With growing acceptance of clusters and grids, the parallel programming
+paradigm is coming out from the research community to the business domain.
+Unfortunately the applications in the business domain are typically dataflow 
+workloads which differ significantly from the traditional high
+performance computing(HPC) workloads.  Most of the existing workload distribution
+solutions concentrate more on HPC applications and are not efficient in quickly 
+deploying the dynamic workload involving large number of small jobs which 
+is the typical case in dataflow applications.
+Also developing and deploying applications on existing infrastructures still 
+is a non-trivial task requiring special runtimes, middleware support and/or language dependence.
+
+We have explored an alternate approach for simplifying workload
+distribution and aggregation based on synthetic filesystems and the private
+namespace concepts of Plan 9.  Instead of sending workloads to a remote
+cluster, XCPU3 works by bringing the remote cluster to the user's desktop,
+leading to full control over the compute environment.   XCPU3 provides
+a filesystem interface, making it runtime and language agnostic.  It also
+allows executing multiple jobs simultaneously in isolation, leading to
+better resource utilization.  XCPU3 makes all nodes independent and
+equivalent in functionality leading to the ability to localize the
+decision making and ability to handle dynamic workloads.  
+XCPU3 provides easy to use, flexible and scalable infrastructure for 
+workload distribution and aggregation that can be used by 
+dynamic workloads and dataflow applications.
+
+\end{abstracts}
+%\end{abstractlongs}
+
+% ----------------------------------------------------------------------
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../thesis"
+%%% End: 
