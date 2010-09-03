@@ -46,6 +46,7 @@ authentication(int cpuflag)
 		break;
 	}
 
+print("waiting for factotum...");
 	/* wait for agent to really be there */
 	while(access("/mnt/factotum", 0) < 0)
 		sleep(250);
