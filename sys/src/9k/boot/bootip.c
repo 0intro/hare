@@ -30,6 +30,7 @@ configip(int bargc, char **bargv, int needfs)
 	memmove(arg, bargv, bargc * sizeof(char*));
 	arg[bargc] = 0;
 
+print("ipconfig...");
 	argc = bargc;
 	argv = arg;
 	strcpy(mpoint, "/net");
