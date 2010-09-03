@@ -1,0 +1,120 @@
+\def\baselinestretch{1}
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+\ifpdf
+    \graphicspath{{Conclusions/ConclusionsFigs/PDF/}
+		{Conclusions/ConclusionsFigs/PNG/}{Conclusions/ConclusionsFigs/}}
+\else
+    \graphicspath{{Conclusions/ConclusionsFigs/EPS/}{Conclusions/ConclusionsFigs/}}
+\fi
+
+\def\baselinestretch{1.66}
+
+This chapter concludes the XCPU3 work that we have presented in this document.
+We will discuss our accomplishments and the limitations in this chapter.
+
+\section{Accomplishments}
+We have created the XCPU3 infrastructure as the workload deployment solution to
+tackle problems faced by dataflow deployments which were mostly ignored in
+previous solutions.  We will discuss a few of our accomplishments in
+this section.
+
+\begin{enumerate}
+\item \textbf{Generic}: Even though we used Blue Gene as our primary target We
+do not use any feature specific to the Blue Gene.  Also, by using Inferno, we
+have ensured that the XCPU3 will work on most of the traditional operating
+systems.  These features make XCPU3 infrastructure generic so that it can be
+used by other clusters and grids also. 
+
+\item \textbf{Agility}: This infrastructure is quick in deploying large numbers
+of small jobs. The overhead involved in starting and closing XCPU3 sessions
+is small. The evaluations chapter provides us with some data about how this
+infrastructure performs and how well it scales for large numbers of deployments.
+
+\item \textbf{Ease of use}:  We have used the filesystem interface for providing
+ease of use without losing the flexibility.  This interface allows the user to
+use any language and runtime for interacting with the system. All existing tools
+which work on the files can be easily used with this interface.
+
+\item \textbf{Flexible}: The XCPU3 infrastructure achieves flexibility by making
+each node an independent entity.  As each node is independent and the
+reservation is decentralized, this infrastructure can provide the flexibility of
+dynamically adjusting the reservations based on the changing requirements and
+computations. Any node can start a new reservation whenever the computation
+increases in the size. These nodes can be organized in any arrangement as per
+user needs.  XCPU3 also provides the means for creating an overlay of nodes and
+sessions by binding them in any organization.
+\end{enumerate}
+
+With these accomplishments we believe that the XCPU3 facilitates the easy and
+quick dataflow deployments without losing the flexibility.
+
+\section{Limitations}
+We understand that the XCPU3 is not a silver bullet, but a step towards
+improving the infrastructure. This section discusses the limitations of the
+XCPU3 which need more work.
+
+\begin{enumerate}
+\item \textbf{Virtualization layer}: By using Inferno for the implementation,
+we have added an additional layer which reduces the performance.  This decision
+was made to quickly get the portability across multiple operating systems but at
+the cost of the performance. 
+
+This virtualization layer can be removed by natively implementing the XCPU3
+filesystem on the different operating systems. We have plans for this in the
+near future and these plans should improve the performance further.
+
+\item \textbf{Infrastructure}: XCPU3 is the infrastructure and not the entire
+solution.  Even though it can be used in stand alone mode, it needs support
+from other services like CSRV and PUSH to facilitate the dataflow
+deployments in an easy way. We do not consider this a serious limitation as the
+XCPU3 is designed to solve only part of the problem.  Other services can be
+easily used in combination with XCPU3 to get the complete solution.
+
+\item \textbf{Fault tolerance}:  The current XCPU3 implementation assumes that
+faults will be infrequent and it expects the user to restart the job in case of
+a fault or problem.  This approach is not scalable for grid-like
+installations.  Failure of any node of link will lead to discarding the work
+done by all other nodes and restarting everything again.
+\end{enumerate}
+
+
+\section{Future work}
+We have the following future plans about overcoming the existing limitations.
+
+We plan to implement the XCPU3 filesystem natively on traditional operating
+systems.  This will improve the performance and allow different nodes with
+different operating systems to directly use each other's resources using the
+XCPU3 interfaces.
+
+We also have plans for providing better fault tolerance by remembering the
+state of each compute session and selectively restarting the sessions which had
+failed.  This mechanism can save a lot of computations where failures are
+frequent.
+
+We also envision the use of XCPU3 in voluntary and collaborative computing
+where each participating user installs the XCPU3 filesystem and then it can
+either provide its resources to the community or use the community's resources
+using these interfaces.
+
+
+\section{Conclusion}
+We conclude this discussion with stating that the XCPU3 opens up a new way for
+dataflow workload deployment.  This infrastructure simplifies quick deployment
+of large numbers of small applications while maintaining flexibility. It
+hides all the networking complexities behind the simple filesystem interface,
+providing ease of use.  This is one more step towards enabling commercial
+dataflow applications on cluster-like setups.  We hope that this work will
+speed up the acceptance of HPC in business domains.
+
+
+
+%%% ----------------------------------------------------------------------
+
+% ------------------------------------------------------------------------
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../thesis"
+%%% End: 

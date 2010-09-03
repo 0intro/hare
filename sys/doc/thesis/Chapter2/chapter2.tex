@@ -1,0 +1,211 @@
+\chapter{Design}
+\label{chap:Design}
+
+\ifpdf
+    \graphicspath{{Chapter2/Chapter2Figs/PDF/}{Chapter2/Chapter2Figs/PNG/}
+		{Chapter2/Chapter2Figs/}}
+\else
+    \graphicspath{{Chapter2/Chapter2Figs/EPS/}{Chapter2/Chapter2Figs/}}
+\fi
+
+The key challenge in this design was to provide the flexibility needed by dataflow
+applications while achieving scalability to the large number of nodes available
+with Blue Gene. 
+
+Even though a lot of work was present in the form of XCPU and XCPU2, we 
+decided to only borrow the concepts and lessons from them, but design and implement
+a new system from scratch instead of just extending XCPU2.
+
+\section{Key design decisions}
+
+We decided to adopt a few guiding principles which will help us to reach our goal
+of flexibility with scalability.  We also decided to keep the design simple,
+and we believe that the simple design should lead to the simple and flexible interface.
+We also hope that the lack of complexity may help in improving scalability.
+In this section we present those decisions which influenced most aspects of
+system design and implementation.
+
+\subsection{Localization of decision making}
+The key requirement for us was scalability to a large number of nodes.  We planned
+to design the system without any central component which should have knowledge
+of the entire system.  This design decision implies that there is no central entity 
+making decisions.  We plan to distribute and localize the computations as well
+as decisions.  These decisions include scheduling, job management and
+workload distribution and aggregation.
+
+The downside of this design decision is the lack of a global view at one location.
+We avoid decision making based on global knowledge and promote use of local
+information.  We hope that if each node tries to attempt a local optimum, we will
+reach the global optimum.  This may not be true in all cases, We hope that in those cases, 
+even if we do not reach global optimum, we will perform acceptably well.
+
+We also assume that there will be applications which will need a detailed global
+view of the system.  We support generating such a global view by aggregating the
+information from each node.  These operations are comparatively expensive
+because of communication involved.  We leave the decision of using such a
+detailed global view to application developers who will be in best position to
+make such trade-off.
+
+\subsection{Independence of every node}
+In some sense, this design decision is a side-effect of the above decision.  As we
+plan to distribute and localize all functionalities, it was essential to replicate
+these functionalities at multiple levels making localization possible.  The
+granularity of functionality replication decides the granularity of control,
+and hence influences the flexibility provided by the system.  As we aim for 
+maximum flexibility, we have decided for replicating the following three
+functionalities at each node.
+\begin{enumerate}
+\item \textbf{Resource reservation}: Each node should be able to reserve more
+resources on it's own without involvement of any central entity.
+
+\item \textbf{Job management}: Every node should be capable of starting new jobs
+using his reservations. The node should also be able to manage and interact with
+these jobs.  And every node should also be able to terminate the jobs it started.
+
+\item \textbf{Computation}: Every node should be able to perform the computation 
+by running the requested application in isolation and returning the results.
+
+\end{enumerate}
+We intend to provide each node with the capability to perform all of these roles
+simultaneously instead of binding them in one role at one time.
+
+This design makes the interface to every node a building block identical to each other, 
+and provides the flexibility to build any structure with these building blocks.
+
+There are a few downsides in making every node independent.  Now the traditional
+master-slave model is no longer valid where a master can assume the control over
+all resources of slave nodes.  Each node has to politely request other nodes for
+help in performing the tasks and they should be ready to handle their requests
+for help being rejected.
+
+With independence of every node, each node can be a source of failures and faults.
+One will need to come up with better ways to deal with faults and
+failures when so many sources of them are present.  This takes the XCPU3 in
+realms of \textbf{Distributed Systems} opening many more possibilities and
+questions.
+
+We avoid these complexities by assuming a very simple model for handling
+failures.  Any failure anywhere in the system will result in the failure of the entire
+operation.  We assume that failures will be in-frequent, so aborting and
+restarting operation should be acceptable for such infrequent failures.
+
+We believe that this approach will work on setups like Blue Gene where failures
+are infrequent, but it will not be acceptable on other grid like system
+which are more prone to failures because of network, hardware and
+administrative issues.  We limit ourself to reliable systems for the purpose of
+this project and keep other systems for our future work.
+
+
+\subsection{Filesystem Interface}
+We want to keep XCPU3 interface agnostic from language,
+runtime and middleware.  Plan 9 has proven that the filesystem interface is very
+flexible and yet powerful in the world of distributed applications.  We aim to 
+follow the same principle of \textbf{Everything is a file} from Plan 9.
+
+Every node will provide access to its services via filesystem interfaces.
+This interface will be exported as the filesystem over the network so that other nodes can use it.
+Other nodes can mount this filesystem and use it as interface for interacting
+with that node.  Multiple remote nodes can be aggregated into the filesystem 
+hierarchy providing a clean and easy way to access them.
+
+Multiple overlay views
+can be created by \textit{binding} the same filesystem at multiple locations with
+different names.  This ability of creating ad-hoc overlays allow users to
+arrange remote resources as per his needs without worrying about their actual
+locations.
+
+Other advantages of using filesystem interfaces are that 
+\begin{enumerate}
+\item Existing tools/commands used with traditional filesystem can be directly
+used with XCPU3.
+
+\item filesystems come with their own mechanism for access control list for
+providing the security.  We can leave the security to these already proven 
+mechanisms instead of implementing our own.
+
+\item We inherit the ability to export, mount and bind the filesystem
+without writing any explicit code for it.
+
+\item Filesystem interfaces are simpler to program than socket interfaces.  This
+can lead to simpler code and hence lesser bugs.
+
+\item Users don't need special privileges or administrative access to interact
+with the filesystem.  This simplifies the user experience in running XCPU3 based
+applications.
+\end{enumerate}
+
+With all the good features offered by the filesystem interface, it does impose
+some requirements/limitations. Following are a few limitations which affect our design
+decisions.
+
+\begin{enumerate}
+
+\item The requirement imposed by using this interface is that
+all operations on these synthetic filesystems should go to actual
+filesystems.   This puts limitations on the application or middleware level caching.
+Such caching may end up providing stale values leading to errors.
+
+\item Another more critical limitation concerns the POSIX standard for failure reporting 
+in filesystem.  POSIX standard dictates that file operations should report their success
+or failure in the form of a number.  But a single number can not report enough
+information about the reason behind failures.  This makes the filesystem interface
+less desirable where failures are common and need more information for
+debugging.  Plan 9 overcomes this limitation by returning a string instead
+of number.  This string can provide much more valuable and verbose information
+if anything goes wrong.  But as we are also aiming to deploy XCPU3 filesystem 
+on POSIX compatible operating systems, we need alternative way to report failures.
+
+\item Another drawback is the way a failure of remote services is detected.
+The filesystem interface relies on the underlying networking protocol for detecting
+failures by waiting for timeouts, and then reporting them back to users as
+an error.  This makes the filesystem interface less desirable where quick 
+failure detection and recovery is needed.  This limitation can be overcome by 
+an alternative design of using callback functions.  If applications can register 
+callback functions with operating systems, then these callback functions
+can be used to quickly report status/error and take recovery actions.
+
+
+\end{enumerate}
+
+Our decision to choose the filesystem interface despite of it's drawbacks is the
+trade-off we are willing to do for flexibility and simplicity.  We do understand
+the limitations imposed by this choice and we try to overcome them and inform 
+the users of this system about these limitations.
+
+\begin{enumerate}
+
+\item We strongly encourage developers to directly interact with filesystems by
+using system calls and avoid using any middleware that might do caching.  We
+also advise users to use the latest content of the file instead of previously read content.
+
+\item We plan to use separate files in the filesystem interface to report errors in
+detail instead of entirely relying on returned error codes.  That way, users
+can get more details about the error by reading this file.
+
+\item We limit ourself in this project with the assumption that failures will be
+infrequent.  With this assumption, we are willing to accept the delays in
+reporting failures at the remote end.
+
+\end{enumerate}
+
+We want to provide flexibility without loosing the simplicity of the interface.
+With the above assumptions and restrictions, we believe that our decision of
+choosing the filesystem interface should provide the best flexibility.
+
+\section{Summary}
+We have built our system with the above three design decisions as our guiding
+principles.  These decisions are taken by understanding the requirements of the
+dataflow applications based on a few assumptions about the reliability of the underlying
+system and a few restrictions on the developers.  This solution may need modifications
+if any of the above parameters change. This solution is not designed to solve
+all the problems in all possible setups, it is targeted to the requirements we
+have discussed.
+
+
+
+% ------------------------------------------------------------------------
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../thesis"
+%%% End: 

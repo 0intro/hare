@@ -1,0 +1,236 @@
+\chapter{Related work}
+\label{chap:related}
+
+\ifpdf
+    \graphicspath{{Chapter5/Chapter5Figs/PDF/}{Chapter5/Chapter5Figs/PNG/}
+		{Chapter5/Chapter5Figs/}}
+\else
+    \graphicspath{{Chapter5/Chapter5Figs/EPS/}{Chapter5/Chapter5Figs/}}
+\fi
+
+This chapter tries to put XCPU3 in the context of other work which 
+has been done in this area.  We will briefly discuss the various related
+projects and how they differ from XCPU3.
+
+\section{Historical solutions}
+Using multiple computers for getting the job done is not new.  With the
+availability of cheap networking, there were attempts in the research community
+to create a \textit{distributed operating system} which can be used for workload
+distribution. This section discusses few of those research projects.
+
+\subsection{Amoeba}
+Amoeba \cite{amoeba} was developed as a general purpose distributed operating
+system which can solve the problem of scarcity of compute resources.  It works
+by creating a \textit{processor pool} using idle workstations and use this pool
+for performing long running computations.  It introduced and used concepts like
+process migration. It provided tightly integrated mechanisms for remote
+process execution and control allowing the resources of the entire network to be
+utilized as a single system.
+
+Amoeba mainly concentrated on turning the collection of workstations into a
+transparent distributed system.  It concentrated more on executing the
+applications reliably and not on deploying the applications quickly. 
+
+\subsection{Cambridge Distributed Computing System}
+The Cambridge distributed computing system\cite{Needham82} system was aimed to 
+tackle the problem faced during 1980 when the machines were less powerful and
+more expensive.  The direct assignment of the machine to a user was inflexible
+as the computational requirements of the users change depending on the work he
+is doing.  This system works by having central \textit{processor bank} which
+does not belong to any user.  Any user can remotely use the processors from the
+processor bank and release them when computation is over.  This system also
+implemented the network filesystem which can be accessed by any processor in the
+processor bank or workstation.
+
+This system provided the mechanism for organizing the multiple resources,
+but it was aimed at sharing the resources between users.
+
+\section{Traditional job deployment solutions}
+Increase  in the capability of the personal computers (pc) and decrease of their
+cost made the above research systems outdated.  As we are reaching the limits of
+silicon technology, it is becoming increasingly difficult to increase the
+speeds of these processors. This has lead to the design of multicore and
+manycore chips.  This trend has also promoted research in clusters and grids. 
+In this new incarnation, most of these clusters run the Unix based operating
+system and the responsibility of extracting parallelism from these clusters
+is left to the applications.  These new incarnations of clusters also used
+different mechanisms for job deployment.  As clusters run the Unix based 
+loosely coupled operating system on each node, the job deployment was based on
+the services like remote shell.  This section discusses a few of these job
+deployment solutions used in recent clusters.
+
+
+\subsection{Secure SHell(SSH)}
+SSH\cite{ssh} is the security aware extension of remote shell.  SSH uses public
+key cryptography for key exchange and provides a secure channel by encrypting
+all the traffic.  The job deployment is done by the client node logging on the
+compute node using SSH and using this remote shell to execute the desired
+application.  The applications and other dependency files are transferred to 
+the remote node either by copying them using \textit{Secure CoPy (SCP)} or 
+fetching them over a network/distributed filesystem.
+
+
+Most of the existing middleware and workload distribution systems use the above
+approach.  Even though they provide wrappers around it to simplify the user
+interface, the above are the fundamental working services.
+
+
+The limitation of using SSH is that the application has to run in the
+environment of the compute node and not in the environment of the client node. 
+This puts additional burden on the application developer to ensure that the
+application will work properly in the compute node environment.
+
+
+Another limitation is that the SSH connections are one-to-one, and this
+one-to-one model does not scale up for controlling large numbers of nodes.
+
+\subsubsection{PSSH}
+Parallel SSH (PSSH)\cite{pssh} is an attempt to overcome the limitation of
+scalability.  This tool allows connecting to multiple remote nodes
+simultaneously.  It allows client to control all the remote nodes simultaneously
+by replicating the same commands to all the remote shells.
+
+This tool definitely improves the scalability but at the loss of flexibility as
+client node loses the fine grained control on each remote node.  Also, as PSSH
+does not use any kind of hierarchy for scaling, client node is responsible for
+maintaining all parallel connections.
+
+\subsection{BProc: Beowulf Distributed Process Space}
+BProc\cite{bproc} is developed as an alternative to the loosely coupled SSH
+based job deployment. BProc works by tightly coupling the kernels running on
+cluster nodes and gives better control on remote processes than SSH.  BProc
+is set of kernel modifications, utilities and libraries.  These modifications
+provide mechanisms for starting and managing processes on remote node and
+process migration by using the OS API.  BProc creates a distributed process ID
+space which allows a front node to locally control all remotely started
+processes.
+
+BProc is a good step towards getting more control over the processes cluster
+environment, but it also imposes few restrictions.  It needs a modified kernel
+on all the nodes.  Another restriction is on the namespace.  The remotely
+started process will work in the namespace of the compute node and not in the
+namespace of the client node.  Also, the process migration is restrictive as all
+the open files except standard input and standard output are lost when a process
+is migrated.  These restrictions lead to the loses of the flexibility which is
+needed for dynamic workloads.
+
+\subsection{Multicast Reduction Network (MRNet)}
+The MRNet\cite{MRNet} is designed for efficient multicast and data aggregation.
+ It uses the tree of internal processes between the front-end and the back-end
+of the tool.  The components of this tool communicate using logical channels
+called streams.  The internal processes attach the filters with these streams to
+efficiently computing the averages, sums and complex operations.  These
+processes internally transfer the data with high bandwidth by using packed
+binary representation and zero copy data paths.  It uses multicast to reduce the
+cost of delivering the messages.
+
+This project concentrates on optimizing group communication but it is language
+dependent.  The MRNet API is in C++ and one needs to develop the applications
+using this API. It needs a lot more efforts from the developer side to use this
+infrastructure in comparison to XCPU3.
+
+
+\subsection{Streamline}
+The idea of using filesystem interface for data-streams is also used by the
+\textit{pipefs}\cite{1400104} which is part of the streamline\cite{streamline}
+project.  The pipefs concentrates on extending the Unix pipeline model for fast
+I/O in the kernel. The pipefs presents the kernel operations as directories and
+live data as pipes using a synthetic filesystem interface.  The pipefs also
+implements a splicing mechanism which allows copy free movement of the data. 
+This approach of using filesystem interface and splice semantics is quite
+similar to XCPU3, but the objectives of both these projects are different. 
+Pipefs concentrates on faster I/O with filesystem interface for the Linux
+kernel while XCPU3 concentrate on the flexible workload management.  We hope
+that we can use the concepts from pipefs to improve the performance of XCPU3.
+
+
+\subsection{Dryad}
+Dryad\cite{yu2008dsg} is a distributed engine for data-parallel applications
+which is designed with a primary focus on simplicity of the programming model,
+reliability, efficiency and scalability.  Dryad application combines
+computational vertices with communication channels to form a dataflow graph. 
+This system explicitly forces the developer to consider the data parallelism of
+the computation. On the other hand the system deals with hard problems like
+resource allocation, scheduling and transient or permanent failures.  Dryad is
+flexible in giving the developers fine control over the communication graph as
+well as subroutines that live on the computational vertices. It also allows the
+application developers to specify an arbitrary directed acyclic graph to
+describe the application's communication patterns.  These graph vertices can use
+arbitrary number of inputs and outputs.
+
+In many senses, Dryad addresses the issues faced by dataflow deployments.
+But there are certain issues with dynamic workload which are not tackled.  Dryad
+assumes that the vertices in the DAG are deterministic and will not change
+dynamically which is not true for all dataflow deployments.  Sometimes the size
+of computation is affected by the results of a few intermediate computations. 
+The dryad API is C++ specific which limits the usability. It needs additional
+wrappers to use Dryad from other languages.  Dryad also tries to support legacy
+executables by putting them in a \textit{process wrapper} but this support is
+quite restrictive about what these legacy executables can do.
+
+Dryad addresses the issues like fault tolerance which are currently ignored by
+XCPU3, but XCPU3 is more flexible as it can support dynamic workload and
+changing DAG of dataflow deployments. Also the filesystem interface of the XCPU3
+is much simpler and cleaner compared to the class based C++ interface of Dryad.
+
+\subsection{Condor}
+Condor\cite{condor-practice} is \textit{high-throughput distributed batch
+computing} system which exploits \textit{opportunistic computing} for better
+performance. It uses the idle CPU cycles of voluntary workstations solve the
+large computational problem.
+Condor works by breaking the large problem into smaller tasks and submitting
+these smaller tasks to voluntary workstations.  Condor also provides the
+fault-tolerance by frequent check-pointing and restarting the tasks which
+failed.
+
+Condor also provide the way to submit scientific workflow application by using
+the meta-scheduler DAGMan (Directed Acyclic Graph Manager).  It allows user to
+specify the various dependencies within tasks in form of directed acyclic graph
+and then DAGMan takes the responsibility of scheduling these tasks by
+maintaining the proper order between them and feeding the results from
+predecessor to successor.
+
+Condor differs from XCPU3 as it is aimed for voluntary computing and hence
+concentrate more on fault tolerance.  It assumes that voluntary workstations
+are unreliable and can leave the system anytime.  This design principle is
+quite opposite of XCPU3 which assumes that resources are mostly reliable.  This
+difference in the assumptions about underlying hardware has lead to entirely
+different systems.  Another difference which has cropped in due to differences
+in underlying asumptions is that the tasks given to the Condor voluntary
+workstations do not communicate with other workstations directly.  They
+typically communicate with the agent responsible for submitting the job.  This
+lack of the ability to communicate directly with other computational nodes
+limit the usefulness of Condor for dataflow applications.
+
+\subsection{Other commercial solutions}
+Apart from the research and development going on in the academic and open
+source industry, there has been lot of interest in the workload deployment
+solution in the commercial domain.  The \textit{Oracle Grid Engine}\cite{oge} is
+a batch-queuing system which can accept, schedule, dispatch and manage the
+remote executions on clusters.  Other solutions involve \textit{PBS
+Works}\cite{pbsworks} which is workload and resource management solution and
+\textit{platform LSF (Load Sharing Facility)}\cite{platformLSF} batch job
+scheduler which is aimed to help in scheduling jobs on private clouds.  Most of
+these solutions target to simplify the resource management and job
+submission/scheduling.  But these commercial solutions mainly differ from XCPU3
+as they do not try to simplify the communication issues within applications. 
+This issue of effective communication between nodes is left to the application
+developers.
+
+
+\section{Conclusion}
+The above discussions shows that there is still lot of scope available for
+working on workload management systems for dataflow workloads.  There are many
+existing solutions which tackle either only part of the problem or tackled this
+problem with different constraints in mind.  We have worked on XCPU3 with
+scalability, flexibility and ease of use as primary objectives and these
+objectives have lead us to the current design of XCPU3.  We hope that XCPU3
+infrastructure will open up the doors for more solutions targeting specific
+use-cases.
+
+% ------------------------------------------------------------------------
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "../thesis"
+%%% End: 
