@@ -560,11 +560,11 @@ Cmdtab ctlcmdtab[]={
 static void
 cmdres(Req *r, int num, int argc, char **argv)
 {
-	int c;
 	Fid *f = r->fid;
 	Gang *g = f->aux;
 	void *resp = nil;
 
+	USED(argc);
 	USED(argv);
 
 	/* okay - by this point we should have gang embedded */
@@ -623,12 +623,13 @@ fswrite(Req *r)
 {
 	Fid *f = r->fid;
 	Qid *q = &f->qid;
+	Gang *g = f->aux;
 	char e[ERRMAX];
 	char *buf;
 	Cmdbuf *cb;
 	Cmdtab *cmd;
 	int num;
-
+	
 	switch(TYPE(*q)) {
 	default:
 		snprint(e, sizeof e, "bug in gangfs path=%llux\n", q->path);
@@ -645,7 +646,11 @@ fswrite(Req *r)
 		cb = parsecmd(buf, strlen(buf));
 		cmd = lookupcmd(cb, ctlcmdtab, nelem(ctlcmdtab));
 		if(cmd == nil) {
-			respondcmderror(r, cb, "%r");
+			if((g == nil)||(g->size == 0)) {
+				respondcmderror(r, cb, "%r");
+			} else {
+				write(g->ctlmp, r->ifcall.data, r->ifcall.count);
+			}
 		} else {
 			switch(cmd->index) {
 			default:
@@ -739,7 +744,26 @@ findexecfs(void)
 	return "/proc";
 }
 
-/* handle exec binding in a separate thread in original namespace*/
+static int
+streamout(int fd, ulong which, char *path)
+{
+	int n; 
+	char hdr[255];
+	ulong tag = ~0; /* header byte is at offset ~0 */
+	char pkttype='>';
+
+	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
+	n = pwrite(fd, hdr, n, tag);
+	
+	return n;
+}
+
+/*
+	bindthread handles two separate functions.
+	during session initialization, it binds the ctl multipipe into place,
+	and during reservation it sets up subject threads in execfs and
+	splices ctl to them
+*/
 static void
 bindthread(void *)
 {
@@ -756,9 +780,10 @@ bindthread(void *)
 		if(g == nil)
 			threadexits("interrupted");
 
-		if(g->size == 0) { /* bind multipipes into place */
+		/* phase 0: bind multipipes into place*/
+		if(g->size == 0) { 
 			snprint(buf, 255, "/proc/g%d", g->index);
-			if(mpipe(buf, "ctl") < 0) {
+			if(mpipe(buf, "ctl -b") < 0) {
 				sendp(g->chan, smprint("couldn't bind ctl multipipe\n"));
 				continue;
 			} else {
@@ -769,18 +794,19 @@ bindthread(void *)
 			continue;
 		}
 
+		/* phase 1: allocate subject threads and stream ctl to them */
 		/* FUTURE: do we want to refork for every new request? */
 		g->sess = emalloc9p(sizeof(Session)*g->size);
 		for(count = 0; count < g->size; count++) {
 			path = findexecfs();
 			snprint(buf, 255, "%s/clone", path);
-			g->sess->fd = open(buf, ORDWR);
-			if(g->sess->fd < 0) {
+			g->sess[count].fd = open(buf, ORDWR);
+			if(g->sess[count].fd < 0) {
 				sendp(g->chan, 
 				  smprint("couldn't open session ctl %s/clone: %r\n", path));
 				goto error;
 			}
-			n = read(g->sess->fd, buf, 255);
+			n = read(g->sess[count].fd, buf, 255);
 			if(n < 0) {
 				sendp(g->chan,
 				  smprint("couldn't read from session ctl %s/clone: %r\n", 
@@ -797,6 +823,9 @@ bindthread(void *)
 				   smprint("couldn't bind %s %s: %r\n", buf, dest));
 				goto error;
 			}
+			/* now splice */
+			snprint(dest, 255, "%s/ctl", buf);
+			streamout(g->ctlmp, 0, dest);
 		}
 		send(g->chan, nil);
 error:
