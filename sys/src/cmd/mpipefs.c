@@ -319,14 +319,11 @@ closebcasts(Mpipe *mp)
 
 /* process mount options */
 static char *
-parsespec(Mpipe *mp, int argc, char **argv)
+parsespec(Mpipe *mp, int argc, char *argv[])
 {
 	char *f;
 	char *err=nil;
 
-/* BUG: this doesn't work: move to end following arg(2) */
-	if(argc >= 1) 
-		mp->name = estrdup9p(argv[0]);
 	ARGBEGIN {
 	case 'e':	/* enumerated mode */
 		f = ARGF();
@@ -344,6 +341,11 @@ parsespec(Mpipe *mp, int argc, char **argv)
 		fprint(2, " badflag('%c')", ARGC());
 		err = Ebadspec;		
 	}ARGEND
+
+	DPRINT(2, "argc: %d\n", argc);
+	
+	if(argc>0) 
+		mp->name = estrdup9p(*argv);
 
 	return err;
 }
@@ -435,24 +437,7 @@ fsclunk(Fid *fid)
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
 		mp->ref--;
-		/* BUG: if we free(mp), then don't the other cases fail? */
-		/* no more references to pipe, cleanup */
-		if(mp->ref == 0) { 
-			free(mp->name);
-			free(mp->uid);
-			free(mp->gid);
-			if(mp->rrchan) {
-				for(count=0;count <  mp->slots; count++) {
-					if(mp->rrchan[count]) {
-						chanclose(mp->rrchan[count]);
-						chanfree(mp->rrchan[count]);
-					}
-				}
-				free(mp->rrchan);
-			}
-			free(mp);
-		}
-		
+
 		/* writer accounting and cleanup */ 
 		/* BUG: doesn't account for ctl block writes */
 		if((fid->omode&OMASK) == OWRITE) {
@@ -494,6 +479,24 @@ fsclunk(Fid *fid)
 				}
 			}
 		}
+
+		/* no more references to pipe, cleanup */
+		if(mp->ref == 0) { 
+			free(mp->name);
+			free(mp->uid);
+			free(mp->gid);
+			if(mp->rrchan) {
+				for(count=0;count <  mp->slots; count++) {
+					if(mp->rrchan[count]) {
+						chanclose(mp->rrchan[count]);
+						chanfree(mp->rrchan[count]);
+					}
+				}
+				free(mp->rrchan);
+			}
+			free(mp);
+		}
+
 	}
 
 	fid->aux = nil;
