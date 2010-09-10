@@ -117,6 +117,8 @@ struct Mpipe {
  */
 struct Fidaux {
 	QLock l;			/* Protect it */
+	int active;			/* if participant has been written yet */
+
 	Mpipe *mp;			/* Multipipe we are dealing with */
 	ulong which;		/* for enumerations */
 
@@ -439,18 +441,17 @@ fsclunk(Fid *fid)
 		mp->ref--;
 
 		/* writer accounting and cleanup */ 
-		/* BUG: doesn't account for ctl block writes */
 		if((fid->omode&OMASK) == OWRITE) {
 			/* MAYBE: mark outstanding requests crap */
 			mp->writers--;
-			if(mp->writers == 0) {
+			if((aux->active) && (mp->writers == 0)) {
 				for(count=0;count <  mp->slots; count++)
 					if(mp->rrchan[count])
 						chanclose(mp->rrchan[count]);
-			}
 
-			if(mp->mode == MPTbcast)
-				closebcasts(mp);
+				if(mp->mode == MPTbcast)
+					closebcasts(mp);
+			}
 
 			free(aux);
 			fid->aux = nil;
@@ -522,10 +523,10 @@ fsopen(Req *r)
 
 	/* allocate a new participant structure */
 	aux = emalloc9pz(sizeof(Fidaux), 1);
+	aux->active = 0;
 	aux->mp = mp;
 	fid->aux = aux;
 
-	/* TODO: consider only doing this on real write to hide ctl msg */
 	if((r->ifcall.mode&OMASK) ==  OWRITE)
 		mp->writers++;
 	
@@ -749,6 +750,7 @@ splicefrom(void *arg) {
 	/* setup a dummy writer */
 	memset(&tr, 0, sizeof(Req));
 	daux->mp = mp;
+	daux->active = 0;
 	mp->ref++;
 	mp->writers++;
 	dummy->omode = OWRITE;
@@ -778,7 +780,9 @@ splicefrom(void *arg) {
 		/* TODO: indiscriminately set - what if its 0 or not valid */
 		daux->which = sa->which;
 		daux->remain = n;
-
+		if(!daux->active)
+			daux->active = 1;
+		
 		/* BUG: what about broadcast? should be different */
 		/* acquire a reader */
 		daux->other = recvp(mp->rrchan[daux->which]);
@@ -953,6 +957,9 @@ fswrite(void *arg)
 		aux->remain = r->ifcall.count;
 		mp->len += r->ifcall.count;
 	}
+
+	if(!aux->active)
+		aux->active = 1;
 
 	if(mp->mode == MPTbcast) {
 		fsbcast(r, mp);
