@@ -21,6 +21,11 @@
 		to break everything right now.  Need to add
 		code to handle such situations in a reasonable
 		fashion.
+
+	See Also:
+		9p(2)
+		9pfid(2)
+		9pfile(2)
 */
 
 #include <u.h>
@@ -30,16 +35,17 @@
 #include <9p.h>
 #include <mp.h>
 #include <libsec.h>
+#include <debug.h>
 
 enum
 {
 	STACK = 8192,
 	MSIZE = 8192,
-	MAXARGS = 8,
-	MAXHDRARGS = 4,
+	MAXARGS = 8,					/* maximum spec arguments */
+	MAXHDRARGS = 4,					/* maximum header entries */
 };
 
-Channel *iochan;		/* dispatch channel */
+Channel *iochan;					/* dispatch channel */
 typedef struct Fidaux Fidaux;
 char defaultsrvpath[] = "mpipe";
 
@@ -52,62 +58,116 @@ char Eremain[] = "new header when bytes still remaining";
 char Eother[] = "Problem with peer";
 char Ebcastoverflow[] = "broadcast read underflow";
 char Ebcast[] = "broadcast failed (perhaps partially)";
+char Ebadspec[] = "bad mount specification arguments";
 
+/*
+ * Right now there are two types of pipe:
+ *	1) normal - writers match to readers
+ *  2) broadcast - writers send to all readers
+ * 
+ */
 enum {
 	MPTnormal = 1,	/* strictly a normal pipe */
 	MPTbcast=2,		/* enumerated pipe */
 };
 
+/*
+ * Mpipe - primary data structure
+ *
+ * There is one of these per pipe.  Mostly it contains
+ * the information necessary for file system queries on the
+ * pipe, but also maintains a number of reference count values
+ * relating to accounting for readers and writers.
+ *
+ * for non-enumerated pipes, there is only a single slot
+ *
+ */
 typedef struct Mpipe Mpipe;
 struct Mpipe {
-	QLock l;
-	int ref;
+	QLock l;		/* protect pipe */
+	int ref;		/* reference count */
 
 	int mode;		/* pipe type */
 
-	ulong path;
-	char *name;
-	char *uid;
-	char *gid;
-	ulong len;
+	ulong path;		/* qid.path */
+	char *name;		/* name in directory */
+	char *uid;		/* owner id */
+	char *gid;		/* owner group */
+	ulong len;		/* current length in bytes of data */
 
 	int writers;	/* number of writers */
 	int readers;	/* number of readers */
 
 	int slots;		/* number of enumerations */
-	Channel **rrchan;	/* ready to read */
-	int *numr;
-	Fidaux *bcastr;		/* broadcast readers */
+
+	/* normal only, one entry per slot: */
+	Channel **rrchan;	/* ready to read channels */
+	int *numr;			/* number of readers on slot */
+
+	/* broadcast only */
+	Fidaux *bcastr;		/* list of readers */
 };
 
+/*
+ * Fidaux - per particpant descriptor accounting structure
+ * 
+ * This is typically hung off the fid private value and contains
+ * the accounting for a particular "participant" (reader or writer)
+ *
+ */
 struct Fidaux {
-	QLock l;
-	Mpipe *mp;
+	QLock l;			/* Protect it */
+	Mpipe *mp;			/* Multipipe we are dealing with */
 	ulong which;		/* for enumerations */
 
 	/* only for writer */
-	Fid *other;		/* peer Fid for long writes */
-	int remain;		/* bytes remaining in multi-block */
+	Fid *other;			/* peer Fid for long writes */
+	int remain;			/* bytes remaining in multi-block */
 	
 	/* only for reader */
-	Req *r;			/* for partial reads */
-	Channel *chan;
+	Req *r;				/* cached request for partial reads */
+	Channel *chan;		/* Response channel (?TODO?)
 
 	/* for bcast */
-	Fidaux *next;
+	Fidaux *next;		/* Linked list of broadcasters */
 };
 
+/*
+ * pipealloc - qid.path accounting 
+ *
+ * we must guarentee unique qid.paths, this helps with that 
+ *
+ */
 static struct
 {
 	Lock l;
 	ulong	path;
 } pipealloc;
 
+/*
+ * splicearg - parameter encapsulation
+ *
+ * since splices get spawned off as sub-procs, this allows
+ * us to pass all the arguments in a structure
+ */
+
 typedef struct Splicearg Splicearg;
 struct Splicearg {
-	Mpipe *mp;
-	int which;
-	int fd;
+	Mpipe *mp;		/* the pipe in question */
+	int which;		/* enumeration, 0 for don't care */
+	int fd;			/* file descriptor to read from/write to */
+};
+
+/*
+ * Bcastr - Broadcast argument
+ *
+ * since broadcasts get spawned off as sub-threads, this allows
+ * us to pass all the arguments in a structure
+ */
+typedef struct Bcastr Bcastr;
+struct Bcastr {
+	Channel *chan;	/* channel to send on */
+	Req *r;			/* request to send */
 };
 
 static void
@@ -147,6 +207,11 @@ emalloc9pz(int sz, int zero)
 	return v;
 }
 
+/*
+ * We need to send our responses down a channel
+ * if one exists so that errors are propagated properly --
+ * particularly for broadcasts.
+ */
 static void
 myrespond(Req *r, char *err)
 {
@@ -156,10 +221,14 @@ myrespond(Req *r, char *err)
 		respond(r, err);
 }
 
+/*
+ * This only gets called from spliceto, which seems odd.
+ * TODO: Understand what is going on better.
+ */
 static void
 myresponderror(Req *r)
 {
-	if(r->aux) {
+	if(r->aux) {/* only happens for spliceto? or only for bcast? */
 		char *err = emalloc9p(ERRMAX);
 		snprint(err, ERRMAX, "%r");
 		sendp(r->aux, err);
@@ -192,6 +261,8 @@ setfidaux(Fid *fid) /* blech */
 }
 
 /* MAYBE: allow splice-to to specify which by setting aux->which */
+
+/* register a new reader with the infrastructure */
 static void
 addnewreader(Mpipe *mp, Fidaux *aux)
 {
@@ -216,6 +287,7 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	qunlock(&mp->l);
 }
 
+/* safely remove a reader from a list */
 static void
 rmreader(Mpipe *mp, Fidaux *aux)
 {
@@ -236,6 +308,7 @@ rmreader(Mpipe *mp, Fidaux *aux)
 	qunlock(&mp->l);
 }
 
+/* cleanup broadcast pipes on last write close */
 static void
 closebcasts(Mpipe *mp)
 {
@@ -244,21 +317,35 @@ closebcasts(Mpipe *mp)
 		chanclose(c->chan);
 }
 
-static void
+/* process mount options */
+static char *
 parsespec(Mpipe *mp, int argc, char **argv)
 {
+	char *f;
+	char *err=nil;
+
+/* BUG: this doesn't work: move to end following arg(2) */
 	if(argc >= 1) 
 		mp->name = estrdup9p(argv[0]);
 	ARGBEGIN {
-	case 'e':
-		mp->slots = atoi(ARGF());
+	case 'e':	/* enumerated mode */
+		f = ARGF();
+		if(f)
+			mp->slots = atoi(ARGF());
+		else {
+			fprint(2, "usage: invalid enumeration argument\n");
+			err = Ebadspec;
+		}
 		break;
-	case 'b':
+	case 'b':	/* broadcast mode */
 		mp->mode = MPTbcast;
 		break;
 	default:
-		print(" badflag('%c')", ARGC());
+		fprint(2, " badflag('%c')", ARGC());
+		err = Ebadspec;		
 	}ARGEND
+
+	return err;
 }
 
 static void
@@ -268,10 +355,15 @@ fsattach(Req *r)
 	char *argv[MAXARGS];
 	int argc;
 	int count;
+	char *err;
 
 	/* need to parse aname */
 	argc = tokenize(r->ifcall.aname, argv, MAXARGS);
-	parsespec(mp, argc, argv);
+	err = parsespec(mp, argc, argv);
+	if(err) {
+		respond(r, err);
+		return;
+	}
 
 	if(mp->slots == 0)
 		mp->slots = 1;
@@ -339,10 +431,12 @@ fsclunk(Fid *fid)
 	Mpipe *mp = setfidmp(fid);
 	int count;
 
+	/* if there is an participant on this fid */
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
 		mp->ref--;
-	
+		/* BUG: if we free(mp), then don't the other cases fail? */
+		/* no more references to pipe, cleanup */
 		if(mp->ref == 0) { 
 			free(mp->name);
 			free(mp->uid);
@@ -358,7 +452,9 @@ fsclunk(Fid *fid)
 			}
 			free(mp);
 		}
-
+		
+		/* writer accounting and cleanup */ 
+		/* BUG: doesn't account for ctl block writes */
 		if((fid->omode&OMASK) == OWRITE) {
 			/* MAYBE: mark outstanding requests crap */
 			mp->writers--;
@@ -367,6 +463,7 @@ fsclunk(Fid *fid)
 					if(mp->rrchan[count])
 						chanclose(mp->rrchan[count]);
 			}
+
 			if(mp->mode == MPTbcast)
 				closebcasts(mp);
 
@@ -374,6 +471,7 @@ fsclunk(Fid *fid)
 			fid->aux = nil;
 		} 
 
+		/* reader accounting & cleanup */
 		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
 			mp->readers--;
 			if(mp->mode == MPTbcast)
@@ -382,7 +480,8 @@ fsclunk(Fid *fid)
 			chanfree(aux->chan);
 			mp->numr[aux->which]--;
 			aux->chan = nil;
-			if(aux->r) {/* crap! we still have data - return short write */
+
+			if(aux->r) { /* crap! we still have data */
 				respond(aux->r, "short write");
 				aux->r = nil;
 			}
@@ -403,7 +502,7 @@ fsclunk(Fid *fid)
 static void
 fsopen(Req *r)
 {
-	Fid*	fid = r->fid;
+	Fid* fid = r->fid;
 	Qid q = fid->qid;
 	Mpipe *mp = setfidmp(fid);
 	Fidaux *aux;
@@ -418,18 +517,22 @@ fsopen(Req *r)
 		return;
 	}
 
+	/* allocate a new participant structure */
 	aux = emalloc9pz(sizeof(Fidaux), 1);
 	aux->mp = mp;
 	fid->aux = aux;
+
+	/* TODO: consider only doing this on real write to hide ctl msg */
 	if((r->ifcall.mode&OMASK) ==  OWRITE)
 		mp->writers++;
 	
-	if((r->ifcall.mode&OMASK)==0) /* READER */
+	if((r->ifcall.mode&OMASK) == 0) /* READER */
 		addnewreader(mp, aux);
 
 	respond(r, nil);
 }
 
+/* simple dirgen for file system directory listings */
 static int
 getdirent(int n, Dir* d, void *aux)
 {
@@ -461,6 +564,7 @@ getdirent(int n, Dir* d, void *aux)
 }
 
 /* copy from transmitter to receiver */
+/* TODO: really, no passing by reference? */
 static int
 fscopy(Req *tr, Req *r, int offset)
 {
@@ -495,16 +599,20 @@ fsread(void *arg)
 		threadexits(nil);
 	}
 
-	if(aux->r) {	/* If remainder, serve that first */
+	/* if remainder, serve that first */
+	if(aux->r) {	
 		tr = aux->r;
 		offset = tr->ofcall.count;
-	 } else {
+	} else {
+		/* if pipe isn't a broadcast & we don't have a peer
+		   then put us on the recvq rrchan */
 		if((mp->mode != MPTbcast) && (aux->other == nil)) {
 			if(sendp(mp->rrchan[aux->which], fid) != 1) {
 				myrespond(r, nil);
 				threadexits(nil);
 			}
 		}
+		/* wait for a new packet */
 		tr = recvp(aux->chan);
 		offset = 0;
 		if(tr == nil) {
@@ -515,14 +623,14 @@ fsread(void *arg)
 	
 	count = fscopy(tr, r, offset);
 
-	if(mp->mode != MPTbcast) {
+	if(mp->mode != MPTbcast) { /* non-broadcast case */
 		raux = aux->other->aux;
 		raux->remain -= count;
 
 		mp->len -= count;
 		offset += count;
 
-		if(offset == tr->ifcall.count) {
+		if(offset == tr->ifcall.count) { /* full packet */
 			if(raux->remain == 0) { /* done for this pkt */
 				raux->other = nil;
 				raux->which = 0;
@@ -530,14 +638,15 @@ fsread(void *arg)
 			}
 			aux->r = nil;
 			tr->ofcall.count = tr->ifcall.count;
-			myrespond(tr, nil);
-			myrespond(r, nil);
-		} else {
+			myrespond(tr, nil); /* respond to writer */
+			myrespond(r, nil); 	/* respond to our reader */
+		} else { 				/* handle partial packet */
 			tr->ofcall.count = offset;
 			aux->r = tr;
-			myrespond(r, nil);
+			myrespond(r, nil); 	/* respond to our reader */
 		}
-	} else {
+	} else { 					/* broadcast case */
+		/* broadcast can't handle partial packet */
 		if(count != tr->ifcall.count)
 			myrespond(tr, Ebcastoverflow);
 		else
@@ -550,17 +659,22 @@ fsread(void *arg)
 }
 
 /* MAYBE: eliminate duplicate code with fsread */
+/* proc to act like a reader and manage splicing data to an fd */
 static void
 spliceto(void *arg) {
 	Splicearg *sa = arg;
 	Mpipe *mp = sa->mp;
-	Fid *dummy = emalloc9pz(sizeof(Fid), 1);
-	Fidaux *raux, *daux = emalloc9pz(sizeof(Fidaux), 1);
+	Fid *dummy = emalloc9pz(sizeof(Fid), 1); /* fake fid */
+	Fidaux *raux;	/* remote fid accounting pointer */
+	Fidaux *daux = emalloc9pz(sizeof(Fidaux), 1); /* our accounting */
 	Req *tr;
 
 	/* setup a dummy reader */
 	dummy->omode = OREAD;
 	dummy->aux = daux;
+	/* daux->which always gets set in addnewreader */
+	/* addnewreader puts on bcast list if we are in bcast mode */
+	/* TODO: are we ignore which argument? */
 	addnewreader(mp, daux);
 	daux->mp = mp;
 	mp->ref++;
@@ -568,7 +682,8 @@ spliceto(void *arg) {
 	while(1) {
 		int offset;
 
-		/* put ourselves on rrchan */
+		/* TODO: BUG? do we need different behavior for bcast? */
+		/* put ourselves on recvq rrchan */
 		if(daux->other == nil)
 			if(sendp(mp->rrchan[daux->which], dummy) != 1) {
 				fprint(2, "spliceto: hungup rrchan\n");
@@ -616,12 +731,14 @@ exit:
 }
 
 /* MAYBE: eliminate duplicate code with fswrite */
+/* process to act like a writer, reading input form a file */ 
 static void
 splicefrom(void *arg) {
 	Splicearg *sa = arg;
 	Mpipe *mp = sa->mp;
 	Fid *dummy = emalloc9pz(sizeof(Fid),1);
-	Fidaux *raux, *daux = emalloc9pz(sizeof(Fidaux), 1);
+	Fidaux *raux;		/* remote fid accounting pointer */ 
+	Fidaux *daux = emalloc9pz(sizeof(Fidaux), 1);
 	Req tr;
 	char *err;
 	Channel *reterr;
@@ -634,6 +751,7 @@ splicefrom(void *arg) {
 	dummy->omode = OWRITE;
 	dummy->aux = daux;
 
+	/* setup initial packet */
 	tr.fid = dummy;
 	tr.ifcall.data = emalloc9pz(MSIZE, 1);
 	reterr = chancreate(sizeof(char *), 0);
@@ -643,7 +761,7 @@ splicefrom(void *arg) {
 		int n;
 
 		tr.ifcall.count = MSIZE;
-		daux->which = sa->which;
+		
 		n = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
 		if(n < 0) { /* Error */
 			fprint(2, "splicefrom: read retuned error: %r\n");
@@ -653,8 +771,12 @@ splicefrom(void *arg) {
 		} else {
 			tr.ifcall.count = n;
 		}
+
+		/* TODO: indiscriminately set - what if its 0 or not valid */
+		daux->which = sa->which;
 		daux->remain = n;
 
+		/* BUG: what about broadcast? should be different */
 		/* acquire a reader */
 		daux->other = recvp(mp->rrchan[daux->which]);
 		if(daux->other == nil) {
@@ -666,7 +788,8 @@ splicefrom(void *arg) {
 			fprint(2, "splicefrom: %s\n", Eother);
 			goto exit;
 		}
-		raux->other = dummy;
+
+		raux->other = dummy; /* TODO: really, this seems wrong? */
 		assert(raux->chan != 0);
 		if(sendp(raux->chan, &tr) != 1) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
@@ -743,12 +866,7 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 	return nil;
 }
 
-typedef struct Bcastr Bcastr;
-struct Bcastr {
-	Channel *chan;
-	Req *r;
-};
-
+/* thread to send a broadcast */
 static void
 bcastsend(void *arg)
 {
@@ -760,6 +878,7 @@ bcastsend(void *arg)
 	free(br);
 }
 
+/* broadcast a message */
 static void
 fsbcast(Req *r, Mpipe *mp)
 {
@@ -769,12 +888,16 @@ fsbcast(Req *r, Mpipe *mp)
 
 	r->aux = reterr;
 
+	/* setup argument structures */
 	qlock(&mp->l);
 	for(c=mp->bcastr; c != nil; c=c->next) {
 		Bcastr *br = emalloc9p(sizeof(Bcastr));
 		br->chan = c->chan;
 		br->r = r;
 		threadcreate(bcastsend, br, STACK);
+		/* TODO: why do we create separate instances instead
+				of just one and then free it ourselves?
+		*/
 	}
 	qunlock(&mp->l);
 
@@ -787,6 +910,7 @@ fsbcast(Req *r, Mpipe *mp)
 		}
 	}
 
+	/* if one fails, we report error */
 	if(err)
 		respond(r, err);
 	else {
@@ -794,6 +918,7 @@ fsbcast(Req *r, Mpipe *mp)
 		respond(r, nil);
 	}
 	
+	/* TODO: do we really need to do both of these? */
 	chanclose(reterr);
 	chanfree(reterr);
 }
@@ -808,6 +933,7 @@ fswrite(void *arg)
 	ulong hdrtag = ~0;
 	char *err;
 	
+	/* BUG: need to track pure control versus write messages */
 	if(r->ifcall.offset == hdrtag) {
 		if(aux->remain) {
 			respond(r,Eremain);
@@ -876,7 +1002,6 @@ fsstat(Req* r)
 }
 
 /* handle potentially blocking ops in their own proc */
-
 static void
 iothread(void*)
 {
@@ -902,6 +1027,7 @@ iothread(void*)
 	}
 }
 
+/* proxy operations to iothread */
 static void
 ioproxy(Req *r)
 {
@@ -913,14 +1039,14 @@ ioproxy(Req *r)
 
 Srv fs=
 {
-	.attach=			fsattach,
+	.attach=		fsattach,
 	.walk1=			fswalk1,
 	.clone=			fsclone,
 	.open=			fsopen,
 	.read=			ioproxy,
 	.write=			ioproxy,
-	.stat	=			fsstat,
-	.destroyfid=		fsclunk,
+	.stat=			fsstat,
+	.destroyfid=	fsclunk,
 	.end=			killall,
 };
 
@@ -934,12 +1060,19 @@ threadmain(int argc, char **argv)
 	case 'D':
 		chatty9p++;
 		break;
+	case 'v':
+		/* TODO: verify ARGF() */
+		vflag = atoi(ARGF());
+		break;
 	case 's':
+		/* TODO: verify ARGF() */
 		srvpath = ARGF();
 		break;
 	default:
 		usage();
 	}ARGEND
+
+	/* TODO: add verbose options */
 
 	if(argc > 1)
 		usage();
