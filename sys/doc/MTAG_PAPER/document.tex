@@ -51,7 +51,7 @@ equivalent in functionality leading to the ability to localize the
 decision making and ability to handle dynamic workloads.  XCPU3 provides easy to
 use, flexible and scalable infrastructure for workload distribution and
 aggregation that can be used by dynamic workloads and dataflow applications.
- 
+
 \end{abstract}
 
 \IEEEpeerreviewmaketitle
@@ -500,13 +500,15 @@ The sessions are represented as directories with session-id number as a name.
 These sessions are self-contained and provide interfaces to manage the
 execution of the session.  Files like \texttt{[env]} and \texttt{[ns]} are
 present is session directory also, and can be used to overwrite the default
-environment and namespace specifically for this session.  Following is the
-simplified defination of the session.
+environment and namespace specifically for this session.  File \texttt{[ctl]} is
+used for controlling the execution and file \texttt{[stdio]} is used to
+manipulate standard input and output.  Sessions can play one of the two roles
+between \textit{single execution unit} and \textit{aggregation} of other
+sessions. Following is the attempt to define these two modes.
 \begin{verbatim}
 SESSION -> AGGREGATION | execution
 AGGREGATION -> SESSION+
 \end{verbatim}
-It can be used as single execution or the aggregation of other sessions.
 The \textbf{execution mode} executes the requested program and provides the
 output.  The \textbf{aggregation} mode aggregates and manages the multiple
 sessions which are created as sub-sessions for this session.  In other words,
@@ -515,17 +517,36 @@ aggregate back the output.  These sub-sessions are nothing but sessions created
 by using \texttt{[clone]} file on local or remote systems.  These newly created
 sessions are binded as sub-directories inside the current session directory.
 
-
-The typical way for using the clone semantic is 
+\subsection{Workload distribution and aggregation}
+The workload distribution and aggregation works by using the dual nature of
+the sessions.  The first step in this is reservation, which is responsible for
+creating the tree of the sessions.  Whenver any session receives the reservation
+request, it evaluates it by considering, if it can execute locally or it should
+break it and divide between its available children.  Depending on the decision,
+it can play one of the following two roles.
 \begin{enumerate}
-\item Open clone file.
-\item Read the session-id. 
-\item Use the files within that session directory for starting and managing the
-computation.
-\item Once your computation is over, close all those files within session.
-\item Close the clone file to release the session and the resources allocated. 
+  \item \textbf{Execution session}: When reservation is request is small enough
+  or there are no children nodes available, then session behave as execution
+  session by performing the requested operations locally.  The execution
+  sessions are the leaf node in the session tree.
+  
+  \item \textbf{Aggregation session}: When request is bigger than what session
+  can handle, it divides the request between children nodes.  The session does
+  this by creating new session and sending the divided
+  reservation request to the each child node available in it's \textbf{CSRV}
+  hierarchy.  These newly created sessions will be binded as directories in the
+  directory of the current session hance making them the sub-sessions of the
+  current session.  The current session now acts as in aggregation point for
+  these sub-sessions by passing the any execution request or input to all
+  sub-sessions and merging the output from all sub-sessions to produce the final
+  output.  These aggregation sessions constitute the non-leaf nodes in the
+  session tree.
 \end{enumerate}
-
+This way, recursive tree of sessions is created whenever new reservation request
+is received.  This tree of the session is then used to request the execution and
+collect back the results.  This design not only distributes the actual
+execution, but also it distributes the distribution and aggregation process as
+this work is divided between all aggregation sessions.
 
 \subsection{Examples}
 It is hard to measure the \textit{ease of use} and \textit{simplicity}
