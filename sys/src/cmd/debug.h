@@ -22,7 +22,7 @@ _dprint(ulong dlevel, char *fmt, ...)
 
 	p = strchr(fmt, '\n');
 
-	newfmt = smprint("%ld %d %s\n", time(0), getpid(), fmt);
+	newfmt = smprint("\t[%8.8ld][%8.8d]\t %s\n", time(0), getpid(), fmt);
 	if(p != nil){
 		p = strchr(newfmt, '\n');
 		*p = ' ';

@@ -128,7 +128,7 @@ struct Fidaux {
 	
 	/* only for reader */
 	Req *r;				/* cached request for partial reads */
-	Channel *chan;		/* Response channel (?TODO?)
+	Channel *chan;		/* Response channel */
 
 	/* for bcast */
 	Fidaux *next;		/* Linked list of broadcasters */
@@ -272,7 +272,7 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	int min = mp->numr[0];
 
 	mp->readers++;
-
+	DPRINT(2, "addnewreader %p total now: %d\n", mp, mp->readers);
 	aux->which = 0;
 	for(count=0; count<mp->slots; count++)
 		if(mp->numr[count] < min)
@@ -283,6 +283,7 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	
 	qlock(&mp->l);
 	if(mp->mode == MPTbcast) {
+		DPRINT(2,"\t adding %p to broadcast list next: %p\n", aux, mp->bcastr);
 		aux->next=mp->bcastr;
 		mp->bcastr=aux;
 	}
@@ -321,7 +322,7 @@ closebcasts(Mpipe *mp)
 
 /* process mount options */
 static char *
-parsespec(Mpipe *mp, int argc, char *argv[])
+parsespec(Mpipe *mp, int argc, char **argv)
 {
 	char *f;
 	char *err=nil;
@@ -329,22 +330,26 @@ parsespec(Mpipe *mp, int argc, char *argv[])
 	ARGBEGIN {
 	case 'e':	/* enumerated mode */
 		f = ARGF();
-		if(f)
-			mp->slots = atoi(ARGF());
-		else {
+		if(f) {
+			char *x = ARGF();
+			if(x)
+				mp->slots = atoi(x);
+			DPRINT(2, "\t enumerated mode (%d)\n", mp->slots);	
+		} else {
 			fprint(2, "usage: invalid enumeration argument\n");
 			err = Ebadspec;
 		}
 		break;
 	case 'b':	/* broadcast mode */
+		DPRINT(2, "\t parsespec: BROADCAST mode\n");
 		mp->mode = MPTbcast;
 		break;
 	default:
-		fprint(2, " badflag('%c')", ARGC());
+		fprint(2, "ERROR: badflag('%c')", ARGC());
 		err = Ebadspec;		
 	}ARGEND
 
-	DPRINT(2, "argc: %d\n", argc);
+	DPRINT(2, "\t argc: %d\n", argc);
 	
 	if(argc>0) 
 		mp->name = estrdup9p(*argv);
@@ -360,10 +365,16 @@ fsattach(Req *r)
 	int argc;
 	int count;
 	char *err;
+	char *scratch;
 
 	/* need to parse aname */
-	argc = tokenize(r->ifcall.aname, argv, MAXARGS);
+	DPRINT(2, "\t args: %s\n", r->ifcall.aname);
+	/* add a stupid extra field so we can use args(2) */
+	scratch = smprint("mount %s\n", r->ifcall.aname);
+	argc = tokenize(scratch, argv, MAXARGS);
+	DPRINT(2, "\t argc: %d\n", argc);
 	err = parsespec(mp, argc, argv);
+	free(scratch);
 	if(err) {
 		respond(r, err);
 		return;
@@ -670,62 +681,81 @@ spliceto(void *arg) {
 	Mpipe *mp = sa->mp;
 	Fid *dummy = emalloc9pz(sizeof(Fid), 1); /* fake fid */
 	Fidaux *raux;	/* remote fid accounting pointer */
-	Fidaux *daux = emalloc9pz(sizeof(Fidaux), 1); /* our accounting */
+	Fidaux *aux = emalloc9pz(sizeof(Fidaux), 1); /* our accounting */
 	Req *tr;
 
 	/* setup a dummy reader */
 	dummy->omode = OREAD;
-	dummy->aux = daux;
-	/* daux->which always gets set in addnewreader */
+	dummy->aux = aux;
+	/* aux->which always gets set in addnewreader */
 	/* addnewreader puts on bcast list if we are in bcast mode */
 	/* TODO: are we ignore which argument? */
-	addnewreader(mp, daux);
-	daux->mp = mp;
+	addnewreader(mp, aux);
+	aux->mp = mp;
 	mp->ref++;
 
 	while(1) {
 		int offset;
+		int count;
 
-		/* TODO: BUG? do we need different behavior for bcast? */
-		/* put ourselves on recvq rrchan */
-		if(daux->other == nil)
-			if(sendp(mp->rrchan[daux->which], dummy) != 1) {
+		/* if pipe isn't a broadcast & we don't have a peer
+		   then put us on the recvq rrchan */
+		if((mp->mode != MPTbcast) && (aux->other == nil)) {
+			if(sendp(mp->rrchan[aux->which], dummy) != 1) {
 				fprint(2, "spliceto: hungup rrchan\n");
 				goto exit;
 			}
-	
+		}
+
 		/* block on incoming */
-		tr = recvp(daux->chan);
+		tr = recvp(aux->chan);
 		if(tr == nil) {
 			fprint(2, "spliceto: hungup daux.chan\n");
 			goto exit;
 		}
 
-		raux = daux->other->aux;
+		raux = aux->other->aux;
 		offset = 0;
+		count = 0;
 
 		while(offset < tr->ifcall.count) {
 			int n;
 
 			n = write(sa->fd, tr->ifcall.data+offset, tr->ifcall.count-offset);
 			if(n < 0) {
-				tr->ofcall.count = offset;
 				myresponderror(tr);
 				goto exit;
 			} else {
 				offset += n;
-				raux->remain -= n;
+				count += n;
 			}
 		}
-		
-		if(raux->remain == 0) {
-			raux->other = nil;
-			raux->which = 0;
-			daux->other = nil;
-		}
 
-		tr->ofcall.count = offset;
-		myrespond(tr, nil);
+		if(mp->mode != MPTbcast) { /* non-broadcast case */
+			raux->remain -= count;
+
+			mp->len -= count;
+
+			if(offset == tr->ifcall.count) { /* full packet */
+				if(raux->remain == 0) { /* done for this pkt */
+					raux->other = nil;
+					raux->which = 0;
+					aux->other = nil;
+				}
+				aux->r = nil;
+				tr->ofcall.count = tr->ifcall.count;
+				myrespond(tr, nil); /* respond to writer */
+			} else { 				/* handle partial packet */
+				tr->ofcall.count = offset;
+				aux->r = tr;
+			}
+		} else { 					/* broadcast case */
+			/* broadcast can't handle partial packet */
+			if(count != tr->ifcall.count)
+				myrespond(tr, Ebcastoverflow);
+			else
+				myrespond(tr, nil);
+		}
 	}
 	/* on error do the right thing */
 exit:
@@ -734,27 +764,90 @@ exit:
 	threadexits(nil);
 }
 
+/* thread to send a broadcast */
+static void
+bcastsend(void *arg)
+{
+	Bcastr *br = arg;
+
+	if(sendp(br->chan, br->r) != 1)
+		sendp(br->r->aux, Ebcast);
+
+	free(br);
+}
+
+/* broadcast a message */
+static void
+fsbcast(Req *r, Mpipe *mp)
+{
+	Fidaux *c;
+	Channel *reterr = chancreate(sizeof(char *), 0);
+	char *err = nil;
+
+
+	r->aux = reterr;
+
+	/* setup argument structures */
+	qlock(&mp->l);
+	for(c=mp->bcastr; c != nil; c=c->next) {
+		Bcastr *br = emalloc9p(sizeof(Bcastr));
+
+		DPRINT(2, "\t broadcasting %p to %p\n", r, c);
+
+		br->chan = c->chan;
+		br->r = r;
+		threadcreate(bcastsend, br, STACK);
+		/* TODO: why do we create separate instances instead
+				of just one and then free it ourselves?
+		*/
+	}
+	qunlock(&mp->l);
+
+	/* gather responses */
+	for(c=mp->bcastr; c != nil; c=c->next) {
+		char *e;
+		if(e = recvp(reterr)) {
+			err = e;
+			fprint(2, "fsbcast: %s\n", err);
+		}
+	}
+
+	/* if one fails, we report error */
+	if(err)
+		respond(r, err);
+	else {
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+	}
+	
+	/* TODO: do we really need to do both of these? */
+	chanclose(reterr);
+	chanfree(reterr);
+}
+
+
 /* MAYBE: eliminate duplicate code with fswrite */
 /* process to act like a writer, reading input form a file */ 
+/* TODO: obviously splicefrom can't handle large packets */
 static void
 splicefrom(void *arg) {
 	Splicearg *sa = arg;
 	Mpipe *mp = sa->mp;
 	Fid *dummy = emalloc9pz(sizeof(Fid),1);
 	Fidaux *raux;		/* remote fid accounting pointer */ 
-	Fidaux *daux = emalloc9pz(sizeof(Fidaux), 1);
+	Fidaux *aux = emalloc9pz(sizeof(Fidaux), 1);
 	Req tr;
 	char *err;
 	Channel *reterr;
 
 	/* setup a dummy writer */
 	memset(&tr, 0, sizeof(Req));
-	daux->mp = mp;
-	daux->active = 0;
+	aux->mp = mp;
+	aux->active = 0;
 	mp->ref++;
 	mp->writers++;
 	dummy->omode = OWRITE;
-	dummy->aux = daux;
+	dummy->aux = aux;
 
 	/* setup initial packet */
 	tr.fid = dummy;
@@ -778,25 +871,29 @@ splicefrom(void *arg) {
 		}
 
 		/* TODO: indiscriminately set - what if its 0 or not valid */
-		daux->which = sa->which;
-		daux->remain = n;
-		if(!daux->active)
-			daux->active = 1;
+		aux->which = sa->which;
+		aux->remain = n;
+		if(!aux->active)
+			aux->active = 1;
 		
-		/* BUG: what about broadcast? should be different */
+		if(mp->mode == MPTbcast) {
+			fsbcast(&tr, mp);
+			continue;
+		}
+		
 		/* acquire a reader */
-		daux->other = recvp(mp->rrchan[daux->which]);
-		if(daux->other == nil) {
+		aux->other = recvp(mp->rrchan[aux->which]);
+		if(aux->other == nil) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
 			goto exit;
 		}
-		raux = daux->other->aux;
+		raux = aux->other->aux;
 		if(raux->other != nil) {
 			fprint(2, "splicefrom: %s\n", Eother);
 			goto exit;
 		}
 
-		raux->other = dummy; /* TODO: really, this seems wrong? */
+		raux->other = dummy;
 		assert(raux->chan != 0);
 		if(sendp(raux->chan, &tr) != 1) {
 			fprint(2, "splicefrom: %s\n", Ehangup);
@@ -821,6 +918,7 @@ splicefrom(void *arg) {
 	}
 
 exit:
+	free(aux);
 	free(sa);
 	threadexits(nil);
 }
@@ -873,62 +971,6 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 	return nil;
 }
 
-/* thread to send a broadcast */
-static void
-bcastsend(void *arg)
-{
-	Bcastr *br = arg;
-
-	if(sendp(br->chan, br->r) != 1)
-		sendp(br->r->aux, Ebcast);
-
-	free(br);
-}
-
-/* broadcast a message */
-static void
-fsbcast(Req *r, Mpipe *mp)
-{
-	Fidaux *c;
-	Channel *reterr = chancreate(sizeof(char *), 0);
-	char *err = nil;
-
-	r->aux = reterr;
-
-	/* setup argument structures */
-	qlock(&mp->l);
-	for(c=mp->bcastr; c != nil; c=c->next) {
-		Bcastr *br = emalloc9p(sizeof(Bcastr));
-		br->chan = c->chan;
-		br->r = r;
-		threadcreate(bcastsend, br, STACK);
-		/* TODO: why do we create separate instances instead
-				of just one and then free it ourselves?
-		*/
-	}
-	qunlock(&mp->l);
-
-	/* gather responses */
-	for(c=mp->bcastr; c != nil; c=c->next) {
-		char *e;
-		if(e = recvp(reterr)) {
-			err = e;
-			fprint(2, "fsbcast: %s\n", err);
-		}
-	}
-
-	/* if one fails, we report error */
-	if(err)
-		respond(r, err);
-	else {
-		r->ofcall.count = r->ifcall.count;
-		respond(r, nil);
-	}
-	
-	/* TODO: do we really need to do both of these? */
-	chanclose(reterr);
-	chanfree(reterr);
-}
 
 static void
 fswrite(void *arg)
@@ -940,7 +982,6 @@ fswrite(void *arg)
 	ulong hdrtag = ~0;
 	char *err;
 	
-	/* BUG: need to track pure control versus write messages */
 	if(r->ifcall.offset == hdrtag) {
 		if(aux->remain) {
 			respond(r,Eremain);
@@ -1065,24 +1106,23 @@ threadmain(int argc, char **argv)
 {
 	char *srvpath = defaultsrvpath;
 	char *mntpath = nil;
+	char *x;
 
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
 		break;
 	case 'v':
-		/* TODO: verify ARGF() */
-		vflag = atoi(ARGF());
+		x = ARGF();
+		if(x)
+			vflag = atoi(x);
 		break;
 	case 's':
-		/* TODO: verify ARGF() */
 		srvpath = ARGF();
 		break;
 	default:
 		usage();
 	}ARGEND
-
-	/* TODO: add verbose options */
 
 	if(argc > 1)
 		usage();
