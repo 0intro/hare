@@ -714,7 +714,6 @@ spliceto(void *arg) {
 			goto exit;
 		}
 
-		raux = aux->other->aux;
 		offset = 0;
 		count = 0;
 
@@ -732,6 +731,7 @@ spliceto(void *arg) {
 		}
 
 		if(mp->mode != MPTbcast) { /* non-broadcast case */
+			raux = aux->other->aux;
 			raux->remain -= count;
 
 			mp->len -= count;
