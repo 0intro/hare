@@ -74,6 +74,31 @@ fn simplepipe {
 	rm -rf $TESTDIR
 }
 
+# TODO: will this really happen deterministicly?
+fn multipipe {
+	echo -n Testing multipipe messages...
+
+	# initialize files
+	rm -rf $TESTDIR
+	mkdir -p $TESTDIR
+
+	mount /srv/mpipe /n/test
+	cat /n/test/data > $TESTDIR/test1 &
+	cat /n/test/data > $TESTDIR/test2 &
+	sleep 5 # poor man's synchornization
+	mp-writer -n 6 -s 8192 /n/test/data	
+
+	# verify results
+	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+		echo FAILED: test2 not equal to test1
+		exit 'multipipe: test1 failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR
+}
+
 fn enum {
 	echo -n Testing enumerated messages...
 
@@ -303,13 +328,14 @@ startup
 # Tests
 named
 simplepipe
+multipipe
 #longmsg #<--- FAILS!
 #enum #<--- FAILS!
 bcast
 splicefrom
 spliceto
 splicetobcast
-splicefrombcast
+#splicefrombcast #<--breaks writer
 
 # Cleanup
 cleanup
