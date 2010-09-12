@@ -918,7 +918,6 @@ splicefrom(void *arg) {
 	}
 
 exit:
-	free(aux);
 	free(sa);
 	threadexits(nil);
 }

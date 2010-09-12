@@ -4,11 +4,8 @@
 #
 
 # TODO:
-# * simple pipe
 # * long message
 # * enumerated pipe
-# * spliceto
-# * splicefrom
 # * broadcast pipe
 # * broadcast splice from
 
@@ -22,6 +19,7 @@ TESTDIR=.test
 # Cleanup Previous Instances
 #
 fn cleanup {
+	echo Cleaning up previous runs...
 	unmount /n/test > /dev/null >[2] /dev/null
 	rm -f /srv/mpipe
 	kill mpipefs | rc
@@ -31,6 +29,7 @@ fn cleanup {
 # Startup mpipefs with debug
 #
 fn startup {
+	echo Starting mpipefs....
 	./mpipefs >[2] $MPIPELOG 
 }
 
@@ -57,6 +56,36 @@ fn simplepipe {
 	}
 
 	echo Success!
+	# cleanup
+	rm -rf $TESTDIR
+}
+
+#
+# splicefrom test
+#
+fn splicefrom {
+	echo -n Testing splicefrom...
+
+	# initialize test files
+	mkdir -p $TESTDIR
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# accomplish the test
+	mount /srv/mpipe /n/test
+	cat /n/test/data > $TESTDIR/test1 &
+	mp-writer -i $TESTDIR/test /n/test/data
+	
+	unmount /n/test
+	
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED: test1 not equal to test
+		exit 'splicefrom: test1 failed'
+	}
+	
+	echo Success!
+
 	# cleanup
 	rm -rf $TESTDIR
 }
@@ -133,5 +162,9 @@ startup
 
 # Tests
 simplepipe
+splicefrom
 spliceto
 splicetobcast
+
+# Cleanup
+cleanup
