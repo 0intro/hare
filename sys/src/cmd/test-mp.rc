@@ -15,7 +15,6 @@
 #
 # Parameters
 #
-HOME=`{cat /env/home}
 MPIPELOG=./mpipe.log
 TESTDIR=.test
 
@@ -34,6 +33,63 @@ fn cleanup {
 fn startup {
 	./mpipefs >[2] $MPIPELOG 
 }
+
+#
+# Simple Pipe Test
+#
+
+fn simplepipe {
+	echo -n Testing simple pipe operation...
+
+	# initialize files
+	mkdir -p $TESTDIR
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	mount /srv/mpipe /n/test
+	cat $TESTDIR/test > /n/test/data &
+	cat /n/test/data > $TESTDIR/test1
+
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED!
+		exit 'simplepipe: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR
+}
+
+#
+# spliceto test
+#
+fn spliceto {
+	echo -n Testing spliceto...
+
+	# initialize test files
+	mkdir -p $TESTDIR
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# accomplish the test
+	mount /srv/mpipe /n/test
+	mp-writer -o $TESTDIR/test1 /n/test/data
+	cat $TESTDIR/test > /n/test/data
+	unmount /n/test
+	
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED: test1 not equal to test
+		exit 'spliceto: test1 failed'
+	}
+	
+	echo Success!
+
+	# cleanup
+	rm -rf $TESTDIR
+}
+
 
 #
 # Broadcast spliceto test
@@ -76,4 +132,6 @@ cleanup
 startup
 
 # Tests
+simplepipe
+spliceto
 splicetobcast
