@@ -22,13 +22,13 @@ mpipefs, mp-writer \- one-way many to many communication
 ]
 
 spec = '[
-.I name
-]
-[
 .I -e num-slots
 ]
 [
 .I -b
+]
+[
+.I name
 ]'
 
 .B mp-writer
@@ -64,7 +64,10 @@ An
 of this device allocates a new  I/O stream whose name
 can be specified as part of the 
 .I spec
-arguments.
+arguments.  
+.B NOTE: 
+the name must always be specified as the last argument
+of the mount spec.
 .PP
 For normal read and write operations, behavior is
 identical to the

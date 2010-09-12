@@ -1,0 +1,79 @@
+#!/bin/rc
+# 
+# Multipipe Regression
+#
+
+# TODO:
+# * simple pipe
+# * long message
+# * enumerated pipe
+# * spliceto
+# * splicefrom
+# * broadcast pipe
+# * broadcast splice from
+
+#
+# Parameters
+#
+HOME=`{cat /env/home}
+MPIPELOG=./mpipe.log
+TESTDIR=.test
+
+#
+# Cleanup Previous Instances
+#
+fn cleanup {
+	unmount /n/test > /dev/null >[2] /dev/null
+	rm -f /srv/mpipe
+	kill mpipefs | rc
+}
+
+#
+# Startup mpipefs with debug
+#
+fn startup {
+	./mpipefs >[2] $MPIPELOG 
+}
+
+#
+# Broadcast spliceto test
+#
+fn splicetobcast {
+	echo -n Testing spliceto with broadcast...
+
+	# initialize test files
+	mkdir -p $TESTDIR
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+	echo > $TESTDIR/test2
+
+	# accomplish the test
+	mount /srv/mpipe /n/test -b
+	mp-writer -o $TESTDIR/test1 /n/test/data
+	mp-writer -o $TESTDIR/test2 /n/test/data
+	cat $TESTDIR/test > /n/test/data
+	unmount /n/test
+	
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED: test1 not equal to test
+		exit 'splicetobcast: test1 failed'
+	}
+	
+	if(! cmp -s $TESTDIR/test $TESTDIR/test2) {
+		echo FAILED: test2 not equal to test
+		exit 'splicetobcast: test2 failed'
+	}
+
+	echo Success!
+
+	# cleanup
+	rm -rf $TESTDIR
+}
+
+# Setup
+cleanup
+startup
+
+# Tests
+splicetobcast
