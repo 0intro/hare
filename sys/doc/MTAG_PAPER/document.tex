@@ -944,80 +944,27 @@ scheduling jobs on private clouds.  Most of these solutions target to simplify
 the resource management and job submission/scheduling, but they do not try to
 simplify the communication issues within applications.
 
+\section{Future work}
+The XCPU3 is an infrastructure which we plan to extend it further to support
+fault tolerance and add capability to selectively restarting the sub-sessions
+for environment where faults are more frequent.
 
-\section{Discussion}
- 
-This section attempts to discuss the various observations and takes a stand on
-about the XCPU3.
+As XCPU3 is filesystem interface and can be implemented by any filesystem, we
+plan to implement this interface natively on traditional operating systems to
+improve the performance by avoiding the virtualization layer added by the
+Inferno.
 
-\subsection{Accomplishments}
-We have created the XCPU3 infrastructure as the workload deployment solution to
-tackle problems faced by dataflow deployments which were mostly ignored in
-previous solutions.
-
-\begin{enumerate}
-\item \textbf{Generic}: By using Inferno, we have ensured that the XCPU3 will
-work on most of the traditional operating systems. 
-
-\item \textbf{Agility}: This infrastructure is quick in deploying large numbers
-of small jobs. The overhead involved in starting and closing XCPU3 sessions
-is small. The evaluations chapter provides us with some data about how this
-infrastructure performs and how well it scales for large numbers of deployments.
-
-\item \textbf{Ease of use}:  We have used the filesystem interface for providing
-ease of use without losing the flexibility.  This interface allows the user to
-use any language and runtime for interacting with the system. All existing tools
-which work on the files can be easily used with this interface.
-
-\item \textbf{Flexible}: The XCPU3 infrastructure achieves flexibility by making
-each node an independent entity.  As each node is independent and the
-reservation is decentralized, which gives the flexibility of
-dynamically adjusting the reservations based on the changing requirements and
-computations. 
-\end{enumerate}
-
-With these accomplishments we believe that the XCPU3 facilitates the easy and
-quick dataflow deployments without losing the flexibility.
-
-\subsection{Limitations}
-We understand that the XCPU3 is not a silver bullet, but a step towards
-improving the infrastructure.
-
-\begin{enumerate}
-\item \textbf{Virtualization layer}: By using virtualization in form of
-Inferno,  we have made the XCPU3 generic at cost of the performance.
-
-However, XCPU3 is a filesystem interface which can be also implemented natively
-in Operating systems supporting psudo filesystems.  So, this is not the
-fundamental limitation but the implementation decision.
-
-\item \textbf{Fault tolerance}:  The current XCPU3 implementation assumes that
-faults will be infrequent and it expects the user to restart the job in case of
-a fault or problem.  Hence, this solution will need modficiations to become  
-effective on grid-like installations where failuers are more probable.
-\end{enumerate}
-
-
-\subsection{Future work}
-We plan to develop alternate fault tolerance model and add capability to
-selectively restarting the sub-sessions for environment where
-faults are more frequent.
-
-We plan to implement the XCPU3 filesystem natively on traditional operating
-systems to improve the performance by avoiding the virtualization layer.
-
-
-\subsection{Conclusion}
-We conclude this discussion with stating that the XCPU3 opens up a new way for
-dataflow workload deployment.  This infrastructure simplifies quick deployment
-of large numbers of small applications while maintaining flexibility. It
-hides all the networking complexities behind the simple filesystem interface,
-providing ease of use.  This is one more step towards enabling commercial
-dataflow applications on cluster-like setups.
-
+\section{Conclusion}
+XCPU3 project was initiated with the goal of creating alternate job deployment
+mechanism primarily for menytask and dataflow deployments which can deal with
+dynamic workloads. We have kept the design simple with the assumption that
+simple design leads to the better scalability and flexibility.  We have tried
+to show that from examples that the XCPU3 interfaces are easy to use in
+language and runtime independent fasion. And with evaluation section we have
+tried to prove that the XCPU3 is viable option for scalable deployment of
+many-task and dataflow workloads.
 
 
 \bibliography{references}
 
 \end{document}
-
