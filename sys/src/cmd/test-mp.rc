@@ -3,12 +3,6 @@
 # Multipipe Regression
 #
 
-# TODO:
-# * long message
-# * enumerated pipe
-# * broadcast pipe
-# * broadcast splice from
-
 #
 # Parameters
 #
@@ -32,6 +26,26 @@ fn startup {
 	echo Starting mpipefs....
 	./mpipefs >[2] $MPIPELOG 
 }
+
+#
+# Naming pipe test
+#
+
+fn named {
+	echo -n Testing name parameter...
+
+
+	mount /srv/mpipe /n/test test
+	if(! test -e /n/test/test) {
+		echo FAILED!
+		exit 'named: test failed'
+	}
+
+	echo Success!	
+	# cleanup
+	unmount /n/test
+}
+
 
 #
 # Simple Pipe Test
@@ -60,6 +74,93 @@ fn simplepipe {
 	rm -rf $TESTDIR
 }
 
+fn enum {
+	echo -n Testing enumerated messages...
+
+	# initialize files
+	rm -rf $TESTDIR
+	mkdir -p $TESTDIR
+
+	mount /srv/mpipe /n/test
+	cat /n/test/data > $TESTDIR/test1 &
+	cat /n/test/data > $TESTDIR/test2 &
+	sleep 5 # poor man's synchornization
+	mp-writer -e 1 -n 5 -s 8192 /n/test/data	
+
+	if(test -s $TESTDIR/test1) {
+		if(test -s $TESTDIR/test2) {
+			echo FAILED: both files have data
+			exit 'enum: both files have data'
+		}
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR
+}
+
+# TODO: 8192 is not long enough, but anything above 64k breaks
+fn longmsg {
+	echo -n Testing long messages...
+
+	# initialize files
+	rm -rf $TESTDIR
+	mkdir -p $TESTDIR
+
+	mount /srv/mpipe /n/test
+	cat /n/test/data > $TESTDIR/test1 &
+	cat /n/test/data > $TESTDIR/test2 &
+	sleep 5 # poor man's synchornization
+	mp-writer -e 1 -n 1 -s 131072 /n/test/data	
+
+	if(test -s $TESTDIR/test1) {
+		if(test -s $TESTDIR/test2) {
+			echo FAILED: both files have data
+			exit 'longmsg: both files have data'
+		}
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR
+}
+
+# Broadcast test
+#
+fn bcast {
+	echo -n Testing with broadcast...
+
+	# initialize test files
+	mkdir -p $TESTDIR
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+	echo > $TESTDIR/test2
+
+	# accomplish the test
+	mount /srv/mpipe /n/test -b
+	cat /n/test/data > $TESTDIR/test1 &
+	cat /n/test/data > $TESTDIR/test2 &	
+	sleep 5	# poor mans synchronization
+	cat $TESTDIR/test > /n/test/data
+	unmount /n/test
+	
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED: test1 not equal to test
+		exit 'bcast: test1 failed'
+	}
+	
+	if(! cmp -s $TESTDIR/test $TESTDIR/test2) {
+		echo FAILED: test2 not equal to test
+		exit 'bcast: test2 failed'
+	}
+
+	echo Success!
+
+	# cleanup
+	rm -rf $TESTDIR
+}
+
 #
 # splicefrom test
 #
@@ -82,6 +183,45 @@ fn splicefrom {
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
 		echo FAILED: test1 not equal to test
 		exit 'splicefrom: test1 failed'
+	}
+	
+	echo Success!
+
+	# cleanup
+	rm -rf $TESTDIR
+}
+
+#
+# splicefrom broadcast test
+#
+fn splicefrombcast {
+	echo -n Testing splicefrom with broadcast ...
+
+	# initialize test files
+	mkdir -p $TESTDIR
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+	echo > $TESTDIR/test2
+
+
+	# accomplish the test
+	mount /srv/mpipe /n/test -b
+	cat /n/test/data > $TESTDIR/test1 &
+	cat /n/test/data > $TESTDIR/test2 &
+	sleep 5	# poor mans synchronization
+	mp-writer -i $TESTDIR/test /n/test/data
+	
+	unmount /n/test
+	
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED: test1 not equal to test
+		exit 'splicefrombcast: test1 failed'
+	}
+
+	if(! cmp -s $TESTDIR/test $TESTDIR/test2) {
+		echo FAILED: test2 not equal to test
+		exit 'splicefrombcast: test2 failed'
 	}
 	
 	echo Success!
@@ -119,7 +259,6 @@ fn spliceto {
 	rm -rf $TESTDIR
 }
 
-
 #
 # Broadcast spliceto test
 #
@@ -136,6 +275,7 @@ fn splicetobcast {
 	mount /srv/mpipe /n/test -b
 	mp-writer -o $TESTDIR/test1 /n/test/data
 	mp-writer -o $TESTDIR/test2 /n/test/data
+	sleep 5	# poor mans synchronization
 	cat $TESTDIR/test > /n/test/data
 	unmount /n/test
 	
@@ -161,10 +301,15 @@ cleanup
 startup
 
 # Tests
+named
 simplepipe
+#longmsg #<--- FAILS!
+#enum #<--- FAILS!
+bcast
 splicefrom
 spliceto
 splicetobcast
+splicefrombcast
 
 # Cleanup
 cleanup
