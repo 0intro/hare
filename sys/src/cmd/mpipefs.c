@@ -217,6 +217,7 @@ emalloc9pz(int sz, int zero)
 static void
 myrespond(Req *r, char *err)
 {
+	DPRINT(2, "myrespond: r: %p aux: %p r->srv: %p err: %p\n", r, r->aux, r->srv, err);
 	if(r->aux)
 		sendp(r->aux, err);
 	else
@@ -225,11 +226,11 @@ myrespond(Req *r, char *err)
 
 /*
  * This only gets called from spliceto, which seems odd.
- * TODO: Understand what is going on better.
  */
 static void
 myresponderror(Req *r)
 {
+	DPRINT(2, "myresponderror: r: %p aux: %p r->srv: %p\n", r, r->aux, r->srv);
 	if(r->aux) {/* only happens for spliceto? or only for bcast? */
 		char *err = emalloc9p(ERRMAX);
 		snprint(err, ERRMAX, "%r");
@@ -783,8 +784,12 @@ fsbcast(Req *r, Mpipe *mp)
 	Fidaux *c;
 	Channel *reterr = chancreate(sizeof(char *), 0);
 	char *err = nil;
+	void *bakaux;
 
+	assert(reterr != nil);
 
+	/* backup r->aux for splicefrom case */
+	bakaux = r->aux;
 	r->aux = reterr;
 
 	/* setup argument structures */
@@ -812,12 +817,15 @@ fsbcast(Req *r, Mpipe *mp)
 		}
 	}
 
+	/* restore r->aux for splicefrom case */
+	r->aux = bakaux;
+	DPRINT(2, "fsbcast respond: r: %p aux: %p r->srv: %p err: %p\n", r, r->aux, r->srv, err);
 	/* if one fails, we report error */
 	if(err)
-		respond(r, err);
+		myrespond(r, err);
 	else {
 		r->ofcall.count = r->ifcall.count;
-		respond(r, nil);
+		myrespond(r, nil);
 	}
 	
 	/* TODO: do we really need to do both of these? */
