@@ -24,8 +24,8 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs....
-	./mpipefs >[2] $MPIPELOG 
-	#./mpipefs -D -v 9
+	#./mpipefs >[2] $MPIPELOG 
+	./mpipefs -D -v 9
 }
 
 #
@@ -332,14 +332,14 @@ startup
 # Tests
 named
 simplepipe
-#multipipe #<--- FAILS due to non-determinsm
-#longmsg #<--- FAILS!
+#multipipe #<--- FAILS sometimes due to non-determinsm
+longmsg #<--- FAILS!
 #enum #<--- FAILS!
 bcast
 splicefrom
 spliceto
-#splicetobcast
-splicefrombcast #<--breaks writer
+splicetobcast
+splicefrombcast
 
 # Cleanup
 cleanup

@@ -967,6 +967,7 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 			return "problem parsing pkt header";
 		aux->remain = atoi(argv[1]);
 		aux->which = atoi(argv[2]) % mp->slots;
+		DPRINT(2, "\t PACKET size: %d which %d\n", aux->remain, aux->which);
 		break;
 	case '>':	/* splice to */
 	case '<':	/* splice from */
@@ -1020,7 +1021,8 @@ fswrite(void *arg)
 		}
 		goto out;
 	} else {
-		aux->remain = r->ifcall.count;
+		if(!aux->remain)
+			aux->remain = r->ifcall.count;
 		mp->len += r->ifcall.count;
 	}
 
@@ -1034,6 +1036,8 @@ fswrite(void *arg)
 		respond(r, err);
 		goto out;
 	}
+
+	DPRINT(2, "fsread: aux: %p aux->other: %p aux->remain: %d\n", aux, aux->other, aux->remain);
 
 	if(aux->other == nil) {
 		aux->other = recvp(mp->rrchan[aux->which]);
