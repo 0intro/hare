@@ -584,11 +584,11 @@ static int
 fscopy(Req *tr, Req *r, int offset)
 {
 	int count = tr->ifcall.count - offset;
-	
+
 	if(count > r->ifcall.count)
 			count = r->ifcall.count;	/* truncate */
 
-	memcpy(r->ofcall.data+offset, tr->ifcall.data, count);
+	memcpy(r->ofcall.data, tr->ifcall.data+offset, count);
 	
 	r->ofcall.count = count;
 	
