@@ -233,9 +233,7 @@ myresponderror(Req *r)
 {
 	DPRINT(2, "myresponderror: r: %p aux: %p r->srv: %p\n", r, r->aux, r->srv);
 	if(r->aux) {/* only happens for spliceto? or only for bcast? */
-		char *err = emalloc9p(ERRMAX);
-		snprint(err, ERRMAX, "%r");
-		sendp(r->aux, err);
+		sendp(r->aux, smprint("%r"));
 	} else
 		responderror(r);
 }
@@ -448,6 +446,7 @@ fsclunk(Fid *fid)
 	Mpipe *mp = setfidmp(fid);
 	int count;
 
+	DPRINT(2, "fslunk %p\n", fid);
 	/* if there is an participant on this fid */
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
@@ -473,8 +472,9 @@ fsclunk(Fid *fid)
 		/* reader accounting & cleanup */
 		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
 			mp->readers--;
-			if(mp->mode == MPTbcast)
+			if(mp->mode == MPTbcast) {
 				rmreader(mp, aux);
+			}
 			chanclose(aux->chan);
 			chanfree(aux->chan);
 			mp->numr[aux->which]--;
@@ -540,8 +540,10 @@ fsopen(Req *r)
 	aux->mp = mp;
 	fid->aux = aux;
 
-	if((r->ifcall.mode&OMASK) ==  OWRITE)
+	if((r->ifcall.mode&OMASK) ==  OWRITE) {
+		DPRINT(2, "fsopen: add new writer\n");
 		mp->writers++;
+	}
 	
 	if((r->ifcall.mode&OMASK) == 0) /* READER */
 		addnewreader(mp, aux);
@@ -721,7 +723,7 @@ spliceto(void *arg) {
 
 		while(offset < tr->ifcall.count) {
 			int n;
-
+			DPRINT(2,"\tspliceto: fd: %d\n", sa->fd);
 			n = write(sa->fd, tr->ifcall.data+offset, tr->ifcall.count-offset);
 			if(n < 0) {
 				myresponderror(tr);
@@ -761,7 +763,8 @@ spliceto(void *arg) {
 	}
 	/* on error do the right thing */
 exit:
-	fsclunk(dummy);	
+	if(mp->mode != MPTbcast)
+		fsclunk(dummy);	
 	free(sa);
 	threadexits(nil);
 }
@@ -771,6 +774,8 @@ static void
 bcastsend(void *arg)
 {
 	Bcastr *br = arg;
+	
+	DPRINT(5, "bcastsend %p\n", arg);
 
 	if(sendp(br->chan, br->r) != 1)
 		sendp(br->r->aux, Ebcast);
@@ -795,7 +800,7 @@ fsbcast(Req *r, Mpipe *mp)
 
 	/* setup argument structures */
 	qlock(&mp->l);
-	for(c=mp->bcastr; c != nil; c=c->next) {
+	for(c = mp->bcastr; c != nil; c = c->next) {
 		Bcastr *br = emalloc9p(sizeof(Bcastr));
 
 		DPRINT(2, "\t broadcasting %p to %p\n", r, c);
@@ -810,7 +815,7 @@ fsbcast(Req *r, Mpipe *mp)
 	qunlock(&mp->l);
 
 	/* gather responses */
-	for(c=mp->bcastr; c != nil; c=c->next) {
+	for(c = mp->bcastr; c != nil; c = c->next) {
 		char *e;
 		if(e = recvp(reterr)) {
 			err = e;
@@ -855,6 +860,7 @@ splicefrom(void *arg) {
 	aux->mp = mp;
 	aux->active = 0;
 	mp->ref++;
+	DPRINT(2, "splicefrom: add new writer\n");
 	mp->writers++;
 	dummy->omode = OWRITE;
 	dummy->aux = aux;
@@ -977,9 +983,10 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 		sa->mp = mp;
 		sa->which = atoi(argv[2]) % mp->slots;
 
-		if(type=='>')
+		if(type=='>') {
 			sa->fd = open(argv[3], OWRITE);
-		else
+			DPRINT(2, "spliceto cmd: %s returned %d\n", argv[3], sa->fd);
+		} else
 			sa->fd = open(argv[3], OREAD);
 
 		if(sa->fd < 0)

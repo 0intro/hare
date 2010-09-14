@@ -13,9 +13,6 @@
 	Based in part on Pravin Shinde's devtask.c
 
 	TODO:
-		* subsession creation, destruction and accounting
-		* reservation & binding of subsessions
-		* aggregated ctl via multipipes
 		* aggregated io via multipipes
 		* aggregated status via multipipes
 		* aggregated wait via multipipe barrier (todo in multipipe)
@@ -30,6 +27,7 @@
 #include <mp.h>
 #include <libsec.h>
 #include <stdio.h>
+#include "debug.h"
 
 char 	defaultpath[] =	"/proc";
 char *procpath;
@@ -479,6 +477,8 @@ fsopen(Req *r)
 	Gang *mygang;
 	void *resp;
 
+	DPRINT(2, "\t fsopen %p\n", r);
+
 	if(TYPE(fid->qid) >= Qsubses) {
 		respond(r, Eperm);
 		return;
@@ -494,6 +494,7 @@ fsopen(Req *r)
 		return;
 	}
 
+	DPRINT(2, "\t newgang %p\n", r);
 	/* insert new session at the end of the list & assign index*/
 	mygang = newgang();
 	if(mygang == nil) {
@@ -506,12 +507,13 @@ fsopen(Req *r)
 	r->fid->qid.path = path;
 	r->ofcall.qid.path = path;
 
-	/* bind multipipes into place */	
+	/* bind multipipes into place */
+	DPRINT(2, "\t sending to binder %p\n", r);
 	if(sendp(bindchan, mygang) != 1) {
 		fprint(2, "bindchan hungup");
 		threadexits("bindchan hungup");
 	}
-
+	DPRINT(2, "\t waiting for binder %p\n", r);
 	if(recv(mygang->chan, &resp) < 0) {
 		respond(r, "unknown problem on binder thread");
 	} else {
@@ -522,6 +524,7 @@ fsopen(Req *r)
 			free(resp);
 		}
 	}
+	DPRINT(2, "\t fsopen done %p\n", r);
 }
 
 static void
@@ -580,24 +583,28 @@ cmdres(Req *r, int num, int argc, char **argv)
 
 	g->size = num;
 
+	DPRINT(4, "\t submitting group to bindchan\n");
 	if(sendp(bindchan, g) != 1) {
 		fprint(2, "bindchan hungup");
 		threadexits("bindchan hungup");
 	}
 
+	DPRINT(4, "\t waiting for bindchan results\n");
 	if(recv(g->chan, &resp) < 0) {
 		/* channel failure.... */
 		respond(r, "unknown problem on binder thread");
 		return;
 	}
 
+	DPRINT(4, "\t bindchan returns: %p\n", resp);
 	if(resp == nil) {
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
 	} else {
 		respond(r, resp);
 		free(resp);
-	}	
+	}
+	DPRINT(4, "\t cmdres exiting normally\n");
 }
 
 /* this should probably be a generic function somewhere */
@@ -629,6 +636,7 @@ fswrite(Req *r)
 	Cmdbuf *cb;
 	Cmdtab *cmd;
 	int num;
+	int n;
 	
 	switch(TYPE(*q)) {
 	default:
@@ -649,7 +657,16 @@ fswrite(Req *r)
 			if((g == nil)||(g->size == 0)) {
 				respondcmderror(r, cb, "%r");
 			} else {
-				write(g->ctlmp, r->ifcall.data, r->ifcall.count);
+				DPRINT(2, "Unknown command, passing to g->ctlmp %d %p size: %d\n", g->ctlmp, r->ifcall.data, r->ifcall.count);
+				n = pwrite(g->ctlmp, r->ifcall.data, r->ifcall.count, 0);
+				DPRINT(2, "Write returned %d\n", n);
+				/* TODO: need error checks here */
+				if(n<0) {
+					respond(r, "problem passing through command");
+				} else {
+					r->ofcall.count = n;
+					respond(r, nil);
+				}
 			}
 		} else {
 			switch(cmd->index) {
@@ -674,6 +691,7 @@ fswrite(Req *r)
 		free(buf);
 		break;		
 	};
+	DPRINT(3, "\t fswrite exiting normally\n");
 }
 
 static void
@@ -714,8 +732,15 @@ iothread(void*)
 	Req *r;
 
 	threadsetname("gangfs-iothread");
+	if(sendp(iochan, nil) < 0) {
+		fprint(2, "iothread: problem sending sync message\n");
+		threadexits("nosync");
+	}
+
 	for(;;) {
+		DPRINT(2, "=== IOTHREAD: waiting for next operation ===\n\n");
 		r = recvp(iochan);
+		DPRINT(2, "=== IOTHREAD: got %d ===\n\n", r->ifcall.type);
 		if(r == nil)
 			threadexits("interrupted");
 
@@ -775,29 +800,46 @@ bindthread(void *)
 	char *path;
 
 	threadsetname("gangfs-bindthread");
+	if(sendp(bindchan, nil) < 0) {
+		fprint(2, "bindchan: sync problems\n");
+		threadexits("nosync");
+	}
 	for(;;) {
+		DPRINT(3,"\t ==== BINDCHAN waiting for new work ====\n");
 		g = recvp(bindchan);
 		if(g == nil)
 			threadexits("interrupted");
 
 		/* phase 0: bind multipipes into place*/
 		if(g->size == 0) { 
+			DPRINT(3,"\t\t bindchan: phase 0 bind\n");
 			snprint(buf, 255, "/proc/g%d", g->index);
-			if(mpipe(buf, "ctl -b") < 0) {
-				sendp(g->chan, smprint("couldn't bind ctl multipipe\n"));
+			if(mpipe(buf, "-b ctl") < 0) {
+				DPRINT(3,"\t\t bindchan:mpipe issues\n");
+				sendp(g->chan, smprint("bindchan: couldn't bind ctl multipipe\n"));
 				continue;
 			} else {
 				snprint(buf, 255, "/proc/g%d/ctl", g->index);
 				g->ctlmp = open(buf, OWRITE);
+				if(g->ctlmp < 0) {
+					DPRINT(2, "bindchan: opening multipipe returned: %r\n");
+					sendp(g->chan, smprint("bindchan: couldn't open ctl multipipe\n"));
+					continue;
+				} else {
+					DPRINT(2, "bindchan: ctl->mp = %d\n", g->ctlmp);
+				}
 			}
+			DPRINT(3,"\t\t bindchan:sending ok\n");
 			send(g->chan, nil);
 			continue;
 		}
 
 		/* phase 1: allocate subject threads and stream ctl to them */
 		/* FUTURE: do we want to refork for every new request? */
+		DPRINT(3, "\t\t phase 1: bind group: %p size: %d\n", g, g->size);
 		g->sess = emalloc9p(sizeof(Session)*g->size);
 		for(count = 0; count < g->size; count++) {
+			DPRINT(2, "\t bindchan: count: %d\n", count); 
 			path = findexecfs();
 			snprint(buf, 255, "%s/clone", path);
 			g->sess[count].fd = open(buf, ORDWR);
@@ -825,7 +867,11 @@ bindthread(void *)
 			}
 			/* now splice */
 			snprint(dest, 255, "%s/ctl", buf);
-			streamout(g->ctlmp, 0, dest);
+			if (streamout(g->ctlmp, 0, dest) < 0) {
+				fprint(2, "bindthread: problem streaming\n");
+				send(g->chan, smprint("bindthread: problem streaming: %r\n"));
+				goto error;
+			}
 		}
 		send(g->chan, nil);
 error:
@@ -836,23 +882,25 @@ error:
 static void
 ioproxy(Req *r)
 {
+	DPRINT(1, "ioproxy->forwarding\n");
 	if(sendp(iochan, r) != 1) {
 		fprint(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
+	DPRINT(1, "ioproxy->back\n");
 }
 
 Srv fs=
 {
 	.attach=	fsattach,
-	.walk1=	fswalk1,
-	.clone=	fsclone,
-	.open=	ioproxy,
-	.write=	ioproxy,
-	.read=	ioproxy,
-	.stat	=	fsstat,
-	.destroyfid =	fsclunk,
-	.end=	cleanup,
+	.walk1=		fswalk1,
+	.clone=		fsclone,
+	.open=		ioproxy,
+	.write=		ioproxy,
+	.read=		ioproxy,
+	.stat=		fsstat,
+	.destroyfid=fsclunk,
+	.end=		cleanup,
 };
 
 void
@@ -861,6 +909,7 @@ threadmain(int argc, char **argv)
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
+		vflag=9;	/* TODO: give it it's own param */
 		break;
 	default:
 		usage();
@@ -875,13 +924,21 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	/* spawn off a io thread */
+	DPRINT(1, "iothread\n");
 	iochan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
+	recvp(iochan);
 
-	threadpostmountsrv(&fs, nil, procpath, MAFTER);
-
+	DPRINT(1, "bindthread\n");
 	/* spawn off a bind thread */
 	bindchan = chancreate(sizeof(void *), 0);
 	proccreate(bindthread, nil, STACK);
+	recvp(bindchan);
+
+	DPRINT(1, "fsthread\n");
+	threadpostmountsrv(&fs, nil, procpath, MAFTER);
+
+
+	DPRINT(1, "exit\n");
 	threadexits(0);
 }
