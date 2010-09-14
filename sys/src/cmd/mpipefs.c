@@ -217,19 +217,21 @@ emalloc9pz(int sz, int zero)
 static void
 myrespond(Req *r, char *err)
 {
+	DPRINT(2, "myrespond: r: %p aux: %p r->srv: %p err: %p\n", r, r->aux, r->srv, err);
 	if(r->aux)
 		sendp(r->aux, err);
 	else
 		respond(r, err);
+	DPRINT(2, "done responding: aux: %p\n", r->aux);
 }
 
 /*
  * This only gets called from spliceto, which seems odd.
- * TODO: Understand what is going on better.
  */
 static void
 myresponderror(Req *r)
 {
+	DPRINT(2, "myresponderror: r: %p aux: %p r->srv: %p\n", r, r->aux, r->srv);
 	if(r->aux) {/* only happens for spliceto? or only for bcast? */
 		char *err = emalloc9p(ERRMAX);
 		snprint(err, ERRMAX, "%r");
@@ -584,11 +586,11 @@ static int
 fscopy(Req *tr, Req *r, int offset)
 {
 	int count = tr->ifcall.count - offset;
-	
+
 	if(count > r->ifcall.count)
 			count = r->ifcall.count;	/* truncate */
 
-	memcpy(r->ofcall.data+offset, tr->ifcall.data, count);
+	memcpy(r->ofcall.data, tr->ifcall.data+offset, count);
 	
 	r->ofcall.count = count;
 	
@@ -777,14 +779,18 @@ bcastsend(void *arg)
 }
 
 /* broadcast a message */
-static void
+static char *
 fsbcast(Req *r, Mpipe *mp)
 {
 	Fidaux *c;
 	Channel *reterr = chancreate(sizeof(char *), 0);
 	char *err = nil;
+	void *bakaux;
 
+	assert(reterr != nil);
 
+	/* backup r->aux for splicefrom case */
+	bakaux = r->aux;
 	r->aux = reterr;
 
 	/* setup argument structures */
@@ -812,23 +818,27 @@ fsbcast(Req *r, Mpipe *mp)
 		}
 	}
 
-	/* if one fails, we report error */
-	if(err)
-		respond(r, err);
-	else {
+	/* restore r->aux for splicefrom case */
+	r->aux = bakaux;
+	DPRINT(2, "fsbcast respond: r: %p aux: %p r->srv: %p err: %p\n", 
+					r, r->aux, r->srv, err);
+
+	if(!err)
 		r->ofcall.count = r->ifcall.count;
-		respond(r, nil);
-	}
-	
+
+	DPRINT(2, "fsbcast closing return channels\n");	
+
 	/* TODO: do we really need to do both of these? */
 	chanclose(reterr);
 	chanfree(reterr);
+
+	return err;
 }
 
 
 /* MAYBE: eliminate duplicate code with fswrite */
 /* process to act like a writer, reading input form a file */ 
-/* TODO: obviously splicefrom can't handle large packets */
+/* TODO: splicefrom won't know how to handle large packets */
 static void
 splicefrom(void *arg) {
 	Splicearg *sa = arg;
@@ -859,13 +869,18 @@ splicefrom(void *arg) {
 		int n;
 
 		tr.ifcall.count = MSIZE;
-		
+		DPRINT(2, "splicefrom: top of loop - reading\n");
 		n = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
+		DPRINT(2, "splicefrom: read returned %d\n", n);
 		if(n < 0) { /* Error */
-			fprint(2, "splicefrom: read retuned error: %r\n");
+			DPRINT(2, "splicefrom: read retuned error: %r\n");
 			close(sa->fd);
+			/* TODO: we need to something more */
 			fsclunk(dummy);
 			goto exit;
+		} else if (n == 0) {
+			DPRINT(2, "splicefrom: got EOF\n");
+ 			goto exit;
 		} else {
 			tr.ifcall.count = n;
 		}
@@ -877,39 +892,38 @@ splicefrom(void *arg) {
 			aux->active = 1;
 		
 		if(mp->mode == MPTbcast) {
-			fsbcast(&tr, mp);
-			continue;
-		}
-		
-		/* acquire a reader */
-		aux->other = recvp(mp->rrchan[aux->which]);
-		if(aux->other == nil) {
-			fprint(2, "splicefrom: %s\n", Ehangup);
-			goto exit;
-		}
-		raux = aux->other->aux;
-		if(raux->other != nil) {
-			fprint(2, "splicefrom: %s\n", Eother);
-			goto exit;
-		}
+			err = fsbcast(&tr, mp);
+			DPRINT(2, "back from fsbcast?\n");
+			
+		} else {
+			/* acquire a reader */
+			aux->other = recvp(mp->rrchan[aux->which]);
+			if(aux->other == nil) {
+				fprint(2, "splicefrom: %s\n", Ehangup);
+				goto exit;
+			}
+			raux = aux->other->aux;
+			if(raux->other != nil) {
+				fprint(2, "splicefrom: %s\n", Eother);
+				goto exit;
+			}
 
-		raux->other = dummy;
-		assert(raux->chan != 0);
-		if(sendp(raux->chan, &tr) != 1) {
-			fprint(2, "splicefrom: %s\n", Ehangup);
-			goto exit;
-		}
-
-		/* wait for completion? */
-		if(err = recvp(reterr)) {
-			fprint(2, "splicefrom: reterr %s\n", Ehangup);
-			goto exit;
+			raux->other = dummy;
+			assert(raux->chan != 0);
+			if(sendp(raux->chan, &tr) != 1) {
+				fprint(2, "splicefrom: %s\n", Ehangup);
+				goto exit;
+			}
+			if(err = recvp(reterr)) {
+				fprint(2, "splicefrom: reterr %s\n", Ehangup);
+				goto exit;
+			}
 		}
 		if(err) {
 			fprint(2, "spliceform: error: %s\n", err);
 			goto exit;
 		}
-
+		/* wait for completion? */
 		if(tr.ifcall.count == 0) {	/* EOF  - so we are done */
 			close(sa->fd);
 			fsclunk(dummy);
@@ -918,7 +932,18 @@ splicefrom(void *arg) {
 	}
 
 exit:
-	free(aux);
+	mp->writers--;
+	if((aux->active) && (mp->writers == 0)) {
+		int count;
+
+		for(count=0;count < mp->slots; count++)
+			if(mp->rrchan[count])
+				chanclose(mp->rrchan[count]);
+
+		if(mp->mode == MPTbcast)
+			closebcasts(mp);
+	}
+
 	free(sa);
 	threadexits(nil);
 }
@@ -942,6 +967,7 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 			return "problem parsing pkt header";
 		aux->remain = atoi(argv[1]);
 		aux->which = atoi(argv[2]) % mp->slots;
+		DPRINT(2, "\t PACKET size: %d which %d\n", aux->remain, aux->which);
 		break;
 	case '>':	/* splice to */
 	case '<':	/* splice from */
@@ -995,7 +1021,8 @@ fswrite(void *arg)
 		}
 		goto out;
 	} else {
-		aux->remain = r->ifcall.count;
+		if(!aux->remain)
+			aux->remain = r->ifcall.count;
 		mp->len += r->ifcall.count;
 	}
 
@@ -1003,9 +1030,14 @@ fswrite(void *arg)
 		aux->active = 1;
 
 	if(mp->mode == MPTbcast) {
-		fsbcast(r, mp);
+		err = fsbcast(r, mp);
+		if(err)
+			DPRINT(2, "fsbcast returned %s\n", err);
+		respond(r, err);
 		goto out;
 	}
+
+	DPRINT(2, "fsread: aux: %p aux->other: %p aux->remain: %d\n", aux, aux->other, aux->remain);
 
 	if(aux->other == nil) {
 		aux->other = recvp(mp->rrchan[aux->which]);

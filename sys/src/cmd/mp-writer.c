@@ -81,7 +81,7 @@ pipewrite(int fd, char *data, ulong size, ulong which)
 void
 main(int argc, char *argv[])
 {
-	int times=5;
+	int times=1;
 	int size=1024;
 	int which=1;
 	int count;
