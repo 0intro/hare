@@ -50,7 +50,8 @@ better resource utilization.  XCPU3 makes all nodes independent and
 equivalent in functionality leading to the ability to localize the
 decision making and ability to handle dynamic workloads.  XCPU3 provides easy to
 use, flexible and scalable infrastructure for workload distribution and
-aggregation that can be used by dynamic workloads and dataflow applications.
+aggregation that can be used by dynamic workloads, many-task workloads and
+dataflow applications.
 
 \end{abstract}
 
@@ -127,10 +128,6 @@ easily this interface can be used. Evaluations section presents some results
 showing that this approach is feasible. Related work section positions XCPU3 in
 the context of other related projects. Conclusion section will conclude this
 project.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%% End of Introduction chapter %%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%% Start of Background chapter %%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Background}
 This section discusses the the previous work from which XCPU3 is evolved.
@@ -903,20 +900,6 @@ XCPU3, but the objectives of both these projects are different. Pipefs
 concentrates on faster I/O with filesystem interface for the Linux kernel
 while XCPU3 concentrate on the flexible workload management.
 
-
-\subsection{Dryad}
-Dryad\cite{yu2008dsg} is a distributed engine for data-parallel applications
-which is designed with a primary focus on simplicity of the programming model,
-reliability, efficiency and scalability.  Dryad is well suited for dataflow
-applications where amount of computation needed is already known.  But it does
-not provide way to dynamically adjust the reservations to deal with changing
-workloads.    
-
-Dryad addresses the issues like fault tolerance which are currently ignored by
-XCPU3, but XCPU3 is more flexible as it can support dynamic workload and
-changing DAG of dataflow deployments. Also the filesystem interface of the XCPU3
-is much simpler and cleaner compared to the class based C++ interface of Dryad.
-
 \subsection{Condor}
 Condor\cite{condor-practice} is \textit{high-throughput distributed batch
 computing} system which exploits \textit{opportunistic computing} and idle CPU
@@ -932,6 +915,43 @@ between the workstations for security reasons.  They typically communicate
 only with the agent responsible for submitting the job.  This lack of the
 ability to communicate directly with other computational nodes limit the
 usefulness of Condor for communication intensive dataflow applications.
+
+
+\subsection{Dryad}
+Dryad\cite{yu2008dsg} is a distributed engine for data-parallel applications
+which is designed with a primary focus on simplicity of the programming model,
+reliability, efficiency and scalability.  Dryad is well suited for dataflow
+applications where amount of computation needed is already known.  But it does
+not provide way to dynamically adjust the reservations to deal with changing
+workloads.    
+
+Dryad addresses the issues like fault tolerance which are currently ignored by
+XCPU3, but XCPU3 is more flexible as it can support dynamic workload and
+changing DAG of dataflow deployments. Also the filesystem interface of the XCPU3
+is much simpler and cleaner compared to the class based C++ interface of Dryad.
+
+\subsection{Hadoop}
+Hadoop is a framework for data-centric distributed applications.   It
+uses location aware Hadoop distributed file system (HDFS) and schedules the
+computation close to the location of the data, hence reducing the need to
+relocate the data.  This localization of the compuation leads to the better
+overall performance.  It is mainly used for map-reduce style of applications,
+but there are work going on to extend it for other approaches also.
+
+Hadoop streaming is one of such approach, which is also similar to XCPU3.
+Hadoop streaming is a utility which allows users to create and run jobs as any
+executables as the mapper and/or the reducer.  It can be also viewed as way to
+create pipeline multiple instances of mapper and multiple instances of reducer
+where pipeline multiplexing and de-multiplexing is indirectly done by intput
+distribution and output aggregation steps.
+
+Hadoop streaming is a positive step toward supporting generic data-streaming
+between applications, but it limits the flexibility in it's current form. 
+This streaming is desinged around map-reduce mechanism, hence does not give a
+way to run different applications on different mapper or reducer nodes.  The
+pipeline is limited to the multiple instances of two applications
+(mapper and reducer).  So, it is not suited for generic dataflow applications
+with arbitrary topology.
 
 \subsection{Other commercial solutions}
 There are few commercial Workload deployment solutions available.  The
