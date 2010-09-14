@@ -24,8 +24,16 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs....
-	#./mpipefs >[2] $MPIPELOG 
-	./mpipefs -D -v 9
+	./mpipefs >[2] $MPIPELOG 
+	#./mpipefs -D -v 9
+}
+
+#
+# Setup a ramfs
+#
+fn testdir {
+	mkdir -p $TESTDIR
+	ramfs -m $TESTDIR
 }
 
 #
@@ -56,7 +64,6 @@ fn simplepipe {
 	echo -n Testing simple pipe operation...
 
 	# initialize files
-	mkdir -p $TESTDIR
 	echo Hello Squidboy > $TESTDIR/test
 	echo > $TESTDIR/test1
 
@@ -72,7 +79,7 @@ fn simplepipe {
 
 	echo Success!
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 # TODO: will this really happen deterministicly?
@@ -80,9 +87,6 @@ fn multipipe {
 	echo -n Testing multipipe messages...
 
 	# initialize files
-	rm -rf $TESTDIR
-	mkdir -p $TESTDIR
-
 	mount /srv/mpipe /n/test
 	cat /n/test/data > $TESTDIR/test1 &
 	cat /n/test/data > $TESTDIR/test2 &
@@ -97,17 +101,15 @@ fn multipipe {
 
 	echo Success!
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 fn enum {
 	echo -n Testing enumerated messages...
 
 	# initialize files
-	rm -rf $TESTDIR
-	mkdir -p $TESTDIR
 
-	mount /srv/mpipe /n/test
+	mount /srv/mpipe /n/test '-e 2'
 	cat /n/test/data > $TESTDIR/test1 &
 	cat /n/test/data > $TESTDIR/test2 &
 	sleep 5 # poor man's synchornization
@@ -122,7 +124,7 @@ fn enum {
 
 	echo Success!
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 # TODO: 8192 is not long enough, but anything above 64k breaks
@@ -130,8 +132,7 @@ fn longmsg {
 	echo -n Testing long messages...
 
 	# initialize files
-	rm -rf $TESTDIR
-	mkdir -p $TESTDIR
+	rm -rf $TESTDIR/*
 
 	mount /srv/mpipe /n/test
 	cat /n/test/data > $TESTDIR/test1 &
@@ -148,7 +149,7 @@ fn longmsg {
 
 	echo Success!
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 # Broadcast test
@@ -157,7 +158,6 @@ fn bcast {
 	echo -n Testing with broadcast...
 
 	# initialize test files
-	mkdir -p $TESTDIR
 	echo Hello Squidboy > $TESTDIR/test
 	echo > $TESTDIR/test1
 	echo > $TESTDIR/test2
@@ -184,7 +184,7 @@ fn bcast {
 	echo Success!
 
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 #
@@ -194,7 +194,6 @@ fn splicefrom {
 	echo -n Testing splicefrom...
 
 	# initialize test files
-	mkdir -p $TESTDIR
 	echo Hello Squidboy > $TESTDIR/test
 	echo > $TESTDIR/test1
 
@@ -216,7 +215,7 @@ fn splicefrom {
 	echo Success!
 
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 #
@@ -226,7 +225,6 @@ fn splicefrombcast {
 	echo -n Testing splicefrom with broadcast ...
 
 	# initialize test files
-	mkdir -p $TESTDIR
 	echo Hello Squidboy > $TESTDIR/test
 	echo > $TESTDIR/test1
 	echo > $TESTDIR/test2
@@ -256,7 +254,7 @@ fn splicefrombcast {
 	unmount /n/test
 
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 #
@@ -266,7 +264,6 @@ fn spliceto {
 	echo -n Testing spliceto...
 
 	# initialize test files
-	mkdir -p $TESTDIR
 	echo Hello Squidboy > $TESTDIR/test
 	echo > $TESTDIR/test1
 
@@ -285,7 +282,7 @@ fn spliceto {
 	echo Success!
 
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 #
@@ -295,7 +292,6 @@ fn splicetobcast {
 	echo -n Testing spliceto with broadcast...
 
 	# initialize test files
-	mkdir -p $TESTDIR
 	echo Hello Squidboy > $TESTDIR/test
 	echo > $TESTDIR/test1
 	echo > $TESTDIR/test2
@@ -322,19 +318,20 @@ fn splicetobcast {
 	echo Success!
 
 	# cleanup
-	rm -rf $TESTDIR
+	rm -rf $TESTDIR/*
 }
 
 # Setup
 cleanup
 startup
+testdir
 
 # Tests
 named
 simplepipe
 #multipipe #<--- FAILS sometimes due to non-determinsm
-longmsg #<--- FAILS!
-#enum #<--- FAILS!
+longmsg
+enum
 bcast
 splicefrom
 spliceto
@@ -342,4 +339,6 @@ splicetobcast
 splicefrombcast
 
 # Cleanup
+unmount $TESTDIR
+rm -rf $TESTDIR
 cleanup
