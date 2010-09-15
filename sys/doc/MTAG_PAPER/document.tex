@@ -149,11 +149,11 @@ environment on remote node.
 \subsection{XCPU}
 XCPU\cite{ron-xcpu} \cite{lucho-xcpu} was an attempt to bring the functionality
 of CPU into mainstream operating systems like Linux.  XCPU allows process
-management using a \textbf{filesystem interface}.  As this underlying psudo
+management using a \textbf{filesystem interface}.  As this underlying pseudo
 filesystem can be exported over network to other nodes, it simplifies the
 sharing of the compute resources.  XCPU does not provide private namespace,
-which is needed for transparantly accessing remote filesystem.  XCPU works
-around this limitation by pushing the executables and it's dependencies needed
+which is needed for transparently accessing remote filesystem.  XCPU works
+around this limitation by pushing the executable and it's dependencies needed
 for requested remote execution.
 
 To achieve scalable pushing of programs and their dependencies, XCPU uses a few
@@ -383,7 +383,7 @@ In a typical setup, Inferno runs in the hosted environment on an operating
 system like Linux or Plan 9.  The hosted inferno will export the XCPU3
 filesystem which can be mounted by the local host operating system. The 
 applications interact with this mounted XCPU3 filesystem using the native
-filesytem interfaces (e.g. VFS for Linux). Any interaction with this XCPU3
+filesystem interfaces (e.g. VFS for Linux). Any interaction with this XCPU3
 filesystem is communicated to Inferno using \textit{9P}. The XCPU3 kernel module
 inside the inferno kernel then receives and interprets the user actions.  If
 needed, it uses services from the host operating system or from other XCPU3
@@ -399,7 +399,7 @@ providing same functionality and interface to both local and remote
 applications.  This allows XCPU3 instances to connect with other XCPU3
 instances and distribute some of their responsibilities among them.
 The \texttt{9P} protocol shields the XCPU3 from complications of remote
-filesystem access and works as transparant glue for connecting multiple XCPU3
+filesystem access and works as transparent glue for connecting multiple XCPU3
 instances together.
 
 \subsubsection{Central Services}
@@ -442,7 +442,7 @@ connections between the nodes.
 
 Assuming the links between the nodes are created by the remote node mounts in
 central services, this diagram shows how the filesystem views at different
-nodes encompases the whole network, even though each node is only connected to
+nodes encompasses the whole network, even though each node is only connected to
 its neighbours. The XCPU3 filesystem starts with the \texttt{[/csrv]}
 directory. The location \texttt{[/csrv/local/]} presents the local resources
 whereas \texttt{[/csrv/parent/]} presents the XCPU3 filesystem of the parent
@@ -486,7 +486,7 @@ resource. Few files here provide information about the system, like
 \texttt{[arch]} file tells the architecture and operating system of the node
 while \texttt{[status]} file provides information about total amount of
 resources available, including the remote resources which are direct or
-indirect decendents of this node.  Files like \texttt{[env]} and \texttt{[ns]}
+indirect decedents of this node.  Files like \texttt{[env]} and \texttt{[ns]}
 allowed controlling the default environment and the namespace of the processes
 created on this node.  \texttt{[fs]} and \texttt{[net]} are links to the local
 filesystem and networking resources available on the node.  The
@@ -517,7 +517,7 @@ sessions are binded as sub-directories inside the current session directory.
 \subsection{Workload distribution and aggregation}
 The workload distribution and aggregation works by using the dual nature of
 the sessions.  The first step in this is reservation, which is responsible for
-creating the tree of the sessions.  Whenver any session receives the reservation
+creating the tree of the sessions.  Whenever any session receives the reservation
 request, it evaluates it by considering, if it can execute locally or it should
 break it and divide between its available children.  Depending on the decision,
 it can play one of the following two roles.
@@ -532,7 +532,7 @@ it can play one of the following two roles.
   this by creating new session and sending the divided
   reservation request to the each child node available in it's \textbf{CSRV}
   hierarchy.  These newly created sessions will be binded as directories in the
-  directory of the current session hance making them the sub-sessions of the
+  directory of the current session hence making them the sub-sessions of the
   current session.  The current session now acts as in aggregation point for
   these sub-sessions by passing the any execution request or input to all
   sub-sessions and merging the output from all sub-sessions to produce the final
@@ -880,7 +880,7 @@ tightly coupling the kernels running on cluster nodes and provides distributed
 process ID space which allows a front node to locally control all remotely
 started processes.
 
-Bproc is definately a step towards more control on remote processes but needs
+Bproc is definitely a step towards more control on remote processes but needs
 modified kernel on all systems and remote processes still run in remote
 namespace instead of the client namespace. These restrictions lead to the
 loses of the flexibility which is needed for dynamic workloads.
@@ -910,7 +910,7 @@ application by using the meta-scheduler DAGMan (Directed Acyclic Graph Manager)
 which allows user to specify the various dependencies within tasks in form of
 directed acyclic graph. 
 
-Unfortunately, the volutary model for condor restricts the direct commnication
+Unfortunately, the voluntary model for condor restricts the direct communication
 between the workstations for security reasons.  They typically communicate
 only with the agent responsible for submitting the job.  This lack of the
 ability to communicate directly with other computational nodes limit the
@@ -934,20 +934,20 @@ is much simpler and cleaner compared to the class based C++ interface of Dryad.
 Hadoop is a framework for data-centric distributed applications.   It
 uses location aware Hadoop distributed file system (HDFS) and schedules the
 computation close to the location of the data, hence reducing the need to
-relocate the data.  This localization of the compuation leads to the better
+relocate the data.  This localization of the computation leads to the better
 overall performance.  It is mainly used for map-reduce style of applications,
 but there are work going on to extend it for other approaches also.
 
 Hadoop streaming is one of such approach, which is also similar to XCPU3.
 Hadoop streaming is a utility which allows users to create and run jobs as any
-executables as the mapper and/or the reducer.  It can be also viewed as way to
+executable as the mapper and/or the reducer.  It can be also viewed as way to
 create pipeline multiple instances of mapper and multiple instances of reducer
-where pipeline multiplexing and de-multiplexing is indirectly done by intput
+where pipeline multiplexing and de-multiplexing is indirectly done by input
 distribution and output aggregation steps.
 
 Hadoop streaming is a positive step toward supporting generic data-streaming
 between applications, but it limits the flexibility in it's current form. 
-This streaming is desinged around map-reduce mechanism, hence does not give a
+This streaming is designed around map-reduce mechanism, hence does not give a
 way to run different applications on different mapper or reducer nodes.  The
 pipeline is limited to the multiple instances of two applications
 (mapper and reducer).  So, it is not suited for generic dataflow applications
@@ -980,11 +980,15 @@ mechanism primarily for menytask and dataflow deployments which can deal with
 dynamic workloads. We have kept the design simple with the assumption that
 simple design leads to the better scalability and flexibility.  We have tried
 to show that from examples that the XCPU3 interfaces are easy to use in
-language and runtime independent fasion. And with evaluation section we have
+language and runtime independent way. And with evaluation section we have
 tried to prove that the XCPU3 is viable option for scalable deployment of
 many-task and dataflow workloads.
+\newline
+\newline
 
-
+\hrule
+This project supported by the Department of Energy under Aware Number 
+DE- FG02-08ER25851
 \bibliography{references}
 
 \end{document}
