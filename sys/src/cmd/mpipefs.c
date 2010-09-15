@@ -331,7 +331,7 @@ parsespec(Mpipe *mp, int argc, char **argv)
 	case 'e':	/* enumerated mode */
 		f = ARGF();
 		if(f) {
-			char *x = ARGF();
+			char *x = f;
 			if(x)
 				mp->slots = atoi(x);
 			DPRINT(2, "\t enumerated mode (%d)\n", mp->slots);	

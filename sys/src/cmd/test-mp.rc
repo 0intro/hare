@@ -25,7 +25,7 @@ fn cleanup {
 fn startup {
 	echo Starting mpipefs....
 	./mpipefs >[2] $MPIPELOG 
-	#./mpipefs -D -v 9
+	#./mpipefs -D -v 9	# CHATTY
 }
 
 #
@@ -115,6 +115,7 @@ fn enum {
 	sleep 5 # poor man's synchornization
 	mp-writer -e 1 -n 5 -s 8192 /n/test/data	
 
+	sleep 5 # poor man's synchornization
 	if(test -s $TESTDIR/test1) {
 		if(test -s $TESTDIR/test2) {
 			echo FAILED: both files have data
@@ -331,7 +332,7 @@ named
 simplepipe
 #multipipe #<--- FAILS sometimes due to non-determinsm
 longmsg
-enum
+enum # <--- FAILS
 bcast
 splicefrom
 spliceto

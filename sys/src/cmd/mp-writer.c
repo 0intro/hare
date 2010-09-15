@@ -143,7 +143,7 @@ main(int argc, char *argv[])
 	for(count = 0; count < times; count++) {
 		if(chatty)
 			fprint(2, "writing %d time\n", count);
-		n = pipewrite(fd, d, size, count);
+		n = pipewrite(fd, d, size, which);
 		if(n != size) {
 			fprint(2, "pipe write failed: %d: %r\n", n);
 			exits("pipe failed");
