@@ -763,6 +763,7 @@ spliceto(void *arg) {
 	}
 	/* on error do the right thing */
 exit:
+	close(sa->fd);
 	if(mp->mode != MPTbcast)
 		fsclunk(dummy);	
 	free(sa);
@@ -949,7 +950,6 @@ exit:
 		if(mp->mode == MPTbcast)
 			closebcasts(mp);
 	}
-
 	free(sa);
 	threadexits(nil);
 }
