@@ -13,9 +13,6 @@
 	Based in part on Pravin Shinde's devtask.c
 
 	TODO:
-		* subsession creation, destruction and accounting
-		* reservation & binding of subsessions
-		* aggregated ctl via multipipes
 		* aggregated io via multipipes
 		* aggregated status via multipipes
 		* aggregated wait via multipipe barrier (todo in multipipe)
@@ -30,12 +27,12 @@
 #include <mp.h>
 #include <libsec.h>
 #include <stdio.h>
+#include "debug.h"
 
 char 	defaultpath[] =	"/proc";
 char *procpath;
 char *srvctl;
 Channel *iochan;
-Channel *bindchan;
 
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
@@ -61,7 +58,9 @@ typedef struct Gang Gang;
 struct Session
 {
 	Gang *g;		/* gang? necessary? */
-	int fd;		/* fd to ctl file */
+	int fd;			/* fd to ctl file */
+	Req *r;			/* outstanding ctl requests */
+	Channel *chan;	/* status channel */
 };
 
 struct Gang
@@ -71,8 +70,6 @@ struct Gang
 	Session *sess;	/* array of subsessions */
 
 	Channel *chan;	/* channel for sync/error reporting */
-
-	int ctlmp;		/* handle to ctl multipipe */
 
 	int refcount;		/* reference count */
 	Gang *next;		/* primary linked list */
@@ -477,7 +474,8 @@ fsopen(Req *r)
 	Fid *fid = r->fid;
 	Qid *q = &fid->qid;
 	Gang *mygang;
-	void *resp;
+
+	DPRINT(2, "\t fsopen %p\n", r);
 
 	if(TYPE(fid->qid) >= Qsubses) {
 		respond(r, Eperm);
@@ -494,6 +492,7 @@ fsopen(Req *r)
 		return;
 	}
 
+	DPRINT(2, "\t newgang %p\n", r);
 	/* insert new session at the end of the list & assign index*/
 	mygang = newgang();
 	if(mygang == nil) {
@@ -506,22 +505,8 @@ fsopen(Req *r)
 	r->fid->qid.path = path;
 	r->ofcall.qid.path = path;
 
-	/* bind multipipes into place */	
-	if(sendp(bindchan, mygang) != 1) {
-		fprint(2, "bindchan hungup");
-		threadexits("bindchan hungup");
-	}
-
-	if(recv(mygang->chan, &resp) < 0) {
-		respond(r, "unknown problem on binder thread");
-	} else {
-		if(resp == nil) {
-			respond(r, nil);
-		} else {
-			respond(r, resp);
-			free(resp);
-		}
-	}
+	respond(r, nil);
+	DPRINT(2, "\t fsopen done %p\n", r);
 }
 
 static void
@@ -548,6 +533,14 @@ fsread(Req *r)
 	respond(r, "not yet");
 }
 
+/* find the execfs to allocate next session from */
+/* right now we just return local execfs */
+static char *
+findexecfs(void)
+{
+	return "/proc";
+}
+
 enum
 {
 	CMres,
@@ -562,7 +555,11 @@ cmdres(Req *r, int num, int argc, char **argv)
 {
 	Fid *f = r->fid;
 	Gang *g = f->aux;
-	void *resp = nil;
+	int n;
+	int count;
+	char buf[255];
+	char dest[255];
+	char *path;
 
 	USED(argc);
 	USED(argv);
@@ -579,25 +576,42 @@ cmdres(Req *r, int num, int argc, char **argv)
 	}
 
 	g->size = num;
+	g->sess = emalloc9p(sizeof(Session)*g->size);
 
-	if(sendp(bindchan, g) != 1) {
-		fprint(2, "bindchan hungup");
-		threadexits("bindchan hungup");
+	/* TODO: consider doing this in sub-procs */
+	for(count = 0; count < g->size; count++) {
+		DPRINT(2, "\t reservation: count: %d\n", count); 
+		path = findexecfs();
+		snprint(buf, 255, "%s/clone", path);
+		g->sess[count].fd = open(buf, ORDWR);
+		DPRINT(2, "\t control channel on fd %d\n", g->sess[count].fd);
+		g->sess[count].r = nil;
+		g->sess[count].chan = chancreate(sizeof(char *), 0);
+		if(g->sess[count].fd < 0) {
+			respond(r, 
+			  smprint("couldn't open session ctl %s/clone: %r\n", path));
+			return;
+		}
+		n = pread(g->sess[count].fd, buf, 255, 0);
+		if(n < 0) {
+			respond(r,
+				smprint("couldn't read from session ctl %s/clone: %r\n", 
+						path));
+			return;
+		}
+		n = atoi(buf); /* convert to local execs session number */
+		snprint(buf, 255, "%s/%d", path, n);
+		/* of course we''l need another buf for our local fs ? */
+		snprint(dest, 255, "/proc/g%d/%d", g->index, count);
+		n = bind(buf, dest, MREPL);
+		if(n < 0) {
+			respond(r, smprint("couldn't bind %s %s: %r\n", buf, dest));
+			return;
+		}
 	}
 
-	if(recv(g->chan, &resp) < 0) {
-		/* channel failure.... */
-		respond(r, "unknown problem on binder thread");
-		return;
-	}
-
-	if(resp == nil) {
-		r->ofcall.count = r->ifcall.count;
-		respond(r, nil);
-	} else {
-		respond(r, resp);
-		free(resp);
-	}	
+	r->ofcall.count = r->ifcall.count;
+	respond(r, nil);
 }
 
 /* this should probably be a generic function somewhere */
@@ -616,6 +630,53 @@ cleanupcb(char *buf, int count)
 	memmove(nbuf, buf, count);
 	nbuf[count] = 0;
 	return nbuf;
+}
+
+static void
+relaycmd(void *arg)
+{
+	Session *s = arg;
+	int n;
+
+	DPRINT(2, "writing %d count of data to %d\n", s->r->ifcall.count, s->fd);
+	n = pwrite(s->fd, s->r->ifcall.data, s->r->ifcall.count, 0);
+	if(n < 0) {
+		sendp(s->chan, smprint("relay write cmd failed: %r\n"));
+	} else {
+		sendp(s->chan, nil);
+	}
+}
+
+static void
+cmdbcast(Req *r, Gang *g)
+{
+	int count;
+	char *resp;
+	char *err = nil;
+
+	/* broadcast to all subsessions */
+	for(count = 0; count < g->size; count++) {
+		/* slightly slimy */
+		g->sess[count].r = r;
+		proccreate(relaycmd, &g->sess[count], STACK);
+	}
+	
+	/* wait for responses, checking for errors */
+	for(count = 0; count < g->size; count++) {
+		/* wait for response */
+		resp = recvp(g->sess[count].chan);
+		g->sess[count].r = nil;
+		if(resp)
+			err = resp;
+	}
+	
+	if(err) {
+		respond(r, err);
+	} else {
+		/* success */
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+	}
 }
 
 static void
@@ -649,7 +710,8 @@ fswrite(Req *r)
 			if((g == nil)||(g->size == 0)) {
 				respondcmderror(r, cb, "%r");
 			} else {
-				write(g->ctlmp, r->ifcall.data, r->ifcall.count);
+				DPRINT(2, "Unknown command, broadcasting to children\n");
+				cmdbcast(r, g);
 			}
 		} else {
 			switch(cmd->index) {
@@ -674,6 +736,7 @@ fswrite(Req *r)
 		free(buf);
 		break;		
 	};
+	DPRINT(3, "\t fswrite exiting normally\n");
 }
 
 static void
@@ -714,8 +777,15 @@ iothread(void*)
 	Req *r;
 
 	threadsetname("gangfs-iothread");
+	if(sendp(iochan, nil) < 0) {
+		fprint(2, "iothread: problem sending sync message\n");
+		threadexits("nosync");
+	}
+
 	for(;;) {
+		DPRINT(2, "=== IOTHREAD: waiting for next operation ===\n\n");
 		r = recvp(iochan);
+		DPRINT(2, "=== IOTHREAD: got %d ===\n\n", r->ifcall.type);
 		if(r == nil)
 			threadexits("interrupted");
 
@@ -736,14 +806,6 @@ iothread(void*)
 	}
 }
 
-/* find the execfs to allocate next session from */
-/* right now we just return local execfs */
-static char *
-findexecfs(void)
-{
-	return "/proc";
-}
-
 static int
 streamout(int fd, ulong which, char *path)
 {
@@ -758,101 +820,28 @@ streamout(int fd, ulong which, char *path)
 	return n;
 }
 
-/*
-	bindthread handles two separate functions.
-	during session initialization, it binds the ctl multipipe into place,
-	and during reservation it sets up subject threads in execfs and
-	splices ctl to them
-*/
-static void
-bindthread(void *)
-{
-	Gang *g;
-	int n;
-	int count;
-	char buf[255];
-	char dest[255];
-	char *path;
-
-	threadsetname("gangfs-bindthread");
-	for(;;) {
-		g = recvp(bindchan);
-		if(g == nil)
-			threadexits("interrupted");
-
-		/* phase 0: bind multipipes into place*/
-		if(g->size == 0) { 
-			snprint(buf, 255, "/proc/g%d", g->index);
-			if(mpipe(buf, "ctl -b") < 0) {
-				sendp(g->chan, smprint("couldn't bind ctl multipipe\n"));
-				continue;
-			} else {
-				snprint(buf, 255, "/proc/g%d/ctl", g->index);
-				g->ctlmp = open(buf, OWRITE);
-			}
-			send(g->chan, nil);
-			continue;
-		}
-
-		/* phase 1: allocate subject threads and stream ctl to them */
-		/* FUTURE: do we want to refork for every new request? */
-		g->sess = emalloc9p(sizeof(Session)*g->size);
-		for(count = 0; count < g->size; count++) {
-			path = findexecfs();
-			snprint(buf, 255, "%s/clone", path);
-			g->sess[count].fd = open(buf, ORDWR);
-			if(g->sess[count].fd < 0) {
-				sendp(g->chan, 
-				  smprint("couldn't open session ctl %s/clone: %r\n", path));
-				goto error;
-			}
-			n = read(g->sess[count].fd, buf, 255);
-			if(n < 0) {
-				sendp(g->chan,
-				  smprint("couldn't read from session ctl %s/clone: %r\n", 
-						path));
-				goto error;
-			}
-			n = atoi(buf); /* convert to local execs session number */
-			snprint(buf, 255, "%s/%d", path, n);
-			/* of course we''l need another buf for our local fs ? */
-			snprint(dest, 255, "/proc/g%d/%d", g->index, count);
-			n = bind(buf, dest, MREPL);
-			if(n < 0) {
-				sendp(g->chan,
-				   smprint("couldn't bind %s %s: %r\n", buf, dest));
-				goto error;
-			}
-			/* now splice */
-			snprint(dest, 255, "%s/ctl", buf);
-			streamout(g->ctlmp, 0, dest);
-		}
-		send(g->chan, nil);
-error:
-		;
-	}
-}
-
 static void
 ioproxy(Req *r)
 {
+	DPRINT(1, "ioproxy->forwarding\n");
 	if(sendp(iochan, r) != 1) {
 		fprint(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
+	DPRINT(1, "ioproxy->back\n");
 }
 
 Srv fs=
 {
 	.attach=	fsattach,
-	.walk1=	fswalk1,
-	.clone=	fsclone,
-	.open=	ioproxy,
-	.write=	ioproxy,
-	.read=	ioproxy,
-	.stat	=	fsstat,
-	.destroyfid =	fsclunk,
-	.end=	cleanup,
+	.walk1=		fswalk1,
+	.clone=		fsclone,
+	.open=		ioproxy,
+	.write=		ioproxy,
+	.read=		ioproxy,
+	.stat=		fsstat,
+	.destroyfid=fsclunk,
+	.end=		cleanup,
 };
 
 void
@@ -861,6 +850,7 @@ threadmain(int argc, char **argv)
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
+		vflag=9;	/* TODO: give it it's own param */
 		break;
 	default:
 		usage();
@@ -875,13 +865,15 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	/* spawn off a io thread */
+	DPRINT(1, "iothread\n");
 	iochan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
+	recvp(iochan);
 
+	DPRINT(1, "fsthread\n");
 	threadpostmountsrv(&fs, nil, procpath, MAFTER);
 
-	/* spawn off a bind thread */
-	bindchan = chancreate(sizeof(void *), 0);
-	proccreate(bindthread, nil, STACK);
+
+	DPRINT(1, "exit\n");
 	threadexits(0);
 }
