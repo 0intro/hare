@@ -99,9 +99,6 @@ enum
 	Qargs,
 	Qstatus,
 	Qwait,
-	Qstdin,
-	Qstdout,
-	Qstderr,
 	Qconvend,
 	Qsubses = Qconvend,
 };
@@ -119,9 +116,6 @@ static Dirtab convdir[] = {
 	"args",		{Qargs},				0444,
 	"status",	{Qstatus},				0444,
 	"wait",		{Qwait},				0444,
-	"stdin",	{Qstdin},				0222,
-	"stdout",	{Qstdout},				0444,
-	"stderr",	{Qstderr},				0444,
 };
 
 static void
@@ -144,6 +138,46 @@ mpipe(char *path, char *name)
 	ret = mount(fd, -1, path, MBEFORE, name);
 	close(fd);
 	return ret;
+}
+
+static int
+spliceto(char *src, char *dest)
+{
+	int fd = open(src, OWRITE);
+	int n; 
+	char hdr[255];
+	ulong tag = ~0; /* header byte is at offset ~0 */
+	char pkttype='>';
+
+	if(fd < 0) {
+		DPRINT(2, "spliceto: open failed: %r\n");
+		return fd;
+	}
+
+	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, dest);
+	n = pwrite(fd, hdr, n, tag);
+	close(fd);
+	return n;
+}
+
+static int
+splicefrom(char *dest, char *src)
+{
+	int fd = open(dest, OWRITE);
+	int n; 
+	char hdr[255];
+	ulong tag = ~0; /* header byte is at offset ~0 */
+	char pkttype='<';
+
+	if(fd < 0) {
+		DPRINT(2, "splicefrom: open failed: %r\n");
+		return fd;
+	}
+
+	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, src);
+	n = pwrite(fd, hdr, n, tag);
+	close(fd);
+	return n;
 }
 
 static Gang *
@@ -550,6 +584,7 @@ Cmdtab ctlcmdtab[]={
 	CMres, "res", 0,
 };
 
+/* TODO: many of the error scenarios here probably need more cleanup */
 static void
 cmdres(Req *r, int num, int argc, char **argv)
 {
@@ -575,11 +610,28 @@ cmdres(Req *r, int num, int argc, char **argv)
 		return;
 	}
 
+	/* setup aggregation I/O */
+	snprint(dest, 255, "/proc/g%d", g->index);
+	if (mpipe(dest, "-b stdin") < 0) {  /* broadcast */
+		respond(r, "problem binding gang stdin");
+		return;
+	}
+	if (mpipe(dest, "stdout") < 0) {  
+		respond(r, "problem binding gang stdout");
+		return;
+	}
+	if (mpipe(dest, "stderr") < 0) { 
+		respond(r, "problem binding gang stderr");
+		return;
+	}
+
 	g->size = num;
 	g->sess = emalloc9p(sizeof(Session)*g->size);
 
 	/* TODO: consider doing this in sub-procs */
 	for(count = 0; count < g->size; count++) {
+		int pid;
+
 		DPRINT(2, "\t reservation: count: %d\n", count); 
 		path = findexecfs();
 		snprint(buf, 255, "%s/clone", path);
@@ -599,8 +651,8 @@ cmdres(Req *r, int num, int argc, char **argv)
 						path));
 			return;
 		}
-		n = atoi(buf); /* convert to local execs session number */
-		snprint(buf, 255, "%s/%d", path, n);
+		pid = atoi(buf); /* convert to local execs session number */
+		snprint(buf, 255, "%s/%d", path, pid);
 		/* of course we''l need another buf for our local fs ? */
 		snprint(dest, 255, "/proc/g%d/%d", g->index, count);
 		n = bind(buf, dest, MREPL);
@@ -608,6 +660,31 @@ cmdres(Req *r, int num, int argc, char **argv)
 			respond(r, smprint("couldn't bind %s %s: %r\n", buf, dest));
 			return;
 		}
+
+		/* FUTURE: conditionalize splicing on res arguments or other commands */
+		snprint(buf, 255, "%s/%d/stdin", path, pid);
+		snprint(dest, 255, "/proc/g%d/stdin", g->index);
+		n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
+		if(n < 0) {
+			respond(r, smprint("splicefrom: %r\n"));
+			return;
+		}
+
+		snprint(buf, 255, "%s/%d/stdout", path, pid);
+		snprint(dest, 255, "/proc/g%d/stdout", g->index);
+		n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
+		if(n < 0) {
+			respond(r, smprint("splicefrom: %r\n"));
+			return;
+		}
+
+		snprint(buf, 255, "%s/%d/stderr", path, pid);
+		snprint(dest, 255, "/proc/g%d/stderr", g->index);
+		spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
+		if(n < 0) {
+			respond(r, smprint("splicefrom: %r\n"));
+			return;
+		}		
 	}
 
 	r->ofcall.count = r->ifcall.count;
@@ -804,20 +881,6 @@ iothread(void*)
 			break;
 		}
 	}
-}
-
-static int
-streamout(int fd, ulong which, char *path)
-{
-	int n; 
-	char hdr[255];
-	ulong tag = ~0; /* header byte is at offset ~0 */
-	char pkttype='>';
-
-	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
-	n = pwrite(fd, hdr, n, tag);
-	
-	return n;
 }
 
 static void
