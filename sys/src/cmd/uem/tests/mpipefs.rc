@@ -3,6 +3,8 @@
 # Multipipe Regression
 #
 
+echo '== Multipipe Regression =='
+
 #
 # Parameters
 #
@@ -24,7 +26,7 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs....
-	./mpipefs >[2] $MPIPELOG 
+	mpipefs >[2] $MPIPELOG 
 	#./mpipefs -D -v 9	# CHATTY
 }
 

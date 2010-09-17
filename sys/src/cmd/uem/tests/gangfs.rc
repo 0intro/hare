@@ -3,6 +3,8 @@
 # Gangfs Regression
 #
 
+echo '== Gangfs Regression =='
+
 #
 # Parameters
 #

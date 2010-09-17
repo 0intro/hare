@@ -3,6 +3,8 @@
 # Execfs Regression
 #
 
+echo '== Execfs Regression =='
+
 #
 # Parameters
 #
