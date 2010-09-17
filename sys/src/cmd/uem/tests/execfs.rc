@@ -1,0 +1,84 @@
+#!/bin/rc
+# 
+# Execfs Regression
+#
+
+#
+# Parameters
+#
+EXECFSLOG=./execfs.log
+TESTDIR=.test
+
+#
+# Cleanup Previous Instances
+#
+fn cleanup {
+	echo Cleaning up previous runs.
+	rm -rf /srv/mpipe
+	unmount /n/test > /dev/null >[2] /dev/null
+	unmount /proc > /dev/null >[2] /dev/null
+	bind '#p' /proc
+	kill execfs | rc
+}
+
+#
+# Startup execfs 
+#
+fn startup {
+	echo Starting mpipefs
+	mpipefs
+	echo Starting execfs....
+	execfs -D >[2] execfs.log
+	#execfs -D	# CHATTY
+}
+
+#
+# Setup a ramfs
+#
+fn testdir {
+	mkdir -p $TESTDIR
+	ramfs -m $TESTDIR
+}
+
+fn myexecstdin {
+	mypid=`{cat}
+
+	echo hello squidboy > /proc/$mypid/stdin &
+	cat /proc/$mypid/stdout > $TESTDIR/stdout &
+	
+	sleep 5
+	echo exec cat
+}
+
+fn myexecstdout {
+	mypid=`{cat}
+	cat /proc/$mypid/stdout > $TESTDIR/stdout &
+	sleep 5
+	echo exec /bin/date
+}
+
+fn stdout {
+	echo Basic Test (stdout only)
+	myexecstdout <>/proc/clone >[1=0]
+	cat $TESTDIR/stdout
+}
+
+fn stdin {
+	echo Stdin Test 
+	myexecstdin <>/proc/clone >[1=0]
+	cat $TESTDIR/stdout
+}
+
+# Setup
+cleanup
+startup
+testdir
+
+# Tests
+stdout
+stdin	#failing
+
+# Cleanup
+unmount $TESTDIR
+rm -rf $TESTDIR
+cleanup
