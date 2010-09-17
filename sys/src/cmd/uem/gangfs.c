@@ -910,10 +910,16 @@ Srv fs=
 void
 threadmain(int argc, char **argv)
 {
+	char *x;
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
-		vflag=9;	/* TODO: give it it's own param */
+		break;
+	case 'v':
+		x = ARGF();
+		if(x)
+			vflag = atoi(x);
 		break;
 	default:
 		usage();

@@ -345,10 +345,17 @@ Srv fs=
 void
 threadmain(int argc, char **argv)
 {
+	char *x;
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
 		break;
+	case 'v':
+		x = ARGF();
+		if(x)
+			vflag = atoi(x);
+		break;		
 	default:
 		usage();
 	}ARGEND
