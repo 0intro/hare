@@ -27,12 +27,12 @@ fn cleanup {
 #
 fn startup {
 
-	echo Starting execfs....
+	echo Starting execfs...
 	execfs -D >[2] execfs.log
-	echo Starting gangfs
+	echo Starting gangfs...
 	gangfs -D >[2] gangfs.log
-	echo Starting mpipefs
-	mpipefs -D >[2] mpipefs.log
+	echo Starting mpipefs...
+	mpipefs -D >[2] mpipe.log
 	sleep 2
 }
 
@@ -46,19 +46,71 @@ fn testdir {
 
 fn myexec {
 	mypid=`{cat}
-	#echo execing $mypid > $TESTDIR/log
-	echo res $1
-	cat /proc/g$mypid/stdout > $TESTDIR/stdout &
-	cat /proc/g$mypid/stderr > $TESTDIR/stderr &
-	echo exec $2
+	echo res 5
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 &
+	echo exec /bin/cat $TESTDIR/test >>[2] gangfs.log
+	sleep 5
+}
+
+fn myexec2 {
+	mypid=`{cat}
+	echo res 5
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 &
+	cat $TESTDIR/test > /proc/g$mypid/stdin
+	echo exec /bin/cat >>[2] gangfs.log
 	sleep 5
 }
 
 fn basic {
-	echo Basic Test - 5 runs of /bin/date
-	myexec 5 /bin/date <>/proc/gclone >[1=0]
-	cat $TESTDIR/stdout
-	cat $TESTDIR/stderr
+	echo -n Basic Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>/proc/gclone >[1=0]
+
+	# verify results (yes, I'm lazy)
+	cat $TESTDIR/test > $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
+fn stdin {
+	echo -n STDIN Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec2 <>/proc/gclone >[1=0]
+
+	# verify results (yes, I'm lazy)
+	cat $TESTDIR/test > $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
 }
 
 # Setup
@@ -67,7 +119,8 @@ startup
 testdir
 
 # Tests
-basic		#<- works, but triggers spurious error
+basic
+stdin
 
 # Cleanup
 unmount $TESTDIR
