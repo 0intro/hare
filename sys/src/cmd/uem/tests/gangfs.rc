@@ -1,0 +1,75 @@
+#!/bin/rc
+# 
+# Gangfs Regression
+#
+
+#
+# Parameters
+#
+EXECFSLOG=./execfs.log
+TESTDIR=.test
+
+#
+# Cleanup Previous Instances
+#
+fn cleanup {
+	echo Cleaning up previous runs.
+	rm -rf /srv/mpipe
+	unmount /n/test > /dev/null >[2] /dev/null
+	unmount /proc > /dev/null >[2] /dev/null
+	bind '#p' /proc
+	kill execfs | rc
+	kill gangfs | rc
+}
+
+#
+# Startup execfs 
+#
+fn startup {
+
+	echo Starting execfs....
+	execfs -D >[2] execfs.log
+	echo Starting gangfs
+	gangfs -D >[2] gangfs.log
+	echo Starting mpipefs
+	mpipefs -D >[2] mpipefs.log
+	sleep 2
+}
+
+#
+# Setup a ramfs
+#
+fn testdir {
+	mkdir -p $TESTDIR
+	ramfs -m $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat}
+	#echo execing $mypid > $TESTDIR/log
+	echo res $1
+	cat /proc/g$mypid/stdout > $TESTDIR/stdout &
+	cat /proc/g$mypid/stderr > $TESTDIR/stderr &
+	echo exec $2
+	sleep 5
+}
+
+fn basic {
+	echo Basic Test - 5 runs of /bin/date
+	myexec 5 /bin/date <>/proc/gclone >[1=0]
+	cat $TESTDIR/stdout
+	cat $TESTDIR/stderr
+}
+
+# Setup
+cleanup
+startup
+testdir
+
+# Tests
+basic		#<- works, but triggers spurious error
+
+# Cleanup
+unmount $TESTDIR
+rm -rf $TESTDIR
+cleanup
