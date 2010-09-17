@@ -1,8 +1,0 @@
-#!/bin/rc
-
-kill gangfs | rc
-kill execfs | rc
-kill mpipefs | rc
-rm /srv/mpipefs
-unmount /proc
-bind '#p' /proc
