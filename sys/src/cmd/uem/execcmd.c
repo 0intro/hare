@@ -65,7 +65,6 @@ main(int argc, char **argv)
 
 	/* need to open our bit */
 	snprint(fname, 255, "/proc/%d/stdin", pid);
-	fprint(2, "just a test you see - [%s]\n", fname);
 	stdinfd = open(fname, OREAD);
 	if(stdinfd < 0)
 		fprint(2, "opening stdin failed: %r\n");

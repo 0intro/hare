@@ -43,7 +43,6 @@ fn testdir {
 fn named {
 	echo -n Testing name parameter...
 
-
 	mount /srv/mpipe /n/test test
 	if(! test -e /n/test/test) {
 		echo FAILED!

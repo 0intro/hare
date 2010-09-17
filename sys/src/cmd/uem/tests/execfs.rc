@@ -6,7 +6,6 @@
 #
 # Parameters
 #
-EXECFSLOG=./execfs.log
 TESTDIR=.test
 
 #
@@ -26,8 +25,8 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs
-	mpipefs
-	echo Starting execfs....
+	mpipefs -D >[2] mpipe.log
+	echo Starting execfs.
 	execfs -D >[2] execfs.log
 	#execfs -D	# CHATTY
 }
@@ -42,31 +41,59 @@ fn testdir {
 
 fn myexecstdin {
 	mypid=`{cat}
-
-	echo hello squidboy > /proc/$mypid/stdin &
-	cat /proc/$mypid/stdout > $TESTDIR/stdout &
-	
+	cat $TESTDIR/test > /proc/$mypid/stdin &
+	cat /proc/$mypid/stdout > $TESTDIR/test1 &
+	echo -n exec /bin/cat >>[2] execfs.log
 	sleep 5
-	echo exec cat
 }
 
 fn myexecstdout {
 	mypid=`{cat}
-	cat /proc/$mypid/stdout > $TESTDIR/stdout &
+	cat /proc/$mypid/stdout > $TESTDIR/test1 &
 	sleep 5
-	echo exec /bin/date
+	echo -n exec /bin/cat $TESTDIR/test >>[2] execfs.log
 }
 
 fn stdout {
-	echo Basic Test (stdout only)
+	echo -n Basic Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
 	myexecstdout <>/proc/clone >[1=0]
-	cat $TESTDIR/stdout
+
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
 }
 
 fn stdin {
-	echo Stdin Test 
+	echo -n Stdin Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
 	myexecstdin <>/proc/clone >[1=0]
-	cat $TESTDIR/stdout
+
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
 }
 
 # Setup

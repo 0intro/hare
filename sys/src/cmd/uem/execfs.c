@@ -14,7 +14,6 @@
 
 	TODO:
 		* need a better way to clean up after fids
-		* need a better logging mechanism
 		* maybe autostart mpipe when we need it
 		
 */
@@ -27,6 +26,7 @@
 #include <mp.h>
 #include <libsec.h>
 #include <stdio.h>
+#include <debug.h>
 
 char Enopid[] =	"process not initialized";
 char Eoverflow[] = "ctl buffer overflow";
@@ -195,6 +195,7 @@ error:
 	respond(r, err);
 }
 
+/* TODO: doesn't appear to do command relaying yet */
 static void
 fswrite(Req *r)
 {
