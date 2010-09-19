@@ -706,7 +706,7 @@ spliceto(void *arg) {
 		   then put us on the recvq rrchan */
 		if((mp->mode != MPTbcast) && (aux->other == nil)) {
 			if(sendp(mp->rrchan[aux->which], dummy) != 1) {
-				fprint(2, "spliceto: hungup rrchan\n");
+				DPRINT(2, "spliceto: hungup rrchan\n");
 				goto exit;
 			}
 		}
@@ -714,7 +714,7 @@ spliceto(void *arg) {
 		/* block on incoming */
 		tr = recvp(aux->chan);
 		if(tr == nil) {
-			fprint(2, "spliceto: hungup daux.chan\n");
+			DPRINT(2, "spliceto: hungup daux.chan\n");
 			goto exit;
 		}
 
@@ -820,7 +820,7 @@ fsbcast(Req *r, Mpipe *mp)
 		char *e;
 		if(e = recvp(reterr)) {
 			err = e;
-			fprint(2, "fsbcast: %s\n", err);
+			DPRINT(2, "fsbcast: %s\n", err);
 		}
 	}
 
@@ -906,28 +906,28 @@ splicefrom(void *arg) {
 			/* acquire a reader */
 			aux->other = recvp(mp->rrchan[aux->which]);
 			if(aux->other == nil) {
-				fprint(2, "splicefrom: %s\n", Ehangup);
+				DPRINT(2, "splicefrom: %s\n", Ehangup);
 				goto exit;
 			}
 			raux = aux->other->aux;
 			if(raux->other != nil) {
-				fprint(2, "splicefrom: %s\n", Eother);
+				DPRINT(2, "splicefrom: %s\n", Eother);
 				goto exit;
 			}
 
 			raux->other = dummy;
 			assert(raux->chan != 0);
 			if(sendp(raux->chan, &tr) != 1) {
-				fprint(2, "splicefrom: %s\n", Ehangup);
+				DPRINT(2, "splicefrom: %s\n", Ehangup);
 				goto exit;
 			}
 			if(err = recvp(reterr)) {
-				fprint(2, "splicefrom: reterr %s\n", Ehangup);
+				DPRINT(2, "splicefrom: reterr %s\n", Ehangup);
 				goto exit;
 			}
 		}
 		if(err) {
-			fprint(2, "spliceform: error: %s\n", err);
+			DPRINT(2, "spliceform: error: %s\n", err);
 			goto exit;
 		}
 		/* wait for completion? */
@@ -1111,7 +1111,7 @@ iothread(void*)
 			threadcreate(fswrite, r, STACK);
 			break;
 		default:
-			fprint(2, "unrecognized io op %d\n", r->ifcall.type);
+			DPRINT(2, "unrecognized io op %d\n", r->ifcall.type);
 			break;
 		}
 	}
@@ -1122,7 +1122,7 @@ static void
 ioproxy(Req *r)
 {
 	if(sendp(iochan, r) != 1) {
-		fprint(2, "iochan hungup");
+		DPRINT(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
 }
