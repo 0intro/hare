@@ -63,15 +63,30 @@ struct Session
 	Channel *chan;	/* status channel */
 };
 
+enum {
+	GANG_NEW,		/* allocated */
+	GANG_RESV,		/* reserved */
+	GANG_EXEC,		/* executing */
+	GANG_CLOSE,		/* closing */
+};
+
+/* NOTE:
+   we use the structural reference count for clean up
+   of the struct and the ctl ref count for the clean
+   up of the directory
+*/
 struct Gang
 {
-	int index;			/* gang id */
+	int refcount;	/* structural reference count */
+	int ctlref;		/* control file reference count */
+	int status;		/* current status of gang */
+
+	int index;		/* gang id */
 	int size;		/* number of subsessions */
 	Session *sess;	/* array of subsessions */
 
 	Channel *chan;	/* channel for sync/error reporting */
 
-	int refcount;		/* reference count */
 	Gang *next;		/* primary linked list */
 };
 
@@ -123,6 +138,21 @@ usage(void)
 {
 	fprint(2, "gangfs [-D] [mtpt]\n");
 	exits("usage");
+}
+
+
+static void
+gangrefinc(Gang *g, char *where)
+{
+	g->refcount++;
+	DPRINT(2, "\t\tGang(%p).refcount++ = %d [%s]\n", g, g->refcount, where);
+}
+
+static void
+gangrefdec(Gang *g, char *where)
+{
+	g->refcount--;
+	DPRINT(2, "\t\tGang(%p).refcount-- = %d [%s]\n", g, g->refcount, where);
 }
 
 static int
@@ -207,7 +237,9 @@ newgang(void)
 		current->next = mygang;
 		mygang->index = current->index+1;
 	}
-	mygang->refcount++;
+	mygang->ctlref = 1;
+	mygang->refcount = 1;
+	mygang->status = GANG_NEW;
 	wunlock(&glock);
 
 	return mygang;
@@ -223,8 +255,8 @@ findgang(int index)
 		goto out;
 	} else {
 		for(current=glist; current != nil; current = current->next) {
-			if(current->index == index) {
-				current->refcount++;
+			if((current->index == index)&&(current->status != GANG_CLOSE)) {
+				gangrefinc(current, "findgang");
 				goto out;
 			}
 		}
@@ -244,8 +276,10 @@ findgangnum(int which)
 	} else {
 		int count = 0;
 		for(current=glist; current != nil; current = current->next) {
+			if(current->status == GANG_CLOSE)
+				continue;
 			if(count == which) {
-				current->refcount++;
+				gangrefinc(current, "findgangnum");
 				goto out;
 			}
 			count++;
@@ -259,36 +293,43 @@ out:
 static void
 releasesessions(Gang *g)
 {
-/* TODO: Remove if we don't need it
 	int count;
 	
-	for(count = 0; count < g->size; count++)
-		free(g->sess[count].path;
-*/
+	for(count = 0; count < g->size; count++) {
+		chanfree(g->sess[count].chan);
+		close(g->sess[count].fd);
+	}
+
 	free(g->sess);
 }
+
 
 static void
 releasegang(Gang *g)
 {
 	wlock(&glock);
-	g->refcount--;
+	gangrefdec(g, "releasegang");
 	if(g->refcount == 0) {	/* clean up */
-		Gang *current;
-		if(glist == nil) {
-			goto out;
-		}
-		for(current=glist; current->next != g; current = current->next) {
-			if(current == nil) {
-				goto out;
+		Gang *c;
+		Gang *p = glist;
+
+		if(glist == g) {
+			glist = g->next;
+		} else {
+			for(c = glist; c != nil; c = c->next) {
+				if(c == g) {
+					p->next = g->next;
+					break;
+				}
+				p = c;
 			}
 		}
-		current->next = g->next;
+		
 		releasesessions(g);
 		chanfree(g->chan);
 		free(g);
 	}
-out:
+
 	wunlock(&glock);
 }
 
@@ -359,6 +400,7 @@ dirgen(int n, Dir *d, void *aux)
 				d->qid.type=QTDIR;
 				d->mode = 0555|DMDIR; /* FUTURE: set perms */
 				d->name = smprint("g%d", g->index);
+				DPRINT(2, "RELEASEGANG called from dirgen\n");
 				releasegang(g);
 				return 0;
 			}
@@ -479,7 +521,6 @@ fsclone(Fid *oldfid, Fid *newfid)
 {
 	Gang *g;
 
-
 	if((oldfid == nil)||(newfid==nil)) {
 		fprint(2, "fsclone: bad fids\n");
 		return nil;
@@ -495,7 +536,7 @@ fsclone(Fid *oldfid, Fid *newfid)
 	g = oldfid->aux;
 	if(g) {
 		newfid->aux = oldfid->aux;
-		g->refcount++;
+		gangrefinc(g, "fsclone");
 	}
 
 	return nil;
@@ -518,6 +559,16 @@ fsopen(Req *r)
 	if (q->type&QTDIR){
 		respond(r, nil);
 		return;
+	}
+	
+	if(TYPE(fid->qid) == Qctl) {
+		mygang = fid->aux;
+		if(mygang) {
+			wlock(&glock);
+			mygang->ctlref++; /* TODO: do we need to lock? */
+			wunlock(&glock);
+		} else
+			DPRINT(2, "fsopen: ctl fid without aux\n");
 	}
 
 	if(TYPE(fid->qid) != Qclone) {
@@ -687,6 +738,7 @@ cmdres(Req *r, int num, int argc, char **argv)
 		}		
 	}
 
+	g->status = GANG_RESV;
 	r->ofcall.count = r->ifcall.count;
 	respond(r, nil);
 }
@@ -834,17 +886,44 @@ fsstat(Req* r)
 }
 
 static void
-fsclunk(Fid *f)
+cleanupgang(Gang *g)
 {
-	USED(f);
-	/*  
+	char fname[255];
+
+	/* TODO: force hangup of multipipes? */
+	snprint(fname, 255, "/proc/g%d/stdin", g->index);
+	unmount(0, fname);
+	snprint(fname, 255, "/proc/g%d/stdout", g->index);
+	unmount(0, fname);
+	snprint(fname, 255, "/proc/g%d/stderr", g->index);
+	unmount(0, fname);
+	/* TODO: Clean up subsessions? */
+}
+
+
+static void
+fsclunk(Fid *fid)
+{
 	Gang *g;
 
-	if((0)&&(f->aux != nil)) {
-		g = f->aux;
+	if(TYPE(fid->qid) == Qctl) {
+		g = fid->aux;
+		if(g) {
+			wlock(&glock);
+			g->ctlref--;	/* TODO: do we need to lock? */
+			if(g->ctlref == 0) {
+				cleanupgang(g); 
+				g->status = GANG_CLOSE;
+			}
+			wunlock(&glock);
+		} else
+			DPRINT(2, "fsclunk: ctl fid without aux\n");
+	}
+
+	if(fid->aux != nil) {
+		g = fid->aux;
 		releasegang(g);
 	}
-	*/
 }
 
 /* handle certain ops in a separate thread in original namespace */
