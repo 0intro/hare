@@ -32,7 +32,7 @@ fn startup {
 	echo Starting execfs...
 	execfs -D >[2] execfs.log
 	echo Starting gangfs...
-	gangfs -D >[2] gangfs.log
+	gangfs -D -v 9 >[2] gangfs.log
 	echo Starting mpipefs...
 	mpipefs -D >[2] mpipe.log
 	sleep 2
@@ -127,4 +127,4 @@ stdin
 # Cleanup
 unmount $TESTDIR
 rm -rf $TESTDIR
-cleanup
+#cleanup
