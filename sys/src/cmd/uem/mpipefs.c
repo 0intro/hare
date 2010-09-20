@@ -706,7 +706,7 @@ spliceto(void *arg) {
 		   then put us on the recvq rrchan */
 		if((mp->mode != MPTbcast) && (aux->other == nil)) {
 			if(sendp(mp->rrchan[aux->which], dummy) != 1) {
-				DPRINT(2, "spliceto: hungup rrchan\n");
+				DPRINT(2, "spliceto: mpipe %p (%s) hungup rrchan\n", mp, mp->name);
 				goto exit;
 			}
 		}
@@ -714,7 +714,7 @@ spliceto(void *arg) {
 		/* block on incoming */
 		tr = recvp(aux->chan);
 		if(tr == nil) {
-			DPRINT(2, "spliceto: hungup daux.chan\n");
+			DPRINT(2, "spliceto: mpipe %p (%s) hungup aux.chan\n", mp, mp->name);
 			goto exit;
 		}
 
@@ -763,6 +763,7 @@ spliceto(void *arg) {
 	}
 	/* on error do the right thing */
 exit:
+	write(sa->fd, "", 0); /* null write */
 	close(sa->fd);
 	if(mp->mode != MPTbcast)
 		fsclunk(dummy);	
@@ -886,7 +887,8 @@ splicefrom(void *arg) {
 			fsclunk(dummy);
 			goto exit;
 		} else if (n == 0) {
-			DPRINT(2, "splicefrom: got EOF\n");
+			DPRINT(2, "mpipe %p (%s) splicefrom: got EOF\n", mp, mp->name);
+			fsclunk(dummy);
  			goto exit;
 		} else {
 			tr.ifcall.count = n;
@@ -927,7 +929,7 @@ splicefrom(void *arg) {
 			}
 		}
 		if(err) {
-			DPRINT(2, "spliceform: error: %s\n", err);
+			DPRINT(2, "splicefrom: mp: %p (%s) error: %s\n", err, mp, mp->name);
 			goto exit;
 		}
 		/* wait for completion? */
