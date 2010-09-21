@@ -41,6 +41,7 @@ char 	defaultpath[] =	"/proc";
 char *procpath;
 char *srvctl;
 Channel *iochan;
+Channel *clunkchan;
 
 static void
 usage(void)
@@ -227,14 +228,7 @@ fswrite(Req *r)
 	if(ret == 0) {		/* other side exec'd - go active */
 		close(e->ctlfd);
 		e->active++;
-		/* reopen ctlfd */
-		snprint(ctlbuf, 255, "/proc/%d/ctl", e->pid);
-		e->ctlfd = open(ctlbuf, OREAD);
-		if(e->ctlfd < 0) {	/* may lead to a confusing error */
-			fprint(2, "fswrite: couldn't open %s: %r\n", ctlbuf);
-			responderror(r);
-			return;
-		}
+
 		goto success;
 	}
 
@@ -267,22 +261,30 @@ fsread(Req *r)
 }
 
 static void
+cleanupsession(void *arg)
+{
+	int pid = (int) arg;
+
+	char *path = smprint("/proc/%d", pid);
+	unmount(0, path);
+	postnote(PNPROC, pid, "kill");
+	free(path);
+}
+
+static void
 fsclunk(Fid *f)
 {
-	char fname[255];
-
+	DPRINT(2, "fsclunk: %p fid=%d aux=%p\n", f, f->fid, f->aux);
 	if(f->aux) {
 		Exec *e = f->aux;
 
-		if(!e->active) {
+		//if(!e->active) {
+		if(1) { /* HACK HACK HACK */
 			if(e->ctlfd)
 				close(e->ctlfd);
 
-			snprint(fname, 255, "/proc/%d", e->pid);
-			unmount(0, fname);
+			proccreate(cleanupsession, (void *)e->pid, STACK);
 
-			/* if we have an outstanding inactive thread, kill it */
-			postnote(PNPROC, e->pid, "kill");
 			e->pid = -1;
 			e->active = 0;
 		}
@@ -317,6 +319,11 @@ iothread(void*)
 		case Twrite:
 			fswrite(r);
 			break;
+		case Tclunk:
+			fsclunk(r->fid);
+			sendp(clunkchan, r);
+			free(r);
+			break;
 		default:
 			fprint(2, "unrecognized io op %d\n", r->ifcall.type);
 			break;
@@ -333,12 +340,29 @@ ioproxy(Req *r)
 	}
 }
 
+static void
+clunkproxy(Fid *f)
+{
+	/* really freaking clunky, but not sure what else to do */
+	Req *r = emalloc9p(sizeof(Req));
+
+	DPRINT(2, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
+
+	r->ifcall.type = Tclunk;
+	r->fid = f;
+	if(sendp(iochan, r) != 1) {
+		fprint(2, "iochan hungup");
+		threadexits("iochan hungup");
+	}
+	recvp(clunkchan);
+}
+
 Srv fs=
 {
 	.open=	ioproxy,
 	.write=	ioproxy,
 	.read=	fsread,
-	.destroyfid=	fsclunk,
+	.destroyfid=	clunkproxy,
 	.end=	cleanup,
 };
 
@@ -375,6 +399,7 @@ threadmain(int argc, char **argv)
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
+	clunkchan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
 
 	threadpostmountsrv(&fs, nil, procpath, MAFTER);
