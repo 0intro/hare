@@ -16,10 +16,11 @@ TESTDIR=.test
 #
 fn cleanup {
 	echo Cleaning up previous runs.
-	rm -rf /srv/mpipe
+	rm -f /srv/mpipe
 	unmount /n/test > /dev/null >[2] /dev/null
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
+	kill mpipfs | rc
 	kill execfs | rc
 	kill gangfs | rc
 }
@@ -35,7 +36,7 @@ fn startup {
 	gangfs -D -v 9 >[2] gangfs.log
 	echo Starting mpipefs...
 	mpipefs -D -v 9>[2] mpipe.log
-	sleep 2
+	sleep 1
 }
 
 #
@@ -49,18 +50,18 @@ fn testdir {
 fn myexec {
 	mypid=`{cat}
 	echo res 5
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 &
+	
 	echo exec /bin/cat $TESTDIR/test >>[2] gangfs.log
-	sleep 5
+	cat /proc/g$mypid/stdout > $TESTDIR/test1
 }
 
 fn myexec2 {
 	mypid=`{cat}
 	echo res 5
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 &
+
 	cat $TESTDIR/test > /proc/g$mypid/stdin
 	echo exec /bin/cat >>[2] gangfs.log
-	sleep 5
+	cat /proc/g$mypid/stdout > $TESTDIR/test1
 }
 
 fn basic {
