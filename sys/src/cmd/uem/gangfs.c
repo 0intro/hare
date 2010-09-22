@@ -910,7 +910,7 @@ fsclunk(Fid *fid)
 		g = fid->aux;
 		if(g) {
 			wlock(&glock);
-			g->ctlref--;	/* TODO: do we need to lock? */
+			g->ctlref--;	
 			if(g->ctlref == 0) {
 				cleanupgang(g); 
 				g->status = GANG_CLOSE;
