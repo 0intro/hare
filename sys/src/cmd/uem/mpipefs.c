@@ -271,6 +271,7 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	int count;
 	int min = mp->numr[0];
 
+	qlock(&mp->l);
 	mp->readers++;
 	DPRINT(2, "addnewreader %p total now: %d\n", mp, mp->readers);
 	aux->which = 0;
@@ -279,15 +280,14 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 			aux->which = count;
 
 	mp->numr[aux->which]++;
-	aux->chan = chancreate(sizeof(Req *), 0);
-	
-	qlock(&mp->l);
+
 	if(mp->mode == MPTbcast) {
 		DPRINT(2,"\t adding %p to broadcast list next: %p\n", aux, mp->bcastr);
 		aux->next=mp->bcastr;
 		mp->bcastr=aux;
 	}
 	qunlock(&mp->l);
+	aux->chan = chancreate(sizeof(Req *), 0);
 }
 
 /* safely remove a reader from a list */
@@ -316,8 +316,11 @@ static void
 closebcasts(Mpipe *mp)
 {
 	Fidaux *c;
+	
+	qlock(&mp->l);
 	for(c=mp->bcastr; c != nil; c=c->next)
 		chanclose(c->chan);
+	qunlock(&mp->l);
 }
 
 /* process mount options */
@@ -446,7 +449,7 @@ fsclunk(Fid *fid)
 	Mpipe *mp = setfidmp(fid);
 	int count;
 
-	DPRINT(2, "fslunk %p\n", fid);
+	DPRINT(2, "fsclunk %p\n", fid);
 	/* if there is an participant on this fid */
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
@@ -454,7 +457,7 @@ fsclunk(Fid *fid)
 
 		/* writer accounting and cleanup */ 
 		if((fid->omode&OMASK) == OWRITE) {
-			/* MAYBE: mark outstanding requests crap */
+			/* TODO: what do we do with outstanding requests? */
 			mp->writers--;
 			if((aux->active) && (mp->writers == 0)) {
 				for(count=0;count <  mp->slots; count++)
@@ -471,20 +474,24 @@ fsclunk(Fid *fid)
 
 		/* reader accounting & cleanup */
 		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
+			qlock(&mp->l);
 			mp->readers--;
-			if(mp->mode == MPTbcast) {
-				rmreader(mp, aux);
-			}
+
 			chanclose(aux->chan);
 			chanfree(aux->chan);
 			mp->numr[aux->which]--;
-			aux->chan = nil;
+			qunlock(&mp->l);
 
+			if(mp->mode == MPTbcast) {
+				rmreader(mp, aux);
+			}
+			aux->chan = nil;
 			if(aux->r) { /* crap! we still have data */
 				respond(aux->r, "short write");
 				aux->r = nil;
 			}
 			
+			qlock(&mp->l);
 			if((mp->writers == 0)&&(mp->readers == 0)) {
 				for(count=0;count <  mp->slots; count++) {
 					if(mp->rrchan[count])
@@ -492,9 +499,11 @@ fsclunk(Fid *fid)
 					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
 				}
 			}
+			qunlock(&mp->l);
 		}
 
 		/* no more references to pipe, cleanup */
+		qlock(&mp->l);
 		if(mp->ref == 0) { 
 			free(mp->name);
 			free(mp->uid);
@@ -509,8 +518,9 @@ fsclunk(Fid *fid)
 				free(mp->rrchan);
 			}
 			free(mp);
+		} else {
+			qunlock(&mp->l);
 		}
-
 	}
 
 	fid->aux = nil;
@@ -706,7 +716,7 @@ spliceto(void *arg) {
 		   then put us on the recvq rrchan */
 		if((mp->mode != MPTbcast) && (aux->other == nil)) {
 			if(sendp(mp->rrchan[aux->which], dummy) != 1) {
-				DPRINT(2, "spliceto: mpipe %p (%s) hungup rrchan\n", mp, mp->name);
+				DPRINT(2, "\n====>spliceto: mpipe %p (%s) hungup rrchan\n", mp, mp->name);
 				goto exit;
 			}
 		}
@@ -714,7 +724,7 @@ spliceto(void *arg) {
 		/* block on incoming */
 		tr = recvp(aux->chan);
 		if(tr == nil) {
-			DPRINT(2, "spliceto: mpipe %p (%s) hungup aux.chan\n", mp, mp->name);
+			DPRINT(2, "\n====> spliceto: mpipe %p (%s) hungup aux.chan\n", mp, mp->name);
 			goto exit;
 		}
 
@@ -763,7 +773,7 @@ spliceto(void *arg) {
 	}
 	/* on error do the right thing */
 exit:
-	write(sa->fd, "", 0); /* null write */
+	//write(sa->fd, "", 0); /* null write */
 	close(sa->fd);
 	if(mp->mode != MPTbcast)
 		fsclunk(dummy);	
@@ -772,6 +782,7 @@ exit:
 }
 
 /* thread to send a broadcast */
+/* TODO: could this block indefinitely until reader becomes available? */
 static void
 bcastsend(void *arg)
 {
@@ -801,7 +812,7 @@ fsbcast(Req *r, Mpipe *mp)
 	r->aux = reterr;
 
 	/* setup argument structures */
-	qlock(&mp->l);
+	qlock(&mp->l); /* we have to hold lock for entire broadcast right now */
 	for(c = mp->bcastr; c != nil; c = c->next) {
 		Bcastr *br = emalloc9p(sizeof(Bcastr));
 
@@ -810,11 +821,10 @@ fsbcast(Req *r, Mpipe *mp)
 		br->chan = c->chan;
 		br->r = r;
 		threadcreate(bcastsend, br, STACK);
-		/* TODO: why do we create separate instances instead
+		/* MAYBE: why do we create separate instances instead
 				of just one and then free it ourselves?
 		*/
 	}
-	qunlock(&mp->l);
 
 	/* gather responses */
 	for(c = mp->bcastr; c != nil; c = c->next) {
@@ -824,6 +834,7 @@ fsbcast(Req *r, Mpipe *mp)
 			DPRINT(2, "fsbcast: %s\n", err);
 		}
 	}
+	qunlock(&mp->l);
 
 	/* restore r->aux for splicefrom case */
 	r->aux = bakaux;
