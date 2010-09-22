@@ -15,11 +15,12 @@ TESTDIR=.test
 #
 fn cleanup {
 	echo Cleaning up previous runs.
-	rm -rf /srv/mpipe
 	unmount /n/test > /dev/null >[2] /dev/null
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
-	kill execfs | rc
+	rm -f /srv/mpipe
+
+	kill mpipefs | rc	# only way to get rid of mpipe turds
 }
 
 #
@@ -27,10 +28,12 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs
-	mpipefs -D >[2] mpipe.log
+	mpipefs -D -v 9 >[2] mpipe.log
 	echo Starting execfs.
-	execfs -D >[2] execfs.log
+	execfs -D -v 9 >[2] execfs.log
 	#execfs -D	# CHATTY
+
+	#ps | grep mpipefs
 }
 
 #
@@ -46,14 +49,15 @@ fn myexecstdin {
 	cat $TESTDIR/test > /proc/$mypid/stdin &
 	cat /proc/$mypid/stdout > $TESTDIR/test1 &
 	echo -n exec /bin/cat >>[2] execfs.log
-	sleep 5
+	sleep 1
 }
 
 fn myexecstdout {
 	mypid=`{cat}
 	cat /proc/$mypid/stdout > $TESTDIR/test1 &
-	sleep 5
+	sleep 1
 	echo -n exec /bin/cat $TESTDIR/test >>[2] execfs.log
+	sleep 1
 }
 
 fn stdout {

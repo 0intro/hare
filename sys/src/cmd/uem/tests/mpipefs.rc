@@ -18,7 +18,7 @@ fn cleanup {
 	echo Cleaning up previous runs...
 	unmount /n/test > /dev/null >[2] /dev/null
 	rm -f /srv/mpipe
-	kill mpipefs | rc
+	#kill mpipefs | rc
 }
 
 #
