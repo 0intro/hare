@@ -108,6 +108,14 @@ struct Mpipe {
 	Fidaux *bcastr;		/* list of readers */
 };
 
+/* states for Fidaux */
+enum {
+	FID_IDLE,
+	FID_CTLONLY,
+	FID_WRITEN,
+	FID_FLUSHED,
+};
+
 /*
  * Fidaux - per particpant descriptor accounting structure
  * 
@@ -117,7 +125,7 @@ struct Mpipe {
  */
 struct Fidaux {
 	QLock l;			/* Protect it */
-	int active;			/* if participant has been written yet */
+	int state;			/* if participant has been written yet */
 
 	Mpipe *mp;			/* Multipipe we are dealing with */
 	ulong which;		/* for enumerations */
@@ -318,8 +326,9 @@ closebcasts(Mpipe *mp)
 	Fidaux *c;
 	
 	qlock(&mp->l);
-	for(c=mp->bcastr; c != nil; c=c->next)
+	for(c=mp->bcastr; c != nil; c=c->next) {
 		chanclose(c->chan);
+	}
 	qunlock(&mp->l);
 }
 
@@ -449,20 +458,26 @@ fsclunk(Fid *fid)
 	Mpipe *mp = setfidmp(fid);
 	int count;
 
-	DPRINT(2, "fsclunk %p\n", fid);
+	DPRINT(2, "fsclunk %p (%d) aux=%p\n", fid, fid->fid, fid->aux);
 	/* if there is an participant on this fid */
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
 		mp->ref--;
+		
+		DPRINT(2, ">>>> fid %d writers: %d readers: %d\n", fid->fid, mp->writers, mp->readers);
+		if(aux)
+			DPRINT(2, ">>>> state: %d\n", aux->state);
 
 		/* writer accounting and cleanup */ 
 		if((fid->omode&OMASK) == OWRITE) {
 			/* TODO: what do we do with outstanding requests? */
 			mp->writers--;
-			if((aux->active) && (mp->writers == 0)) {
+			DPRINT(2, "---- fid %d writers now %d\n", fid->fid, mp->writers);
+			if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
 				for(count=0;count <  mp->slots; count++)
-					if(mp->rrchan[count])
+					if(mp->rrchan[count]) {
 						chanclose(mp->rrchan[count]);
+					}
 
 				if(mp->mode == MPTbcast)
 					closebcasts(mp);
@@ -478,7 +493,6 @@ fsclunk(Fid *fid)
 			mp->readers--;
 
 			chanclose(aux->chan);
-			chanfree(aux->chan);
 			mp->numr[aux->which]--;
 			qunlock(&mp->l);
 
@@ -495,7 +509,7 @@ fsclunk(Fid *fid)
 			if((mp->writers == 0)&&(mp->readers == 0)) {
 				for(count=0;count <  mp->slots; count++) {
 					if(mp->rrchan[count])
-						chanfree(mp->rrchan[count]);
+						chanclose(mp->rrchan[count]);
 					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
 				}
 			}
@@ -512,7 +526,6 @@ fsclunk(Fid *fid)
 				for(count=0;count <  mp->slots; count++) {
 					if(mp->rrchan[count]) {
 						chanclose(mp->rrchan[count]);
-						chanfree(mp->rrchan[count]);
 					}
 				}
 				free(mp->rrchan);
@@ -546,7 +559,7 @@ fsopen(Req *r)
 
 	/* allocate a new participant structure */
 	aux = emalloc9pz(sizeof(Fidaux), 1);
-	aux->active = 0;
+	aux->state = FID_IDLE;
 	aux->mp = mp;
 	fid->aux = aux;
 
@@ -871,7 +884,7 @@ splicefrom(void *arg) {
 	/* setup a dummy writer */
 	memset(&tr, 0, sizeof(Req));
 	aux->mp = mp;
-	aux->active = 0;
+	aux->state = FID_IDLE;
 	mp->ref++;
 	DPRINT(2, "splicefrom: add new writer\n");
 	mp->writers++;
@@ -893,13 +906,10 @@ splicefrom(void *arg) {
 		DPRINT(2, "splicefrom: read returned %d\n", n);
 		if(n < 0) { /* Error */
 			DPRINT(2, "splicefrom: read retuned error: %r\n");
-			close(sa->fd);
-			/* TODO: we need to something more */
-			fsclunk(dummy);
+			close(sa->fd);		
 			goto exit;
 		} else if (n == 0) {
 			DPRINT(2, "mpipe %p (%s) splicefrom: got EOF\n", mp, mp->name);
-			fsclunk(dummy);
  			goto exit;
 		} else {
 			tr.ifcall.count = n;
@@ -908,13 +918,11 @@ splicefrom(void *arg) {
 		/* TODO: indiscriminately set - what if its 0 or not valid */
 		aux->which = sa->which;
 		aux->remain = n;
-		if(!aux->active)
-			aux->active = 1;
+		aux->state = FID_WRITEN;
 		
 		if(mp->mode == MPTbcast) {
 			err = fsbcast(&tr, mp);
 			DPRINT(2, "back from fsbcast?\n");
-			
 		} else {
 			/* acquire a reader */
 			aux->other = recvp(mp->rrchan[aux->which]);
@@ -946,19 +954,19 @@ splicefrom(void *arg) {
 		/* wait for completion? */
 		if(tr.ifcall.count == 0) {	/* EOF  - so we are done */
 			close(sa->fd);
-			fsclunk(dummy);
 			goto exit;
 		}
 	}
 
 exit:
-	mp->writers--;
-	if((aux->active) && (mp->writers == 0)) {
+	fsclunk(dummy);
+	if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
 		int count;
 
 		for(count=0;count < mp->slots; count++)
-			if(mp->rrchan[count])
+			if(mp->rrchan[count]) {
 				chanclose(mp->rrchan[count]);
+			}
 
 		if(mp->mode == MPTbcast)
 			closebcasts(mp);
@@ -998,7 +1006,7 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 
 		if(type=='>') {
 			sa->fd = open(argv[3], OWRITE);
-			DPRINT(2, "spliceto cmd: %s returned %d\n", argv[3], sa->fd);
+			DPRINT(2, "spliceto open: %s returned %d\n", argv[3], sa->fd);
 		} else
 			sa->fd = open(argv[3], OREAD);
 
@@ -1009,6 +1017,9 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 			proccreate(spliceto, sa, STACK);
 		else
 			proccreate(splicefrom, sa, STACK);
+		break;
+	case '.': /* forced close */
+		aux->state = FID_FLUSHED;
 		break;
 	default:
 		return "unknown pkt header";
@@ -1029,6 +1040,8 @@ fswrite(void *arg)
 	char *err;
 	
 	if(r->ifcall.offset == hdrtag) {
+		if(aux->state == FID_IDLE)
+			aux->state = FID_CTLONLY;
 		if(aux->remain) {
 			respond(r,Eremain);
 			goto out;
@@ -1046,8 +1059,7 @@ fswrite(void *arg)
 		mp->len += r->ifcall.count;
 	}
 
-	if(!aux->active)
-		aux->active = 1;
+	aux->state = FID_WRITEN;
 
 	if(mp->mode == MPTbcast) {
 		err = fsbcast(r, mp);
@@ -1134,6 +1146,7 @@ iothread(void*)
 static void
 ioproxy(Req *r)
 {
+	DPRINT(2, "ioproxy: forwarding %p %d\n", r, r->ifcall.type);
 	if(sendp(iochan, r) != 1) {
 		DPRINT(2, "iochan hungup");
 		threadexits("iochan hungup");

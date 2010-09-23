@@ -33,6 +33,7 @@ char 	defaultpath[] =	"/proc";
 char *procpath;
 char *srvctl;
 Channel *iochan;
+Channel *clunkchan;
 
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
@@ -67,7 +68,8 @@ enum {
 	GANG_NEW,		/* allocated */
 	GANG_RESV,		/* reserved */
 	GANG_EXEC,		/* executing */
-	GANG_CLOSE,		/* closing */
+	GANG_CLOSING,	/* closing */
+	GANG_CLOSED,	/* closed */
 };
 
 /* NOTE:
@@ -171,6 +173,26 @@ mpipe(char *path, char *name)
 }
 
 static int
+flushmp(char *src)
+{
+	int fd = open(src, OWRITE);
+	int n; 
+	char hdr[255];
+	ulong tag = ~0; /* header byte is at offset ~0 */
+	char pkttype='.';
+
+	if(fd < 0) {
+		DPRINT(2, "flushmp: open failed: %r\n");
+		return fd;
+	}
+
+	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, "");
+	n = pwrite(fd, hdr, n, tag);
+	close(fd);
+	return n;
+}
+
+static int
 spliceto(char *src, char *dest)
 {
 	int fd = open(src, OWRITE);
@@ -255,7 +277,7 @@ findgang(int index)
 		goto out;
 	} else {
 		for(current=glist; current != nil; current = current->next) {
-			if((current->index == index)&&(current->status != GANG_CLOSE)) {
+			if((current->index == index)&&(current->status != GANG_CLOSED)) {
 				gangrefinc(current, "findgang");
 				goto out;
 			}
@@ -276,7 +298,7 @@ findgangnum(int which)
 	} else {
 		int count = 0;
 		for(current=glist; current != nil; current = current->next) {
-			if(current->status == GANG_CLOSE)
+			if(current->status == GANG_CLOSED)
 				continue;
 			if(count == which) {
 				gangrefinc(current, "findgangnum");
@@ -384,7 +406,7 @@ dirgen(int n, Dir *d, void *aux)
 			d->qid.path=CONVQIDP(CONV(q), Qconv);
 			d->qid.type=QTDIR;
 			d->mode = 0555|DMDIR;
-			d->name = smprint("g%lud", CONV(q)); /* TODO: this isn't going to line up? */
+			d->name = smprint("g%lud", CONV(q)); 
 			return 0;			
 		}
 	}
@@ -563,9 +585,16 @@ fsopen(Req *r)
 	
 	if(TYPE(fid->qid) == Qctl) {
 		mygang = fid->aux;
+		
 		if(mygang) {
 			wlock(&glock);
-			mygang->ctlref++; /* TODO: do we need to lock? */
+			if(mygang->status >= GANG_CLOSING) {
+				wunlock(&glock);
+				respond(r, "gang already in the process of closing");
+				return;
+			} else {
+				mygang->ctlref++; /* TODO: do we need to lock? */
+			}
 			wunlock(&glock);
 		} else
 			DPRINT(2, "fsopen: ctl fid without aux\n");
@@ -809,8 +838,9 @@ cmdbcast(Req *r, Gang *g)
 }
 
 static void
-fswrite(Req *r)
+fswrite(void *arg)
 {
+	Req *r = (Req *)arg;
 	Fid *f = r->fid;
 	Qid *q = &f->qid;
 	Gang *g = f->aux;
@@ -886,18 +916,23 @@ fsstat(Req* r)
 }
 
 static void
-cleanupgang(Gang *g)
+cleanupgang(void *arg)
 {
+	Gang *g = arg;
 	char fname[255];
 
-	/* TODO: force hangup of multipipes? */
+	DPRINT(2, "cleaning up gang, entering umount\n");
 	snprint(fname, 255, "/proc/g%d/stdin", g->index);
 	unmount(0, fname);
 	snprint(fname, 255, "/proc/g%d/stdout", g->index);
 	unmount(0, fname);
 	snprint(fname, 255, "/proc/g%d/stderr", g->index);
 	unmount(0, fname);
+
 	/* TODO: Clean up subsessions? */
+
+	/* close it out */
+	g->status=GANG_CLOSED;
 }
 
 
@@ -906,23 +941,29 @@ fsclunk(Fid *fid)
 {
 	Gang *g;
 
+	DPRINT(2, "fsclunk: %d\n", fid->fid);
 	if(TYPE(fid->qid) == Qctl) {
+		DPRINT(2, "and its a ctl\n");
 		g = fid->aux;
 		if(g) {
+			DPRINT(2, "wlock\n");
 			wlock(&glock);
 			g->ctlref--;	
+			DPRINT(2, "ctlref=%d\n", g->ctlref);
 			if(g->ctlref == 0) {
-				cleanupgang(g); 
-				g->status = GANG_CLOSE;
+				g->status=GANG_CLOSING;
+				wunlock(&glock);
+				proccreate(cleanupgang, (void *)g, STACK); 
+			} else {
+				wunlock(&glock);
 			}
-			wunlock(&glock);
 		} else
 			DPRINT(2, "fsclunk: ctl fid without aux\n");
-	}
-
-	if(fid->aux != nil) {
-		g = fid->aux;
-		releasegang(g);
+	} else {
+		if(fid->aux != nil) {
+			g = fid->aux;
+			releasegang(g);
+		}
 	}
 }
 
@@ -953,7 +994,12 @@ iothread(void*)
 			fsread(r);			
 			break;
 		case Twrite:
-			fswrite(r);
+			proccreate(fswrite, (void *) r, STACK);
+			break;
+		case Tclunk:
+			fsclunk(r->fid);
+			sendp(clunkchan, r);
+			free(r);
 			break;
 		default:
 			fprint(2, "unrecognized io op %d\n", r->ifcall.type);
@@ -973,6 +1019,25 @@ ioproxy(Req *r)
 	DPRINT(1, "ioproxy->back\n");
 }
 
+static void
+clunkproxy(Fid *f)
+{
+	/* really freaking clunky, but not sure what else to do */
+	Req *r = emalloc9p(sizeof(Req));
+
+	DPRINT(2, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
+
+	r->ifcall.type = Tclunk;
+	r->fid = f;
+	if(sendp(iochan, r) != 1) {
+		fprint(2, "iochan hungup");
+		threadexits("iochan hungup");
+	}
+	DPRINT(2, "clunkproxy: waiting on response\n");
+	recvp(clunkchan);
+}
+
+
 Srv fs=
 {
 	.attach=	fsattach,
@@ -982,7 +1047,7 @@ Srv fs=
 	.write=		ioproxy,
 	.read=		ioproxy,
 	.stat=		fsstat,
-	.destroyfid=fsclunk,
+	.destroyfid=clunkproxy,
 	.end=		cleanup,
 };
 
@@ -1015,6 +1080,7 @@ threadmain(int argc, char **argv)
 	/* spawn off a io thread */
 	DPRINT(1, "iothread\n");
 	iochan = chancreate(sizeof(void *), 0);
+	clunkchan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
 	recvp(iochan);
 

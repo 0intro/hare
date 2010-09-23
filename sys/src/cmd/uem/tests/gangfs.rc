@@ -44,7 +44,6 @@ fn startup {
 #
 fn testdir {
 	mkdir -p $TESTDIR
-	ramfs -m $TESTDIR
 }
 
 fn myexec {
@@ -58,9 +57,9 @@ fn myexec {
 fn myexec2 {
 	mypid=`{cat}
 	echo res 5
-
-	cat $TESTDIR/test > /proc/g$mypid/stdin
 	echo exec /bin/cat >>[2] gangfs.log
+	sleep 5 # shouldn't need this
+	cat $TESTDIR/test > /proc/g$mypid/stdin
 	cat /proc/g$mypid/stdout > $TESTDIR/test1
 }
 

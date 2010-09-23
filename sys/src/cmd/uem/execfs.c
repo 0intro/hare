@@ -264,11 +264,12 @@ static void
 cleanupsession(void *arg)
 {
 	int pid = (int) arg;
+	char path[255];
 
-	char *path = smprint("/proc/%d", pid);
+	/* BUG: what if we can't get to them because proc is already closed? */
+	snprint(path, 255, "/proc/%d", pid);
 	unmount(0, path);
 	postnote(PNPROC, pid, "kill");
-	free(path);
 }
 
 static void
@@ -278,16 +279,13 @@ fsclunk(Fid *f)
 	if(f->aux) {
 		Exec *e = f->aux;
 
-		//if(!e->active) {
-		if(1) { /* HACK HACK HACK */
-			if(e->ctlfd)
-				close(e->ctlfd);
+		if(e->ctlfd)
+			close(e->ctlfd);
 
-			proccreate(cleanupsession, (void *)e->pid, STACK);
+		proccreate(cleanupsession, (void *)e->pid, STACK);
 
-			e->pid = -1;
-			e->active = 0;
-		}
+		e->pid = -1;
+		e->active = 0;
 
 		free(e);
 		f->aux = nil;
