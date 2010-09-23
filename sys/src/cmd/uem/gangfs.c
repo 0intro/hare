@@ -358,6 +358,9 @@ releasegang(Gang *g)
 static void
 cleanup(Srv *)
 {
+	nbsendp(iochan, 0); /* flush any blocked readers */
+	chanclose(iochan);
+	sleep(5);
 	threadexitsall("done");
 }
 

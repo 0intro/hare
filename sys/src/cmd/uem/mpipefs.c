@@ -190,8 +190,9 @@ usage(void)
 void
 killall(Srv*)
 {
+	nbsendp(iochan, 0);
 	chanclose(iochan);
-	chanfree(iochan);
+	sleep(5);
 	threadexitsall("killall");
 }
 
