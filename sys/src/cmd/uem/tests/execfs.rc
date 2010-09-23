@@ -28,12 +28,11 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs
-	mpipefs -D -v 9 >[2] mpipe.log
+	#mpipefs -D -v 9 >[2] mpipe.log
+	mpipefs >[2] mpipe.log
 	echo Starting execfs.
-	execfs -D -v 9 >[2] execfs.log
-	#execfs -D	# CHATTY
-
-	#ps | grep mpipefs
+	#execfs -D -v 9 >[2] execfs.log
+	execfs >[2] execfs.log
 }
 
 #
@@ -46,18 +45,17 @@ fn testdir {
 
 fn myexecstdin {
 	mypid=`{cat}
-	cat $TESTDIR/test > /proc/$mypid/stdin &
-	cat /proc/$mypid/stdout > $TESTDIR/test1 &
-	echo -n exec /bin/cat >>[2] execfs.log
-	sleep 1
+
+	echo -n exec /bin/cat >>[2] execfs.log >>[2] error.log
+	cat $TESTDIR/test > /proc/$mypid/stdin >>[2] error.log
+	cat /proc/$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexecstdout {
 	mypid=`{cat}
-	cat /proc/$mypid/stdout > $TESTDIR/test1 &
-	sleep 1
-	echo -n exec /bin/cat $TESTDIR/test >>[2] execfs.log
-	sleep 1
+
+	echo -n exec /bin/cat $TESTDIR/test >>[2] error.log
+	cat /proc/$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn stdout {

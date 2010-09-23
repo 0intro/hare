@@ -26,8 +26,8 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs....
-	#mpipefs >[2] $MPIPELOG 
-	mpipefs -D -v 9 >[2] $MPIPELOG 	# CHATTY
+	mpipefs >[2] $MPIPELOG 
+	#mpipefs -D -v 9 >[2] $MPIPELOG 	# CHATTY
 }
 
 #

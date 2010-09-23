@@ -31,16 +31,18 @@ fn cleanup {
 fn startup {
 
 	echo Starting execfs...
-	execfs -D -v 9>[2] execfs.log
+	#execfs -D -v 9>[2] execfs.log
+	execfs >[2] execfs.log
 	echo Starting gangfs...
-	gangfs -D -v 9 >[2] gangfs.log
+	#gangfs -D -v 9 >[2] gangfs.log
+	gangfs >[2] gangfs.log
 	echo Starting mpipefs...
-	mpipefs -D -v 9>[2] mpipe.log
-	sleep 1
+	#mpipefs -D -v 9>[2] mpipe.log
+	mpipefs >[2] mpipe.log
 }
 
 #
-# Setup a ramfs
+# Setup a testdirp
 #
 fn testdir {
 	mkdir -p $TESTDIR
@@ -48,19 +50,18 @@ fn testdir {
 
 fn myexec {
 	mypid=`{cat}
-	echo res 5
-	echo exec /bin/cat $TESTDIR/test >>[2] gangfs.log
-	sleep 5
-	cat /proc/g$mypid/stdout > $TESTDIR/test1
+	echo res 5 >>[2] error.log
+	echo exec /bin/cat $TESTDIR/test >>[2] error.log
+	#sleep 5 >>[2] error.log
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexec2 {
 	mypid=`{cat}
-	echo res 5
-	echo exec /bin/cat >>[2] gangfs.log
-	sleep 5 # shouldn't need this
-	cat $TESTDIR/test > /proc/g$mypid/stdin
-	cat /proc/g$mypid/stdout > $TESTDIR/test1
+	echo res 5 >>[2] error.log
+	echo exec /bin/cat >>[2] error.log
+	cat $TESTDIR/test > /proc/g$mypid/stdin >>[2] error.log
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn basic {
@@ -122,9 +123,8 @@ testdir
 
 # Tests
 basic
-#stdin # <- broken right now
+stdin
 
 # Cleanup
-unmount $TESTDIR
 rm -rf $TESTDIR
 cleanup
