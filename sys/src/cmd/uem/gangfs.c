@@ -923,6 +923,7 @@ cleanupgang(void *arg)
 
 	DPRINT(2, "cleaning up gang, entering umount\n");
 	snprint(fname, 255, "/proc/g%d/stdin", g->index);
+	flushmp(fname); /* flush pipe to be sure */
 	unmount(0, fname);
 	snprint(fname, 255, "/proc/g%d/stdout", g->index);
 	unmount(0, fname);

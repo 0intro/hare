@@ -658,6 +658,8 @@ fsread(void *arg)
 		tr = recvp(aux->chan);
 		offset = 0;
 		if(tr == nil) {
+			DPRINT(2, "fsread got a nil packet, exiting\n");
+			r->ofcall.count = 0;
 			myrespond(r, nil);
 			threadexits(nil);
 		}
@@ -959,18 +961,9 @@ splicefrom(void *arg) {
 	}
 
 exit:
+	DPRINT(2, "]]]]]]]]]]]]] SPLICEFROM (mp %p) (fid %d) (aux %p) EXITING [[[[[[[[[[[[\n", 
+			mp, sa->fd, dummy->aux);
 	fsclunk(dummy);
-	if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
-		int count;
-
-		for(count=0;count < mp->slots; count++)
-			if(mp->rrchan[count]) {
-				chanclose(mp->rrchan[count]);
-			}
-
-		if(mp->mode == MPTbcast)
-			closebcasts(mp);
-	}
 	free(sa);
 	threadexits(nil);
 }
