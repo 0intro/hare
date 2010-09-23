@@ -62,6 +62,7 @@ struct Exec
 	int active;	/* setup=0, executing=1 */
 	int pid;	/* maybe this would be sufficient for above? */
 	int ctlfd;	/* command and control channel */
+	int rctlfd;	/* actual control channel */
 };
 
 enum
@@ -126,15 +127,15 @@ fsopen(Req *r)
 
 	/* setup bootstrap ctlfd */
 	pipe(p);
-         fd = create(srvctl, OWRITE, 0666);
+	fd = create(srvctl, OWRITE, 0666);
 	if(fd < 0) {
 		err = "couldn't create srv file";
 		goto error;
 	}
 
-         fprint(fd, "%d", p[0]);
-         close(fd);
-         close(p[0]);
+	fprint(fd, "%d", p[0]);
+	close(fd);
+	close(p[0]);
 	e->ctlfd = p[1];
      
 	/* ask for a new child process */
@@ -171,9 +172,16 @@ fsopen(Req *r)
 	if(n < 0) {
 		err = estrdup9p(Ectlchan);
 		goto error;	
-	}	
+	}
 
-	/* check that wrapper has open and dup'd stdio */
+	/* grab actual reference to real control channel */
+	snprint(fname, 255, "/proc/%d/ctl", e->pid);
+	e->rctlfd = open(fname, OWRITE);
+	if(e->rctlfd < 0) {
+		DPRINT(2, "Couldn't open pid %d ctl: %r\n", e->pid);
+	}
+
+	/* check for partial success: execcmd has opened stdio */
 	n = read(e->ctlfd, ctlbuf, 255);
 	if(n < 0) {
 		err = estrdup9p(Ectlchan);
@@ -196,7 +204,6 @@ error:
 	respond(r, err);
 }
 
-/* TODO: doesn't appear to do command relaying yet */
 static void
 fswrite(Req *r)
 {
@@ -218,15 +225,17 @@ fswrite(Req *r)
 		goto success;
 	}
 
-	/* not active to read to get response */
+	/* not active yet: read to get response */
 	ret = read(e->ctlfd, ctlbuf, 255);
 	if(ret < 0) {
 		responderror(r);
 		return;
 	}
-
+	
 	if(ret == 0) {		/* other side exec'd - go active */
 		close(e->ctlfd);
+		/* replace our channel with the real control channel */
+		e->ctlfd = e->rctlfd;
 		e->active++;
 
 		goto success;
