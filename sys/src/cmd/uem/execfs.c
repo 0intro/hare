@@ -36,6 +36,7 @@ char Eusage[] = "exec: invalid number of arguments";
 char Ectlchan[] ="problems with command channel to wrapper";
 char Ectlopen[] ="problems with opening command channel to wrapper";
 char Empipe[] = "problems with mpipe";
+char Epid[] = "stupid pid problem";
 
 char 	defaultpath[] =	"/proc";
 char *procpath;
@@ -152,6 +153,14 @@ fsopen(Req *r)
 
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
+	/* grab actual reference to real control channel 
+	snprint(fname, 255, "/proc/%d/ctl", e->pid);
+	e->rctlfd = open(fname, OWRITE);
+	if(e->rctlfd < 0) {
+		err = Epid;
+		goto error;
+	}
+
 	snprint(fname, 255, "/proc/%d", e->pid);
 	/* bind things here boofhead */
 	if(mpipe(fname, "stdin") < 0) {
@@ -172,13 +181,6 @@ fsopen(Req *r)
 	if(n < 0) {
 		err = estrdup9p(Ectlchan);
 		goto error;	
-	}
-
-	/* grab actual reference to real control channel */
-	snprint(fname, 255, "/proc/%d/ctl", e->pid);
-	e->rctlfd = open(fname, OWRITE);
-	if(e->rctlfd < 0) {
-		DPRINT(2, "Couldn't open pid %d ctl: %r\n", e->pid);
 	}
 
 	/* check for partial success: execcmd has opened stdio */
