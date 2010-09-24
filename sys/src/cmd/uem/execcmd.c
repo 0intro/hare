@@ -38,16 +38,17 @@ Cmdtab ctltab[]={
 void
 main(int argc, char **argv)
 {
-	int stdinfd = -1;
-	int stdoutfd = -1;
-	int stderrfd = -1;
+	int stdinfd;
+	int stdoutfd;
+	int stderrfd;
 	int ctlfd;
 	int ret;
-	char ctlbuf[255];
+	char *ctlbuf = emalloc9p(255);
+	char *fname = emalloc9p(255);
 	Cmdbuf *cb;
 	Cmdtab *cmd;
 	char *srvctl;
-	char fname[255];
+	
 	int pid = getpid();
 
 	assert(argc == 2);
@@ -59,23 +60,18 @@ main(int argc, char **argv)
 	remove(srvctl);
 
 	ret = read(ctlfd, ctlbuf, 255);
-	if(ret <= 0) {
-		goto error;
-	}
+	assert(ret > 0);
 
 	/* need to open our bit */
 	snprint(fname, 255, "/proc/%d/stdin", pid);
 	stdinfd = open(fname, OREAD);
-	if(stdinfd < 0)
-		fprint(2, "opening stdin failed: %r\n");
+	assert(stdinfd > 0);
 	snprint(fname, 255, "/proc/%d/stdout", pid);
 	stdoutfd = open(fname, OWRITE);
-	if(stdoutfd < 0)
-		fprint(2, "opening stdout failed: %r\n");
+	assert(stdoutfd > 0);
 	snprint(fname, 255, "/proc/%d/stderr", pid);
 	stderrfd = open(fname, OWRITE);
-	if(stderrfd < 0)
-		fprint(2, "opening stderr failed: %r\n");
+	assert(stderrfd > 0);
 
 	if((stdinfd < 0)||(stdoutfd < 0)||(stderrfd < 0)) {
 		write(ctlfd, Estdios, strlen(Estdios));
@@ -83,8 +79,7 @@ main(int argc, char **argv)
 	}
 
 	ret = write(ctlfd, "1", 1);	/* report partial sucess */
-	if(ret < 0)
-		exits("ctlfdack");
+	assert(ret > 0);
 
 	while((ret = read(ctlfd, ctlbuf, 255)) > 0) {
 		cb = parsecmd(ctlbuf, ret);
@@ -105,12 +100,15 @@ main(int argc, char **argv)
 			dup(stdoutfd, 1);
 			dup(stderrfd, 2);
 
+			free(fname);
+			free(ctlbuf);
 			/* go baby go */
 			exec(cb->f[1], &cb->f[1]);
 
 			/* something happened report it */
-			ret = snprint(ctlbuf, 255, "execcmd: exec: %r");
+			ctlbuf = smprint("execcmd: exec: %r");
 			write(ctlfd, ctlbuf, ret);
+			free(ctlbuf);
 			goto error;
 			break;
 		/* room for more commands later */
@@ -118,6 +116,8 @@ main(int argc, char **argv)
 	}
 
 error:
+	free(fname);
+	free(ctlbuf);
 	close(ctlfd);
 	close(stdinfd);
 	close(stdoutfd);

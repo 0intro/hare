@@ -714,19 +714,27 @@ cmdres(Req *r, int num, int argc, char **argv)
 	/* TODO: consider doing this in sub-procs */
 	for(count = 0; count < g->size; count++) {
 		int pid;
+		int retries = 0;
 
 		DPRINT(2, "\t reservation: count: %d\n", count); 
 		path = findexecfs();
 		snprint(buf, 255, "%s/clone", path);
-		g->sess[count].fd = open(buf, ORDWR);
+		while(1) {
+			g->sess[count].fd = open(buf, ORDWR);
+			if(g->sess[count].fd > 0)
+				break;
+			DPRINT(2, "opening execfs returned %d: %r -- retrying\n");
+			if(retries++ > 10) {
+				DPRINT(2, "giving up\n");
+				respond(r, smprint("execfs returning %r"));
+				return;
+			}
+			/* retry on failure */
+		}
 		DPRINT(2, "\t control channel on fd %d\n", g->sess[count].fd);
 		g->sess[count].r = nil;
 		g->sess[count].chan = chancreate(sizeof(char *), 0);
-		if(g->sess[count].fd < 0) {
-			respond(r, 
-			  smprint("couldn't open session ctl %s/clone: %r\n", path));
-			return;
-		}
+
 		n = pread(g->sess[count].fd, buf, 255, 0);
 		if(n < 0) {
 			respond(r,

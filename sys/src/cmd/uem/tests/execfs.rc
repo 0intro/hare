@@ -28,19 +28,18 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs
-	#mpipefs -D -v 9 >[2] mpipe.log
-	mpipefs >[2] mpipe.log
-	echo Starting execfs.
-	#execfs -D -v 9 >[2] execfs.log
-	execfs >[2] execfs.log
+	mpipefs -D -v 9 >[2] mpipe.log
+	#mpipefs >[2] mpipe.log
+	echo Starting logging execfs.
+	execfs -D -v 9 >[2] execfs.log
+	#execfs >[2] execfs.log
 }
 
 #
-# Setup a ramfs
+# Setup a test directory
 #
 fn testdir {
 	mkdir -p $TESTDIR
-	ramfs -m $TESTDIR
 }
 
 fn myexecstdin {
@@ -110,6 +109,5 @@ stdout
 stdin	#failing
 
 # Cleanup
-unmount $TESTDIR
 rm -rf $TESTDIR
 cleanup

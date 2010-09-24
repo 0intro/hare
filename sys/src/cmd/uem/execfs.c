@@ -37,6 +37,8 @@ char Ectlchan[] ="problems with command channel to wrapper";
 char Ectlopen[] ="problems with opening command channel to wrapper";
 char Empipe[] = "problems with mpipe";
 char Epid[] = "stupid pid problem";
+char Esrv[] = "couldn't create srv file";
+char Ewtf[] = "I have no idea what could be going wrong here";
 
 char 	defaultpath[] =	"/proc";
 char *procpath;
@@ -53,7 +55,8 @@ usage(void)
 
 enum
 {
-	STACK = (8 * 1024),
+	STACK = (32 * 1024),
+	STRMAX = 255,
 	Xclone = 1,
 };
 
@@ -75,16 +78,16 @@ Cmdtab ctltab[]={
 	Cexec,	"exec", 0,
 };
 
+static char *Execcmd = "/bin/execcmd";
+
 /* call the execution wrapper */
 static void
 cloneproc(void *arg)
 {
 	Channel *pidc = arg;
-
-	threadsetname("cloneproc");
-
-	procexecl(pidc, "/bin/execcmd", "/bin/execcmd", srvctl, nil);
-	fprint(2, "cloneproc: could not find execution wrapper\n");
+	
+	rfork(RFFDG);
+	procexecl(pidc, Execcmd, Execcmd, srvctl, nil);
 	
 	sendul(pidc, 0); /* failure */
 	threadexits("no exection wrapper");
@@ -94,6 +97,7 @@ static int
 mpipe(char *path, char *name)
 {
 	int fd, ret;
+	DPRINT(2, "MPIPE: path=%s name=%s\n", path, name);
 	fd = open("/srv/mpipe", ORDWR);
 	if(fd<0) {
 		fprint(2, "couldn't open /srv/mpipe: %r\n");
@@ -112,12 +116,15 @@ fsopen(Req *r)
 	Exec *e;
 	char *err;
 	int n;
-	char fname[255];	/* pathname buffer */
-	char ctlbuf[255];	/* error string from wrapper */
+	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
+	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
 	int p[2];
 	int fd;
 	Channel *pidc;
 
+
+	assert(fname != nil);
+	assert(ctlbuf != nil);
 	if(f->file->aux != (void *)Xclone) {
 		respond(r, nil);
 		return;
@@ -130,7 +137,7 @@ fsopen(Req *r)
 	pipe(p);
 	fd = create(srvctl, OWRITE, 0666);
 	if(fd < 0) {
-		err = "couldn't create srv file";
+		err = Esrv;
 		goto error;
 	}
 
@@ -140,9 +147,9 @@ fsopen(Req *r)
 	e->ctlfd = p[1];
      
 	/* ask for a new child process */
-	pidc = chancreate(sizeof(ulong), 1);
+	pidc = chancreate(sizeof(ulong), 0);
 
-	procrfork(cloneproc, pidc, STACK, RFCFDG); 
+	proccreate(cloneproc, pidc, STACK); 
 
 	e->pid = recvul(pidc);
 	if(e->pid <= 0) {
@@ -154,27 +161,25 @@ fsopen(Req *r)
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel 
-	snprint(fname, 255, "/proc/%d/ctl", e->pid);
+	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
+	assert(n > 0);
+		
 	e->rctlfd = open(fname, OWRITE);
-	if(e->rctlfd < 0) {
-		err = Epid;
-		goto error;
-	}
+	assert(e->rctlfd > 0);
 
-	snprint(fname, 255, "/proc/%d", e->pid);
-	/* bind things here boofhead */
-	if(mpipe(fname, "stdin") < 0) {
-		err = estrdup9p("stdin-pipe");
-		goto error;
-	}
-	if(mpipe(fname, "stdout") < 0) {
-		err = estrdup9p("stdout-pipe");
-		goto error;
-	}
-	if(mpipe(fname, "stderr") < 0) {
-		err = estrdup9p("stderr-pipe");
-		goto error;
-	}
+	n = snprint(fname, STRMAX, "/proc/%d", e->pid);
+	assert(n > 0);
+
+	assert(strlen(fname) != 0);
+
+	fprint(2, "mounting stdio mpipefs to %s\n", fname);
+	/* asserts are heavy handed, but help with debug */
+	n = mpipe(fname, "stdin");
+	assert(n < 0);
+	n = mpipe(fname, "stdout");
+	assert(n < 0);
+	n = mpipe(fname, "stderr");
+	assert(n < 0);
 
 	/* handshake to execcmd */
 	n = write(e->ctlfd, "1", 1);
@@ -184,7 +189,7 @@ fsopen(Req *r)
 	}
 
 	/* check for partial success: execcmd has opened stdio */
-	n = read(e->ctlfd, ctlbuf, 255);
+	n = read(e->ctlfd, ctlbuf, STRMAX);
 	if(n < 0) {
 		err = estrdup9p(Ectlchan);
 		goto error;	
@@ -196,10 +201,14 @@ fsopen(Req *r)
 	}
 
 	f->aux = e;
+	free(fname);
+	free(ctlbuf);
 	respond(r, nil);
 	return;
 
 error:
+	free(fname);
+	free(ctlbuf);
 	/* free channel */
 	free(e);
 	f->aux = nil;
@@ -228,7 +237,7 @@ fswrite(Req *r)
 	}
 
 	/* not active yet: read to get response */
-	ret = read(e->ctlfd, ctlbuf, 255);
+	ret = read(e->ctlfd, ctlbuf, STRMAX);
 	if(ret < 0) {
 		responderror(r);
 		return;
@@ -275,12 +284,13 @@ static void
 cleanupsession(void *arg)
 {
 	int pid = (int) arg;
-	char path[255];
+	char *path = (char *) emalloc9p(STRMAX);
 
 	/* BUG: what if we can't get to them because proc is already closed? */
-	snprint(path, 255, "/proc/%d", pid);
+	snprint(path, STRMAX, "/proc/%d", pid);
 	unmount(0, path);
 	postnote(PNPROC, pid, "kill");
+	free(path);
 }
 
 static void
@@ -402,7 +412,7 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	srvctl = smprint("/srv/execfs-%d", getpid());
-
+	DPRINT(2, "Sanity check 2\n");
 	fs.tree = alloctree("execfs", "execfs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "execfs", 0666, (void *)Xclone));
 
