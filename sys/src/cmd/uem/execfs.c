@@ -163,7 +163,11 @@ fsopen(Req *r)
 	assert(n > 0);
 		
 	e->rctlfd = open(fname, OWRITE);
-	assert(e->rctlfd > 0);
+	if(e->rctlfd < 0) {
+		DPRINT(2, "opening %s failed: %r\n");
+		err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
+		goto error;
+	}
 
 	n = snprint(fname, STRMAX, "/proc/%d", e->pid);
 	assert(n > 0);

@@ -31,14 +31,14 @@ fn cleanup {
 fn startup {
 
 	echo Starting execfs...
-	execfs -D -v 9>[2] execfs.log
-	#execfs >[2] execfs.log
+	#execfs -D -v 9>[2] execfs.log
+	execfs >[2] execfs.log
 	echo Starting gangfs...
-	gangfs -D -v 9 >[2] gangfs.log
-	#gangfs >[2] gangfs.log
+	#gangfs -D -v 9 >[2] gangfs.log
+	gangfs >[2] gangfs.log
 	echo Starting mpipefs...
-	mpipefs -D -v 9>[2] mpipe.log
-	#mpipefs >[2] mpipe.log
+	#mpipefs -D -v 9>[2] mpipe.log
+	mpipefs >[2] mpipe.log
 }
 
 #
