@@ -172,14 +172,14 @@ fsopen(Req *r)
 
 	assert(strlen(fname) != 0);
 
-	fprint(2, "mounting stdio mpipefs to %s\n", fname);
+	DPRINT(2, "mounting stdio mpipefs to %s\n", fname);
 	/* asserts are heavy handed, but help with debug */
 	n = mpipe(fname, "stdin");
-	assert(n < 0);
+	assert(n > 0);
 	n = mpipe(fname, "stdout");
-	assert(n < 0);
+	assert(n > 0);
 	n = mpipe(fname, "stderr");
-	assert(n < 0);
+	assert(n > 0);
 
 	/* handshake to execcmd */
 	n = write(e->ctlfd, "1", 1);
