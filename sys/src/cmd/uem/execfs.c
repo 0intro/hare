@@ -28,23 +28,23 @@
 #include <stdio.h>
 #include <debug.h>
 
-char Enopid[] =	"process not initialized";
-char Eoverflow[] = "ctl buffer overflow";
-char Ebadctl[] = "bad ctl message";
-char Eexec[] = "could not exec";
-char Eusage[] = "exec: invalid number of arguments";
-char Ectlchan[] ="problems with command channel to wrapper";
-char Ectlopen[] ="problems with opening command channel to wrapper";
-char Empipe[] = "problems with mpipe";
-char Epid[] = "stupid pid problem";
-char Esrv[] = "couldn't create srv file";
-char Ewtf[] = "I have no idea what could be going wrong here";
+static char Enopid[] =	"process not initialized";
+static char Eoverflow[] = "ctl buffer overflow";
+static char Ebadctl[] = "bad ctl message";
+static char Eexec[] = "could not exec";
+static char Eusage[] = "exec: invalid number of arguments";
+static char Ectlchan[] ="problems with command channel to wrapper";
+static char Ectlopen[] ="problems with opening command channel to wrapper";
+static char Empipe[] = "problems with mpipe";
+static char Epid[] = "stupid pid problem";
+static char Esrv[] = "couldn't create srv file";
+static char Ewtf[] = "I have no idea what could be going wrong here";
 
-char 	defaultpath[] =	"/proc";
-char *procpath;
-char *srvctl;
-Channel *iochan;
-Channel *clunkchan;
+static char defaultpath[] =	"/proc";
+static char *procpath;
+static char *srvctl;
+static Channel *iochan;
+static Channel *clunkchan;
 
 static void
 usage(void)
@@ -78,8 +78,6 @@ Cmdtab ctltab[]={
 	Cexec,	"exec", 0,
 };
 
-static char *Execcmd = "/bin/execcmd";
-
 /* call the execution wrapper */
 static void
 cloneproc(void *arg)
@@ -87,17 +85,16 @@ cloneproc(void *arg)
 	Channel *pidc = arg;
 	
 	rfork(RFFDG);
-	procexecl(pidc, Execcmd, Execcmd, srvctl, nil);
+	procexecl(pidc, "/bin/execcmd", "execcmd", srvctl, nil);
 	
 	sendul(pidc, 0); /* failure */
-	threadexits("no exection wrapper");
+	threadexits(nil);
 }
 
 static int
 mpipe(char *path, char *name)
 {
 	int fd, ret;
-	DPRINT(2, "MPIPE: path=%s name=%s\n", path, name);
 	fd = open("/srv/mpipe", ORDWR);
 	if(fd<0) {
 		fprint(2, "couldn't open /srv/mpipe: %r\n");
@@ -109,22 +106,33 @@ mpipe(char *path, char *name)
 	return ret;
 }
 
+static ulong
+kickit(void)
+{
+	Channel *pidc = chancreate(sizeof(ulong), 0);
+	ulong pid;
+
+	proccreate(cloneproc, (void *) pidc, STACK);
+	pid = recvul(pidc);
+
+	chanclose(pidc);
+	chanfree(pidc);
+
+	return pid;
+}
+
 static void
 fsopen(Req *r)
 {
-	Fid *f = r->fid;
-	Exec *e;
-	char *err;
 	int n;
-	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
-	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
 	int p[2];
 	int fd;
-	Channel *pidc;
+	Exec *e;
+	char *err;
+	Fid *f = r->fid;
+	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
+	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
 
-
-	assert(fname != nil);
-	assert(ctlbuf != nil);
 	if(f->file->aux != (void *)Xclone) {
 		respond(r, nil);
 		return;
@@ -147,17 +155,7 @@ fsopen(Req *r)
 	e->ctlfd = p[1];
      
 	/* ask for a new child process */
-	pidc = chancreate(sizeof(ulong), 0);
-
-	proccreate(cloneproc, pidc, STACK); 
-
-	e->pid = recvul(pidc);
-	if(e->pid <= 0) {
-		fprint(2, "problem during exec process: %r\n");
-		err = Eexec;
-		goto error;
-	}
-
+	e->pid = (int) kickit();
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel 
@@ -170,9 +168,6 @@ fsopen(Req *r)
 	n = snprint(fname, STRMAX, "/proc/%d", e->pid);
 	assert(n > 0);
 
-	assert(strlen(fname) != 0);
-
-	DPRINT(2, "mounting stdio mpipefs to %s\n", fname);
 	/* asserts are heavy handed, but help with debug */
 	n = mpipe(fname, "stdin");
 	assert(n > 0);

@@ -36,4 +36,4 @@ _dprint(ulong dlevel, char *fmt, ...)
 	fprint(2, "%s", s);
 }
 
-#define DPRINT if(vflag)_dprint
+#define DPRINT if(!vflag){} else _dprint
