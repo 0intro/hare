@@ -158,7 +158,7 @@ fsopen(Req *r)
 	e->pid = (int) kickit();
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
-	/* grab actual reference to real control channel 
+	/* grab actual reference to real control channel */
 	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
 	assert(n > 0);
 		
