@@ -54,6 +54,11 @@ regress:V: install dirsinstall
 	tests/execfs.rc
 	tests/gangfs.rc
 
+debug:V: install dirsinstall
+	tests/mpipefs.rc 9
+	tests/execfs.rc 9
+	tests/gangfs.rc 9
+
 tidy:V:
 	unmount /proc
 	bind '#p' /proc
