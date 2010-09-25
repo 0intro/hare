@@ -59,6 +59,23 @@ char Eother[] = "Problem with peer";
 char Ebcastoverflow[] = "broadcast read underflow";
 char Ebcast[] = "broadcast failed (perhaps partially)";
 char Ebadspec[] = "bad mount specification arguments";
+char Esplice[] = "splice couldnt open target";
+char Ebadhdr[] = "unknown packet header";
+
+enum {	/* DEBUG LEVELS */
+	DERR = 0,	/* error */
+	DCUR = 1,	/* current - temporary trace */
+	DHDR = 2,	/* packet headers */
+	DOPS = 3,	/* operation tracking */
+	DWRT = 4,	/* writer */
+	DRDR = 5,	/* reader */
+	DBCA = 6,	/* broadcast */
+	DSPT = 7,	/* splice to */
+	DSPF = 8,	/* splice from */
+	DFID = 9,	/* fid tracking */
+	DARG = 10,	/* arguments */
+};
+
 
 /*
  * Right now there are two types of pipe:
@@ -183,16 +200,17 @@ struct Bcastr {
 static void
 usage(void)
 {
-	fprint(2, "mpipefs [-D] [-s <srvpt>] [mtpt]\n");
+	fprint(2, "mpipefs [-D] [-v debuglevel] [-s <srvpt>] [mtpt]\n");
 	threadexits("usage");
 }
 
-void
+static void
 killall(Srv*)
 {
 	nbsendp(iochan, 0);
 	chanclose(iochan);
 	sleep(5);
+	chanfree(iochan);
 	threadexitsall("killall");
 }
 
@@ -207,7 +225,7 @@ enum
 	Qdata,
 };
 
-char MPdefault[] = "data";
+static char MPdefault[] = "data";
 
 /* tiny helper, why don't we have this generically? */
 static void *
@@ -227,22 +245,19 @@ emalloc9pz(int sz, int zero)
 static void
 myrespond(Req *r, char *err)
 {
-	DPRINT(2, "myrespond: r: %p aux: %p r->srv: %p err: %p\n", r, r->aux, r->srv, err);
 	if(r->aux)
 		sendp(r->aux, err);
 	else
 		respond(r, err);
-	DPRINT(2, "done responding: aux: %p\n", r->aux);
 }
 
 /*
- * This only gets called from spliceto, which seems odd.
+ * This only gets called from spliceto.
  */
 static void
 myresponderror(Req *r)
 {
-	DPRINT(2, "myresponderror: r: %p aux: %p r->srv: %p\n", r, r->aux, r->srv);
-	if(r->aux) {/* only happens for spliceto? or only for bcast? */
+	if(r->aux) {
 		sendp(r->aux, smprint("%r"));
 	} else
 		responderror(r);
@@ -273,17 +288,20 @@ setfidaux(Fid *fid) /* blech */
 }
 
 /* MAYBE: allow splice-to to specify which by setting aux->which */
-
 /* register a new reader with the infrastructure */
 static void
 addnewreader(Mpipe *mp, Fidaux *aux)
 {
 	int count;
 	int min = mp->numr[0];
+	aux->chan = chancreate(sizeof(Req *), 0);
+	assert(aux->chan != nil);
 
 	qlock(&mp->l);
 	mp->readers++;
-	DPRINT(2, "addnewreader %p total now: %d\n", mp, mp->readers);
+	DPRINT(DRDR, "[%s](%p) addnewreader total now: %d\n", mp->name, mp, mp->readers);
+	
+	/* find enumeration slot with fewest readers */
 	aux->which = 0;
 	for(count=0; count<mp->slots; count++)
 		if(mp->numr[count] < min)
@@ -292,15 +310,14 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	mp->numr[aux->which]++;
 
 	if(mp->mode == MPTbcast) {
-		DPRINT(2,"\t adding %p to broadcast list next: %p\n", aux, mp->bcastr);
+		DPRINT(DBCA,"[%s](%p) adding %p to broadcast list next: %p\n", mp->name, mp, aux, mp->bcastr);
 		aux->next=mp->bcastr;
 		mp->bcastr=aux;
 	}
 	qunlock(&mp->l);
-	aux->chan = chancreate(sizeof(Req *), 0);
 }
 
-/* safely remove a reader from a list */
+/* safely remove a reader from the broadcast list */
 static void
 rmreader(Mpipe *mp, Fidaux *aux)
 {
@@ -348,22 +365,22 @@ parsespec(Mpipe *mp, int argc, char **argv)
 			char *x = f;
 			if(x)
 				mp->slots = atoi(x);
-			DPRINT(2, "\t enumerated mode (%d)\n", mp->slots);	
+			DPRINT(DARG, "(%p) enumerated mode (%d)\n", mp, mp->slots);	
 		} else {
-			fprint(2, "usage: invalid enumeration argument\n");
+			DPRINT(DERR, "(%p) *ERROR*: usage: invalid enumeration argument\n", mp);
 			err = Ebadspec;
 		}
 		break;
 	case 'b':	/* broadcast mode */
-		DPRINT(2, "\t parsespec: BROADCAST mode\n");
+		DPRINT(DARG, "(%p) parsespec: BROADCAST mode\n", mp);
 		mp->mode = MPTbcast;
 		break;
 	default:
-		fprint(2, "ERROR: badflag('%c')", ARGC());
+		DPRINT(DERR, "(%p) *ERROR*:  badflag('%c')", mp, ARGC());
 		err = Ebadspec;		
 	}ARGEND
 
-	DPRINT(2, "\t argc: %d\n", argc);
+	DPRINT(DARG, "(%p) argc: %d\n", mp, argc);
 	
 	if(argc>0) 
 		mp->name = estrdup9p(*argv);
@@ -382,11 +399,11 @@ fsattach(Req *r)
 	char *scratch;
 
 	/* need to parse aname */
-	DPRINT(2, "\t args: %s\n", r->ifcall.aname);
+	DPRINT(DARG, "args: %s\n", r->ifcall.aname);
 	/* add a stupid extra field so we can use args(2) */
 	scratch = smprint("mount %s\n", r->ifcall.aname);
 	argc = tokenize(scratch, argv, MAXARGS);
-	DPRINT(2, "\t argc: %d\n", argc);
+	DPRINT(DARG, "argc: %d\n", argc);
 	err = parsespec(mp, argc, argv);
 	free(scratch);
 	if(err) {
@@ -460,21 +477,22 @@ fsclunk(Fid *fid)
 	Mpipe *mp = setfidmp(fid);
 	int count;
 
-	DPRINT(2, "fsclunk %p (%d) aux=%p\n", fid, fid->fid, fid->aux);
+
+	DPRINT(DOPS, "[%s](%p) fsclunk: fid %p (%d) aux=%p\n", 
+			mp==nil ? "nil" : mp->name, mp, fid, fid->fid, fid->aux);
+
 	/* if there is an participant on this fid */
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
 		mp->ref--;
 		
-		DPRINT(2, ">>>> fid %d writers: %d readers: %d\n", fid->fid, mp->writers, mp->readers);
-		if(aux)
-			DPRINT(2, ">>>> state: %d\n", aux->state);
+		DPRINT(DFID, ">>>> fid %d writers: %d readers: %d\n", fid->fid, mp->writers, mp->readers);
 
 		/* writer accounting and cleanup */ 
 		if((fid->omode&OMASK) == OWRITE) {
 			/* TODO: what do we do with outstanding requests? */
 			mp->writers--;
-			DPRINT(2, "---- fid %d writers now %d\n", fid->fid, mp->writers);
+			DPRINT(DWRT, "---- fid %d writers now %d\n", fid->fid, mp->writers);
 			if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
 				for(count=0;count <  mp->slots; count++)
 					if(mp->rrchan[count]) {
@@ -565,13 +583,15 @@ fsopen(Req *r)
 	aux->mp = mp;
 	fid->aux = aux;
 
-	if((r->ifcall.mode&OMASK) ==  OWRITE) {
-		DPRINT(2, "fsopen: add new writer\n");
+	if((r->ifcall.mode&OMASK) == OWRITE) {
 		mp->writers++;
+		DPRINT(DWRT, "[%s](%p) fsopen: add new writer (writers=%d)\n", mp->name, mp, mp->writers);	
 	}
 	
 	if((r->ifcall.mode&OMASK) == 0) /* READER */
 		addnewreader(mp, aux);
+
+	/* TODO: detect bad open modes */
 
 	respond(r, nil);
 }
@@ -660,7 +680,7 @@ fsread(void *arg)
 		tr = recvp(aux->chan);
 		offset = 0;
 		if(tr == nil) {
-			DPRINT(2, "fsread got a nil packet, exiting\n");
+			DPRINT(DRDR, "[%s](%p): fsread: got a nil packet, exiting\n", mp->name, mp);
 			r->ofcall.count = 0;
 			myrespond(r, nil);
 			threadexits(nil);
@@ -733,7 +753,7 @@ spliceto(void *arg) {
 		   then put us on the recvq rrchan */
 		if((mp->mode != MPTbcast) && (aux->other == nil)) {
 			if(sendp(mp->rrchan[aux->which], dummy) != 1) {
-				DPRINT(2, "\n====>spliceto: mpipe %p (%s) hungup rrchan\n", mp, mp->name);
+				DPRINT(DSPF, "[%s](%p) spliceto: hungup rrchan\n", mp->name, mp);
 				goto exit;
 			}
 		}
@@ -741,7 +761,7 @@ spliceto(void *arg) {
 		/* block on incoming */
 		tr = recvp(aux->chan);
 		if(tr == nil) {
-			DPRINT(2, "\n====> spliceto: mpipe %p (%s) hungup aux.chan\n", mp, mp->name);
+			DPRINT(DSPF, "[%s](%p) spliceto: mpipe %p (%s) hungup aux.chan\n", mp->name, mp);
 			goto exit;
 		}
 
@@ -750,7 +770,7 @@ spliceto(void *arg) {
 
 		while(offset < tr->ifcall.count) {
 			int n;
-			DPRINT(2,"\tspliceto: fd: %d\n", sa->fd);
+			DPRINT(DSPF,"[%s](%p) spliceto: fd: %d\n",  mp->name, mp, sa->fd);
 			n = write(sa->fd, tr->ifcall.data+offset, tr->ifcall.count-offset);
 			if(n < 0) {
 				myresponderror(tr);
@@ -790,7 +810,6 @@ spliceto(void *arg) {
 	}
 	/* on error do the right thing */
 exit:
-	//write(sa->fd, "", 0); /* null write */
 	close(sa->fd);
 	if(mp->mode != MPTbcast)
 		fsclunk(dummy);	
@@ -805,7 +824,7 @@ bcastsend(void *arg)
 {
 	Bcastr *br = arg;
 	
-	DPRINT(5, "bcastsend %p\n", arg);
+	DPRINT(DBCA, ">>>> bcastsend %p\n", arg);
 
 	if(sendp(br->chan, br->r) != 1)
 		sendp(br->r->aux, Ebcast);
@@ -833,7 +852,7 @@ fsbcast(Req *r, Mpipe *mp)
 	for(c = mp->bcastr; c != nil; c = c->next) {
 		Bcastr *br = emalloc9p(sizeof(Bcastr));
 
-		DPRINT(2, "\t broadcasting %p to %p\n", r, c);
+		DPRINT(DBCA, "[%s](%p) broadcasting %p to %p\n", mp->name, mp, r, c);
 
 		br->chan = c->chan;
 		br->r = r;
@@ -848,22 +867,19 @@ fsbcast(Req *r, Mpipe *mp)
 		char *e;
 		if(e = recvp(reterr)) {
 			err = e;
-			DPRINT(2, "fsbcast: %s\n", err);
+			DPRINT(DBCA, "fsbcast: %s\n", err);
 		}
 	}
 	qunlock(&mp->l);
 
 	/* restore r->aux for splicefrom case */
 	r->aux = bakaux;
-	DPRINT(2, "fsbcast respond: r: %p aux: %p r->srv: %p err: %p\n", 
-					r, r->aux, r->srv, err);
+	DPRINT(DBCA, "[%s](%p) fsbcast done: r: %p aux: %p r->srv: %p err: %p\n", 
+					mp->name, mp, r, r->aux, r->srv, err);
 
 	if(!err)
 		r->ofcall.count = r->ifcall.count;
 
-	DPRINT(2, "fsbcast closing return channels\n");	
-
-	/* TODO: do we really need to do both of these? */
 	chanclose(reterr);
 	chanfree(reterr);
 
@@ -890,8 +906,10 @@ splicefrom(void *arg) {
 	aux->mp = mp;
 	aux->state = FID_IDLE;
 	mp->ref++;
-	DPRINT(2, "splicefrom: add new writer\n");
 	mp->writers++;
+	DPRINT(DSPF, "[%s](%p) splicefrom: add new writer (writers=%d)\n", mp->name, mp, mp->writers);
+
+	/* create a dummy fid */
 	dummy->omode = OWRITE;
 	dummy->aux = aux;
 
@@ -905,15 +923,15 @@ splicefrom(void *arg) {
 		int n;
 
 		tr.ifcall.count = MSIZE;
-		DPRINT(2, "splicefrom: top of loop - reading\n");
+		DPRINT(DSPF, "[%s](%p) splicefrom: top of loop - reading\n", mp->name, mp);
 		n = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
-		DPRINT(2, "splicefrom: read returned %d\n", n);
+		DPRINT(DSPF, "[%s](%p) splicefrom: read returned %d\n", mp->name, mp, n);
 		if(n < 0) { /* Error */
-			DPRINT(2, "splicefrom: read retuned error: %r\n");
+			DPRINT(DSPF, "[%s](%p) splicefrom: read retuned error: %r\n", mp->name, mp);
 			close(sa->fd);		
 			goto exit;
 		} else if (n == 0) {
-			DPRINT(2, "mpipe %p (%s) splicefrom: got EOF\n", mp, mp->name);
+			DPRINT(DSPF, "[%s](%p) splicefrom: got EOF\n", mp->name, mp);
  			goto exit;
 		} else {
 			tr.ifcall.count = n;
@@ -926,33 +944,32 @@ splicefrom(void *arg) {
 		
 		if(mp->mode == MPTbcast) {
 			err = fsbcast(&tr, mp);
-			DPRINT(2, "back from fsbcast?\n");
 		} else {
 			/* acquire a reader */
 			aux->other = recvp(mp->rrchan[aux->which]);
 			if(aux->other == nil) {
-				DPRINT(2, "splicefrom: %s\n", Ehangup);
+				DPRINT(DSPF, "[%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
 				goto exit;
 			}
 			raux = aux->other->aux;
 			if(raux->other != nil) {
-				DPRINT(2, "splicefrom: %s\n", Eother);
+				DPRINT(DSPF, "[%s](%p) splicefrom: %s\n", mp->name, mp, Eother);
 				goto exit;
 			}
 
 			raux->other = dummy;
 			assert(raux->chan != 0);
 			if(sendp(raux->chan, &tr) != 1) {
-				DPRINT(2, "splicefrom: %s\n", Ehangup);
+				DPRINT(DSPF, "[%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
 				goto exit;
 			}
 			if(err = recvp(reterr)) {
-				DPRINT(2, "splicefrom: reterr %s\n", Ehangup);
+				DPRINT(DSPF, "[%s](%p) splicefrom: reterr %s\n", mp->name, mp, Ehangup);
 				goto exit;
 			}
 		}
 		if(err) {
-			DPRINT(2, "splicefrom: mp: %p (%s) error: %s\n", err, mp, mp->name);
+			DPRINT(DSPF, "[%s](%p) splicefrom: error: %s\n", mp->name, mp, err);
 			goto exit;
 		}
 		/* wait for completion? */
@@ -963,8 +980,8 @@ splicefrom(void *arg) {
 	}
 
 exit:
-	DPRINT(2, "]]]]]]]]]]]]] SPLICEFROM (mp %p) (fid %d) (aux %p) EXITING [[[[[[[[[[[[\n", 
-			mp, sa->fd, dummy->aux);
+	DPRINT(DSPF, "[%s](%p) SPLICEFROM (mp %p) (fid %d) (aux %p) EXITING\n", 
+			mp->name, mp, sa->fd, dummy->aux);
 	fsclunk(dummy);
 	free(sa);
 	threadexits(nil);
@@ -989,7 +1006,8 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 			return "problem parsing pkt header";
 		aux->remain = atoi(argv[1]);
 		aux->which = atoi(argv[2]) % mp->slots;
-		DPRINT(2, "\t PACKET size: %d which %d\n", aux->remain, aux->which);
+		DPRINT(DHDR, "[%s](%p) PACKET size: %d which %d\n", 
+				mp->name, mp, aux->remain, aux->which);
 		break;
 	case '>':	/* splice to */
 	case '<':	/* splice from */
@@ -1001,12 +1019,16 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 
 		if(type=='>') {
 			sa->fd = open(argv[3], OWRITE);
-			DPRINT(2, "spliceto open: %s returned %d\n", argv[3], sa->fd);
-		} else
+			DPRINT(DHDR, "[%s](%p) spliceto open: %s returned %d\n", 
+					mp->name, mp, argv[3], sa->fd);
+		} else {
 			sa->fd = open(argv[3], OREAD);
+			DPRINT(DHDR, "[%s](%p) splicefrom open: %s returned %d\n", 
+					mp->name, mp, argv[3], sa->fd);
+		}
 
 		if(sa->fd < 0)
-			return "splice couldnt open target";
+			return Esplice;
 
 		if(type=='>')
 			proccreate(spliceto, sa, STACK);
@@ -1014,10 +1036,11 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 			proccreate(splicefrom, sa, STACK);
 		break;
 	case '.': /* forced close */
+		DPRINT(DHDR, "[%s](%p) FLUSHED\n", mp->name, mp);
 		aux->state = FID_FLUSHED;
 		break;
 	default:
-		return "unknown pkt header";
+		return Ebadhdr;
 	}
 
 	return nil;
@@ -1059,12 +1082,13 @@ fswrite(void *arg)
 	if(mp->mode == MPTbcast) {
 		err = fsbcast(r, mp);
 		if(err)
-			DPRINT(2, "fsbcast returned %s\n", err);
+			DPRINT(DBCA, "[%s](%p) fswrite: fsbcast returned %s\n", mp->name, mp, err);
 		respond(r, err);
 		goto out;
 	}
 
-	DPRINT(2, "fsread: aux: %p aux->other: %p aux->remain: %d\n", aux, aux->other, aux->remain);
+	DPRINT(DWRT, "[%s](%p)  fswrite: aux: %p aux->other: %p aux->remain: %d\n",
+			mp->name, mp, aux, aux->other, aux->remain);
 
 	if(aux->other == nil) {
 		aux->other = recvp(mp->rrchan[aux->which]);
@@ -1117,7 +1141,8 @@ iothread(void*)
 {
 	Req *r;
 
-	threadsetname("mpipfs-iothread");
+	threadsetname("mpipefs-iothread");
+
 	for(;;) {
 		r = recvp(iochan);
 		if(r == nil)
@@ -1131,7 +1156,7 @@ iothread(void*)
 			threadcreate(fswrite, r, STACK);
 			break;
 		default:
-			DPRINT(2, "unrecognized io op %d\n", r->ifcall.type);
+			DPRINT(DOPS, "unrecognized io op %d\n", r->ifcall.type);
 			break;
 		}
 	}
@@ -1141,9 +1166,8 @@ iothread(void*)
 static void
 ioproxy(Req *r)
 {
-	DPRINT(2, "ioproxy: forwarding %p %d\n", r, r->ifcall.type);
 	if(sendp(iochan, r) != 1) {
-		DPRINT(2, "iochan hungup");
+		DPRINT(DERR, "iochan hungup");
 		threadexits("iochan hungup");
 	}
 }

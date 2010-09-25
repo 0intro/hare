@@ -22,12 +22,16 @@ fn cleanup {
 }
 
 #
-# Startup mpipefs with debug
+# Startup mpipefs (maybe with debug evel specified by $1)
 #
 fn startup {
 	echo Starting mpipefs....
-	mpipefs >[2] $MPIPELOG 
-	#mpipefs -D -v 9 >[2] $MPIPELOG 	# CHATTY
+	if(~ $#* 0) {
+		mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
 }
 
 #
@@ -35,7 +39,6 @@ fn startup {
 #
 fn testdir {
 	mkdir -p $TESTDIR
-	ramfs -m $TESTDIR
 }
 
 #
@@ -325,7 +328,7 @@ fn splicetobcast {
 
 # Setup
 cleanup
-startup
+startup $*
 testdir
 
 # Tests
@@ -341,6 +344,6 @@ splicetobcast
 splicefrombcast
 
 # Cleanup
-unmount $TESTDIR
-rm -rf $TESTDIR
+rm -f $TESTDIR
 cleanup
+
