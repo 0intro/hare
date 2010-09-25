@@ -196,9 +196,10 @@ killall(Srv*)
 	threadexitsall("killall");
 }
 
+#define MAGIC		((uvlong) 6163 << 32)
 #define NETTYPE(x)	((ulong)(x)&0x1f)
-#define NETID(x)	(((ulong)(x))>>5)
-#define NETQID(i,t)	(((i)<<5)|(t))
+#define NETID(x)	((((ulong)(x))>>5)&0xffff)
+#define NETQID(i,t)	(MAGIC|(((i)<<5)|(t)))
 
 enum
 {

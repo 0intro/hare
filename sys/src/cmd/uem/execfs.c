@@ -160,7 +160,7 @@ fsopen(Req *r)
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel */
-	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
+	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
 	assert(n > 0);
 	
 	/* this is here to try and spin to catch the race */

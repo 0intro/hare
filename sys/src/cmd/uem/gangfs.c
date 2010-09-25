@@ -49,7 +49,7 @@ enum
   qid.path format:
 	[MAGIC(16)][CONV(16)][TYPE(16)] where low 00ff bytes are type
 */
-#define MAGIC		 ((uvlong)0x6<<32)
+#define MAGIC		 ((uvlong)0x6AF5<<32)
 #define TYPE(x) 	 ((ulong) (x).path & 0xff)
 #define CONVP(x) 	 ((((ulong) (x).path >> 16)&0xffff) -1)
 #define CONV(x) 	 ((((ulong) (x)->path >> 16)&0xffff) -1)
