@@ -10,6 +10,7 @@ echo '== Execfs Regression =='
 #
 TESTDIR=.test
 EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
 
 #
 # Cleanup Previous Instances

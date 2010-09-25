@@ -8,7 +8,7 @@ echo '== Multipipe Regression =='
 #
 # Parameters
 #
-MPIPELOG=./mpipe.log
+MPIPELOG=mpipefs.log
 TESTDIR=.test
 
 #

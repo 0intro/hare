@@ -8,7 +8,9 @@ echo '== Gangfs Regression =='
 #
 # Parameters
 #
-EXECFSLOG=./execfs.log
+GANGLOG=gangfs.log
+EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
 TESTDIR=.test
 
 #
@@ -29,16 +31,27 @@ fn cleanup {
 # Startup execfs 
 #
 fn startup {
-
-	echo Starting execfs...
-	execfs -D -v 9>[2] execfs.log
-	#execfs >[2] execfs.log
-	echo Starting gangfs...
-	gangfs -D -v 9 >[2] gangfs.log
-	#gangfs >[2] gangfs.log
-	echo Starting mpipefs...
-	#mpipefs -D -v 9>[2] mpipe.log
-	mpipefs >[2] mpipe.log
+	echo Starting execfs.
+	if(~ $#* 0) {
+		execfs >[2] $EXECLOG 
+	}
+	if not {
+		execfs -D -v $1 >[2] $EXECLOG  	# CHATTY
+	}
+	echo Starting gangfs.
+	if(~ $#* 0) {
+		gangfs >[2] $GANGLOG 
+	}
+	if not {
+		gangfs -D -v $1 >[2] $GANGLOG  	# CHATTY
+	}
+	echo Starting mpipefs....
+	if(~ $#* 0) {
+		mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
 }
 
 #
@@ -117,7 +130,7 @@ fn stdin {
 
 # Setup
 cleanup
-startup
+startup $1
 testdir
 
 # Tests

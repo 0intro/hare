@@ -47,7 +47,6 @@ enum {	/* DEBUG LEVELS */
 	DARG = 10,	/* arguments */
 };
 
-
 static char defaultpath[] =	"/proc";
 static char *procpath;
 static char *srvctl;

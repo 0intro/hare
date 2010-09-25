@@ -39,6 +39,18 @@ char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
 char Eperm[] = "Permission denied";
 
+enum {	/* DEBUG LEVELS */
+	DERR = 0,	/* error */
+	DCUR = 1,	/* current - temporary trace */
+	DFID = 2,	/* fid tracking */
+	DGAN = 3,	/* gang tracking */
+	DEXE = 4,	/* execfs interactions */
+	DCLN = 7,	/* cleanup tracking */
+	DPIP = 8,	/* interactions with multipipes */
+	DREF = 9,	/* ref count tracking */
+	DARG = 10,	/* arguments */
+};
+
 enum
 {
 	STACK = (8 * 1024),
@@ -148,14 +160,14 @@ static void
 gangrefinc(Gang *g, char *where)
 {
 	g->refcount++;
-	DPRINT(2, "\t\tGang(%p).refcount++ = %d [%s]\n", g, g->refcount, where);
+	DPRINT(DREF, "\t\tGang(%p).refcount++ = %d [%s]\n", g, g->refcount, where);
 }
 
 static void
 gangrefdec(Gang *g, char *where)
 {
 	g->refcount--;
-	DPRINT(2, "\t\tGang(%p).refcount-- = %d [%s]\n", g, g->refcount, where);
+	DPRINT(DREF, "\t\tGang(%p).refcount-- = %d [%s]\n", g, g->refcount, where);
 }
 
 static int
@@ -183,7 +195,7 @@ flushmp(char *src)
 	char pkttype='.';
 
 	if(fd < 0) {
-		DPRINT(2, "flushmp: open failed: %r\n");
+		DPRINT(DPIP, "flushmp: open failed: %r\n");
 		return fd;
 	}
 
@@ -203,7 +215,7 @@ spliceto(char *src, char *dest)
 	char pkttype='>';
 
 	if(fd < 0) {
-		DPRINT(2, "spliceto: open failed: %r\n");
+		DPRINT(DPIP, "spliceto: open %s failed: %r\n", src);
 		return fd;
 	}
 
@@ -223,7 +235,7 @@ splicefrom(char *dest, char *src)
 	char pkttype='<';
 
 	if(fd < 0) {
-		DPRINT(2, "splicefrom: open failed: %r\n");
+		DPRINT(DPIP, "splicefrom: open %s failed: %r\n", dest);
 		return fd;
 	}
 
@@ -426,7 +438,6 @@ dirgen(int n, Dir *d, void *aux)
 				d->qid.type=QTDIR;
 				d->mode = 0555|DMDIR; /* FUTURE: set perms */
 				d->name = smprint("g%d", g->index);
-				DPRINT(2, "RELEASEGANG called from dirgen\n");
 				releasegang(g);
 				return 0;
 			}
@@ -576,8 +587,6 @@ fsopen(Req *r)
 	Qid *q = &fid->qid;
 	Gang *mygang;
 
-	DPRINT(2, "\t fsopen %p\n", r);
-
 	if(TYPE(fid->qid) >= Qsubses) {
 		respond(r, Eperm);
 		return;
@@ -601,7 +610,7 @@ fsopen(Req *r)
 			}
 			wunlock(&glock);
 		} else
-			DPRINT(2, "fsopen: ctl fid without aux\n");
+			DPRINT(DERR, "*ERROR*: fsopen: ctl fid %d without aux\n", fid->fid);
 	}
 
 	if(TYPE(fid->qid) != Qclone) {
@@ -610,7 +619,7 @@ fsopen(Req *r)
 		return;
 	}
 
-	DPRINT(2, "\t newgang %p\n", r);
+	DPRINT(DGAN, "\t newgang %p\n", r);
 	/* insert new session at the end of the list & assign index*/
 	mygang = newgang();
 	if(mygang == nil) {
@@ -624,7 +633,6 @@ fsopen(Req *r)
 	r->ofcall.qid.path = path;
 
 	respond(r, nil);
-	DPRINT(2, "\t fsopen done %p\n", r);
 }
 
 static void
@@ -717,22 +725,22 @@ cmdres(Req *r, int num, int argc, char **argv)
 		int pid;
 		int retries = 0;
 
-		DPRINT(2, "\t reservation: count: %d\n", count); 
+		DPRINT(DEXE, "\t reservation: count: %d\n", count); 
 		path = findexecfs();
 		snprint(buf, 255, "%s/clone", path);
 		while(1) {
 			g->sess[count].fd = open(buf, ORDWR);
 			if(g->sess[count].fd > 0)
 				break;
-			DPRINT(2, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", retries, g->sess[count].fd);
+			DPRINT(DERR, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", retries, g->sess[count].fd);
 			if(retries++ > 10) {
-				DPRINT(2, "*ERROR* giving up\n");
+				DPRINT(DERR, "*ERROR* giving up\n");
 				respond(r, smprint("execfs returning %r"));
 				return;
 			}
 			/* retry on failure */
 		}
-		DPRINT(2, "\t control channel on fd %d\n", g->sess[count].fd);
+		DPRINT(DEXE, "\t control channel on fd %d\n", g->sess[count].fd);
 		g->sess[count].r = nil;
 		g->sess[count].chan = chancreate(sizeof(char *), 0);
 
@@ -808,7 +816,7 @@ relaycmd(void *arg)
 	Session *s = arg;
 	int n;
 
-	DPRINT(2, "writing %d count of data to %d\n", s->r->ifcall.count, s->fd);
+	DPRINT(DEXE, "writing %d count of data to %d\n", s->r->ifcall.count, s->fd);
 	n = pwrite(s->fd, s->r->ifcall.data, s->r->ifcall.count, 0);
 	if(n < 0) {
 		sendp(s->chan, smprint("relay write cmd failed: %r\n"));
@@ -881,7 +889,7 @@ fswrite(void *arg)
 			if((g == nil)||(g->size == 0)) {
 				respondcmderror(r, cb, "%r");
 			} else {
-				DPRINT(2, "Unknown command, broadcasting to children\n");
+				DPRINT(DEXE, "Unknown command, broadcasting to children\n");
 				cmdbcast(r, g);
 			}
 		} else {
@@ -907,7 +915,6 @@ fswrite(void *arg)
 		free(buf);
 		break;		
 	};
-	DPRINT(3, "\t fswrite exiting normally\n");
 }
 
 static void
@@ -933,7 +940,7 @@ cleanupgang(void *arg)
 	Gang *g = arg;
 	char fname[255];
 
-	DPRINT(2, "cleaning up gang, entering umount\n");
+	DPRINT(DCLN, "cleaning up gang, entering umount\n");
 	snprint(fname, 255, "/proc/g%d/stdin", g->index);
 	flushmp(fname); /* flush pipe to be sure */
 	unmount(0, fname);
@@ -954,15 +961,14 @@ fsclunk(Fid *fid)
 {
 	Gang *g;
 
-	DPRINT(2, "fsclunk: %d\n", fid->fid);
+	DPRINT(DFID, "fsclunk: %d\n", fid->fid);
 	if(TYPE(fid->qid) == Qctl) {
-		DPRINT(2, "and its a ctl\n");
+		DPRINT(DFID, "and its a ctl\n");
 		g = fid->aux;
 		if(g) {
-			DPRINT(2, "wlock\n");
 			wlock(&glock);
 			g->ctlref--;	
-			DPRINT(2, "ctlref=%d\n", g->ctlref);
+			DPRINT(DREF, "ctlref=%d\n", g->ctlref);
 			if(g->ctlref == 0) {
 				g->status=GANG_CLOSING;
 				wunlock(&glock);
@@ -971,7 +977,7 @@ fsclunk(Fid *fid)
 				wunlock(&glock);
 			}
 		} else
-			DPRINT(2, "fsclunk: ctl fid without aux\n");
+			DPRINT(DERR, "*ERROR*: fsclunk: ctl fid without aux\n");
 	} else {
 		if(fid->aux != nil) {
 			g = fid->aux;
@@ -993,9 +999,7 @@ iothread(void*)
 	}
 
 	for(;;) {
-		DPRINT(2, "=== IOTHREAD: waiting for next operation ===\n\n");
 		r = recvp(iochan);
-		DPRINT(2, "=== IOTHREAD: got %d ===\n\n", r->ifcall.type);
 		if(r == nil)
 			threadexits("interrupted");
 
@@ -1024,12 +1028,10 @@ iothread(void*)
 static void
 ioproxy(Req *r)
 {
-	DPRINT(1, "ioproxy->forwarding\n");
 	if(sendp(iochan, r) != 1) {
 		fprint(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
-	DPRINT(1, "ioproxy->back\n");
 }
 
 static void
@@ -1038,7 +1040,7 @@ clunkproxy(Fid *f)
 	/* really freaking clunky, but not sure what else to do */
 	Req *r = emalloc9p(sizeof(Req));
 
-	DPRINT(2, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
+	DPRINT(DFID, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
 
 	r->ifcall.type = Tclunk;
 	r->fid = f;
@@ -1046,7 +1048,7 @@ clunkproxy(Fid *f)
 		fprint(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
-	DPRINT(2, "clunkproxy: waiting on response\n");
+	DPRINT(DFID, "clunkproxy: waiting on response\n");
 	recvp(clunkchan);
 }
 
@@ -1091,16 +1093,12 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	/* spawn off a io thread */
-	DPRINT(1, "iothread\n");
 	iochan = chancreate(sizeof(void *), 0);
 	clunkchan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
 	recvp(iochan);
 
-	DPRINT(1, "fsthread\n");
 	threadpostmountsrv(&fs, nil, procpath, MAFTER);
 
-
-	DPRINT(1, "exit\n");
 	threadexits(0);
 }
