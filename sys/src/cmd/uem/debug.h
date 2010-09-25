@@ -7,6 +7,7 @@
 */
 
 static int vflag = 0;
+static int debugfd = 2;
 
 static void
 _dprint(ulong dlevel, char *fmt, ...)
@@ -22,7 +23,7 @@ _dprint(ulong dlevel, char *fmt, ...)
 
 	p = strchr(fmt, '\n');
 
-	newfmt = smprint("\t[%8.8ld][%8.8d]\t %s\n", time(0), getpid(), fmt);
+	newfmt = smprint("\t[%8.8llud][%8.8d]\t %s\n", nsec()>>16, getpid(), fmt);
 	if(p != nil){
 		p = strchr(newfmt, '\n');
 		*p = ' ';
@@ -33,7 +34,7 @@ _dprint(ulong dlevel, char *fmt, ...)
 	if (newfmt != nil) free(newfmt);
 	s[len]=0;	
 
-	fprint(2, "%s", s);
+	fprint(debugfd, "%s", s);
 }
 
 #define DPRINT if(!vflag){} else _dprint

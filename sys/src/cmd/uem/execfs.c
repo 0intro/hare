@@ -13,8 +13,7 @@
 		in the proc table.
 
 	TODO:
-		* need a better way to clean up after fids
-		* maybe autostart mpipe when we need it
+		* maybe autostart mpipe when we need it (on-demand pipes)
 		
 */
 
@@ -31,6 +30,7 @@
 static char Enopid[] =	"process not initialized";
 static char Eoverflow[] = "ctl buffer overflow";
 static char Ebadctl[] = "bad ctl message";
+static char Ebadfid[] = "bad fid";
 static char Eexec[] = "could not exec";
 static char Eusage[] = "exec: invalid number of arguments";
 static char Ectlchan[] ="problems with command channel to wrapper";
@@ -39,6 +39,14 @@ static char Empipe[] = "problems with mpipe";
 static char Epid[] = "stupid pid problem";
 static char Esrv[] = "couldn't create srv file";
 static char Ewtf[] = "I have no idea what could be going wrong here";
+
+enum {	/* DEBUG LEVELS */
+	DERR = 0,	/* error */
+	DCUR = 1,	/* current - temporary trace */
+	DFID = 2,	/* fid tracking */
+	DARG = 10,	/* arguments */
+};
+
 
 static char defaultpath[] =	"/proc";
 static char *procpath;
@@ -49,13 +57,13 @@ static Channel *clunkchan;
 static void
 usage(void)
 {
-	fprint(2, "execfs [-D] [mtpt]\n");
+	fprint(2, "execfs [-D] [-v debuglevel] [mtpt]\n");
 	exits("usage");
 }
 
 enum
 {
-	STACK = (32 * 1024),
+	STACK = (8 * 1024),
 	STRMAX = 255,
 	Xclone = 1,
 };
@@ -78,26 +86,13 @@ Cmdtab ctltab[]={
 	Cexec,	"exec", 0,
 };
 
-/* call the execution wrapper */
-static void
-cloneproc(void *arg)
-{
-	Channel *pidc = arg;
-	
-	rfork(RFFDG);
-	procexecl(pidc, "/bin/execcmd", "execcmd", srvctl, nil);
-	
-	sendul(pidc, 0); /* failure */
-	threadexits(nil);
-}
-
 static int
 mpipe(char *path, char *name)
 {
 	int fd, ret;
 	fd = open("/srv/mpipe", ORDWR);
 	if(fd<0) {
-		fprint(2, "couldn't open /srv/mpipe: %r\n");
+		DPRINT(DERR, "*ERROR*: couldn't open /srv/mpipe: %r\n");
 		return -1;
 	}
 	
@@ -106,14 +101,32 @@ mpipe(char *path, char *name)
 	return ret;
 }
 
+/* call the execution wrapper */
+static void
+cloneproc(void *arg)
+{
+	Channel *pidc = arg;
+
+	threadsetname("execfs-cloneproc");
+
+	procexecl(pidc, "/bin/execcmd", "execcmd", srvctl, smprint("%d", vflag), nil);
+	
+	sendul(pidc, 0); /* failure */
+	threadexits(nil);
+}
+
+/* separated process creation to a function to help with debug */
 static ulong
 kickit(void)
 {
 	Channel *pidc = chancreate(sizeof(ulong), 0);
 	ulong pid;
 
-	proccreate(cloneproc, (void *) pidc, STACK);
+	procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
 	pid = recvul(pidc);
+	if(pid==0) {
+		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
+	}
 
 	chanclose(pidc);
 	chanfree(pidc);
@@ -129,7 +142,6 @@ fsopen(Req *r)
 	int fd;
 	Exec *e;
 	char *err;
-	int retries = 0;
 	Fid *f = r->fid;
 	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
@@ -163,16 +175,11 @@ fsopen(Req *r)
 	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
 	assert(n > 0);
 	
-	/* this is here to try and spin to catch the race */
-	while((e->rctlfd = open(fname, OWRITE)) < 0) {
-		if(retries++ > 5) {
-			DPRINT(2, "*ERROR*: giving up try: %d opening %s failed: %r\n", retries, fname);
-			err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
-			goto error;
-		} else {
-			DPRINT(2, "*ERROR*: try: %d opening %s failed: %r\n", retries, fname);
-			sleep(10);
-		}
+	/* grab ahold of the ctl file */
+	if((e->rctlfd = open(fname, OWRITE)) < 0) {
+		DPRINT(DERR, "*ERROR*: opening %s failed: %r\n", fname);
+		err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
+		goto error;
 	}
 
 	n = snprint(fname, STRMAX, "/proc/%d", e->pid);
@@ -229,7 +236,7 @@ fswrite(Req *r)
 	int ret;
 	
 	if(e == 0) {
-		respond(r, "crappy fid\n");
+		respond(r, Ebadfid);
 	}
 	assert(e->ctlfd != -1);
 
@@ -295,13 +302,14 @@ cleanupsession(void *arg)
 	snprint(path, STRMAX, "/proc/%d", pid);
 	unmount(0, path);
 	postnote(PNPROC, pid, "kill");
+
 	free(path);
 }
 
 static void
 fsclunk(Fid *f)
 {
-	DPRINT(2, "fsclunk: %p fid=%d aux=%p\n", f, f->fid, f->aux);
+	DPRINT(DFID, "fsclunk: %p fid=%d aux=%p\n", f, f->fid, f->aux);
 	if(f->aux) {
 		Exec *e = f->aux;
 
@@ -321,6 +329,11 @@ fsclunk(Fid *f)
 static void
 cleanup(Srv *)
 {
+	chanclose(iochan);
+	chanfree(iochan);
+	chanclose(clunkchan);
+	chanfree(clunkchan);
+	free(srvctl);
 	threadexitsall("done");
 }
 
@@ -349,7 +362,7 @@ iothread(void*)
 			free(r);
 			break;
 		default:
-			fprint(2, "unrecognized io op %d\n", r->ifcall.type);
+			DPRINT(DERR, "*ERROR*: unrecognized io op %d\n", r->ifcall.type);
 			break;
 		}
 	}
@@ -370,7 +383,7 @@ clunkproxy(Fid *f)
 	/* really freaking clunky, but not sure what else to do */
 	Req *r = emalloc9p(sizeof(Req));
 
-	DPRINT(2, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
+	DPRINT(DFID, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
 
 	r->ifcall.type = Tclunk;
 	r->fid = f;
@@ -383,11 +396,11 @@ clunkproxy(Fid *f)
 
 Srv fs=
 {
-	.open=	ioproxy,
-	.write=	ioproxy,
-	.read=	fsread,
-	.destroyfid=	clunkproxy,
-	.end=	cleanup,
+	.open=		ioproxy,
+	.write=		ioproxy,
+	.read=		fsread,
+	.destroyfid=clunkproxy,
+	.end=		cleanup,
 };
 
 void
@@ -417,7 +430,7 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	srvctl = smprint("/srv/execfs-%d", getpid());
-	DPRINT(2, "Sanity check 2\n");
+
 	fs.tree = alloctree("execfs", "execfs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "execfs", 0666, (void *)Xclone));
 

@@ -9,6 +9,7 @@ echo '== Execfs Regression =='
 # Parameters
 #
 TESTDIR=.test
+EXECLOG=execfs.log
 
 #
 # Cleanup Previous Instances
@@ -19,20 +20,26 @@ fn cleanup {
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
 	rm -f /srv/mpipe
-
-	kill mpipefs | rc	# only way to get rid of mpipe turds
 }
 
 #
 # Startup execfs 
 #
 fn startup {
-	echo Starting mpipefs
-	mpipefs -D -v 9 >[2] mpipe.log
-	#mpipefs >[2] mpipe.log
-	echo Starting logging execfs.
-	execfs -D -v 9 >[2] execfs.log
-	#execfs >[2] execfs.log
+	echo Starting mpipefs....
+	if(~ $#* 0) {
+		mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
+	echo Starting execfs.
+	if(~ $#* 0) {
+		execfs >[2] $EXECLOG 
+	}
+	if not {
+		execfs -D -v $1 >[2] $EXECLOG  	# CHATTY
+	}
 }
 
 #
@@ -101,7 +108,7 @@ fn stdin {
 
 # Setup
 cleanup
-startup
+startup $1
 testdir
 
 # Tests
