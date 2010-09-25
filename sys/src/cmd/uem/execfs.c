@@ -129,6 +129,7 @@ fsopen(Req *r)
 	int fd;
 	Exec *e;
 	char *err;
+	int retries = 0;
 	Fid *f = r->fid;
 	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
@@ -159,14 +160,19 @@ fsopen(Req *r)
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel */
-	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
+	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
 	assert(n > 0);
-		
-	e->rctlfd = open(fname, OWRITE);
-	if(e->rctlfd < 0) {
-		DPRINT(2, "opening %s failed: %r\n");
-		err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
-		goto error;
+	
+	/* this is here to try and spin to catch the race */
+	while((e->rctlfd = open(fname, OWRITE)) < 0) {
+		if(retries++ > 5) {
+			DPRINT(2, "*ERROR*: giving up try: %d opening %s failed: %r\n", retries, fname);
+			err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
+			goto error;
+		} else {
+			DPRINT(2, "*ERROR*: try: %d opening %s failed: %r\n", retries, fname);
+			sleep(10);
+		}
 	}
 
 	n = snprint(fname, STRMAX, "/proc/%d", e->pid);

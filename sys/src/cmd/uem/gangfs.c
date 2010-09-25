@@ -47,12 +47,13 @@ enum
 
 /* 
   qid.path format:
-	[CONV(16)][TYPE(16)] where low 00ff bytes are type
+	[MAGIC(16)][CONV(16)][TYPE(16)] where low 00ff bytes are type
 */
+#define MAGIC		 ((uvlong)0x6<<32)
 #define TYPE(x) 	 ((ulong) (x).path & 0xff)
 #define CONVP(x) 	 ((((ulong) (x).path >> 16)&0xffff) -1)
 #define CONV(x) 	 ((((ulong) (x)->path >> 16)&0xffff) -1)
-#define CONVQIDP(c, y) (((c+1) << 16)|(y))
+#define CONVQIDP(c, y) ((uvlong)(MAGIC|((((c+1) << 16)|(y)))))
 
 typedef struct Session Session;
 typedef struct Gang Gang;
@@ -723,9 +724,9 @@ cmdres(Req *r, int num, int argc, char **argv)
 			g->sess[count].fd = open(buf, ORDWR);
 			if(g->sess[count].fd > 0)
 				break;
-			DPRINT(2, "opening execfs returned %d: %r -- retrying\n");
+			DPRINT(2, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", retries, g->sess[count].fd);
 			if(retries++ > 10) {
-				DPRINT(2, "giving up\n");
+				DPRINT(2, "*ERROR* giving up\n");
 				respond(r, smprint("execfs returning %r"));
 				return;
 			}
