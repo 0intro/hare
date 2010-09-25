@@ -207,9 +207,7 @@ usage(void)
 static void
 killall(Srv*)
 {
-	nbsendp(iochan, 0);
 	chanclose(iochan);
-	sleep(5);
 	chanfree(iochan);
 	threadexitsall("killall");
 }
