@@ -13,10 +13,10 @@
 	Based in part on Pravin Shinde's devtask.c
 
 	TODO:
-		* aggregated io via multipipes
+		* node status reporting
+		* supporting enumerated fanout gangs
 		* aggregated status via multipipes
 		* aggregated wait via multipipe barrier (todo in multipipe)
-		* garbage collection on close
 */
 
 #include <u.h>
@@ -640,6 +640,7 @@ fsread(Req *r)
 {
 	Fid *fid = r->fid;
 	Qid *q = &fid->qid;
+	char buf[NAMELEN];
 
 	if (q->type&QTDIR) {
 		dirread9p(r, dirgen, fid);
@@ -647,16 +648,18 @@ fsread(Req *r)
 		return;
 	}
 
-	if(TYPE(fid->qid) == Qctl) {
-		char buf[NAMELEN];
-
-		sprint(buf, "%lud\n", CONVP(fid->qid));
-		readstr(r, buf);
-		respond(r, nil);
-		return;
+	switch(TYPE(fid->qid)) {
+		case Qctl:
+			sprint(buf, "%lud\n", CONVP(fid->qid));
+			readstr(r, buf);
+			respond(r, nil);
+			return;
+		case Qgstat:
+			respond(r, "not yet");
+			return;
+		default:
+			respond(r, "not yet");
 	}
-
-	respond(r, "not yet");
 }
 
 /* find the execfs to allocate next session from */
