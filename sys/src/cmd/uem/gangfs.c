@@ -38,6 +38,13 @@ Channel *clunkchan;
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
 char Eperm[] = "Permission denied";
+char Enogang[] = "ctl file has no gang";
+char Ebusy[] = "gang already has subsessions reserved";
+char Ebadimode[] = "unknown input mode";
+char Estdin[] = "problem binding gang stdin";
+char Estdout[] = "problem binding gang stdout";
+char Estderr[] = "problem binding gang stderr";
+
 
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
@@ -99,6 +106,7 @@ struct Gang
 	int index;		/* gang id */
 	int size;		/* number of subsessions */
 	Session *sess;	/* array of subsessions */
+	int imode;		/* input mode (enum/bcast) */
 
 	Channel *chan;	/* channel for sync/error reporting */
 
@@ -146,6 +154,19 @@ static Dirtab convdir[] = {
 	"args",		{Qargs},				0444,
 	"status",	{Qstatus},				0444,
 	"wait",		{Qwait},				0444,
+};
+
+enum
+{
+	CMenum,			/* set input to enum (must be before res) */
+	CMbcast,		/* set input to broadcast mode (must be before res) */
+	CMres,			/* reserve a set of nodes */
+};
+
+Cmdtab ctlcmdtab[]={
+	CMenum, "enum", 1,
+	CMbcast, "bcast", 1,
+	CMres, "res", 0,
 };
 
 static void
@@ -274,6 +295,7 @@ newgang(void)
 	}
 	mygang->ctlref = 1;
 	mygang->refcount = 1;
+	mygang->imode = CMbcast;	/* broadcast mode default */
 	mygang->status = GANG_NEW;
 	wunlock(&glock);
 
@@ -670,15 +692,6 @@ findexecfs(void)
 	return "/proc";
 }
 
-enum
-{
-	CMres,
-};
-
-Cmdtab ctlcmdtab[]={
-	CMres, "res", 0,
-};
-
 /* TODO: many of the error scenarios here probably need more cleanup */
 static void
 cmdres(Req *r, int num, int argc, char **argv)
@@ -690,33 +703,53 @@ cmdres(Req *r, int num, int argc, char **argv)
 	char buf[255];
 	char dest[255];
 	char *path;
+	char *mntargs;
 
 	USED(argc);
 	USED(argv);
 
 	/* okay - by this point we should have gang embedded */
 	if(g == nil) {
-		respond(r, "ctl file has no gang");
+		respond(r, Enogang);
 		return;
 	} 
 
 	if(g->size > 0) {
-		respond(r, "gang already has subsessions reserved");
+		respond(r, Ebusy);
 		return;
 	}
 
 	/* setup aggregation I/O */
 	snprint(dest, 255, "/proc/g%d", g->index);
-	if (mpipe(dest, "-b stdin") < 0) {  /* broadcast */
-		respond(r, "problem binding gang stdin");
-		return;
-	}
+
+	switch(g->imode) {
+		case CMbcast:
+			DPRINT(DGAN, "broadcast mode\n");
+			if (mpipe(dest, "-b stdin") < 0) {
+				respond(r, Estdin);
+				return;
+			}
+			break;
+		case CMenum:
+			DPRINT(DGAN, "enumerated mode\n");
+			mntargs = smprint("-e %d stdin", num);
+			if (mpipe(dest, mntargs)< 0) {
+				free(mntargs);
+				respond(r, Estdin);
+				return;
+			}
+			free(mntargs);
+			break;
+		default:
+			respond(r, Ebadimode);
+			return;
+	};
 	if (mpipe(dest, "stdout") < 0) {  
-		respond(r, "problem binding gang stdout");
+		respond(r, Estdout);
 		return;
 	}
 	if (mpipe(dest, "stderr") < 0) { 
-		respond(r, "problem binding gang stderr");
+		respond(r, Estderr);
 		return;
 	}
 
@@ -902,7 +935,7 @@ fswrite(void *arg)
 				break;
 			case CMres:	/* reservation */	
 				if(cb->nf < 2) {
-					respondcmderror(r, cb, "insufficient args %d", cb->nf);
+					respondcmderror(r, cb, "res insufficient args %d", cb->nf);
 					break;
 				}
 				num = atol(cb->f[1]);
@@ -911,7 +944,19 @@ fswrite(void *arg)
 				} else {
 					cmdres(r, num, cb->nf-2, &cb->f[2]);
 				}
-				break;				
+				break;	
+			case CMenum: /* enable enumeration mode */
+				DPRINT(DGAN, "Setting enumerated mode\n");
+				g->imode = CMenum;
+				r->ofcall.count = r->ifcall.count;
+				respond(r, nil);
+				break;
+			case CMbcast: /* enable broadcast mode */
+				DPRINT(DGAN, "Setting broadcast mode\n");
+				g->imode = CMbcast;
+				r->ofcall.count = r->ifcall.count;
+				respond(r, nil);
+				break;		
 			};
 		}
 		free(cb);

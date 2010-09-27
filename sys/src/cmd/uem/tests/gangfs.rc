@@ -76,6 +76,15 @@ fn myexec2 {
 	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
+fn myexec3 {
+	mypid=`{cat}
+	echo enum >>[2] error.log
+	echo res 5 >>[2] error.log
+	echo exec /bin/cat >>[2] error.log
+	read -n 5 $TESTDIR/test > /proc/g$mypid/stdin >>[2] error.log &
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+}
+
 fn basic {
 	echo -n Basic Test....
 
@@ -128,6 +137,32 @@ fn stdin {
 	rm -rf $TESTDIR/*
 }
 
+fn enum {
+	echo -n Enumerated STDIN Test....
+
+	# initialize files
+	echo one > $TESTDIR/test
+	echo two >> $TESTDIR/test
+	echo three >> $TESTDIR/test
+	echo four >> $TESTDIR/test
+	echo five >> $TESTDIR/test
+
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec3 <>/proc/gclone >[1=0]
+
+	# verify results 
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
 # Setup
 cleanup
 startup $1
@@ -136,6 +171,7 @@ testdir
 # Tests
 basic
 stdin
+enum
 
 # Cleanup
 rm -rf $TESTDIR
