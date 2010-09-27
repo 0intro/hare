@@ -865,7 +865,7 @@ fsbcast(Req *r, Mpipe *mp)
 		char *e;
 		if(e = recvp(reterr)) {
 			err = e;
-			DPRINT(DBCA, "fsbcast: %s\n", err);
+			DPRINT(DERR, "*ERROR*: fsbcast: %s\n", err);
 		}
 	}
 	qunlock(&mp->l);
@@ -925,7 +925,7 @@ splicefrom(void *arg) {
 		n = read(sa->fd, tr.ifcall.data, tr.ifcall.count);
 		DPRINT(DSPF, "[%s](%p) splicefrom: read returned %d\n", mp->name, mp, n);
 		if(n < 0) { /* Error */
-			DPRINT(DSPF, "[%s](%p) splicefrom: read retuned error: %r\n", mp->name, mp);
+			DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: read retuned error: %r\n", mp->name, mp);
 			close(sa->fd);		
 			goto exit;
 		} else if (n == 0) {
@@ -946,28 +946,28 @@ splicefrom(void *arg) {
 			/* acquire a reader */
 			aux->other = recvp(mp->rrchan[aux->which]);
 			if(aux->other == nil) {
-				DPRINT(DSPF, "[%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
+				DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
 				goto exit;
 			}
 			raux = aux->other->aux;
 			if(raux->other != nil) {
-				DPRINT(DSPF, "[%s](%p) splicefrom: %s\n", mp->name, mp, Eother);
+				DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: %s\n", mp->name, mp, Eother);
 				goto exit;
 			}
 
 			raux->other = dummy;
 			assert(raux->chan != 0);
 			if(sendp(raux->chan, &tr) != 1) {
-				DPRINT(DSPF, "[%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
+				DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
 				goto exit;
 			}
 			if(err = recvp(reterr)) {
-				DPRINT(DSPF, "[%s](%p) splicefrom: reterr %s\n", mp->name, mp, Ehangup);
+				DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: reterr %s\n", mp->name, mp, Ehangup);
 				goto exit;
 			}
 		}
 		if(err) {
-			DPRINT(DSPF, "[%s](%p) splicefrom: error: %s\n", mp->name, mp, err);
+			DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: error: %s\n", mp->name, mp, err);
 			goto exit;
 		}
 		/* wait for completion? */
@@ -1080,7 +1080,9 @@ fswrite(void *arg)
 	if(mp->mode == MPTbcast) {
 		err = fsbcast(r, mp);
 		if(err)
-			DPRINT(DBCA, "[%s](%p) fswrite: fsbcast returned %s\n", mp->name, mp, err);
+			DPRINT(DERR, "*ERROR*: [%s](%p) fswrite: fsbcast returned %s\n", mp->name, mp, err);
+
+		mp->len -= r->ofcall.count; /* bcast must do this in sender */
 		respond(r, err);
 		goto out;
 	}
@@ -1154,7 +1156,7 @@ iothread(void*)
 			threadcreate(fswrite, r, STACK);
 			break;
 		default:
-			DPRINT(DOPS, "unrecognized io op %d\n", r->ifcall.type);
+			DPRINT(DERR, "*ERROR*: unrecognized io op %d\n", r->ifcall.type);
 			break;
 		}
 	}
@@ -1165,7 +1167,7 @@ static void
 ioproxy(Req *r)
 {
 	if(sendp(iochan, r) != 1) {
-		DPRINT(DERR, "iochan hungup");
+		DPRINT(DERR, "*ERROR*: iochan hungup");
 		threadexits("iochan hungup");
 	}
 }
