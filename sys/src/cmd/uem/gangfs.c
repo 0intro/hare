@@ -308,18 +308,48 @@ refreshstatus(Status *m)
 	int i;
 	uvlong a[nelem(m->devsysstat)];
 
-	if(loadbuf(m, &m->swapfd) && readswap(m, a))
-		memmove(m->devswap, a, sizeof m->devswap);
+	if(m->next) { /* aggregation node */
+		Status *c;
+		/* go through all the children and add the important bits up */
+		m->nproc = 0;
+		m->nchild = 0;
+		m->njobs = 0; /* MAYBE: do we really want to do this? */
+		m->devswap[Mem] = 0;
+		m->devswap[Maxmem] = 0;
+		m->devsysstat[Load] = 0;
+		m->devsysstat[Idle] = 0;
+		c=m->next;
+		while(c != nil) {
+			m->nproc += c->nproc;
+			/* if child is an aggregation node only count its children */
+			if(c->nchild) { 
+				m->nchild += c->nchild;
+			} else {			
+				m->nchild++;
+			}
 
-	if(loadbuf(m, &m->statsfd)){
-		memset(m->devsysstat, 0, sizeof m->devsysstat);
-		for(n=0; n<m->nproc && readnums(m, nelem(m->devsysstat), a, 0); n++)
-			for(i=0; i<nelem(m->devsysstat); i++)
-				m->devsysstat[i] += a[i];
+			m->njobs += c->njobs;
+			m->devswap[Mem] += c->devswap[Mem];
+			m->devswap[Maxmem] += c->devswap[Maxmem];
+			m->devsysstat[Load] += c->devsysstat[Load];
+			m->devsysstat[Idle] =+ c->devsysstat[Idle];
+			c = c->next;
+		}
+
+		/* MAYBE: average load and idle when done? */
+	} else { /* child node */
+		if(loadbuf(m, &m->swapfd) && readswap(m, a))
+			memmove(m->devswap, a, sizeof m->devswap);
+
+		if(loadbuf(m, &m->statsfd)){
+			memset(m->devsysstat, 0, sizeof m->devsysstat);
+			for(n=0; n<m->nproc && readnums(m, nelem(m->devsysstat), a, 0); n++)
+				for(i=0; i<nelem(m->devsysstat); i++)
+					m->devsysstat[i] += a[i];
+		}
+
+		m->lastup = time(0);
 	}
-
-	m->lastup = time(0);
-
 	return 1;
 }
 
@@ -443,7 +473,7 @@ initstatus(Status *m, char *name)
 		m->nproc = n;
 	}else
 		m->nproc = 1;
-	m->lastup = 0;
+	m->lastup = time(0);
 }
 
 static void
