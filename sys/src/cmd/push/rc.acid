@@ -1,0 +1,154 @@
+include("/usr/npe/src/cmd/push/rcdefs.acid");
+include("/sys/lib/acid/forktrace");
+print("new();");
+print("newtree();");
+print("newreal();");
+print("newquiet();");
+print("newtree();");
+print("new(); fds();");
+
+//	nextfork();
+//	setproc(proclist[1]);
+//	nextfork();
+//	setproc(proclist[1]);
+//	bpset(flush);
+
+defn new() {
+	newproc("-m /usr/npe/src/cmd/push/rcmain -r -c 'orf=(f1 orf) irf=(f2 irf) f3 test |< f4 >| f5'");
+	cont();
+
+}
+
+defn newtree() {
+	newproc("-m /usr/npe/src/cmd/push/rcmain -t -c 'orf=(f1 orf) irf=(f2 irf) f3 test |< f4  >| f5'");
+	cont();
+
+}
+
+defn newreal() {
+	newproc(" -r -c 'orf=cat irf=cat echo test |< cat  >| cat'");
+	cont();
+
+}
+
+defn newquiet() {
+	newproc("-c 'orf=(echo orf) irf=(echo irf) echo test |< cat  >| cat'");
+	cont();
+
+}
+
+defn newtree() {
+	newproc("-m /usr/npe/src/cmd/push/rcmain -t -c 'orf=cat irf=cat echo test |< cat  >| cat'");
+	cont();
+
+}
+
+defn dumpcode() {
+	local c;
+	c = runq->code;
+	while c.i do {
+		print(c);
+		c++;
+	}
+
+}
+
+defn loopcode() {
+	local c;
+	c = runq->code;
+	loop 1,200 do {
+		code(c);
+		c++;
+	}
+
+}
+
+defn findfunc(f) {
+	local c;
+	c = runq->code;
+	while c.f != f do c++;
+	return c;
+}
+
+// rcprocs
+// will take rc's output and give you the acid commands to add the forked processes to the process table. 
+
+// should this be added to stop?
+
+defn myfds() {
+	local l, m, fds, ss, fdlist, pid, name;
+	l = proclist;
+	fdlist = {};
+	fds = {};
+	while l do {
+		pid = itoa(head l);
+		m = file("/proc/"+pid+"/fd");
+		name = split(file("/proc/"+pid+"/status")[0], ' ')[0];
+		fds = append fds, name;
+		fds = append fds, pid;
+		m = tail m;
+		while m do {
+			ss = split(head m, ' ');
+			fds = append fds, {ss[0], ss[4], ss[9]};
+			m = tail m;
+		}
+		fdlist = append fdlist, fds;
+		fds = {};
+		l = tail l;
+	}
+	return fdlist;
+}
+
+defn fds() {
+	local l, m;
+	
+	l = myfds();
+	while l do {
+		m = head l;
+		print(head m);
+		m = tail m;
+		print("\t", head m, "\n");
+		m = tail m;		
+		while m do {
+			print("\t", m[0][0], "\t", m[0][1],"\t", m[0][2],  "\n");	
+			m = tail m;
+		}
+		l = tail l;
+	}
+}
+
+defn split(ss, sep) {
+	local l, s, i, j;
+	i = 0;
+	j = 0;
+	s = "";
+	l = {};
+	while ss[i] do {
+		if ss[i] == sep then {
+			if s != "" then {
+				l = append l, s;
+				s = "";
+			}
+		}else {
+			s = s + ss[i];
+			j = j + 1;
+		}
+		i = i + 1;
+	}
+	l = append l, s;
+	
+	return l;
+}
+
+
+defn newacid(pid) {
+	if access("/mnt/acme/label") then
+		rc("win acid "+itoa(pid));
+	else if access("/mnt/wsys/label") then
+		rc("window acid "+itoa(pid));
+	else
+		error("need a terminal multiplexor for multiple sessions, should acid be like sam?");
+}
+
+// have something like setmap to change between systems?
+// you also want to have acids be able to communicate with one another. 

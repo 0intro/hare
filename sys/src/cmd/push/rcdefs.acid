@@ -1,0 +1,11560 @@
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'A' io 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+complex tree compile:t;
+complex tree fnstr:t;
+complex io fnstr:f;
+complex tree outcode:t;
+complex tree outcode:tt;
+complex tree codeswitch:t;
+complex tree codeswitch:tt;
+complex tree iscase:t;
+complex code codecopy:cp;
+complex code codefree:cp;
+complex code codefree:p;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\a, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex code startargv:c;
+complex var startargv:$local;
+complex list startargv:argv;
+complex thread startargv:p;
+complex code start:c;
+complex var start:$local;
+complex thread start:p;
+complex word newword:next;
+complex word newword:p;
+complex word popword:p;
+complex word freelist:w;
+complex word freelist:nw;
+complex list pushlist:p;
+complex list poplist:p;
+complex word count:w;
+complex redir pushredir:rp;
+complex var newvar:next;
+complex var newvar:v;
+complex var Xexit:trapreq;
+complex word Xexit:starval;
+complex redir Xpopredir:rp;
+complex thread Xreturn:p;
+complex word list2str:words;
+complex word list2str:ap;
+complex word Xmatch:p;
+complex word Xcase:p;
+complex word conclist:lp;
+complex word conclist:rp;
+complex word conclist:$tail;
+complex word conclist:v;
+complex word Xconc:lp;
+complex word Xconc:rp;
+complex word Xconc:vp;
+complex var Xassign:v;
+complex word copywords:a;
+complex word copywords:$tail;
+complex word copywords:v;
+complex word copywords:end;
+complex word Xdol:a;
+complex word Xdol:star;
+complex word Xqdol:a;
+complex word Xqdol:p;
+complex word copynwords:a;
+complex word copynwords:$tail;
+complex word copynwords:v;
+complex word copynwords:end;
+complex word subwords:val;
+complex word subwords:sub;
+complex word subwords:a;
+complex word Xsub:a;
+complex word Xsub:v;
+complex word Xcount:a;
+complex var Xunlocal:v;
+complex var Xunlocal:hid;
+complex word freewords:w;
+complex word freewords:nw;
+complex var Xfn:v;
+complex word Xfn:a;
+complex var Xdelfn:v;
+complex word Xdelfn:a;
+complex thread Xrdcmds:p;
+complex word Xrdcmds:prompt;
+complex var getstatus:status;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+complex word globv;
+complex word globsort:left;
+complex word globsort:right;
+complex word globsort:a;
+complex word glob:svglobv;
+complex word globlist1:gl;
+complex word globlist:a;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex thread Xpipe:p;
+complex thread Xfanin:p;
+complex pipes Xfanin:m;
+complex thread Xfanout:p;
+complex pipes Xfanout:m;
+Wordmax = 8192;
+complex io Xbackq:f;
+complex var Xbackq:ifs;
+complex word Xbackq:v;
+complex word Xbackq:nextv;
+complex thread Xpipefd:p;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex word rcargv:p;
+complex io Xbackq:f;
+complex var Xbackq:ifs;
+complex word Xbackq:v;
+complex word Xbackq:nextv;
+complex thread Xpipe:p;
+complex word execforkexec:path;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex here here;
+complex here ehere;
+complex tree heredoc:tag;
+complex here heredoc:h;
+complex here readhere:h;
+complex here readhere:nexth;
+complex io readhere:f;
+complex io psubst:f;
+complex word psubst:star;
+complex io pstrs:f;
+complex word pstrs:a;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+Stralloc = 100;
+complex io pfmt:f;
+complex io pchr:b;
+complex io rchr:b;
+complex io pquo:f;
+complex io pwrd:f;
+complex io pptr:f;
+complex io pstr:f;
+complex io pdec:f;
+complex io poct:f;
+complex io pval:f;
+complex word pval:a;
+complex io fullbuf:f;
+complex io flush:f;
+complex io openfd:f;
+complex io openstr:f;
+complex io opencore:f;
+complex io rewind:io;
+complex io closeio:io;
+complex io emptybuf:f;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex var pprompt:prompt;
+complex tree yylex:t;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex io pdeglob:f;
+complex io pcmd:f;
+complex tree pcmd:t;
+complex tree labelname:t;
+complex io leaf2node:f;
+complex tree leaf2node:t;
+complex io tree2dot:f;
+complex tree tree2dot:t;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+sizeof_3_ = 8;
+aggr _3_
+{
+	'X' 0 f;
+	'X' 4 name;
+};
+
+defn
+_3_(addr) {
+	complex _3_ addr;
+	print("	f	", addr.f\X, "\n");
+	print("	name	", addr.name\X, "\n");
+};
+
+complex io pfnc:fd;
+complex thread pfnc:t;
+complex list pfnc:a;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+Maxenvname = 256;
+complex word Vinit:val;
+complex Dir Vinit:ent;
+complex Dir Xrdfn:e;
+complex Dir ent$16;
+complex Dir allocent$16;
+complex thread Waitfor:p;
+complex Waitmsg Waitfor:w;
+complex word mkargv:a;
+complex var addenv:v;
+complex word addenv:w;
+complex io addenv:fd;
+complex var updenvlocal:v;
+complex var Updenv:v;
+complex var Updenv:h;
+complex word Execute:args;
+complex word Execute:path;
+sizeof_3_ = 12;
+aggr _3_
+{
+	'A' Dir 0 dbuf;
+	'D' 4 i;
+	'D' 8 n;
+};
+
+defn
+_3_(addr) {
+	complex _3_ addr;
+	print("	dbuf	", addr.dbuf\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	n	", addr.n, "\n");
+};
+
+complex Dir Opendir:db;
+complex Dir trimdirs:d;
+complex Dir Executable:statbuf;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex code exitnext:c;
+complex word Xsimple:a;
+complex thread Xsimple:p;
+complex var Xsimple:v;
+complex bltin Xsimple:bp;
+complex word nullpath;
+complex redir doredir:rp;
+complex word searchpath:path;
+complex var execfunc:func;
+complex word execfunc:starval;
+complex word execcd:a;
+complex word execcd:cdpath;
+complex word execshift:a;
+complex var execshift:star;
+complex redir mapfd:rp;
+complex io execcmds:f;
+complex word execeval:ap;
+complex list execdot:av;
+complex thread execdot:p;
+complex word execdot:path;
+complex word execwhatis:a;
+complex word execwhatis:b;
+complex word execwhatis:path;
+complex var execwhatis:v;
+complex bltin execwhatis:bp;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex var dotrap:trapreq;
+complex word dotrap:starval;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex tree treenodes;
+complex tree newtree:t;
+complex tree freenodes:t;
+complex tree freenodes:u;
+complex tree tree1:c0;
+complex tree tree2:c0;
+complex tree tree2:c1;
+complex tree tree3:c0;
+complex tree tree3:c1;
+complex tree tree3:c2;
+complex tree tree3:t;
+complex tree mung1:t;
+complex tree mung1:c0;
+complex tree mung2:t;
+complex tree mung2:c0;
+complex tree mung2:c1;
+complex tree mung3mp:t;
+complex tree mung3mp:c0;
+complex tree mung3mp:c1;
+complex tree mung3mp:c2;
+complex tree mung3:t;
+complex tree mung3:c0;
+complex tree mung3:c1;
+complex tree mung3:c2;
+complex tree epimung:comp;
+complex tree epimung:epi;
+complex tree epimung:p;
+complex tree simplemung:t;
+complex tree simplemung:u;
+complex io simplemung:s;
+complex tree token:t;
+complex tree freetree:p;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofkw = 12;
+aggr kw
+{
+	'X' 0 name;
+	'D' 4 type;
+	'A' kw 8 next;
+};
+
+defn
+kw(addr) {
+	complex kw addr;
+	print("	name	", addr.name\X, "\n");
+	print("	type	", addr.type, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+complex kw kenter:p;
+complex kw klook:p;
+complex tree klook:t;
+complex var gvlook:v;
+complex var vlook:v;
+complex word setvar:val;
+complex var setvar:v;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'X' 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn
+code(addr) {
+	complex code addr;
+	print("	f	", addr.f\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	s	", addr.s\X, "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofword = 8;
+aggr word
+{
+	'X' 0 word;
+	'A' word 4 next;
+};
+
+defn
+word(addr) {
+	complex word addr;
+	print("	word	", addr.word\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeoflist = 8;
+aggr list
+{
+	'A' word 0 words;
+	'A' list 4 next;
+};
+
+defn
+list(addr) {
+	complex list addr;
+	print("	words	", addr.words\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofredir = 12;
+aggr redir
+{
+	'C' 0 type;
+	'd' 2 from;
+	'd' 4 to;
+	'A' redir 8 next;
+};
+
+defn
+redir(addr) {
+	complex redir addr;
+	print("	type	", addr.type, "\n");
+	print("	from	", addr.from, "\n");
+	print("	to	", addr.to, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofthread = 188;
+aggr thread
+{
+	'A' code 0 code;
+	'D' 4 pc;
+	'A' list 8 argv;
+	'A' redir 12 redir;
+	'A' redir 16 startredir;
+	'A' var 20 $local;
+	'X' 24 cmdfile;
+	'X' 28 cmdfd;
+	'D' 32 iflast;
+	'D' 36 eof;
+	'D' 40 iflag;
+	'D' 44 lineno;
+	'D' 48 pid;
+	'a' 52 status;
+	'A' tree 180 treenodes;
+	'A' thread 184 ret;
+};
+
+defn
+thread(addr) {
+	complex thread addr;
+	print("	code	", addr.code\X, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	argv	", addr.argv\X, "\n");
+	print("	redir	", addr.redir\X, "\n");
+	print("	startredir	", addr.startredir\X, "\n");
+	print("	$local	", addr.$local\X, "\n");
+	print("	cmdfile	", addr.cmdfile\X, "\n");
+	print("	cmdfd	", addr.cmdfd\X, "\n");
+	print("	iflast	", addr.iflast, "\n");
+	print("	eof	", addr.eof, "\n");
+	print("	iflag	", addr.iflag, "\n");
+	print("	lineno	", addr.lineno, "\n");
+	print("	pid	", addr.pid, "\n");
+	print("	status	", addr.status, "\n");
+	print("	treenodes	", addr.treenodes\X, "\n");
+	print("	ret	", addr.ret\X, "\n");
+};
+
+complex thread runq;
+complex pipes mpstk;
+complex code codebuf;
+sizeofbltin = 8;
+aggr bltin
+{
+	'X' 0 name;
+	'X' 4 fnc;
+};
+
+defn
+bltin(addr) {
+	complex bltin addr;
+	print("	name	", addr.name\X, "\n");
+	print("	fnc	", addr.fnc\X, "\n");
+};
+
+sizeofio = 528;
+aggr io
+{
+	'D' 0 fd;
+	'X' 4 bufp;
+	'X' 8 ebuf;
+	'X' 12 strp;
+	'a' 16 buf;
+};
+
+defn
+io(addr) {
+	complex io addr;
+	print("	fd	", addr.fd, "\n");
+	print("	bufp	", addr.bufp\X, "\n");
+	print("	ebuf	", addr.ebuf\X, "\n");
+	print("	strp	", addr.strp\X, "\n");
+	print("	buf	", addr.buf, "\n");
+};
+
+complex io err;
+complex word Vinit:val;
+complex Dir Vinit:ent;
+complex Dir ent$11;
+complex Dir allocent$11;
+complex Dir Xrdfn:e;
+complex thread Waitfor:p;
+complex Waitmsg Waitfor:w;
+complex word mkargv:a;
+complex var addenv:v;
+complex word addenv:w;
+complex io addenv:fd;
+complex var updenvlocal:v;
+complex var Updenv:v;
+complex var Updenv:h;
+complex word Execute:args;
+complex word Execute:path;
+sizeof_3_ = 12;
+aggr _3_
+{
+	'A' Dir 0 dbuf;
+	'D' 4 i;
+	'D' 8 n;
+};
+
+defn
+_3_(addr) {
+	complex _3_ addr;
+	print("	dbuf	", addr.dbuf\X, "\n");
+	print("	i	", addr.i, "\n");
+	print("	n	", addr.n, "\n");
+};
+
+complex Dir Opendir:db;
+complex Dir trimdirs:d;
+complex Dir Executable:statbuf;
+complex Dir Isatty:d1;
+complex Dir Isatty:d2;
+sizeof_1_ = 8;
+aggr _1_
+{
+	'U' 0 lo;
+	'U' 4 hi;
+};
+
+defn
+_1_(addr) {
+	complex _1_ addr;
+	print("	lo	", addr.lo, "\n");
+	print("	hi	", addr.hi, "\n");
+};
+
+sizeofFPdbleword = 8;
+aggr FPdbleword
+{
+	'F' 0 x;
+	{
+	'U' 0 lo;
+	'U' 4 hi;
+	};
+};
+
+defn
+FPdbleword(addr) {
+	complex FPdbleword addr;
+	print("	x	", addr.x, "\n");
+	print("_1_ {\n");
+		_1_(addr+0);
+	print("}\n");
+};
+
+UTFmax = 3;
+Runesync = 128;
+Runeself = 128;
+Runeerror = 65533;
+sizeofFmt = 48;
+aggr Fmt
+{
+	'b' 0 runes;
+	'X' 4 start;
+	'X' 8 to;
+	'X' 12 stop;
+	'X' 16 flush;
+	'X' 20 farg;
+	'D' 24 nfmt;
+	'X' 28 args;
+	'D' 32 r;
+	'D' 36 width;
+	'D' 40 prec;
+	'U' 44 flags;
+};
+
+defn
+Fmt(addr) {
+	complex Fmt addr;
+	print("	runes	", addr.runes, "\n");
+	print("	start	", addr.start\X, "\n");
+	print("	to	", addr.to\X, "\n");
+	print("	stop	", addr.stop\X, "\n");
+	print("	flush	", addr.flush\X, "\n");
+	print("	farg	", addr.farg\X, "\n");
+	print("	nfmt	", addr.nfmt, "\n");
+	print("	args	", addr.args\X, "\n");
+	print("	r	", addr.r, "\n");
+	print("	width	", addr.width, "\n");
+	print("	prec	", addr.prec, "\n");
+	print("	flags	", addr.flags, "\n");
+};
+
+FmtWidth = 1;
+FmtLeft = 2;
+FmtPrec = 4;
+FmtSharp = 8;
+FmtSpace = 16;
+FmtSign = 32;
+FmtZero = 64;
+FmtUnsigned = 128;
+FmtShort = 256;
+FmtLong = 512;
+FmtVLong = 1024;
+FmtComma = 2048;
+FmtByte = 4096;
+FmtFlag = 8192;
+sizeofTm = 40;
+aggr Tm
+{
+	'D' 0 sec;
+	'D' 4 min;
+	'D' 8 hour;
+	'D' 12 mday;
+	'D' 16 mon;
+	'D' 20 year;
+	'D' 24 wday;
+	'D' 28 yday;
+	'a' 32 zone;
+	'D' 36 tzoff;
+};
+
+defn
+Tm(addr) {
+	complex Tm addr;
+	print("	sec	", addr.sec, "\n");
+	print("	min	", addr.min, "\n");
+	print("	hour	", addr.hour, "\n");
+	print("	mday	", addr.mday, "\n");
+	print("	mon	", addr.mon, "\n");
+	print("	year	", addr.year, "\n");
+	print("	wday	", addr.wday, "\n");
+	print("	yday	", addr.yday, "\n");
+	print("	zone	", addr.zone, "\n");
+	print("	tzoff	", addr.tzoff, "\n");
+};
+
+PNPROC = 1;
+PNGROUP = 2;
+Profoff = 0;
+Profuser = 1;
+Profkernel = 2;
+Proftime = 3;
+Profsample = 4;
+sizeofLock = 4;
+aggr Lock
+{
+	'D' 0 val;
+};
+
+defn
+Lock(addr) {
+	complex Lock addr;
+	print("	val	", addr.val, "\n");
+};
+
+sizeofQLp = 12;
+aggr QLp
+{
+	'D' 0 inuse;
+	'A' QLp 4 next;
+	'C' 8 state;
+};
+
+defn
+QLp(addr) {
+	complex QLp addr;
+	print("	inuse	", addr.inuse, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	state	", addr.state, "\n");
+};
+
+sizeofQLock = 16;
+aggr QLock
+{
+	Lock 0 lock;
+	'D' 4 locked;
+	'A' QLp 8 $head;
+	'A' QLp 12 $tail;
+};
+
+defn
+QLock(addr) {
+	complex QLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	locked	", addr.locked, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRWLock = 20;
+aggr RWLock
+{
+	Lock 0 lock;
+	'D' 4 readers;
+	'D' 8 writer;
+	'A' QLp 12 $head;
+	'A' QLp 16 $tail;
+};
+
+defn
+RWLock(addr) {
+	complex RWLock addr;
+	print("Lock lock {\n");
+	Lock(addr.lock);
+	print("}\n");
+	print("	readers	", addr.readers, "\n");
+	print("	writer	", addr.writer, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofRendez = 12;
+aggr Rendez
+{
+	'A' QLock 0 l;
+	'A' QLp 4 $head;
+	'A' QLp 8 $tail;
+};
+
+defn
+Rendez(addr) {
+	complex Rendez addr;
+	print("	l	", addr.l\X, "\n");
+	print("	$head	", addr.$head\X, "\n");
+	print("	$tail	", addr.$tail\X, "\n");
+};
+
+sizeofNetConnInfo = 36;
+aggr NetConnInfo
+{
+	'X' 0 dir;
+	'X' 4 root;
+	'X' 8 spec;
+	'X' 12 lsys;
+	'X' 16 lserv;
+	'X' 20 rsys;
+	'X' 24 rserv;
+	'X' 28 laddr;
+	'X' 32 raddr;
+};
+
+defn
+NetConnInfo(addr) {
+	complex NetConnInfo addr;
+	print("	dir	", addr.dir\X, "\n");
+	print("	root	", addr.root\X, "\n");
+	print("	spec	", addr.spec\X, "\n");
+	print("	lsys	", addr.lsys\X, "\n");
+	print("	lserv	", addr.lserv\X, "\n");
+	print("	rsys	", addr.rsys\X, "\n");
+	print("	rserv	", addr.rserv\X, "\n");
+	print("	laddr	", addr.laddr\X, "\n");
+	print("	raddr	", addr.raddr\X, "\n");
+};
+
+RFNAMEG = 1;
+RFENVG = 2;
+RFFDG = 4;
+RFNOTEG = 8;
+RFPROC = 16;
+RFMEM = 32;
+RFNOWAIT = 64;
+RFCNAMEG = 1024;
+RFCENVG = 2048;
+RFCFDG = 4096;
+RFREND = 8192;
+RFNOMNT = 16384;
+sizeofQid = 16;
+aggr Qid
+{
+	'W' 0 path;
+	'U' 8 vers;
+	'b' 12 type;
+};
+
+defn
+Qid(addr) {
+	complex Qid addr;
+	print("	path	", addr.path, "\n");
+	print("	vers	", addr.vers, "\n");
+	print("	type	", addr.type, "\n");
+};
+
+sizeofDir = 60;
+aggr Dir
+{
+	'u' 0 type;
+	'U' 4 dev;
+	Qid 8 qid;
+	'U' 24 mode;
+	'U' 28 atime;
+	'U' 32 mtime;
+	'V' 36 length;
+	'X' 44 name;
+	'X' 48 uid;
+	'X' 52 gid;
+	'X' 56 muid;
+};
+
+defn
+Dir(addr) {
+	complex Dir addr;
+	print("	type	", addr.type, "\n");
+	print("	dev	", addr.dev, "\n");
+	print("Qid qid {\n");
+	Qid(addr.qid);
+	print("}\n");
+	print("	mode	", addr.mode, "\n");
+	print("	atime	", addr.atime, "\n");
+	print("	mtime	", addr.mtime, "\n");
+	print("	length	", addr.length, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	uid	", addr.uid\X, "\n");
+	print("	gid	", addr.gid\X, "\n");
+	print("	muid	", addr.muid\X, "\n");
+};
+
+sizeofWaitmsg = 20;
+aggr Waitmsg
+{
+	'D' 0 pid;
+	'a' 4 time;
+	'X' 16 msg;
+};
+
+defn
+Waitmsg(addr) {
+	complex Waitmsg addr;
+	print("	pid	", addr.pid, "\n");
+	print("	time	", addr.time, "\n");
+	print("	msg	", addr.msg\X, "\n");
+};
+
+sizeofIOchunk = 8;
+aggr IOchunk
+{
+	'X' 0 addr;
+	'U' 4 len;
+};
+
+defn
+IOchunk(addr) {
+	complex IOchunk addr;
+	print("	addr	", addr.addr\X, "\n");
+	print("	len	", addr.len, "\n");
+};
+
+sizeofMpipe = 16;
+aggr Mpipe
+{
+	'X' 0 sep;
+	'D' 4 infd;
+	'D' 8 npipe;
+	'X' 12 fds;
+};
+
+defn
+Mpipe(addr) {
+	complex Mpipe addr;
+	print("	sep	", addr.sep\X, "\n");
+	print("	infd	", addr.infd, "\n");
+	print("	npipe	", addr.npipe, "\n");
+	print("	fds	", addr.fds\X, "\n");
+};
+
+sizeofpipes = 12;
+aggr pipes
+{
+	'D' 0 npipe;
+	'a' 4 fd;
+};
+
+defn
+pipes(addr) {
+	complex pipes addr;
+	print("	npipe	", addr.npipe, "\n");
+	print("	fd	", addr.fd, "\n");
+};
+
+sizeoftree = 48;
+aggr tree
+{
+	'D' 0 type;
+	'D' 4 rtype;
+	'D' 8 fd0;
+	'D' 12 fd1;
+	'X' 16 str;
+	'D' 20 quoted;
+	'D' 24 iskw;
+	'a' 28 child;
+	'A' tree 40 next;
+	'A' pipes 44 mp;
+};
+
+defn
+tree(addr) {
+	complex tree addr;
+	print("	type	", addr.type, "\n");
+	print("	rtype	", addr.rtype, "\n");
+	print("	fd0	", addr.fd0, "\n");
+	print("	fd1	", addr.fd1, "\n");
+	print("	str	", addr.str\X, "\n");
+	print("	quoted	", addr.quoted, "\n");
+	print("	iskw	", addr.iskw, "\n");
+	print("	child	", addr.child, "\n");
+	print("	next	", addr.next\X, "\n");
+	print("	mp	", addr.mp\X, "\n");
+};
+
+complex tree cmdtree;
+sizeofcode = 4;
+aggr code
+{
+	'X' 0 f;
+	'D' 0 i;
+	'X' 0 s;
+};
+
+defn code(addr) {
+	complex code addr;
+	print("	f	", addr.f\a, "\n");
+	print("	i	", addr.i, "\n");
+	
+	print("	s	", *(addr.s\s), "\n");
+};
+
+sizeofvar = 28;
+aggr var
+{
+	'X' 0 name;
+	'X' 4 val;
+	'D' 8 changed;
+	'A' code 12 fn;
+	'D' 16 fnchanged;
+	'D' 20 pc;
+	'A' var 24 next;
+};
+
+defn
+var(addr) {
+	complex var addr;
+	print("	name	", addr.name\X, "\n");
+	print("	val	", addr.val\X, "\n");
+	print("	changed	", addr.changed, "\n");
+	print("	fn	", addr.fn\X, "\n");
+	print("	fnchanged	", addr.fnchanged, "\n");
+	print("	pc	", addr.pc, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeofhere = 12;
+aggr here
+{
+	'A' tree 0 tag;
+	'X' 4 name;
+	'A' here 8 next;
+};
+
+defn
+here(addr) {
+	complex here addr;
+	print("	tag	", addr.tag\X, "\n");
+	print("	name	", addr.name\X, "\n");
+	print("	next	", addr.next\X, "\n");
+};
+
+sizeof_2_ = 4;
+aggr _2_
+{
+	'A' tree 0 tree;
+};
+
+defn
+_2_(addr) {
+	complex _2_ addr;
+	print("	tree	", addr.tree\X, "\n");
+};
+
+complex _2_ yylval;
+complex _2_ yyval;
+sizeof_3_ = 8;
+aggr _3_
+{
+	_2_ 0 yyv;
+	'D' 4 yys;
+};
+
+defn
+_3_(addr) {
+	complex _3_ addr;
+	print("_2_ yyv {\n");
+	_2_(addr.yyv);
+	print("}\n");
+	print("	yys	", addr.yys, "\n");
+};
+
+complex _3_ yyparse:yyp;
+complex _3_ yyparse:yypt;
+complex _2_ yyparse:save1;
+complex _2_ yyparse:save2;

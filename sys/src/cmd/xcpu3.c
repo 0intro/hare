@@ -22,18 +22,9 @@ char sess[64];
 void
 threadmain(int argc, char **argv)
 {
-	char *prog;
-	Biobuf *in;
-	int pid;
-	int n, i, nres;
-	int cfd, dfd, *resfdctl, nfdctl;
+	int n;
+	int cfd, dfd;
 	char fdfile[512];
-	char *buf;
-	int qidpath;
-	char *s, *line;
-	char *a[4], *b[2];
-	
-	buf = malloc(8192);
 
 	mnt = "/csrv/local";
 	ARGBEGIN{

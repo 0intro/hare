@@ -85,17 +85,47 @@ Cmdtab ctltab[]={
 	Cexec,	"exec", 0,
 };
 
+<<<<<<< local
+static char *Execcmd = "/bin/execcmd";
+
+/* call the execution wrapper */
+static void
+cloneproc(void *arg)
+{
+	char *s;
+	Channel *pidc = arg;
+    	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD IN PROC!: %s\n", s);	
+	rfork(RFFDG);
+    	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD IN PROC AFTER RFORK!: %s\n", s);	
+	procexecl(pidc, Execcmd, Execcmd, srvctl, nil);
+	
+	sendul(pidc, 0); /* failure */
+	threadexits("no exection wrapper");
+}
+
+=======
+>>>>>>> other
 static int
 mpipe(char *path, char *name)
 {
 	int fd, ret;
+<<<<<<< local
+	char *s;
+	DPRINT(2, "MPIPE: path=%s name=%s\n", path, name);
+=======
+>>>>>>> other
 	fd = open("/srv/mpipe", ORDWR);
 	if(fd<0) {
 		DPRINT(DERR, "*ERROR*: couldn't open /srv/mpipe: %r\n");
 		return -1;
 	}
-	
+    	s = smprint("/proc/2345235/ctl");
+	print("I FEEEEEEEEL PIPEY: %s\n", s);	
 	ret = mount(fd, -1, path, MAFTER, name);
+    	s = smprint("/proc/2345235/ctl");
+	print("I FEEEEEEEEL MOUNTY: %s: %r\n", s);	
 	close(fd);
 	return ret;
 }
@@ -144,15 +174,31 @@ fsopen(Req *r)
 	Fid *f = r->fid;
 	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
+<<<<<<< local
+	char *s, *t, *u, *v;
+	int p[2];
+	int fd;
+	Channel *pidc;
+=======
+>>>>>>> other
 
+<<<<<<< local
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD AT BEGIN!: %s\n", s);
+	assert(fname != nil);
+	assert(ctlbuf != nil);
+=======
+>>>>>>> other
 	if(f->file->aux != (void *)Xclone) {
 		respond(r, nil);
 		return;
 	}
-
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD BEFORE MEMSET!: %s\n", s);
 	e = emalloc9p(sizeof(Exec));
 	memset(e, 0, sizeof(Exec));
-
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD BEFORE CREATE!: %s\n", s);
 	/* setup bootstrap ctlfd */
 	pipe(p);
 	fd = create(srvctl, OWRITE, 0666);
@@ -160,13 +206,31 @@ fsopen(Req *r)
 		err = Esrv;
 		goto error;
 	}
-
+	print("%s\n", srvctl);
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD BEFORE PROC!: %s\n", s);
 	fprint(fd, "%d", p[0]);
 	close(fd);
 	close(p[0]);
-	e->ctlfd = p[1];
-     
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD BEFORE CHAN!: %s\n", s);
 	/* ask for a new child process */
+<<<<<<< local
+	pidc = chancreate(sizeof(ulong), 0);
+	print("I'M A FUNCTION!\n");
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD BEFORE PROC!: %s\n", s);
+	proccreate(cloneproc, pidc, STACK); 
+	print("I'M MADE A FUNCTION?!\n");
+	/* grab actual reference to real control channel 
+	e->ctlfd = p[1];
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD!: %s\n", s);
+	e->pid = recvul(pidc);
+	if(e->pid <= 0) {
+		fprint(2, "problem during exec process: %r\n");
+		err = Eexec;
+=======
 	e->pid = (int) kickit();
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
@@ -178,18 +242,42 @@ fsopen(Req *r)
 	if((e->rctlfd = open(fname, OWRITE)) < 0) {
 		DPRINT(DERR, "*ERROR*: opening %s failed: %r\n", fname);
 		err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
+>>>>>>> other
 		goto error;
 	}
+	print("PIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIID! e %p e->pid %d\n", e, e->pid);
 
+<<<<<<< local
+	assert(e->pid > 2);	/* assumption for our ctl channels */
+
+	/* grab actual reference to real control channel 
+	s = smprint("/proc/%d/ctl", e->pid);
+	print("I'M MR S!: %s\n", s);
+
+
+	e->rctlfd = open(s, OWRITE);
+	assert(e->rctlfd > 0);
+
+	t = smprint("/proc/%d", e->pid);
+	print("I'M MR T!: %s\n", t);
+	assert(strlen(t) != 0);
+
+	DPRINT(2, "mounting stdio mpipefs to %s\n", t);
+	/* asserts are heavy handed, but help with debug */
+	n = mpipe(t, "stdin");
+=======
 	n = snprint(fname, STRMAX, "/proc/%d", e->pid);
+>>>>>>> other
 	assert(n > 0);
+<<<<<<< local
+	n = mpipe(t, "stdout");
+=======
 
 	/* asserts are heavy handed, but help with debug */
 	n = mpipe(fname, "stdin");
+>>>>>>> other
 	assert(n > 0);
-	n = mpipe(fname, "stdout");
-	assert(n > 0);
-	n = mpipe(fname, "stderr");
+	n = mpipe(t, "stderr");
 	assert(n > 0);
 
 	/* handshake to execcmd */
@@ -341,13 +429,16 @@ static void
 iothread(void*)
 {
 	Req *r;
-
+	char *s;
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD AT IOTHREAD!: %s\n", s);
 	threadsetname("execfs-iothread");
 	for(;;) {
 		r = recvp(iochan);
 		if(r == nil)
 			threadexits("interrupted");
-
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD AT SWITCH!: %s\n", s);
 		switch(r->ifcall.type){
 		case Topen:
 			fsopen(r);
@@ -406,6 +497,7 @@ void
 threadmain(int argc, char **argv)
 {
 	char *x;
+	char *s;
 
 	ARGBEGIN{
 	case 'D':
@@ -436,8 +528,11 @@ threadmain(int argc, char **argv)
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
 	clunkchan = chancreate(sizeof(void *), 0);
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD AT IOTHREAD!: %s\n", s);	
 	proccreate(iothread, nil, STACK);
-
+     	s = smprint("/proc/2345235/ctl");
+	print("I SPRINT GUD AT POSTMOUNT!: %s\n", s);
 	threadpostmountsrv(&fs, nil, procpath, MAFTER);
 	threadexits(0);
 }

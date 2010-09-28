@@ -23,7 +23,7 @@ usage(char *me)
 void
 main(int argc, char **argv)
 {
-	int i, fd, *fds;
+	int i, fd;
 	char buf[8192];
 	
 	prog = argv[0];
@@ -39,7 +39,6 @@ main(int argc, char **argv)
 		sysfatal("no /srv/csrv");
 	if(mount(fd, -1, "/n/csrv", MREPL, "") < 0)
 		sysfatal("no xcpu namespace");
-	fds = malloc(sizeof(int)*argc);
 	for(i = 0; i < argc; i++){
 		fd = open(argv[i], OWRITE);
 		if(fd < 0)

@@ -1,0 +1,1 @@
+x=cat echo hello word | $x: '/bin/x=cat echo hello word | $x' file does not exist
