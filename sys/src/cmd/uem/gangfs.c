@@ -63,6 +63,7 @@ enum
 {
 	STACK = (8 * 1024),
 	NAMELEN = 255,
+	NUMSIZE = 12,
 };
 
 /* 
@@ -171,12 +172,34 @@ Cmdtab ctlcmdtab[]={
 };
 
 #define	MAXNUM	10	/* maximum number of numbers on data line */
+#define STATQUANTA 5 /* 5 second minimum between status refreshes */
 
-typedef struct Machine	Machine;
-struct Machine
+enum
+{
+	/* old /dev/swap */
+	Mem		= 0,
+	Maxmem,
+	Swap,
+	Maxswap,
+
+	/* /dev/sysstats */
+	Procno	= 0,
+	Context,
+	Interrupt,
+	Syscall,
+	Fault,
+	TLBfault,
+	TLBpurge,
+	Load,
+	Idle,
+	InIntr,
+};
+
+typedef struct Status Status;
+struct Status
 {
 	char	*name;
-	uvlong	lastupdate;	/* last time this was updated */
+	long	lastup;	/* last time this was updated */
 
 	int		nproc;
 	int		nchild;
@@ -193,15 +216,15 @@ struct Machine
 	char	*bufp;
 	char	*ebufp;
 
-	Machine	*next;	/* next Machine in list */
-	Machine	*child;	/* linked list of children */
+	Status	*next;	/* next Machine in list */
+	Status	*child;	/* linked list of children */
 };
 
-static Machine	avgmach;	/* composite statistics */
-static Machine	mach;		/* my statistics */
+static Status avgstats;	/* composite statistics */
+static Status mystats;	/* my statistics */
 
 static int
-loadbuf(Machine *m, int *fd)
+loadbuf(Status *m, int *fd)
 {
 	int n;
 
@@ -221,8 +244,8 @@ loadbuf(Machine *m, int *fd)
 }
 
 /* read one line of text from buffer and process integers */
-int
-readnums(Machine *m, int n, uvlong *a, int spanlines)
+static int
+readnums(Status *m, int n, uvlong *a, int spanlines)
 {
 	int i;
 	char *p, *ep;
@@ -247,8 +270,8 @@ readnums(Machine *m, int n, uvlong *a, int spanlines)
 	return i == n;
 }
 
-int
-readswap(Machine *m, uvlong *a)
+static int
+readswap(Status *m, uvlong *a)
 {
 	if(strstr(m->buf, "memory\n")){
 		/* new /dev/swap - skip first 3 numbers */
@@ -263,29 +286,69 @@ readswap(Machine *m, uvlong *a)
 	return readnums(m, nelem(m->devswap), a, 0);
 }
 
-int
-initmach(Machine *m)
+static int
+refreshstatus(Status *m)
 {
 	int n;
-	uvlong a[MAXNUM];
+	int i;
+	uvlong a[nelem(m->devsysstat)];
 
-	m->name = estrdup9p(getenv("sysname"));
-	m->swapfd = open("/dev/swap", OREAD);
 	if(loadbuf(m, &m->swapfd) && readswap(m, a))
 		memmove(m->devswap, a, sizeof m->devswap);
-	else{
-		DPRINT(DCUR, "old style memory?\n");
+
+	if(loadbuf(m, &m->statsfd)){
+		memset(m->devsysstat, 0, sizeof m->devsysstat);
+		for(n=0; n<m->nproc && readnums(m, nelem(m->devsysstat), a, 0); n++)
+			for(i=0; i<nelem(m->devsysstat); i++)
+				m->devsysstat[i] += a[i];
 	}
 
+	m->lastup = time(0);
+
+	return 1;
+}
+
+static void
+initstatus(Status *m)
+{
+	int n;
+	uvlong a[nelem(m->devsysstat)];
+
+	memset(m, 0, sizeof(Status));
+	m->name = estrdup9p(getenv("sysname")); 
+	m->swapfd = open("/dev/swap", OREAD);
+	assert(m->swapfd > 0);
 	m->statsfd = open("/dev/sysstat", OREAD);
+	assert(m->swapfd > 0);
 	if(loadbuf(m, &m->statsfd)){
 		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
 			;
 		m->nproc = n;
 	}else
 		m->nproc = 1;
+	m->lastup = 0;
+}
 
-	return 1;
+static void
+closestatus(Status *m)
+{
+	close(m->statsfd);
+	close(m->swapfd);
+}
+
+int
+readnum(ulong off, char *buf, ulong n, ulong val, int size)
+{
+	char tmp[64];
+
+	snprint(tmp, sizeof(tmp), "%*lud", size-1, val);
+	tmp[size-1] = ' ';
+	if(off >= size)
+		return 0;
+	if(off+n > size)
+		n = size-off;
+	memmove(buf, tmp+off, n);
+	return n;
 }
 
 static void
@@ -514,6 +577,7 @@ cleanup(Srv *)
 {
 	nbsendp(iochan, 0); /* flush any blocked readers */
 	chanclose(iochan);
+	closestatus(&mystats);
 	sleep(5);
 	threadexitsall("done");
 }
@@ -782,6 +846,9 @@ fsread(Req *r)
 	Fid *fid = r->fid;
 	Qid *q = &fid->qid;
 	char buf[NAMELEN];
+	char *statbuf;
+	char *bp;
+	ulong t;
 
 	if (q->type&QTDIR) {
 		dirread9p(r, dirgen, fid);
@@ -796,7 +863,31 @@ fsread(Req *r)
 			respond(r, nil);
 			return;
 		case Qgstat:
-			respond(r, "not yet");
+			statbuf=emalloc9p((NUMSIZE*11+1) + 1);
+			bp = statbuf;
+			t = time(0);
+			if(t-mystats.lastup > STATQUANTA)
+				refreshstatus(&mystats);
+			bp+=snprint(bp, 16, "%15s ", mystats.name);
+			
+			readnum(0, bp, NUMSIZE, mystats.nproc, NUMSIZE);
+			bp+=NUMSIZE;
+			readnum(0, bp, NUMSIZE, mystats.nchild, NUMSIZE);
+			bp+=NUMSIZE;
+			readnum(0, bp, NUMSIZE, mystats.njobs, NUMSIZE); /* TODO: Fix */
+			bp+=NUMSIZE;	
+			readnum(0, bp, NUMSIZE, mystats.devsysstat[Load], NUMSIZE);
+			bp+=NUMSIZE;
+			readnum(0, bp, NUMSIZE, mystats.devsysstat[Idle], NUMSIZE);
+			bp+=NUMSIZE;
+			readnum(0, bp, NUMSIZE, mystats.devswap[Mem], NUMSIZE);
+			bp+=NUMSIZE;
+			readnum(0, bp, NUMSIZE, mystats.devswap[Maxmem], NUMSIZE);
+			bp+=NUMSIZE;
+			*bp = 0;
+			readstr(r, statbuf);
+			respond(r, nil);
+			free(statbuf);
 			return;
 		default:
 			respond(r, "not yet");
@@ -1258,6 +1349,9 @@ threadmain(int argc, char **argv)
 		procpath = argv[0];
 	else
 		procpath = defaultpath;
+
+	/* initialize status */
+	initstatus(&mystats);
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
