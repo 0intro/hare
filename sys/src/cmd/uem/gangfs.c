@@ -16,7 +16,7 @@
 		* node status reporting
 		* supporting enumerated fanout gangs
 		* aggregated status via multipipes
-		* aggregated wait via multipipe barrier (todo in multipipe)
+		* nextaggregated wait via multipipe barrier (todo in multipipe)
 */
 
 #include <u.h>
@@ -195,6 +195,7 @@ enum
 	InIntr,
 };
 
+/* TODO: we'll need a lock to protect the linked list */
 typedef struct Status Status;
 struct Status
 {
@@ -216,8 +217,7 @@ struct Status
 	char	*bufp;
 	char	*ebufp;
 
-	Status	*next;	/* next Machine in list */
-	Status	*child;	/* linked list of children */
+	Status	*next;	/* linked list of children */
 };
 
 static Status avgstats;	/* composite statistics */
@@ -270,6 +270,21 @@ readnums(Status *m, int n, uvlong *a, int spanlines)
 	return i == n;
 }
 
+int
+readnum(ulong off, char *buf, ulong n, ulong val, int size)
+{
+	char tmp[64];
+
+	snprint(tmp, sizeof(tmp), "%*lud", size-1, val);
+	tmp[size-1] = ' ';
+	if(off >= size)
+		return 0;
+	if(off+n > size)
+		n = size-off;
+	memmove(buf, tmp+off, n);
+	return n;
+}
+
 static int
 readswap(Status *m, uvlong *a)
 {
@@ -309,6 +324,76 @@ refreshstatus(Status *m)
 }
 
 static void
+fillstatbuf(Status *m, char *statbuf)
+{
+	char *bp;
+	ulong t;
+
+	bp = statbuf;
+	t = time(0);
+	if(t-m->lastup > STATQUANTA)
+		refreshstatus(m);
+
+	bp+=snprint(bp, 16, "%15s ", mystats.name);
+			
+	readnum(0, bp, NUMSIZE, m->nproc, NUMSIZE);
+	bp+=NUMSIZE;
+	readnum(0, bp, NUMSIZE, m->nchild, NUMSIZE);
+	bp+=NUMSIZE;
+	readnum(0, bp, NUMSIZE, m->njobs, NUMSIZE); /* TODO: Fix */
+	bp+=NUMSIZE;	
+	readnum(0, bp, NUMSIZE, m->devsysstat[Load], NUMSIZE);
+	bp+=NUMSIZE;
+	readnum(0, bp, NUMSIZE, m->devsysstat[Idle], NUMSIZE);
+	bp+=NUMSIZE;
+	readnum(0, bp, NUMSIZE, m->devswap[Mem], NUMSIZE);
+	bp+=NUMSIZE;
+	readnum(0, bp, NUMSIZE, m->devswap[Maxmem], NUMSIZE);
+	bp+=NUMSIZE;
+	*bp = 0;	
+}
+
+static Status *
+findchild(Status *m, char *name)
+{	
+	Status *current = m;
+
+	while(current != nil) {
+		if(strcmp(name, current->name) == 0) 
+			break;
+		current = current->next;
+	}
+
+	return current;
+}
+
+static void
+statuswrite(char *buf)
+{
+	char name[16];
+	Status *m;
+
+	/* grab name and match it to our children */
+	sscanf(buf, "%15s", name);
+	m = findchild(&mystats, name);
+	if(m == nil) {
+		m = emalloc9p(sizeof(Status));
+		memset(m, 0, sizeof(Status));
+		/* TODO: lock */
+		m->next = mystats.next;
+		mystats.next = m;
+		mystats.nchild++;
+		m->name = estrdup9p(name);
+		/* TODO: unlock */
+	}
+	assert(m != nil);
+	sscanf(buf, "%15s %12d %12d %12d %12llud %12llud %12llud %12llud", 
+			m->name, &m->nproc, &m->nchild, &m->njobs, &m->devsysstat[Load], 
+			&m->devsysstat[Idle], &m->devswap[Mem], &m->devswap[Maxmem]);
+	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
+}
+
+static void
 initstatus(Status *m)
 {
 	int n;
@@ -334,21 +419,6 @@ closestatus(Status *m)
 {
 	close(m->statsfd);
 	close(m->swapfd);
-}
-
-int
-readnum(ulong off, char *buf, ulong n, ulong val, int size)
-{
-	char tmp[64];
-
-	snprint(tmp, sizeof(tmp), "%*lud", size-1, val);
-	tmp[size-1] = ' ';
-	if(off >= size)
-		return 0;
-	if(off+n > size)
-		n = size-off;
-	memmove(buf, tmp+off, n);
-	return n;
 }
 
 static void
@@ -541,7 +611,6 @@ releasesessions(Gang *g)
 
 	free(g->sess);
 }
-
 
 static void
 releasegang(Gang *g)
@@ -847,8 +916,6 @@ fsread(Req *r)
 	Qid *q = &fid->qid;
 	char buf[NAMELEN];
 	char *statbuf;
-	char *bp;
-	ulong t;
 
 	if (q->type&QTDIR) {
 		dirread9p(r, dirgen, fid);
@@ -864,27 +931,7 @@ fsread(Req *r)
 			return;
 		case Qgstat:
 			statbuf=emalloc9p((NUMSIZE*11+1) + 1);
-			bp = statbuf;
-			t = time(0);
-			if(t-mystats.lastup > STATQUANTA)
-				refreshstatus(&mystats);
-			bp+=snprint(bp, 16, "%15s ", mystats.name);
-			
-			readnum(0, bp, NUMSIZE, mystats.nproc, NUMSIZE);
-			bp+=NUMSIZE;
-			readnum(0, bp, NUMSIZE, mystats.nchild, NUMSIZE);
-			bp+=NUMSIZE;
-			readnum(0, bp, NUMSIZE, mystats.njobs, NUMSIZE); /* TODO: Fix */
-			bp+=NUMSIZE;	
-			readnum(0, bp, NUMSIZE, mystats.devsysstat[Load], NUMSIZE);
-			bp+=NUMSIZE;
-			readnum(0, bp, NUMSIZE, mystats.devsysstat[Idle], NUMSIZE);
-			bp+=NUMSIZE;
-			readnum(0, bp, NUMSIZE, mystats.devswap[Mem], NUMSIZE);
-			bp+=NUMSIZE;
-			readnum(0, bp, NUMSIZE, mystats.devswap[Maxmem], NUMSIZE);
-			bp+=NUMSIZE;
-			*bp = 0;
+			fillstatbuf(&mystats, statbuf);
 			readstr(r, statbuf);
 			respond(r, nil);
 			free(statbuf);
@@ -1121,7 +1168,12 @@ fswrite(void *arg)
 		snprint(e, sizeof e, "bug in gangfs path=%llux\n", q->path);
 		respond(r, e);
 		break;
-
+	case Qgstat:
+		buf = estrdup9p(r->ifcall.data);
+		statuswrite(buf);	/* TODO: add error checking & reporting */
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+		return;
 	case Qctl:
 		if(r->ifcall.count >= 1024) {
 			respond(r, "ctl message too long");
