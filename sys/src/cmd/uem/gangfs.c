@@ -21,6 +21,7 @@
 
 #include <u.h>
 #include <libc.h>
+#include <ctype.h>
 #include <fcall.h>
 #include <thread.h>
 #include <9p.h>
@@ -168,6 +169,124 @@ Cmdtab ctlcmdtab[]={
 	CMbcast, "bcast", 1,
 	CMres, "res", 0,
 };
+
+#define	MAXNUM	10	/* maximum number of numbers on data line */
+
+typedef struct Machine	Machine;
+struct Machine
+{
+	char	*name;
+	uvlong	lastupdate;	/* last time this was updated */
+
+	int		nproc;
+	int		nchild;
+	int		njobs;
+
+	int		statsfd;
+	int		swapfd;
+
+	uvlong	devswap[4];
+	uvlong	devsysstat[10];
+
+	/* big enough to hold /dev/sysstat even with many processors */
+	char	buf[8*1024];
+	char	*bufp;
+	char	*ebufp;
+
+	Machine	*next;	/* next Machine in list */
+	Machine	*child;	/* linked list of children */
+};
+
+static Machine	avgmach;	/* composite statistics */
+static Machine	mach;		/* my statistics */
+
+static int
+loadbuf(Machine *m, int *fd)
+{
+	int n;
+
+	if(*fd < 0)
+		return 0;
+	seek(*fd, 0, 0);
+	n = read(*fd, m->buf, sizeof m->buf-1);
+	if(n <= 0){
+		close(*fd);
+		*fd = -1;
+		return 0;
+	}
+	m->bufp = m->buf;
+	m->ebufp = m->buf+n;
+	m->buf[n] = 0;
+	return 1;
+}
+
+/* read one line of text from buffer and process integers */
+int
+readnums(Machine *m, int n, uvlong *a, int spanlines)
+{
+	int i;
+	char *p, *ep;
+
+	if(spanlines)
+		ep = m->ebufp;
+	else
+		for(ep=m->bufp; ep<m->ebufp; ep++)
+			if(*ep == '\n')
+				break;
+	p = m->bufp;
+	for(i=0; i<n && p<ep; i++){
+		while(p<ep && (!isascii(*p) || !isdigit(*p)) && *p!='-')
+			p++;
+		if(p == ep)
+			break;
+		a[i] = strtoull(p, &p, 10);
+	}
+	if(ep < m->ebufp)
+		ep++;
+	m->bufp = ep;
+	return i == n;
+}
+
+int
+readswap(Machine *m, uvlong *a)
+{
+	if(strstr(m->buf, "memory\n")){
+		/* new /dev/swap - skip first 3 numbers */
+		if(!readnums(m, 7, a, 1))
+			return 0;
+		a[0] = a[3];
+		a[1] = a[4];
+		a[2] = a[5];
+		a[3] = a[6];
+		return 1;
+	}
+	return readnums(m, nelem(m->devswap), a, 0);
+}
+
+int
+initmach(Machine *m)
+{
+	int n;
+	uvlong a[MAXNUM];
+
+	m->name = estrdup9p(getenv("sysname"));
+	m->swapfd = open("/dev/swap", OREAD);
+	if(loadbuf(m, &m->swapfd) && readswap(m, a))
+		memmove(m->devswap, a, sizeof m->devswap);
+	else{
+		DPRINT(DCUR, "old style memory?\n");
+	}
+
+	m->statsfd = open("/dev/sysstat", OREAD);
+	if(loadbuf(m, &m->statsfd)){
+		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
+			;
+		m->nproc = n;
+	}else
+		m->nproc = 1;
+
+	return 1;
+}
 
 static void
 usage(void)
@@ -768,7 +887,8 @@ cmdres(Req *r, int num, int argc, char **argv)
 			g->sess[count].fd = open(buf, ORDWR);
 			if(g->sess[count].fd > 0)
 				break;
-			DPRINT(DERR, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", retries, g->sess[count].fd);
+			DPRINT(DERR, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", 
+					retries, g->sess[count].fd);
 			if(retries++ > 10) {
 				DPRINT(DERR, "*ERROR* giving up\n");
 				respond(r, smprint("execfs returning %r"));
@@ -797,7 +917,6 @@ cmdres(Req *r, int num, int argc, char **argv)
 			return;
 		}
 
-		/* FUTURE: conditionalize splicing on res arguments or other commands */
 		snprint(buf, 255, "%s/%d/stdin", path, pid);
 		snprint(dest, 255, "/proc/g%d/stdin", g->index);
 		n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
