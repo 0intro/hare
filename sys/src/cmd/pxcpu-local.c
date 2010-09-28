@@ -30,16 +30,19 @@ char sess[64];
 void
 main(int argc, char **argv)
 {
-	Biobuf *in,*stdout;
+	char *prog;
+	Biobuf *in,*out, *stdout;
 ;
+	int pid;
 	int n, i, nres;
-	int cfd, *resfdctl, fd;
+	int cfd, *resfdctl, nfdctl, fd;
 	char fdfile[512];
 	char buf[8192];
-	char *line;
-	char *a[4];
+	int qidpath;
+	char *s, *line;
+	char *a[4], *b[2];
 	
-	fd = -1;
+
 	mnt = "/n/csrv/local";
 	childmnt = "";
 	ARGBEGIN{
@@ -120,8 +123,6 @@ main(int argc, char **argv)
 		}else
 			sysfatal("invalid command string");
 	}
-	if(fd == -1)
-		sysfatal("no data endpoint");
 	stdout = Bopen("/fd/1", OWRITE);
 	if(stdout == nil)
 		sysfatal("couldn't open stdout");

@@ -58,7 +58,6 @@ spec = '[
 .I pipe-path
 
 .SH DESCRIPTION
-.I Mpipefs creates I/O endpoints that facilitate one to many or many to one communication between processes. 
 .PP
 An
 .IR attach (5)

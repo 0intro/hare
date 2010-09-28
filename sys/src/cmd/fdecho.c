@@ -40,7 +40,7 @@ main(int argc, char *argv[])
 		
 	if(!nflag)
 		*p++ = '\n';
-	fprint(logfd, "%ld %d %s %.*s\n", time(0), getpid(), argv[0], (int)(p-buf), buf);
+	fprint(logfd, "%ld %d %s %*s\n", time(0), getpid(), argv[0], p-buf, buf);
 	if(write(1, buf, p-buf) < 0){
 		fprint(2, "echo: write error: %r\n");
 		exits("write error");

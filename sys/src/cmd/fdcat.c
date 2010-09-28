@@ -15,10 +15,10 @@ void
 cat(int f, char *s)
 {
 	char buf[8192];
-	int n;
+	long n;
 
 	while((n=read(f, buf, (long)sizeof buf))>0){
-		fprint(logfd, "%ld %d %s %.*s\n", time(0), getpid(), argv0, n, buf);
+		fprint(logfd, "%ld %d %s %*s\n", time(0), getpid(), argv0, n, buf);
 		if(write(1, buf, n)!=n){
 			fprint(logfd, "%ld %d %s write error copying %s: %r", time(0), getpid(), argv0, s);
 			sysfatal("write error copying %s: %r", s);

@@ -92,7 +92,7 @@ main(int argc, char **argv)
 			j = atoi(a[1]);
 			if(j < 0 || nres <= j)
 				sysfatal("bad io endpoint");
-			n=getfields(strdup(topo[j]), c, 64, 1, "/");
+			n=getfields(s=strdup(topo[j]), c, 64, 1, "/");
 			print("n %d levels in splice\n", n);
 			s = buf;
 			e = buf+8192;

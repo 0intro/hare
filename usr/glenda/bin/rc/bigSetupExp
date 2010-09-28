@@ -3,8 +3,7 @@
 
 cleanbra >[2=1] >/dev/null
 slay brasil|rc
-#coords=`{mktopo  -d 9 1 2 4 >[2=1]}
-coords=`{mktopo 1 2 4 >[2=1]}
+coords=`{mktopo  -d 9 1 2 4 >[2=1]}
 echo coords $coords 
 mount -nc /srv/ionode0 /n/csrv
 

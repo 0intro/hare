@@ -3,7 +3,6 @@
 
 #include <u.h>
 #include <libc.h>
-#include <thread.h>
 
 char *MPOINT = "/n/anl/";
 char *CMD = "rc";
@@ -49,6 +48,7 @@ execute_cmd (char *cmd)
 	int n;
 	int session_id;
 	int iofd;
+	int i;
 	
 	snprint (path, sizeof(path), "%s/cmd/clone", MPOINT );
 	clonefd = open(path, ORDWR);

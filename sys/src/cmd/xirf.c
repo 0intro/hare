@@ -83,6 +83,7 @@ threadmain(int argc, char **argv)
 	int i;
 	int *fd, nfd;
 	char fdfile[512];
+	char *mnt;
 	Alt a[3];
 	Str *s;
 
