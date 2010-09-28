@@ -44,6 +44,9 @@ typedef struct thread thread;
 typedef struct builtin builtin;
 typedef struct pipes pipes;
 
+#pragma incomplete word
+#pragma incomplete io
+
 struct pipes{
 	int npipe;
 	int fd[1][2][2];
