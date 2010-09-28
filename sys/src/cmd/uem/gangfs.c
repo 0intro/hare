@@ -30,11 +30,13 @@
 #include <stdio.h>
 #include "debug.h"
 
-char 	defaultpath[] =	"/proc";
-char *procpath;
-char *srvctl;
-Channel *iochan;
-Channel *clunkchan;
+static char defaultpath[] =	"/proc";
+static char *procpath;
+static char *srvctl;
+static Channel *iochan;
+static Channel *clunkchan;
+static int updateinterval; /* in seconds */
+static char *amprefix = "/am"; /* automounter prefix */
 
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
@@ -45,7 +47,6 @@ char Ebadimode[] = "unknown input mode";
 char Estdin[] = "problem binding gang stdin";
 char Estdout[] = "problem binding gang stdout";
 char Estderr[] = "problem binding gang stderr";
-
 
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
@@ -172,7 +173,6 @@ Cmdtab ctlcmdtab[]={
 };
 
 #define	MAXNUM	10	/* maximum number of numbers on data line */
-#define STATQUANTA 5 /* 5 second minimum between status refreshes */
 
 enum
 {
@@ -331,7 +331,7 @@ fillstatbuf(Status *m, char *statbuf)
 
 	bp = statbuf;
 	t = time(0);
-	if(t-m->lastup > STATQUANTA)
+	if(t-m->lastup > updateinterval)
 		refreshstatus(m);
 
 	bp+=snprint(bp, 16, "%15s ", mystats.name);
@@ -393,14 +393,46 @@ statuswrite(char *buf)
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
 }
 
+proccreate(updatestatus, parent, STACK);
 static void
-initstatus(Status *m)
+updatestatus(void *arg)
+{
+	int n;
+	char *parent = (char *) arg;
+	char *statbuf=emalloc9p((NUMSIZE*11+1) + 1);
+	char *parentpath = smprint("%s/%s/status", amprefix, parent);
+	int parentfd = open(parentpath, OWRITE);
+			
+	if(parentfd < 0) {
+		DPRINT(DERR, "*ERROR*: couldn't open parent %s on path %s\n", parent, parentpath);
+		return;
+	}
+	
+	/* TODO: set my priority low */ 
+
+	for(;;) {
+		fillstatbuf(&mystats, statbuf);
+		n = fprint(parentfd, "%s\n", statbuf);
+		if(n < 0)
+			break;
+		sleep(updateinterval*1000);
+	}
+
+	free(parentpath);
+	free(statbuf);
+}
+
+static void
+initstatus(Status *m, char *name)
 {
 	int n;
 	uvlong a[nelem(m->devsysstat)];
 
 	memset(m, 0, sizeof(Status));
-	m->name = estrdup9p(getenv("sysname")); 
+	if(name) 
+		m->name = estrdup9p(name);
+	else
+		m->name = estrdup9p(getenv("sysname")); 
 	m->swapfd = open("/dev/swap", OREAD);
 	assert(m->swapfd > 0);
 	m->statsfd = open("/dev/sysstat", OREAD);
@@ -1380,6 +1412,10 @@ void
 threadmain(int argc, char **argv)
 {
 	char *x;
+	char *name = nil;
+	char *parent = nil;
+
+	updateinterval = 5;	/* 5 second default update interval */
 
 	ARGBEGIN{
 	case 'D':
@@ -1389,6 +1425,17 @@ threadmain(int argc, char **argv)
 		x = ARGF();
 		if(x)
 			vflag = atoi(x);
+		break;
+	case 'p':	/* specify parent */
+		parent = ARGF();
+		break;
+	case 'n':	/* name override */
+		name = ARGF();
+		break;
+	case 'i':	/* update interval */
+		x = ARGF();
+		if(x)
+			updateinterval = atoi(x);
 		break;
 	default:
 		usage();
@@ -1403,8 +1450,11 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	/* initialize status */
-	initstatus(&mystats);
+	initstatus(&mystats, name);
 
+	if(parent)
+		proccreate(updatestatus, (void *)parent, STACK);
+		
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
 	clunkchan = chancreate(sizeof(void *), 0);
