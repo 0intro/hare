@@ -36,7 +36,7 @@ static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
 static int updateinterval; /* in seconds */
-static char *amprefix = "/am"; /* automounter prefix */
+static char *amprefix = "/n"; /* mount prefix */
 
 char Enotdir[] = "Not a directory";
 char Enotfound[] = "File not found";
@@ -423,14 +423,13 @@ statuswrite(char *buf)
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
 }
 
-proccreate(updatestatus, parent, STACK);
 static void
 updatestatus(void *arg)
 {
 	int n;
 	char *parent = (char *) arg;
 	char *statbuf=emalloc9p((NUMSIZE*11+1) + 1);
-	char *parentpath = smprint("%s/%s/status", amprefix, parent);
+	char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
 	int parentfd = open(parentpath, OWRITE);
 			
 	if(parentfd < 0) {
@@ -483,13 +482,60 @@ closestatus(Status *m)
 	close(m->swapfd);
 }
 
+/* remote support */
+static void
+startimport(void *arg)
+{
+	char *addr = (char *) arg;
+
+	threadsetname("gangfs-startimport");
+	
+	procexecl(nil, "/bin/import", "import", arg, "/", smprint("/n/%s", addr), nil);
+
+	DPRINT(DERR, "*ERROR*: startimport: procexecl returned %r\n");
+	threadexits(nil);
+}
+
+/* checkmount: check to see if a remote system is already, if not mount it */
+static int
+checkmount(char *addr)
+{
+	char *dest = estrdup9p(addr);
+	char *mtpt = smprint("/n/%s/proc", addr);
+	Dir *tmp;
+	int retries = 0;
+	int err = 0;
+
+	if((tmp = dirstat(mtpt)) != nil) /* dir exists, sweet */
+		goto out;
+
+	/* no dir, spawn off an import */
+	proccreate(startimport, dest, STACK);
+
+	/* we need to wait for this to be done */
+	while( (tmp = dirstat(mtpt)) == nil) {
+		sleep(100);
+		if(retries++ > 100) {
+			DPRINT(DERR, "*ERROR*: checkmount: import not complete after 10 seconds, giving up\n");
+
+			err = -1;
+			break;
+		}
+	}
+
+out:
+	free(tmp);
+	free(dest);
+	free(mtpt);
+	return err;
+}	
+
 static void
 usage(void)
 {
 	fprint(2, "gangfs [-D] [mtpt]\n");
 	exits("usage");
 }
-
 
 static void
 gangrefinc(Gang *g, char *where)
@@ -1486,8 +1532,14 @@ threadmain(int argc, char **argv)
 	/* initialize status */
 	initstatus(&mystats, name);
 
-	if(parent)
+	if(parent) {
+		if(checkmount(parent) < 0) {
+			DPRINT(DERR, "*ERROR*: Connecting to parent failed\n");
+			threadexits("problem connecting to parent\n");
+		}
 		proccreate(updatestatus, (void *)parent, STACK);
+	}
+
 		
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);

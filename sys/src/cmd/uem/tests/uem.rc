@@ -1,0 +1,108 @@
+#!/bin/rc
+# 
+# (pseudo-)Multi-Node Regression
+#
+
+echo '== UEM Regression =='
+
+#
+# Parameters
+#
+GANGLOG=gangfs.log
+EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
+TESTDIR=.test
+# metadir is the subdir in which instances will store their logs and .tests
+METADIR=.meta
+
+#
+# Cleanup Previous Instances
+#
+fn cleanup {
+	echo Cleaning up previous runs.
+	rm -f /srv/mpipe
+	unmount /n/test > /dev/null >[2] /dev/null
+	unmount /proc > /dev/null >[2] /dev/null
+	bind '#p' /proc
+	kill mpipfs | rc
+	kill execfs | rc
+	kill gangfs | rc
+	rm -f /srv/master
+	rm -f /srv/child
+}
+
+#
+# Startup execfs 
+#
+fn startup {
+	if(~ $#* 0) {
+		exit usage
+	}
+	echo Starting execfs.
+	if(~ $#* 1) {
+		execfs >[2] $EXECLOG 
+	}
+	if not {
+		execfs -D -v $2 >[2] $EXECLOG  	# CHATTY
+	}
+	echo Starting gangfs parent $PARENT
+	if(~ $#* 1) {
+		if (~ $PARENT 0) {
+			gangfs -n $1 >[2] $GANGLOG
+		}
+		if not {
+			echo child mode
+			gangfs -n $1 -p $PARENT >[2] $GANGLOG
+		}
+	}
+	if not {
+		if (~ $PARENT 0) {
+			gangfs -D -v $2 -n $1 >[2] $GANGLOG  	# CHATTY
+		}
+		if not {
+			echo child mode with debug $2
+			gangfs -D -v $2 -n $1 -p $PARENT >[2] $GANGLOG  	# CHATTY
+		}
+	}
+	echo Starting mpipefs....
+	if(~ $#* 1) {
+		mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		mpipefs -D -v $2 >[2] $MPIPELOG 	# CHATTY
+	}
+}
+
+
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	mkdir -p $METADIR
+	mkdir -p $TESTDIR
+}
+
+#
+# Setup metanode in its own namespace
+#
+fn metanode {
+	rfork n
+	startup $1 $2	
+	srvfs $1 /
+}
+
+# Setup
+cleanup
+# startup master node
+PARENT=0
+@{metanode master $1}
+mount /srv/master /n/master
+PARENT=master
+@{ metanode child $1 9}
+mount /srv/child /n/child
+
+# Cleanup
+#rm -rf $METADIR
+#rm -rf $TESTDIR
+#cleanup
