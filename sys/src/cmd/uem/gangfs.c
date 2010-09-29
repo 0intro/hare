@@ -1073,6 +1073,8 @@ cmdres(Req *r, int num, int argc, char **argv)
 	}
 
 	g->size = num;
+	if(mystats.next == nil)
+		mystats.njobs += g->size;
 	g->sess = emalloc9p(sizeof(Session)*g->size);
 
 	/* TODO: consider doing this in sub-procs */
@@ -1342,6 +1344,8 @@ fsclunk(Fid *fid)
 			g->ctlref--;	
 			DPRINT(DREF, "ctlref=%d\n", g->ctlref);
 			if(g->ctlref == 0) {
+				if(mystats.next == nil)
+					mystats.njobs -= g->size;
 				g->status=GANG_CLOSING;
 				wunlock(&glock);
 				proccreate(cleanupgang, (void *)g, STACK); 
