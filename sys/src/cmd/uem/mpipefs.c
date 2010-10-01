@@ -183,6 +183,8 @@ struct Splicearg {
 	Mpipe *mp;		/* the pipe in question */
 	int which;		/* enumeration, 0 for don't care */
 	int fd;			/* file descriptor to read from/write to */
+	char *path;		/* name of target of splice */
+	Channel *chan;	/* error/sync channel */
 };
 
 /*
@@ -733,6 +735,16 @@ spliceto(void *arg) {
 	Fidaux *aux = emalloc9pz(sizeof(Fidaux), 1); /* our accounting */
 	Req *tr;
 
+	sa->fd = open(sa->path, OWRITE);
+	DPRINT(DHDR, "[%s](%p) spliceto open: %s returned %d\n", 
+					mp->name, mp, sa->path, sa->fd);
+	free(sa->path);
+	if(sa->fd < 0) {
+		sendp(sa->chan, smprint("spliceto: open returned %r\n"));
+		threadexits(Esplice);
+	}
+	sendp(sa->chan, nil);
+
 	/* setup a dummy reader */
 	dummy->omode = OREAD;
 	dummy->aux = aux;
@@ -899,6 +911,16 @@ splicefrom(void *arg) {
 	char *err;
 	Channel *reterr;
 
+	sa->fd = open(sa->path, OREAD);
+	DPRINT(DHDR, "[%s](%p) splicefrom open: %s returned %d\n", 
+					mp->name, mp, sa->path, sa->fd);
+	free(sa->path);
+	if(sa->fd < 0) {
+		sendp(sa->chan, smprint("splicefrom: open returned %r\n"));
+		threadexits(Esplice);
+	}
+	sendp(sa->chan, nil);
+
 	/* setup a dummy writer */
 	memset(&tr, 0, sizeof(Req));
 	aux->mp = mp;
@@ -916,7 +938,7 @@ splicefrom(void *arg) {
 	tr.ifcall.data = emalloc9pz(MSIZE, 1);
 	reterr = chancreate(sizeof(char *), 0);
 	tr.aux = reterr;
-	
+
 	while(1) {
 		int n;
 
@@ -992,6 +1014,7 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 	char type;
 	int n;
 	Splicearg *sa;
+	char *err;
 
 	n = tokenize(r->ifcall.data, argv, MAXHDRARGS);
 	if(n==0)
@@ -1014,24 +1037,16 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 		sa = emalloc9p(sizeof(Splicearg));
 		sa->mp = mp;
 		sa->which = atoi(argv[2]) % mp->slots;
-
-		if(type=='>') {
-			sa->fd = open(argv[3], OWRITE);
-			DPRINT(DHDR, "[%s](%p) spliceto open: %s returned %d\n", 
-					mp->name, mp, argv[3], sa->fd);
-		} else {
-			sa->fd = open(argv[3], OREAD);
-			DPRINT(DHDR, "[%s](%p) splicefrom open: %s returned %d\n", 
-					mp->name, mp, argv[3], sa->fd);
-		}
-
-		if(sa->fd < 0)
-			return Esplice;
-
+		sa->path = estrdup9p(argv[3]);
+		sa->chan = chancreate(sizeof(void *), 0);
 		if(type=='>')
 			proccreate(spliceto, sa, STACK);
 		else
 			proccreate(splicefrom, sa, STACK);
+		err = recvp(sa->chan); /* sync */
+		chanclose(sa->chan);
+		chanfree(sa->chan);
+		return err;
 		break;
 	case '.': /* forced close */
 		DPRINT(DHDR, "[%s](%p) FLUSHED\n", mp->name, mp);
