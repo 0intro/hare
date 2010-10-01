@@ -32,6 +32,7 @@
 
 static char defaultpath[] =	"/proc";
 static char *procpath;
+static char *gangpath;
 static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
@@ -228,6 +229,7 @@ struct Status
 
 static Status avgstats;	/* composite statistics */
 static Status mystats;	/* my statistics */
+static char *canonpath; /* canonical path */
 
 static int
 loadbuf(Status *m, int *fd)
@@ -427,6 +429,7 @@ statuswrite(char *buf)
 			m->name, &m->nproc, &m->nchild, &m->njobs, &m->devsysstat[Load], 
 			&m->devsysstat[Idle], &m->devswap[Mem], &m->devswap[Maxmem]);
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
+	gangpath = smprint("/n/%s%s", getenv("sysname"), procpath);
 }
 
 static void
@@ -659,7 +662,7 @@ newgang(void)
 		current->next = mygang;
 		mygang->index = current->index+1;
 	}
-	mygang->path = "/proc";	/* NEXT: hardcoded for now, but need canonical */
+
 	mygang->ctlref = 1;
 	mygang->refcount = 1;
 	mygang->imode = CMbcast;	/* broadcast mode default */
@@ -1075,25 +1078,25 @@ setupstdio(Session *s)
 	int n;
 
 	snprint(buf, 255, "%s/%d", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/%d", g->path, g->index, s->index);
+	snprint(dest, 255, "%s/g%d/%d", gangpath, g->index, s->index);
 	n = bind(buf, dest, MREPL);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
 
 	snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdin", g->path, g->index);
+	snprint(dest, 255, "%s/g%d/stdin", gangpath, g->index);
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
 	if(n < 0)
 		return smprint("splicefrom: %r\n");
 
 	snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdout", g->path, g->index);
+	snprint(dest, 255, "%s/g%d/stdout", gangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
 	if(n < 0)
 		return smprint("splicefrom: %r\n");
 
 	snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stderr", g->path, g->index);
+	snprint(dest, 255, "%s/g%d/stderr", gangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
 	if(n < 0)
 		return smprint("spliceto: %r\n");
@@ -1171,7 +1174,7 @@ cmdres(Req *r, int num)
 	}
 
 	/* setup aggregation I/O */
-	snprint(dest, 255, "/proc/g%d", g->index);
+	snprint(dest, 255, "%s/g%d", gangpath, g->index);
 
 	switch(g->imode) {
 		case CMbcast:
@@ -1404,12 +1407,12 @@ cleanupgang(void *arg)
 	char fname[255];
 
 	DPRINT(DCLN, "cleaning up gang, entering umount\n");
-	snprint(fname, 255, "/proc/g%d/stdin", g->index);
+	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
 	flushmp(fname); /* flush pipe to be sure */
 	unmount(0, fname);
-	snprint(fname, 255, "/proc/g%d/stdout", g->index);
+	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
 	unmount(0, fname);
-	snprint(fname, 255, "/proc/g%d/stderr", g->index);
+	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
 	unmount(0, fname);
 
 	/* TODO: Clean up subsessions? */
@@ -1572,9 +1575,11 @@ threadmain(int argc, char **argv)
 	else
 		procpath = defaultpath;
 
+	gangpath = procpath;
+
 	/* initialize status */
 	initstatus(&mystats, name);
-
+	
 	if(parent) {
 		if(checkmount(parent) < 0) {
 			DPRINT(DERR, "*ERROR*: Connecting to parent failed\n");
@@ -1583,7 +1588,6 @@ threadmain(int argc, char **argv)
 		proccreate(updatestatus, (void *)parent, STACK);
 	}
 
-		
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
 	clunkchan = chancreate(sizeof(void *), 0);
