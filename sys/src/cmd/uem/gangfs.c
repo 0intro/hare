@@ -13,9 +13,9 @@
 	Based in part on Pravin Shinde's devtask.c
 
 	TODO:
-		* node status reporting
-		* supporting enumerated fanout gangs
-		* aggregated status via multipipes
+		* gang->gang job deployment
+		* session level status file
+		* MAYBE: aggregated status via multipipes
 		* nextaggregated wait via multipipe barrier (todo in multipipe)
 */
 
@@ -44,6 +44,8 @@ char Eperm[] = "Permission denied";
 char Enogang[] = "ctl file has no gang";
 char Ebusy[] = "gang already has subsessions reserved";
 char Ebadimode[] = "unknown input mode";
+char Ebadpid[] = "stupid pid problem";
+char Ebadctl[] = "problemn reading session ctl";
 char Estdin[] = "problem binding gang stdin";
 char Estdout[] = "problem binding gang stdout";
 char Estderr[] = "problem binding gang stderr";
@@ -82,9 +84,12 @@ typedef struct Gang Gang;
 struct Session
 {
 	Gang *g;		/* gang? necessary? */
+	char *path;		/* path to exec gang */
 	int fd;			/* fd to ctl file */
 	Req *r;			/* outstanding ctl requests */
 	Channel *chan;	/* status channel */
+	int pid;		/* Session's actual pid */
+	int index;		/* session index in gang */
 };
 
 enum {
@@ -102,6 +107,7 @@ enum {
 */
 struct Gang
 {
+	char *path;		/* gang's path */
 	int refcount;	/* structural reference count */
 	int ctlref;		/* control file reference count */
 	int status;		/* current status of gang */
@@ -370,7 +376,7 @@ fillstatbuf(Status *m, char *statbuf)
 	bp+=NUMSIZE;
 	readnum(0, bp, NUMSIZE, m->nchild, NUMSIZE);
 	bp+=NUMSIZE;
-	readnum(0, bp, NUMSIZE, m->njobs, NUMSIZE); /* TODO: Fix */
+	readnum(0, bp, NUMSIZE, m->njobs, NUMSIZE);
 	bp+=NUMSIZE;	
 	readnum(0, bp, NUMSIZE, m->devsysstat[Load], NUMSIZE);
 	bp+=NUMSIZE;
@@ -653,6 +659,7 @@ newgang(void)
 		current->next = mygang;
 		mygang->index = current->index+1;
 	}
+	mygang->path = "/proc";	/* NEXT: hardcoded for now, but need canonical */
 	mygang->ctlref = 1;
 	mygang->refcount = 1;
 	mygang->imode = CMbcast;	/* broadcast mode default */
@@ -1057,21 +1064,100 @@ findexecfs(void)
 	return "/proc";
 }
 
+/* mypath is the canonical path to my gproc */
+/* path is the path to the target proc */
+static char *
+setupstdio(Session *s)
+{
+	Gang *g = s->g;
+	char buf[255];
+	char dest[255];
+	int n;
+
+	snprint(buf, 255, "%s/%d", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/%d", g->path, g->index, s->index);
+	n = bind(buf, dest, MREPL);
+	if(n < 0)
+		return smprint("couldn't bind %s %s: %r\n", buf, dest);
+
+	snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/stdin", g->path, g->index);
+	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
+	if(n < 0)
+		return smprint("splicefrom: %r\n");
+
+	snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/stdout", g->path, g->index);
+	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
+	if(n < 0)
+		return smprint("splicefrom: %r\n");
+
+	snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/stderr", g->path, g->index);
+	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
+	if(n < 0)
+		return smprint("spliceto: %r\n");
+
+	return nil;
+}		
+
+/* reserve a local session using execfs */
+static void
+reslocalproc(void *arg)
+{
+	Session *sess = (Session *) arg;
+	char buf[255];
+	int retries = 0;
+	int n;
+	char *err;
+
+	snprint(buf, 255, "%s/clone", sess->path);
+	while(1) {
+		sess->fd = open(buf, ORDWR);
+		if(sess->fd > 0)
+			break;
+		DPRINT(DERR, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", 
+				retries, sess->fd);
+		if(retries++ > 10) {
+			DPRINT(DERR, "*ERROR* giving up\n");
+			sendp(sess->chan, smprint("execfs returning %r"));
+			threadexits(Ebadpid);
+		}
+		/* retry on failure */
+	}
+	DPRINT(DEXE, "\t control channel on fd %d\n", sess->fd);
+
+	n = pread(sess->fd, buf, 255, 0);
+	if(n < 0) {
+		sendp(sess->chan,
+			smprint("couldn't read from session ctl %s/clone: %r\n", 
+					sess->path));
+		threadexits(Ebadctl);
+	}
+	sess->pid = atoi(buf); /* convert to local execs session number */
+	
+	/* finish by setting up stdio */
+	if(err = setupstdio(sess)) {
+		DPRINT(DEXE, "reporting failure from session %d\n", sess->index);
+		sendp(sess->chan, err);
+	} else {
+		DPRINT(DEXE, "reporting success from session %d\n", sess->index);
+		sendp(sess->chan, nil);
+	}
+
+	threadexits(nil);
+}
+
 /* TODO: many of the error scenarios here probably need more cleanup */
 static void
-cmdres(Req *r, int num, int argc, char **argv)
+cmdres(Req *r, int num)
 {
 	Fid *f = r->fid;
 	Gang *g = f->aux;
-	int n;
 	int count;
-	char buf[255];
 	char dest[255];
-	char *path;
 	char *mntargs;
-
-	USED(argc);
-	USED(argv);
+	char *err = nil;
 
 	/* okay - by this point we should have gang embedded */
 	if(g == nil) {
@@ -1123,76 +1209,33 @@ cmdres(Req *r, int num, int argc, char **argv)
 		mystats.njobs += g->size;
 	g->sess = emalloc9p(sizeof(Session)*g->size);
 
-	/* TODO: consider doing this in sub-procs */
 	for(count = 0; count < g->size; count++) {
-		int pid;
-		int retries = 0;
-
 		DPRINT(DEXE, "\t reservation: count: %d\n", count); 
-		path = findexecfs();
-		snprint(buf, 255, "%s/clone", path);
-		while(1) {
-			g->sess[count].fd = open(buf, ORDWR);
-			if(g->sess[count].fd > 0)
-				break;
-			DPRINT(DERR, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", 
-					retries, g->sess[count].fd);
-			if(retries++ > 10) {
-				DPRINT(DERR, "*ERROR* giving up\n");
-				respond(r, smprint("execfs returning %r"));
-				return;
-			}
-			/* retry on failure */
-		}
-		DPRINT(DEXE, "\t control channel on fd %d\n", g->sess[count].fd);
+		g->sess[count].path = findexecfs();
 		g->sess[count].r = nil;
 		g->sess[count].chan = chancreate(sizeof(char *), 0);
-
-		n = pread(g->sess[count].fd, buf, 255, 0);
-		if(n < 0) {
-			respond(r,
-				smprint("couldn't read from session ctl %s/clone: %r\n", 
-						path));
-			return;
-		}
-		pid = atoi(buf); /* convert to local execs session number */
-		snprint(buf, 255, "%s/%d", path, pid);
-		/* of course we''l need another buf for our local fs ? */
-		snprint(dest, 255, "/proc/g%d/%d", g->index, count);
-		n = bind(buf, dest, MREPL);
-		if(n < 0) {
-			respond(r, smprint("couldn't bind %s %s: %r\n", buf, dest));
-			return;
-		}
-
-		snprint(buf, 255, "%s/%d/stdin", path, pid);
-		snprint(dest, 255, "/proc/g%d/stdin", g->index);
-		n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
-		if(n < 0) {
-			respond(r, smprint("splicefrom: %r\n"));
-			return;
-		}
-
-		snprint(buf, 255, "%s/%d/stdout", path, pid);
-		snprint(dest, 255, "/proc/g%d/stdout", g->index);
-		n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
-		if(n < 0) {
-			respond(r, smprint("splicefrom: %r\n"));
-			return;
-		}
-
-		snprint(buf, 255, "%s/%d/stderr", path, pid);
-		snprint(dest, 255, "/proc/g%d/stderr", g->index);
-		spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
-		if(n < 0) {
-			respond(r, smprint("splicefrom: %r\n"));
-			return;
-		}		
+		g->sess[count].g = g; /* back pointer */
+		proccreate(reslocalproc, &g->sess[count], STACK);
 	}
 
-	g->status = GANG_RESV;
-	r->ofcall.count = r->ifcall.count;
-	respond(r, nil);
+	for(count = 0; count < g->size; count++) {
+		char *myerr;
+		DPRINT(DEXE, "\t waiting on reservation: count: %d\n", count); 
+		myerr = recvp(g->sess[count].chan);
+		if(myerr != nil) 
+			err = myerr;
+			/* MAYBE: retry here? for reliability ? */
+	}
+	if(err) {
+		DPRINT(DERR, "*ERROR*: problem establishing gang reservation: %s\n", err);
+		respond(r, err);
+		free(err);
+	} else {
+		DPRINT(DEXE, "\t gangs all here: count: %d\n", count); 
+		g->status = GANG_RESV;
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+	}
 }
 
 /* this should probably be a generic function somewhere */
@@ -1314,7 +1357,7 @@ fswrite(void *arg)
 				if(num < 0) {
 					respondcmderror(r, cb, "bad arguments: %d", num);
 				} else {
-					cmdres(r, num, cb->nf-2, &cb->f[2]);
+					cmdres(r, num);
 				}
 				break;	
 			case CMenum: /* enable enumeration mode */
