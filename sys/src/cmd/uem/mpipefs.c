@@ -22,6 +22,18 @@
 		code to handle such situations in a reasonable
 		fashion.
 
+	Todo:
+		* buffered mpipes
+		* internal splice optimization
+		* reads of ~(0) yielding ctl blocks
+		* ability to forward headers
+		* network tight coupling mode (distributed mpipes)
+			* direct connects bypassing 9P
+			* broadcast mpipe tight coupling
+			* collective mpipe tight coupling on BG/P
+			* MAYBE: RDMA support
+		* filter builtins for common scenarios (whitespace, EOL, etc)
+		
 	See Also:
 		9p(2)
 		9pfid(2)
