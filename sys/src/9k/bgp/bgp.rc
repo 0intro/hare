@@ -67,8 +67,9 @@ if not {
 # I/O node has Ethernet on the outside.
 # Everyone has Tree on the inside, loopback.
 #
+# bad assumption on this check, need to check x,y,z
 ip=(`{cat /dev/ioip})
-if(~ $#ip 4 && ! ~ $ip(1) '0.0.0.0'){
+if(~ $cpunode '0'){
 	i=`{cat /net/ipifc/clone}
 	echo bind gbe /net/ether0 > /net/ipifc/$i/ctl
 	echo add $ip(1) $ip(2) $ip(3) > /net/ipifc/$i/ctl
@@ -83,7 +84,7 @@ i=`{cat /net/ipifc/clone}
 echo bind tree /dev/vc1 > /net/ipifc/$i/ctl
 echo add 11.$treeip $xyzip(2) 11.$xyzip(3) > /net/ipifc/$i/ctl
 echo add 12.$treeip $xyzip(2) 12.$xyzip(3) > /net/ipifc/$i/ctl
-#echo Tree: I am '1[12]'.$treeip^, pset I/O node 11.$xyzip(4)
+echo Tree: I am '1[12]'.$treeip^, pset I/O node 11.$xyzip(4)
 
 i=`{cat /net/ipifc/clone}
 echo bind loopback /dev/null > /net/ipifc/$i/ctl
@@ -92,11 +93,11 @@ echo add 127.0.0.1 255.0.0.0 127.0.0.0 > /net/ipifc/$i/ctl
 #
 # Torus
 #
-#if(~ $cpunode '1'){
-#	i=`{cat /net/ipifc/clone}
-#	echo bind torus /dev/torus > /net/ipifc/$i/ctl
-#	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
-#}
+if(~ $cpunode '1'){
+	i=`{cat /net/ipifc/clone}
+	echo bind torus /dev/torus > /net/ipifc/$i/ctl
+	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
+}
 #
 # Set up authentication if necessary.
 # Factotum has to be allowed to mount on /mnt here because
