@@ -14,6 +14,9 @@
 
 	TODO:
 		* gang->gang job deployment
+		* per stdio aggregation mode
+		* non-aggregation mode for stdio(s)
+		* push helper: (launch local stage1 and stage3 with fanout stage2)
 		* session level status file
 		* MAYBE: aggregated status via multipipes
 		* nextaggregated wait via multipipe barrier (todo in multipipe)
@@ -50,6 +53,7 @@ char Ebadctl[] = "problemn reading session ctl";
 char Estdin[] = "problem binding gang stdin";
 char Estdout[] = "problem binding gang stdout";
 char Estderr[] = "problem binding gang stderr";
+char Enores[] = "insufficient resources";
 
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
@@ -116,7 +120,7 @@ struct Gang
 	int index;		/* gang id */
 	int size;		/* number of subsessions */
 	Session *sess;	/* array of subsessions */
-	int imode;		/* input mode (enum/bcast) */
+	int imode;		/* input mode (enum/bcast/raw) */
 
 	Channel *chan;	/* channel for sync/error reporting */
 
@@ -403,6 +407,23 @@ findchild(Status *m, char *name)
 	}
 
 	return current;
+}
+
+/* find lowest loaded child for next workload */
+/* NOTE: right now we just base this on number of jobs */
+static Status *
+idlechild(Status *m)
+{
+	Status *current = m->next;
+	Status *lowest = current;
+
+	while(current != nil) {
+		if(current->njobs < lowest->njobs)
+			lowest = current;
+		current = current->next;
+	}
+
+	return lowest;
 }
 
 static void
@@ -1102,17 +1123,19 @@ setupstdio(Session *s)
 		return smprint("spliceto: %r\n");
 
 	return nil;
-}		
+}
 
-/* reserve a local session using execfs */
+/* reserve a session using clone semantics */
+/* NOTE: Should work with execfs or gangfs */
 static void
-reslocalproc(void *arg)
+cloneproc(void *arg)
 {
 	Session *sess = (Session *) arg;
 	char buf[255];
 	int retries = 0;
 	int n;
 	char *err;
+	char *work;
 
 	snprint(buf, 255, "%s/clone", sess->path);
 	while(1) {
@@ -1148,7 +1171,129 @@ reslocalproc(void *arg)
 		sendp(sess->chan, nil);
 	}
 
+	/* see if there is more to do */
+	while(work = recvp(sess->chan)) {
+		n = pwrite(sess->fd, work, strlen(work), 0);
+		if(n < 0) {
+			sendp(sess->chan, smprint("%r"));
+			break; /* always break on error for now */
+		} else {
+			sendp(sess->chan, nil);
+		}
+	}
+
 	threadexits(nil);
+}
+
+static void
+setupsess(Gang *g, Session *s, char *path)
+{
+	s->path = path;
+	s->r = nil;
+	s->chan = chancreate(sizeof(char *), 0);
+	s->g = g; /* back pointer */
+}
+
+/* local reservation */
+static char *
+reslocal(Gang *g)
+{
+	int count;
+	char *err = nil;
+
+	if(mystats.next == nil)
+		mystats.njobs += g->size;
+
+	g->sess = emalloc9p(sizeof(Session)*g->size);
+	
+	for(count = 0; count < g->size; count++) {
+		DPRINT(DEXE, "\t reservation: count: %d\n", count);
+		setupsess(g, &g->sess[count], findexecfs());
+		proccreate(cloneproc, &g->sess[count], STACK);
+	}
+
+	for(count = 0; count < g->size; count++) {
+		char *myerr;
+		DPRINT(DEXE, "\t waiting on reservation: count: %d\n", count); 
+		myerr = recvp(g->sess[count].chan);
+		if(myerr != nil) 
+			err = myerr;
+			/* MAYBE: retry here? for reliability ? */
+		sendp(g->sess[count].chan, nil); /* no more work for that sess */
+	}
+	
+	return err;
+}
+
+/* simple RPC wrapper */
+/* TODO: add more robust error checking */
+static char *
+sendsess(Session *s, char *msg)
+{	
+	sendp(s->chan, msg);
+	return recvp(s->chan);
+}
+
+/* multinode reservation */
+static char *
+resgang(Gang *g)
+{
+	int *njobs; /* array of children with jobs per child */
+	int remaining;
+	Status *current;
+	int scount = 0;
+	int count;
+	char *err;
+
+	/* MAYBE: Lock? */
+	/* TODO: implement other modes (block, time-share) */
+	if(g->size > (mystats.nproc-mystats.njobs))
+		return Enores;
+	
+	/* TODO: CRUX: determine how many subsessions we'll need */
+	/* Lock down gang */
+	njobs = emalloc9p(sizeof(int)*mystats.nchild);
+	remaining = g->size;
+	/* walk children tree, allocating cores and incrementing stats.njobs
+		counting sessions and keeping children per subsession in an array? */
+	for(current=mystats.next; current !=nil; current = current->next) {
+		int avail = current->nproc - current->njobs;
+		if(avail < remaining) {
+			njobs[scount] = remaining;
+			current->njobs += njobs[scount];
+			break;
+		} else {
+			njobs[scount] = current->nproc - current->njobs;
+			remaining -= njobs[scount];
+		}
+		current->njobs += njobs[scount];
+		scount++;
+	}
+	
+	/* allocate subsessions */
+	g->sess = emalloc9p(sizeof(Session)*scount);
+	
+	/* while more to schedule */
+	current = mystats.next;
+	for(count = 0; count < scount; count++) {
+		char *rescmd;
+		
+		setupsess(g, &g->sess[count], current->name);
+		checkmount(current->name);
+		proccreate(cloneproc, &g->sess[count], STACK);
+		err = sendsess(&g->sess[count], "enum"); /* TODO: always? */
+		if(err)
+			return err;
+		rescmd = smprint("res %d", njobs[count]);
+		err = sendsess(&g->sess[count], rescmd);
+		free(rescmd);
+		if(err) {
+			return err;
+		} else {
+			sendp(g->sess[count].chan, nil);
+		}
+	}
+	return nil;
 }
 
 /* TODO: many of the error scenarios here probably need more cleanup */
@@ -1157,10 +1302,10 @@ cmdres(Req *r, int num)
 {
 	Fid *f = r->fid;
 	Gang *g = f->aux;
-	int count;
+
 	char dest[255];
 	char *mntargs;
-	char *err = nil;
+	char *err;
 
 	/* okay - by this point we should have gang embedded */
 	if(g == nil) {
@@ -1208,33 +1353,19 @@ cmdres(Req *r, int num)
 	}
 
 	g->size = num;
-	if(mystats.next == nil)
-		mystats.njobs += g->size;
-	g->sess = emalloc9p(sizeof(Session)*g->size);
 
-	for(count = 0; count < g->size; count++) {
-		DPRINT(DEXE, "\t reservation: count: %d\n", count); 
-		g->sess[count].path = findexecfs();
-		g->sess[count].r = nil;
-		g->sess[count].chan = chancreate(sizeof(char *), 0);
-		g->sess[count].g = g; /* back pointer */
-		proccreate(reslocalproc, &g->sess[count], STACK);
-	}
+	/* this assumes top down reservation model */
+	if(mystats.nchild)
+		err = resgang(g);
+	else
+		err = reslocal(g);
 
-	for(count = 0; count < g->size; count++) {
-		char *myerr;
-		DPRINT(DEXE, "\t waiting on reservation: count: %d\n", count); 
-		myerr = recvp(g->sess[count].chan);
-		if(myerr != nil) 
-			err = myerr;
-			/* MAYBE: retry here? for reliability ? */
-	}
 	if(err) {
 		DPRINT(DERR, "*ERROR*: problem establishing gang reservation: %s\n", err);
 		respond(r, err);
 		free(err);
 	} else {
-		DPRINT(DEXE, "\t gangs all here: count: %d\n", count); 
+		DPRINT(DEXE, "\t gangs all here\n"); 
 		g->status = GANG_RESV;
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
