@@ -35,7 +35,9 @@
 
 static char defaultpath[] =	"/proc";
 static char *procpath;
-static char *gangpath;
+static char *gangpath;	/* our view of the gang path */
+static char *xgangpath; /* external view of the gang path */
+static char *mysysname;
 static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
@@ -54,6 +56,7 @@ char Estdin[] = "problem binding gang stdin";
 char Estdout[] = "problem binding gang stdout";
 char Estderr[] = "problem binding gang stderr";
 char Enores[] = "insufficient resources";
+char Echeckmount[] = "could not check mount";
 
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
@@ -95,6 +98,7 @@ struct Session
 	Channel *chan;	/* status channel */
 	int pid;		/* Session's actual pid */
 	int index;		/* session index in gang */
+	int remote;		/* flag marking whether session is local or remote */
 };
 
 enum {
@@ -175,12 +179,14 @@ enum
 	CMenum,			/* set input to enum (must be before res) */
 	CMbcast,		/* set input to broadcast mode (must be before res) */
 	CMres,			/* reserve a set of nodes */
+	CMmount,		/* backmount peer */
 };
 
 Cmdtab ctlcmdtab[]={
 	CMenum, "enum", 1,
 	CMbcast, "bcast", 1,
 	CMres, "res", 0,
+	CMmount, "checkmount", 2,
 };
 
 #define	MAXNUM	10	/* maximum number of numbers on data line */
@@ -450,7 +456,7 @@ statuswrite(char *buf)
 			m->name, &m->nproc, &m->nchild, &m->njobs, &m->devsysstat[Load], 
 			&m->devsysstat[Idle], &m->devswap[Mem], &m->devswap[Maxmem]);
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
-	gangpath = smprint("/n/%s%s", getenv("sysname"), procpath);
+	
 }
 
 static void
@@ -482,16 +488,13 @@ updatestatus(void *arg)
 }
 
 static void
-initstatus(Status *m, char *name)
+initstatus(Status *m)
 {
 	int n;
 	uvlong a[nelem(m->devsysstat)];
 
 	memset(m, 0, sizeof(Status));
-	if(name) 
-		m->name = estrdup9p(name);
-	else
-		m->name = estrdup9p(getenv("sysname")); 
+	m->name = mysysname;
 	m->swapfd = open("/dev/swap", OREAD);
 	assert(m->swapfd > 0);
 	m->statsfd = open("/dev/sysstat", OREAD);
@@ -538,6 +541,25 @@ checkmount(char *addr)
 
 	if((tmp = dirstat(mtpt)) != nil) /* dir exists, sweet */
 		goto out;
+	else {
+		char *srvpt = smprint("/srv/%s", addr);
+		char *srvtg = smprint("/n/%s", addr);
+		int fd;
+		DPRINT(DCUR, "attempting to mount %s on %s\n", srvpt, srvtg);
+		if(fd = open(srvpt, ORDWR)) { /* srv exists, sweet */
+			free(srvpt);
+			if(mount(fd, -1, srvtg, MREPL, "") < 0) {
+				free(srvtg);
+				close(fd);
+				DPRINT(DERR, "srv mount failed: %r\n");
+			} else {
+				free(srvtg);
+				close(fd);
+				DPRINT(DERR, "srv mount succeeded\n");
+				goto out;
+			}
+		}
+	}
 
 	/* no dir, spawn off an import */
 	proccreate(startimport, dest, STACK);
@@ -587,11 +609,14 @@ mpipe(char *path, char *name)
 	int fd, ret;
 	fd = open("/srv/mpipe", ORDWR);
 	if(fd<0) {
-		fprint(2, "couldn't open /srv/mpipe: %r\n");
+		DPRINT(DERR, "couldn't open /srv/mpipe: %r\n");
 		return -1;
 	}
 	
 	ret = mount(fd, -1, path, MBEFORE, name);
+	if(ret < 0) {
+		DPRINT(DERR, "mount of multipipe failed: %r\n");
+	}
 	close(fd);
 	return ret;
 }
@@ -1080,14 +1105,6 @@ fsread(Req *r)
 	}
 }
 
-/* find the execfs to allocate next session from */
-/* right now we just return local execfs */
-static char *
-findexecfs(void)
-{
-	return "/proc";
-}
-
 /* mypath is the canonical path to my gproc */
 /* path is the path to the target proc */
 static char *
@@ -1098,26 +1115,39 @@ setupstdio(Session *s)
 	char dest[255];
 	int n;
 
-	snprint(buf, 255, "%s/%d", s->path, s->pid);
+	/* BUG: won't work for gang because gang pid is not an int */
+	if(s->remote)
+		snprint(buf, 255, "%s/g%d", s->path, s->pid);
+	else
+		snprint(buf, 255, "%s/%d", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/%d", gangpath, g->index, s->index);
 	n = bind(buf, dest, MREPL);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
 
-	snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdin", gangpath, g->index);
+	if(s->remote)
+		snprint(buf, 255, "%s/g%d/stdin", s->path, s->pid);
+	else
+		snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/stdin", xgangpath, g->index);
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
 	if(n < 0)
 		return smprint("splicefrom: %r\n");
 
-	snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdout", gangpath, g->index);
+	if(s->remote)
+		snprint(buf, 255, "%s/g%d/stdout", s->path, s->pid);
+	else
+		snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
 	if(n < 0)
 		return smprint("splicefrom: %r\n");
 
-	snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stderr", gangpath, g->index);
+	if(s->remote)
+		snprint(buf, 255, "%s/g%d/stderr", s->path, s->pid);
+	else
+		snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
+	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
 	if(n < 0)
 		return smprint("spliceto: %r\n");
@@ -1137,8 +1167,14 @@ cloneproc(void *arg)
 	char *err;
 	char *work;
 
-	snprint(buf, 255, "%s/clone", sess->path);
+	DPRINT(DEXE, "clone proc\n");
+	
+	if(sess->remote)
+		snprint(buf, 255, "%s/gclone", sess->path);
+	else
+		snprint(buf, 255, "%s/clone", sess->path);
 	while(1) {
+		DPRINT(DEXE, "Attempting to open child exec: %s\n", buf);
 		sess->fd = open(buf, ORDWR);
 		if(sess->fd > 0)
 			break;
@@ -1160,11 +1196,22 @@ cloneproc(void *arg)
 					sess->path));
 		threadexits(Ebadctl);
 	}
-	sess->pid = atoi(buf); /* convert to local execs session number */
+	if(sess->remote)
+		sess->pid = atoi(buf+1); /* skip the g */
+	else 
+		sess->pid = atoi(buf); /* convert to local execs session number */
 	
+	/* if we are a remote session, setup backmount */
+	if(sess->remote) {
+		DPRINT(DEXE, "Attempting to remote checkmount %s\n", xgangpath);
+		n = fprint(sess->fd, "checkmount %s", mysysname);
+		if(n < 0)
+			DPRINT(DEXE, "setting up backmount failed: %r\n");
+	}
+
 	/* finish by setting up stdio */
 	if(err = setupstdio(sess)) {
-		DPRINT(DEXE, "reporting failure from session %d\n", sess->index);
+		DPRINT(DEXE, "reporting failure from stdio setup session %d: %s\n", sess->index, err);
 		sendp(sess->chan, err);
 	} else {
 		DPRINT(DEXE, "reporting success from session %d\n", sess->index);
@@ -1173,11 +1220,14 @@ cloneproc(void *arg)
 
 	/* see if there is more to do */
 	while(work = recvp(sess->chan)) {
+		DPRINT(DEXE, "clone proc: got work: %s\n", work);
 		n = pwrite(sess->fd, work, strlen(work), 0);
 		if(n < 0) {
+			DPRINT(DEXE, "clone proc: work returned error: %r\n");
 			sendp(sess->chan, smprint("%r"));
 			break; /* always break on error for now */
 		} else {
+			DPRINT(DEXE, "clone proc: work returned success\n");
 			sendp(sess->chan, nil);
 		}
 	}
@@ -1186,12 +1236,16 @@ cloneproc(void *arg)
 }
 
 static void
-setupsess(Gang *g, Session *s, char *path)
+setupsess(Gang *g, Session *s, char *path, int r)
 {
-	s->path = path;
+	if(path)
+		s->path = smprint("/n/%s/proc", path);
+	else
+		s->path = smprint("/proc");
 	s->r = nil;
 	s->chan = chancreate(sizeof(char *), 0);
 	s->g = g; /* back pointer */
+	s->remote = r;
 }
 
 /* local reservation */
@@ -1201,6 +1255,8 @@ reslocal(Gang *g)
 	int count;
 	char *err = nil;
 
+	DPRINT(DEXE, "reslocal %d\n", g->size);
+
 	if(mystats.next == nil)
 		mystats.njobs += g->size;
 
@@ -1208,7 +1264,7 @@ reslocal(Gang *g)
 	
 	for(count = 0; count < g->size; count++) {
 		DPRINT(DEXE, "\t reservation: count: %d\n", count);
-		setupsess(g, &g->sess[count], findexecfs());
+		setupsess(g, &g->sess[count], nil, 0);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	}
 
@@ -1245,6 +1301,8 @@ resgang(Gang *g)
 	int count;
 	char *err;
 
+	DPRINT(DEXE, "resgang %d\n", g->size);
+
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
 	if(g->size > (mystats.nproc-mystats.njobs))
@@ -1277,13 +1335,14 @@ resgang(Gang *g)
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
 		char *rescmd;
-		
-		setupsess(g, &g->sess[count], current->name);
 		checkmount(current->name);
+		setupsess(g, &g->sess[count], current->name, 1);
 		proccreate(cloneproc, &g->sess[count], STACK);
-		err = sendsess(&g->sess[count], "enum"); /* TODO: always? */
-		if(err)
-			return err;
+		if(g->imode == CMenum) {
+			err = sendsess(&g->sess[count], "enum");
+			if(err)
+				return err;
+		}
 		rescmd = smprint("res %d", njobs[count]);
 		err = sendsess(&g->sess[count], rescmd);
 		free(rescmd);
@@ -1325,6 +1384,7 @@ cmdres(Req *r, int num)
 		case CMbcast:
 			DPRINT(DGAN, "broadcast mode\n");
 			if (mpipe(dest, "-b stdin") < 0) {
+				DPRINT(DGAN, "setting up stdin pipe failed\n");
 				respond(r, Estdin);
 				return;
 			}
@@ -1493,7 +1553,16 @@ fswrite(void *arg)
 				} else {
 					cmdres(r, num);
 				}
-				break;	
+				break;
+			case CMmount: /* check mount */
+				DPRINT(DGAN, "check mount %s (%d)\n", cb->f[1], cb->nf);
+				if(checkmount(cb->f[1]) < 0) {
+					respond(r, Echeckmount);
+				} else {
+					r->ofcall.count = r->ifcall.count;
+					respond(r, nil);
+				}
+				break;				
 			case CMenum: /* enable enumeration mode */
 				DPRINT(DGAN, "Setting enumerated mode\n");
 				g->imode = CMenum;
@@ -1669,10 +1738,10 @@ void
 threadmain(int argc, char **argv)
 {
 	char *x;
-	char *name = nil;
 	char *parent = nil;
 
 	updateinterval = 5;	/* 5 second default update interval */
+	mysysname = getenv("sysname");
 
 	ARGBEGIN{
 	case 'D':
@@ -1687,7 +1756,7 @@ threadmain(int argc, char **argv)
 		parent = ARGF();
 		break;
 	case 'n':	/* name override */
-		name = ARGF();
+		mysysname = estrdup9p(ARGF());
 		break;
 	case 'i':	/* update interval */
 		x = ARGF();
@@ -1708,8 +1777,12 @@ threadmain(int argc, char **argv)
 
 	gangpath = procpath;
 
+	xgangpath = smprint("/n/%s%s", mysysname, procpath);
+	
+	DPRINT(DGAN, "Ganpath=%s procpath=%s\n", gangpath, procpath);
+
 	/* initialize status */
-	initstatus(&mystats, name);
+	initstatus(&mystats);
 	
 	if(parent) {
 		if(checkmount(parent) < 0) {
