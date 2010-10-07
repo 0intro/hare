@@ -57,6 +57,7 @@ char Estdout[] = "problem binding gang stdout";
 char Estderr[] = "problem binding gang stderr";
 char Enores[] = "insufficient resources";
 char Echeckmount[] = "could not check mount";
+char Eclosing[] = "gang is closing or broken";
 
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
@@ -64,6 +65,7 @@ enum {	/* DEBUG LEVELS */
 	DFID = 2,	/* fid tracking */
 	DGAN = 3,	/* gang tracking */
 	DEXE = 4,	/* execfs interactions */
+	DBCA = 5,	/* broadcast operations */
 	DCLN = 7,	/* cleanup tracking */
 	DPIP = 8,	/* interactions with multipipes */
 	DREF = 9,	/* ref count tracking */
@@ -107,6 +109,7 @@ enum {
 	GANG_EXEC,		/* executing */
 	GANG_CLOSING,	/* closing */
 	GANG_CLOSED,	/* closed */
+	GANG_BROKE,		/* broken */
 };
 
 /* NOTE:
@@ -456,7 +459,7 @@ statuswrite(char *buf)
 			m->name, &m->nproc, &m->nchild, &m->njobs, &m->devsysstat[Load], 
 			&m->devsysstat[Idle], &m->devswap[Mem], &m->devswap[Maxmem]);
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
-	
+	xgangpath = smprint("/n/%s%s", mysysname, procpath);	
 }
 
 static void
@@ -671,7 +674,7 @@ splicefrom(char *dest, char *src)
 	char pkttype='<';
 
 	if(fd < 0) {
-		DPRINT(DPIP, "splicefrom: open %s failed: %r\n", dest);
+		DPRINT(DERR, "*ERROR*: splicefrom: open %s failed: %r\n", dest);
 		return fd;
 	}
 
@@ -769,6 +772,8 @@ releasesessions(Gang *g)
 	int count;
 	
 	for(count = 0; count < g->size; count++) {
+		free(g->sess[count].path);
+		chanclose(g->sess[count].chan);
 		chanfree(g->sess[count].chan);
 		close(g->sess[count].fd);
 	}
@@ -1141,7 +1146,7 @@ setupstdio(Session *s)
 	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
 	if(n < 0)
-		return smprint("splicefrom: %r\n");
+		return smprint("spliceto: %r\n");
 
 	if(s->remote)
 		snprint(buf, 255, "%s/g%d/stderr", s->path, s->pid);
@@ -1165,7 +1170,6 @@ cloneproc(void *arg)
 	int retries = 0;
 	int n;
 	char *err;
-	char *work;
 
 	DPRINT(DEXE, "clone proc\n");
 	
@@ -1205,33 +1209,40 @@ cloneproc(void *arg)
 	if(sess->remote) {
 		DPRINT(DEXE, "Attempting to remote checkmount %s\n", xgangpath);
 		n = fprint(sess->fd, "checkmount %s", mysysname);
-		if(n < 0)
+		if(n < 0) {
 			DPRINT(DEXE, "setting up backmount failed: %r\n");
+			chanprint(sess->chan, "setting up backmount failed: %r\n");
+			goto error;
+		}
+
+		if(sess->g->imode == CMenum) {
+			n = fprint(sess->fd, "enum");
+			if(n < 0) {
+				DPRINT(DEXE, "setting up enum failed: %r\n");
+				chanprint(sess->chan, "setting up enum failed: %r\n");
+				goto error;
+			}
+		}
+
+		n = fprint(sess->fd, "res %d", sess->remote);
+		if(n < 0) {
+			DPRINT(DEXE, "remote reservation failed: %r\n");
+			chanprint(sess->chan, "remote reservation failed: %r\n");
+			goto error;
+		}
 	}
 
 	/* finish by setting up stdio */
 	if(err = setupstdio(sess)) {
-		DPRINT(DEXE, "reporting failure from stdio setup session %d: %s\n", sess->index, err);
+		DPRINT(DEXE, "reporting failure from stdio setup session %d: %s\n", 
+				sess->index, err);
 		sendp(sess->chan, err);
 	} else {
 		DPRINT(DEXE, "reporting success from session %d\n", sess->index);
 		sendp(sess->chan, nil);
 	}
 
-	/* see if there is more to do */
-	while(work = recvp(sess->chan)) {
-		DPRINT(DEXE, "clone proc: got work: %s\n", work);
-		n = pwrite(sess->fd, work, strlen(work), 0);
-		if(n < 0) {
-			DPRINT(DEXE, "clone proc: work returned error: %r\n");
-			sendp(sess->chan, smprint("%r"));
-			break; /* always break on error for now */
-		} else {
-			DPRINT(DEXE, "clone proc: work returned success\n");
-			sendp(sess->chan, nil);
-		}
-	}
-
+error:
 	threadexits(nil);
 }
 
@@ -1275,19 +1286,9 @@ reslocal(Gang *g)
 		if(myerr != nil) 
 			err = myerr;
 			/* MAYBE: retry here? for reliability ? */
-		sendp(g->sess[count].chan, nil); /* no more work for that sess */
 	}
 	
 	return err;
-}
-
-/* simple RPC wrapper */
-/* TODO: add more robust error checking */
-static char *
-sendsess(Session *s, char *msg)
-{	
-	sendp(s->chan, msg);
-	return recvp(s->chan);
 }
 
 /* multinode reservation */
@@ -1299,24 +1300,27 @@ resgang(Gang *g)
 	Status *current;
 	int scount = 0;
 	int count;
-	char *err;
+	char *err = nil;
+	int size = g->size;
 
-	DPRINT(DEXE, "resgang %d\n", g->size);
+	g->size=0;
+
+	DPRINT(DEXE, "resgang %d\n", size);
 
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
-	if(g->size > (mystats.nproc-mystats.njobs))
+	if(size > (mystats.nproc-mystats.njobs))
 		return Enores;
 	
 	/* TODO: CRUX: determine how many subsessions we'll need */
 	/* Lock down gang */
 	njobs = emalloc9p(sizeof(int)*mystats.nchild);
-	remaining = g->size;
+	remaining = size;
 	/* walk children tree, allocating cores and incrementing stats.njobs
 		counting sessions and keeping children per subsession in an array? */
 	for(current=mystats.next; current !=nil; current = current->next) {
 		int avail = current->nproc - current->njobs;
-		if(avail < remaining) {
+		if(avail > remaining) {
 			njobs[scount] = remaining;
 			current->njobs += njobs[scount];
 			break;
@@ -1330,29 +1334,30 @@ resgang(Gang *g)
 	
 	/* allocate subsessions */
 	g->sess = emalloc9p(sizeof(Session)*scount);
-	
+	g->size = scount;
+
 	/* while more to schedule */
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
-		char *rescmd;
 		checkmount(current->name);
-		setupsess(g, &g->sess[count], current->name, 1);
+		setupsess(g, &g->sess[count], current->name, njobs[count]);
 		proccreate(cloneproc, &g->sess[count], STACK);
-		if(g->imode == CMenum) {
-			err = sendsess(&g->sess[count], "enum");
-			if(err)
-				return err;
-		}
-		rescmd = smprint("res %d", njobs[count]);
-		err = sendsess(&g->sess[count], rescmd);
-		free(rescmd);
-		if(err) {
-			return err;
-		} else {
-			sendp(g->sess[count].chan, nil);
-		}
 	}
-	return nil;
+
+	for(count = 0; count < scount; count++) {
+		char *myerr;
+		DPRINT(DEXE, "\t waiting on reservation: count: %d\n", count); 
+		myerr = recvp(g->sess[count].chan);
+		if(myerr != nil) {
+			DPRINT(DERR, "*ERROR*: session %d broke\n", count);
+			err = myerr;
+			g->status = GANG_BROKE;
+		}
+			/* MAYBE: retry here? for reliability ? */
+	}
+
+
+	return err;
 }
 
 /* TODO: many of the error scenarios here probably need more cleanup */
@@ -1423,6 +1428,8 @@ cmdres(Req *r, int num)
 	if(err) {
 		DPRINT(DERR, "*ERROR*: problem establishing gang reservation: %s\n", err);
 		respond(r, err);
+		/* TODO: we have to cleanup gang and sessions here */
+		
 		free(err);
 	} else {
 		DPRINT(DEXE, "\t gangs all here\n"); 
@@ -1471,6 +1478,8 @@ cmdbcast(Req *r, Gang *g)
 	int count;
 	char *resp;
 	char *err = nil;
+
+	DPRINT(DBCA, "broadcasting %s to gang %d (size: %d)\n", r->ifcall.data, g->index, g->size);
 
 	/* broadcast to all subsessions */
 	for(count = 0; count < g->size; count++) {
@@ -1526,6 +1535,10 @@ fswrite(void *arg)
 			respond(r, "ctl message too long");
 			return;
 		}
+		if(g->status > GANG_EXEC) {
+			respond(r, Eclosing);
+			return;
+		}	
 		
 		buf = cleanupcb(r->ifcall.data, r->ifcall.count);
 		cb = parsecmd(buf, strlen(buf));
@@ -1776,8 +1789,7 @@ threadmain(int argc, char **argv)
 		procpath = defaultpath;
 
 	gangpath = procpath;
-
-	xgangpath = smprint("/n/%s%s", mysysname, procpath);
+	xgangpath = procpath; /* until we get a statuswrite */
 	
 	DPRINT(DGAN, "Ganpath=%s procpath=%s\n", gangpath, procpath);
 
