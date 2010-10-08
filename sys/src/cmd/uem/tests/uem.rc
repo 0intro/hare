@@ -11,7 +11,7 @@ echo '== UEM Regression =='
 GANGLOG=gangfs.log
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
-TESTDIR=.test
+TESTDIR=/usr/ericvh/src/hare/sys/src/cmd/uem/.test
 # metadir is the subdir in which instances will store their logs and .tests
 METADIR=.meta
 

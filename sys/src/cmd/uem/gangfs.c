@@ -1096,7 +1096,7 @@ fsread(Req *r)
 
 	switch(TYPE(fid->qid)) {
 		case Qctl:
-			sprint(buf, "%lud\n", CONVP(fid->qid));
+			sprint(buf, "%lud", CONVP(fid->qid));
 			readstr(r, buf);
 			respond(r, nil);
 			return;
@@ -1173,12 +1173,13 @@ cloneproc(void *arg)
 	int n;
 	char *err;
 
-	DPRINT(DEXE, "clone proc\n");
-	
 	if(sess->remote)
 		snprint(buf, 255, "%s/gclone", sess->path);
 	else
 		snprint(buf, 255, "%s/clone", sess->path);
+
+	DPRINT(DEXE, "**** clone proc %s\n", buf);
+
 	while(1) {
 		DPRINT(DEXE, "Attempting to open child exec: %s\n", buf);
 		sess->fd = open(buf, ORDWR);
@@ -1324,7 +1325,6 @@ resgang(Gang *g)
 		counting sessions and keeping children per subsession in an array? */
 	for(current=mystats.next; current !=nil; current = current->next) {
 		int avail = current->nproc - current->njobs;
-		scount++;
 		if(avail > remaining) {
 			njobs[scount] = remaining;
 			current->njobs += njobs[scount];
@@ -1334,7 +1334,10 @@ resgang(Gang *g)
 			remaining -= njobs[scount];
 		}
 		current->njobs += njobs[scount];
+		scount++;
 	}
+
+	scount++; /* count instead of index now */
 	
 	/* allocate subsessions */
 	g->sess = emalloc9p(sizeof(Session)*scount);
@@ -1346,6 +1349,8 @@ resgang(Gang *g)
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
 		checkmount(current->name);
+		assert(njobs[count] != 0);
+		DPRINT(DEXE, "Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
 		setupsess(g, &g->sess[count], current->name, njobs[count]);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	}
