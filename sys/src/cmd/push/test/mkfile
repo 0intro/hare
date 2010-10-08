@@ -1,0 +1,10 @@
+</$objtype/mkfile
+
+ALL=`{ls *.test}
+
+all:V: $ALL
+	for(i in $ALL){
+		rc ./$i 
+		if(! ~ $status '')
+			echo >[1=2] test ./$i failed
+	}
