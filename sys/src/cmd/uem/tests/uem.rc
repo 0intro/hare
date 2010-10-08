@@ -116,9 +116,6 @@ fn basic {
 	# verify results (yes, I'm lazy)
 	cat $TESTDIR/test > $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
-	cat $TESTDIR/test >> $TESTDIR/test2
-	cat $TESTDIR/test >> $TESTDIR/test2
-	cat $TESTDIR/test >> $TESTDIR/test2
 	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
 		echo FAILED!
 		exit 'stdout: test failed'
@@ -140,7 +137,7 @@ mount /srv/master /n/master
 PARENT=master
 @{metanode child $1 9}
 mount /srv/child /n/child
-startmp
+startmp 9 9
 bind /n/master/proc /proc
 basic
 
