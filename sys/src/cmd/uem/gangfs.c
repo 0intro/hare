@@ -678,6 +678,8 @@ splicefrom(char *dest, char *src)
 		return fd;
 	}
 
+	DPRINT(DEXE, "just so we know where we are splicing: [%s]\n", src);
+
 	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, src);
 	n = pwrite(fd, hdr, n, tag);
 	close(fd);
@@ -1309,8 +1311,10 @@ resgang(Gang *g)
 
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
-	if(size > (mystats.nproc-mystats.njobs))
+	if(size > (mystats.nproc-mystats.njobs)) {
+		DPRINT(DEXE, "insufficient resources for %d\n", size);
 		return Enores;
+	}
 	
 	/* TODO: CRUX: determine how many subsessions we'll need */
 	/* Lock down gang */
@@ -1320,6 +1324,7 @@ resgang(Gang *g)
 		counting sessions and keeping children per subsession in an array? */
 	for(current=mystats.next; current !=nil; current = current->next) {
 		int avail = current->nproc - current->njobs;
+		scount++;
 		if(avail > remaining) {
 			njobs[scount] = remaining;
 			current->njobs += njobs[scount];
@@ -1329,12 +1334,13 @@ resgang(Gang *g)
 			remaining -= njobs[scount];
 		}
 		current->njobs += njobs[scount];
-		scount++;
 	}
 	
 	/* allocate subsessions */
 	g->sess = emalloc9p(sizeof(Session)*scount);
 	g->size = scount;
+
+	DPRINT(DEXE, "Gang opening up %d sessions\n", scount);
 
 	/* while more to schedule */
 	current = mystats.next;
@@ -1343,6 +1349,8 @@ resgang(Gang *g)
 		setupsess(g, &g->sess[count], current->name, njobs[count]);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	}
+
+	DPRINT(DEXE, "waiting on %d sessions\n", scount);
 
 	for(count = 0; count < scount; count++) {
 		char *myerr;

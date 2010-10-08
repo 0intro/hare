@@ -43,7 +43,7 @@ fn startup {
 		execfs >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $2 >[2] $EXECLOG  	# CHATTY
+		execfs -v $2 >[2] $EXECLOG  	# CHATTY
 	}
 	echo Starting gangfs parent $PARENT
 	if(~ $#* 1) {
@@ -57,23 +57,25 @@ fn startup {
 	}
 	if not {
 		if (~ $PARENT 0) {
-			gangfs -D -v $2 -n $1 >[2] $GANGLOG  	# CHATTY
+			gangfs -v $2 -n $1 >[2] $GANGLOG  	# CHATTY
 		}
 		if not {
 			echo child mode with debug $2
-			gangfs -D -v $2 -n $1 -p $PARENT >[2] $GANGLOG  	# CHATTY
+			gangfs -v $2 -n $1 -p $PARENT >[2] $GANGLOG  	# CHATTY
 		}
 	}
+
+}
+
+fn startmp {
 	echo Starting mpipefs....
 	if(~ $#* 1) {
 		mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $2 >[2] $MPIPELOG 	# CHATTY
+		mpipefs -v $2 >[2] $MPIPELOG 	# CHATTY
 	}
 }
-
-
 
 #
 # Setup a testdirp
@@ -88,21 +90,61 @@ fn testdir {
 #
 fn metanode {
 	rfork n
+	mkdir -p $METADIR/$1
+	cd $METADIR/$1
 	startup $1 $2	
 	srvfs $1 /
 }
 
+fn myexec {
+	mypid=`{cat}
+	echo res 2 >>[2] error.log
+	echo exec /bin/cat $TESTDIR/test >>[2] error.log
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+}
+
+fn basic {
+	echo -n Basic Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <> /proc/gclone >[1=0]
+
+	# verify results (yes, I'm lazy)
+	cat $TESTDIR/test > $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	cat $TESTDIR/test >> $TESTDIR/test2
+	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
 # Setup
 cleanup
+testdir
+
 # startup master node
 PARENT=0
 @{metanode master $1}
 mount /srv/master /n/master
 PARENT=master
-@{ metanode child $1 9}
+@{metanode child $1 9}
 mount /srv/child /n/child
+startmp
+bind /n/master/proc /proc
+basic
 
 # Cleanup
-#rm -rf $METADIR
-#rm -rf $TESTDIR
-#cleanup
+rm -rf $METADIR
+rm -rf $TESTDIR
+cleanup
