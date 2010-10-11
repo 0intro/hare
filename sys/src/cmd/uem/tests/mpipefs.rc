@@ -312,8 +312,10 @@ fn splicetochain {
 	mp-writer -o /n/stage2/s2 /n/stage1/s1
 	mp-writer -o /n/stage3/s3 /n/stage2/s2
 	mp-writer -o $TESTDIR/test1 /n/stage3/s3
-	echo one > /n/stage0/s0
-	echo two > /n/stage1/s1
+	echo one > /n/stage0/s0 &
+	echo two > /n/stage1/s1 &
+	
+	sleep 1
 	
 	unmount /n/stage0
 	unmount /n/stage1
