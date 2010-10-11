@@ -221,7 +221,6 @@ usage(void)
 static void
 killall(Srv*)
 {
-	chanclose(iochan);
 	chanfree(iochan);
 	threadexitsall("killall");
 }
@@ -902,7 +901,6 @@ fsbcast(Req *r, Mpipe *mp)
 	if(!err)
 		r->ofcall.count = r->ifcall.count;
 
-	chanclose(reterr);
 	chanfree(reterr);
 
 	return err;
@@ -1056,7 +1054,6 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 		else
 			proccreate(splicefrom, sa, STACK);
 		err = recvp(sa->chan); /* sync */
-		chanclose(sa->chan);
 		chanfree(sa->chan);
 		return err;
 		break;
