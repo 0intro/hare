@@ -127,7 +127,6 @@ kickit(void)
 		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
 	}
 
-	chanclose(pidc);
 	chanfree(pidc);
 
 	return pid;
@@ -328,9 +327,7 @@ fsclunk(Fid *f)
 static void
 cleanup(Srv *)
 {
-	chanclose(iochan);
 	chanfree(iochan);
-	chanclose(clunkchan);
 	chanfree(clunkchan);
 	free(srvctl);
 	threadexitsall("done");
