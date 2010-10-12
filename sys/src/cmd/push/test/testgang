@@ -1,0 +1,55 @@
+#!/bin/rc 
+GANGLOG=gangfs.log
+EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
+TESTDIR=.test
+fn cleanup {
+	echo Cleaning up previous runs.
+	rm -f /srv/mpipe
+	unmount /n/test > /dev/null >[2] /dev/null
+	unmount /proc > /dev/null >[2] /dev/null
+	bind '#p' /proc
+	kill mpipfs | rc
+	kill execfs | rc
+	kill gangfs | rc
+}
+
+#
+# Startup execfs 
+#
+fn startup {
+	echo Starting execfs.
+	if(~ $#* 0) {
+		execfs >[2] $EXECLOG 
+	}
+	if not {
+		execfs -D -v $1 >[2] $EXECLOG  	# CHATTY
+	}
+	echo Starting gangfs.
+	if(~ $#* 0) {
+		gangfs >[2] $GANGLOG 
+	}
+	if not {
+		gangfs -D -v $1 >[2] $GANGLOG  	# CHATTY
+	}
+	echo Starting mpipefs....
+	if(~ $#* 0) {
+		mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	mkdir -p $TESTDIR
+}
+
+cleanup
+startup
+
+
+push -rg -c 'orf=(cat) irf=(cat) echo test |<[3] cat >| cat' >[2]/tmp/tree.dot
