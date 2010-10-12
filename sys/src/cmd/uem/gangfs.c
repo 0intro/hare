@@ -775,7 +775,6 @@ releasesessions(Gang *g)
 	
 	for(count = 0; count < g->size; count++) {
 		free(g->sess[count].path);
-		chanclose(g->sess[count].chan);
 		chanfree(g->sess[count].chan);
 		close(g->sess[count].fd);
 	}

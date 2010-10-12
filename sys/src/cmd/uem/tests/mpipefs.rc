@@ -291,6 +291,52 @@ fn spliceto {
 }
 
 #
+# splice to chain to tests problem
+# experienced using multinode gangfs
+#
+
+fn splicetochain {
+	echo -n Testing spliceto chains...
+
+	# initialize test files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# accomplish the test
+	# stage0 and stage1 feeds stage2 which feeds stage3
+	mount /srv/mpipe /n/stage0 s0
+	mount /srv/mpipe /n/stage1 s1
+	mount /srv/mpipe /n/stage2 s2
+	mount /srv/mpipe /n/stage3 s3
+	mp-writer -o /n/stage2/s2 /n/stage0/s0
+	mp-writer -o /n/stage2/s2 /n/stage1/s1
+	mp-writer -o /n/stage3/s3 /n/stage2/s2
+	mp-writer -o $TESTDIR/test1 /n/stage3/s3
+	echo one > /n/stage0/s0 &
+	echo two > /n/stage1/s1 &
+	
+	sleep 1
+	
+	unmount /n/stage0
+	unmount /n/stage1
+	unmount /n/stage2
+	unmount /n/stage3
+	
+	# verify results
+	echo one > $TESTDIR/test2
+	echo two >> $TESTDIR/test2
+	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+		echo FAILED: test1 not equal to test2
+		exit 'splicetochain: failed'
+	}
+	
+	echo Success!
+
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
+#
 # Broadcast spliceto test
 #
 fn splicetobcast {
@@ -342,6 +388,7 @@ splicefrom
 spliceto
 splicetobcast
 splicefrombcast
+splicetochain
 
 # Cleanup
 rm -f $TESTDIR

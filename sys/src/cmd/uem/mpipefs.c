@@ -221,7 +221,6 @@ usage(void)
 static void
 killall(Srv*)
 {
-	chanclose(iochan);
 	chanfree(iochan);
 	threadexitsall("killall");
 }
@@ -356,11 +355,9 @@ closebcasts(Mpipe *mp)
 {
 	Fidaux *c;
 	
-	qlock(&mp->l);
 	for(c=mp->bcastr; c != nil; c=c->next) {
 		chanclose(c->chan);
 	}
-	qunlock(&mp->l);
 }
 
 /* process mount options */
@@ -503,8 +500,10 @@ fsclunk(Fid *fid)
 		/* writer accounting and cleanup */ 
 		if((fid->omode&OMASK) == OWRITE) {
 			/* TODO: what do we do with outstanding requests? */
+			DPRINT(DWRT, "---- fid %d writers now %d\n", fid->fid, mp->writers-1);
+			qlock(&mp->l);
 			mp->writers--;
-			DPRINT(DWRT, "---- fid %d writers now %d\n", fid->fid, mp->writers);
+
 			if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
 				for(count=0;count <  mp->slots; count++)
 					if(mp->rrchan[count]) {
@@ -514,6 +513,7 @@ fsclunk(Fid *fid)
 				if(mp->mode == MPTbcast)
 					closebcasts(mp);
 			}
+			qunlock(&mp->l);
 
 			free(aux);
 			fid->aux = nil;
@@ -902,7 +902,6 @@ fsbcast(Req *r, Mpipe *mp)
 	if(!err)
 		r->ofcall.count = r->ifcall.count;
 
-	chanclose(reterr);
 	chanfree(reterr);
 
 	return err;
@@ -1056,7 +1055,6 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 		else
 			proccreate(splicefrom, sa, STACK);
 		err = recvp(sa->chan); /* sync */
-		chanclose(sa->chan);
 		chanfree(sa->chan);
 		return err;
 		break;
