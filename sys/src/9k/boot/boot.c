@@ -67,31 +67,26 @@ boot(int argc, char *argv[])
 
 	readfile("#e/cputype", cputype, sizeof(cputype));
 
-print("usbinit...");
 	/*
 	 *  set up usb keyboard, mouse and disk, if any.
 	 */
 	usbinit();
 
-print("method...");
 	/*
 	 *  pick a method and initialize it
 	 */
 	if(method[0].name == nil)
 		fatal("no boot methods");
 	mp = rootserver(argc ? *argv : 0);
-print("config...");
 	(*mp->config)(mp);
 	islocal = strcmp(mp->name, "local") == 0;
 	ishybrid = strcmp(mp->name, "hybrid") == 0;
 
-print("kbmap...");
 	/*
 	 *  load keymap if it is there.
 	 */
 	kbmap();
 
-print("auth...");
 	/*
  	 *  authentication agent
 	 */
