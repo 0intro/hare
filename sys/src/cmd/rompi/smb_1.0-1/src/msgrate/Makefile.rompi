@@ -1,0 +1,12 @@
+CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
+CFLAGS=-Dcnk
+all: msgrate
+
+reduce: msgrate.o rompilib.a
+	$(CC)  -o msgrate msgrate.o rompilib.a
+	cp msgrate ~/rompi
+
+msgrate.o: msgrate.c
+	$(CC) -I . -c msgrate.c
+clean: 
+	rm *.a *.o 

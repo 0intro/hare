@@ -1,0 +1,20 @@
+#!/bin/bash
+RUN=mpi_overhead
+#RUN=strid3
+#NODES=64
+#CORES=64
+#CORES=256
+NODES=$1
+CORES=2
+MODE=smp
+#MAPPING=XYZT
+MAPPING=XYZ
+TASK=$RUN-$NODES-$CORES-$MODE
+rm -rf $TASK.error $TASK.output
+echo Processors: nodes $NODES, cores $CORES, mode $MODE
+shift
+qsub -q short -t 0:10:00 -n $NODES --proccount $CORES --mode $MODE -O $TASK \
+   --env BG_MAPPING=$MAPPING $RUN --msgsize $*
+qstat -f
+touch $TASK.error
+

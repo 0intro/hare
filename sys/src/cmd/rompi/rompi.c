@@ -39,6 +39,8 @@ enum {
 struct bufpacket {
 	struct  bufpacket *next, *prev;
 	unsigned long tag[TAG];
+	void *userdata; /* for irecv */
+	int count; /* for irecv */
 	unsigned char data[];
 };
 
@@ -92,6 +94,32 @@ panic(char *s)
 	exits(m);
 }
 
+int MPI_Abort( MPI_Comm comm, int errorcode )
+{
+	panic("MPI_Abort: aborting as abort is not implemented\n");
+	exit(errorcode);
+}
+
+int MPI_Comm_dup ( 
+        MPI_Comm comm, 
+        MPI_Comm *comm_out )
+{
+	/* yes well ... we have no real use for this yet. Maybe never. 
+	 * we can hope so anyway.
+	 */
+	*comm_out = comm;
+	return MPI_SUCCESS;
+}
+int MPI_Comm_split ( MPI_Comm comm, int color, int key, MPI_Comm *comm_out )
+{
+	panic("no split yet. Or ever. \n");
+}
+
+int MPI_Comm_free ( MPI_Comm *commp )
+{
+	/* that was easy */
+	return MPI_SUCCESS;
+}
 /* we require that myproc be the first arg and nproc the second. */
 int
 MPI_Init(int *argc, char ***argv)
@@ -146,20 +174,6 @@ MPI_Comm_rank(MPI_Comm x, int *s)
 		default:
 			panic("comm rank only implements MPI_COMM_WORLD\n");
 	}
-	return MPI_SUCCESS;
-}
-
-int
-MPI_Barrier(MPI_Comm x)
-{
-	switch(x) {
-		case MPI_COMM_WORLD:
-			break;
-		default:
-			panic("MPI_Barrier only implements MPI_COMM_WORLD\n");
-	}
-
-	
 	return MPI_SUCCESS;
 }
 
@@ -232,6 +246,86 @@ MPI_Send( void *buf, int num, MPI_Datatype datatype, int dest,
 	return MPI_SUCCESS;
 }
 
+/* the kernel is catching these things. So just queue them up and WaitAll
+ * will pick them up via MPI_Recv
+ */
+int
+MPI_Irecv( void *buf, int num, MPI_Datatype datatype, int source, 
+              int tag, MPI_Comm comm, MPI_Request *request )
+{
+	unsigned char nbytes = datatype >> 8;
+	int count;
+	int size;
+	count = num * nbytes;
+	struct bufpacket *b;
+	switch(comm) {
+		case MPI_COMM_WORLD:
+			break;
+		default:
+			panic("MPI_Recv only implements MPI_COMM_WORLD\n");
+	}
+
+	b = calloc(sizeof(*b) + 1048576, 1);
+	if (! b) {
+		panic("calloc in recv returned 0");
+	}
+	b->userdata = buf;
+	b->count = count;
+
+	buf_add(b);
+	*request = (MPI_Request )b;	
+	return MPI_SUCCESS;
+}
+
+/* for now, any non-posted receives are discarded. You're not supposed
+ * to do that. 
+ */
+int MPI_Waitall(
+        int count, 
+        MPI_Request array_of_requests[], 
+        MPI_Status array_of_statuses[] )
+{
+	int i, size;
+	/* just allocate a bufpacket with room for headers and data and such  -- make it a nice page-multiple*/
+	struct bufpacket *b, *req;
+	MPI_Request *curreq;
+	b = calloc(1048576 + 4096, 1);
+	if (! b) {
+		panic("calloc in recv returned 0");
+	}
+	for(i = 0; i < count; i++, req++) {
+		/* receive something. */
+		size = torusrecv(b->data, 1048576, b->tag, sizeof(b->tag));
+		if (rompidebug &2){
+			int rx, ry, rz;
+			ranktoxyz(b->tag[TAGsource], &rx, &ry, &rz);
+			print("REcv comm %lx tag %ld source %ld(%d, %d, %d)\n", b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource], rx, ry, rz);
+		}
+		/* OK, we got it. Find the matching request and then remove
+		 * that buf. 
+		 */
+		if (size < 0)
+			panic("torusrecv -1: %r");
+//print("WANT %d, buffer %s\n", source, buf_empty() ? "empty":"");
+		/* Well, first, let's see if it's here somewhere. */
+		for(curreq = array_of_requests; curreq - array_of_requests < count; curreq++) {
+			req = (struct bufpacket *) *curreq;
+			if (rompidebug &2) print("Check %p tag %ld source %ld\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
+			if ((b->tag[TAGcomm] == req->tag[TAGcomm]) && (b->tag[TAGtag] == req->tag[TAGtag]) && (b->tag[TAGsource] == req->tag[TAGsource])){
+				memcpy(req->userdata, b->data, req->count);
+				buf_del(req);
+			}
+		}
+	}
+
+	if (rompidebug &2)print("MPI WaitAll: done\n");
+	free(b);
+	return MPI_SUCCESS;
+}
+
+/* todo: Should have implemented recv as a special kind of irecv+waitall. 
+ * reason is that irecv is the common case. OH well, live and learn.
+ */
 int
 MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source, 
               int tag, MPI_Comm comm, MPI_Status *status )
@@ -390,7 +484,7 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root,
 
 	if(rompidebug&8) print("%lld reduce_end: %d(%d, %d, %d)\n", tbget(), myproc, x, y, z);
 
-	rompidebug |= 2;
+	//rompidebug |= 2;
 	/* the easy cases: z > 0 and the origin */
 	if (z) {
 		/* get the sum from rank x,y,0 */
@@ -553,4 +647,16 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 	}
 
 	return reduce_end (recvbuf, count, datatype, root, comm, &status);
+}
+
+int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count, 
+                   MPI_Datatype datatype, MPI_Op op, MPI_Comm comm )
+{
+	return MPI_Reduce ( sendbuf, recvbuf, count, datatype, op, 0, comm);
+}
+/* use a reduce, it's pretty good. Our barrier driver is broken at this point */
+int MPI_Barrier (MPI_Comm comm )
+{
+	unsigned long sum[1], nsum[1];
+	MPI_Allreduce (sum, nsum, 1, MPI_INT, MPI_SUM, comm);
 }

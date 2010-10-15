@@ -1,0 +1,620 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta content="text/html; charset=ISO-8859-1"
+ http-equiv="content-type">
+  <title>SMB Host Processor Overhead</title>
+  <meta content="Douglas Doerfler" name="author">
+  <meta content="MPI host overhead micro-benchmark" name="description">
+</head>
+<body>
+<a href="index.html">Back to main page</a><br>
+<br>
+<h2>Host Processor Overhead</h2>
+<ul id="mozToc">
+<!--mozToc h3 1-->
+  <li><a href="#mozTocId365893">Method</a></li>
+  <li><a href="#mozTocId758897">Usage</a></li>
+  <li><a href="#mozTocId275765">Results</a></li>
+  <li><a href="#mozTocId269148">References</a></li>
+  <li><a href="#mozTocId316713">Contact Information</a></li>
+  <li><a href="http://www.cs.sandia.gov/web1400/1400_download.html">Download</a><br>
+  </li>
+</ul>
+<br>
+<hr style="width: 100%; height: 2px;">
+<h3><a class="mozTocH3" name="mozTocId365893"></a><a name="Method_"></a>Method</h3>
+There are multiple methods an application can use to overlap
+computation and communication using MPI. The method used by this
+routine is the post-work-wait loop using the MPI non-blocking send and
+receive calls, MPI_Isend() and MPI_Irecv(), to initiate the respective
+transfer, perform some work, and then wait for the transfer to complete
+using MPI_Wait(). This method is typical of most applications, and
+hence makes for the most realistic measure of a micro-benchmark.
+Periodic polling methods have also been analyzed [1], but that
+particular method only makes sense if the application knows that
+progress will not be made without periodic MPI calls during the
+transfer. Overhead is defined to be [2]:<br>
+<br>
+<div style="margin-left: 40px;">"&#8230; the overhead, defined as the length
+of time that a processor is engaged in the transmission or reception of
+each message; during this time, the processor cannot perform other
+operations. "<br>
+</div>
+<br>
+Application availability is defined to be the fraction of total
+transfer time&nbsp; that the application is free to perform non-MPI
+related work.<br>
+&nbsp;<br>
+<div style="text-align: center;">Application Availability = 1 &#8211;
+(overhead / transfer time)&nbsp;&nbsp;&nbsp; (1)<br>
+</div>
+<br>
+Figure 1 illustrates the method used for determining the overhead time
+and the message transfer time. For each iteration of the post-work-wait
+loop the amount of work performed (work_t), which is overlapped in time
+with the message transfer, increases and the total amount of time for
+the loop to complete (iter_t) is measured. If the work interval is
+small, it completes before the message transfer is complete. At some
+point the work interval is greater than the message transfer time and
+the message transfer completes first. At this point, the loop time
+becomes the amount of time required to perform the work plus the
+overhead time required by the host processor to complete the transfer.
+The overhead can then be calculated by measuring the amount of time
+used to perform the same amount of work without overlapping a message
+transfer and subtracting this value from the loop time.<br>
+<br>
+The message transfer time is equal to the loop time before the work
+interval becomes the dominant factor. In order to get an accurate
+estimate of the transfer time, the loop time values are accumulated and
+averaged, but only those values measured before the work interval
+starts to contribute to the loop time. Those values used in the average
+calculation are determined by comparing the iteration time to a given
+threshold (base_t). This threshold must be set sufficiently high to
+avoid a premature stop in the accumulation of the values used for the
+average calculation, but not so high as to use values measured after
+the work becomes a factor. The method does not automatically determine
+the threshold value. It is best to determine it empirically for a given
+system by trying different values and observing the results in verbose
+mode. A typical value is 1.02 to 1.05 times the message transfer time.<br>
+<br>
+Figure 1 also shows an iteration loop stop threshold (iter_t). This
+threshold is not critical and can be of any value as long as it is
+ensured that the total loop time is significantly larger than the
+transfer time. A typical value is 1.5 to 2 times the transfer time. In
+theory, the method could stop when the base_t threshold is exceeded,
+but in practice it has been found that this point can be too close to
+the knee of the curve to provide a reliable measurement. In addition,
+it is not necessary to calculate the work interval without messaging
+until the final sample has been taken.<br>
+<div style="text-align: center;">&nbsp;<img alt="Figure 1."
+ src="method.png" style="width: 746px; height: 469px;" vspace="12"><br>
+</div>
+<div style="margin-left: 40px;">Figure. 1. A conceptual illustration of
+the message transfer time (iter_t) of a given message size for each
+iteration of the algorithm, with the work performed (work_t) increasing
+for each iteration. The message transfer time calculation threshold
+(base_t) and the iteration stop threshold (iter_t) are also shown along
+with the point at which the overhead calculation is taken.<br>
+<br>
+</div>
+<h3><a class="mozTocH3" name="mozTocId758897"></a><a name="Usage_"></a>Usage</h3>
+The source is distributed as a gzip'd tarball. To install,<br>
+<br>
+<span style="font-family: monospace;">% cd installdir</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">% tar xzf smb.tar.gz</span><br
+ style="font-family: monospace;">
+<br>
+To build,<br>
+<br>
+<span style="font-family: monospace;">% cd smb/src/mpi_overhead</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">% make</span><br>
+<br>
+The makefile assumes that mpicc is the compiler and is in the user's
+PATH. If this is not the case, edit Makefile to define the appropriate
+compiler and switches. The routine nominally is executed on two nodes.
+A single runtime instance will measure overhead and availability for a
+given message size. E.g.<br>
+<br>
+<span style="font-family: monospace;">% mpirun -np 2 ./mpi_overhead -v</span><br>
+<span style="font-family: monospace;">Calculating send overhead</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Iterations are being calculated
+automatically</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">Message size is 8 bytes</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Overhead comparison threshold is
+1.500000 (50.0%)</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">Base time comparison threshold is
+1.020000 (2.0%)</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">Timing resolution is 0.10 uS</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Using 1000 iterations per work
+value</span><br style="font-family: monospace;">
+<span style="font-family: monospace;">work&nbsp;&nbsp;&nbsp;
+iter_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+base_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.992&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.992&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.991&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.991&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.991&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.991&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.993&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.992&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.985&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">32&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.986&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">64&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.002&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.991&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">128&nbsp;&nbsp;&nbsp;&nbsp;
+3.978&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">256&nbsp;&nbsp;&nbsp;&nbsp;
+4.002&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.991&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">512&nbsp;&nbsp;&nbsp;&nbsp;
+3.975&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">1024&nbsp;&nbsp;&nbsp;
+4.172&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">2048&nbsp;&nbsp;&nbsp;
+5.933&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">4096&nbsp;&nbsp;&nbsp;
+9.465&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">msgsize iterations&nbsp;
+iter_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+work_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; overhead&nbsp;&nbsp;&nbsp;
+base_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; avail(%)&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.465&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.608&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.858&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.990&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+78.5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">mpi_overhead: done</span><br>
+<br>
+In this example, the -v switch prints out the intermediate results as
+the work is interval is increased. When the iter_t threshold is
+exceeded, then the iteration loop terminates and the final calculations
+are made and the results are printed to stdout. In this case, the
+overhead = 9.465 - 8.608 = 0.858 uSec, the average loop message
+transfer time is 3.990 uSec, and the availability = 1 - 0.858/3.990 =
+78.5%. It should be pointed out the the base_t value is a running
+average of the iter_t values, until the base_t threshold is exceeded.
+In the above example this occurs when the work interval is 1024.<br>
+<br>
+In general, the usage of the routine is<br>
+<br>
+<span style="font-family: monospace;">% mpirun -np 2 ./mpi_overhead -q</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp; Usage:./mpi_overhead <br>
+&nbsp; [-r | --recv] measure receive overhead, default is send<br>
+&nbsp; [-i | --iterations num_iterations] default = autocalculate<br>
+&nbsp; [-m | --msgsize size] default = 8 bytes<br>
+&nbsp; [-t | --thresh threshold] default = 1.500000 <br>
+&nbsp; [-b | --bthresh base time threshold] default = 1.020000 <br>
+&nbsp; [-n | --nohdr] don't print header information, default == off<br>
+&nbsp; [-v | --verbose] print partial results, default == off<br>
+</span><br>
+The default operation is a send. To measure receive performance,
+specify the --recv switch. The iter_t and base_t thresholds can be
+defined on the command line also. As was discussed in the method, the
+base_t threshold for a given system may need to be determined
+empirically. If the base_t value is set too small, the base_t average
+value calculation will terminate too early. This can occur if there is
+significant noise in the system and the hence a large variation in
+measured iter_t values for each iteration of the work loop.<br>
+<br>
+In order to run the routine for a series of message sizes, an example
+script is provided. The script assumes mpirun is the command to use for
+launching an MPI job. Edit the script for the appropriate command for
+your system. A simple execution of the script results in a series of
+results being printed out. These results can then be imported into your
+favorite spreadsheet or plotting routine for analysis.<br>
+<br>
+<span style="font-family: monospace;">% ./run_script </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">######### START #########</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Running on n107</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Dir is
+/scratch2/dwdoerf/smb/source/mpi_overhead</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">msgsize iterations&nbsp;
+iter_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+work_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; overhead&nbsp;&nbsp;&nbsp;
+base_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; avail(%)&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+5.708&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.932&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.776&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.765&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+79.4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.308&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.444&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.863&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.881&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+77.8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+5.681&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.969&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.712&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.773&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+81.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+5.700&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.974&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.726&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.785&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+80.8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.320&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.485&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.835&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.890&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+78.5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">32&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.324&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.442&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.882&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.944&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+77.6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">64&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.428&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.445&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.983&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.507&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+78.2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">128&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.491&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.484&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.007&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.863&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+79.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">256&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.591&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.482&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.110&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+5.487&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+79.8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">512&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+16.452&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+15.499&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.952&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+6.624&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+85.6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">1024&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+16.495&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+15.529&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.965&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+7.216&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+86.6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">2048&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+16.509&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+15.521&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.988&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.509&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+88.4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">4096&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+16.510&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+15.480&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.030&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+10.674&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+90.4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">8192&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+30.629&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+29.546&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.083&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+15.365&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+93.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">16384&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+58.887&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+57.682&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.205&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+24.688&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+95.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">32768&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+115.392&nbsp;&nbsp;&nbsp;&nbsp; 113.956&nbsp;&nbsp;&nbsp;&nbsp;
+1.436&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+43.360&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+96.7&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">65536&nbsp;&nbsp;
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+228.098&nbsp;&nbsp;&nbsp;&nbsp; 226.690&nbsp;&nbsp;&nbsp;&nbsp;
+1.408&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+82.308&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+98.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">131072&nbsp;
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+453.242&nbsp;&nbsp;&nbsp;&nbsp; 451.644&nbsp;&nbsp;&nbsp;&nbsp;
+1.598&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+156.938&nbsp;&nbsp;&nbsp;&nbsp;
+99.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">262144&nbsp;
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+903.974&nbsp;&nbsp;&nbsp;&nbsp; 901.958&nbsp;&nbsp;&nbsp;&nbsp;
+2.016&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+306.440&nbsp;&nbsp;&nbsp;&nbsp;
+99.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">524288&nbsp;
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1804.092&nbsp;&nbsp;&nbsp; 1802.496&nbsp;&nbsp;&nbsp;
+1.596&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+604.897&nbsp;&nbsp;&nbsp;&nbsp;
+99.7&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">1048576
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1804.090&nbsp;&nbsp;&nbsp; 1802.560&nbsp;&nbsp;&nbsp;
+1.530&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1202.453&nbsp;&nbsp;&nbsp;
+99.9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">2097152
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3605.904&nbsp;&nbsp;&nbsp; 3603.544&nbsp;&nbsp;&nbsp;
+2.360&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2396.718&nbsp;&nbsp;&nbsp;
+99.9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">4194304
+100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+7208.664&nbsp;&nbsp;&nbsp; 7205.820&nbsp;&nbsp;&nbsp;
+2.844&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4786.473&nbsp;&nbsp;&nbsp;
+99.9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">######### DONE! #########</span><br>
+<br>
+By default, the script measures the send operation. To measure receive
+performance, specify --recv.<br>
+<br>
+<span style="font-family: monospace;">% ./run_script --recv</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">######### START #########</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Running on n107</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">Dir is
+/scratch2/dwdoerf/smb/source/mpi_overhead</span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">msgsize iterations&nbsp;
+iter_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+work_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; overhead&nbsp;&nbsp;&nbsp;
+base_t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; avail(%)&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.392&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.490&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0.902&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3.859&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+76.6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.526&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.493&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.033&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.173&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+75.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.501&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.451&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.049&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.044&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+74.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.502&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.453&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.050&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.054&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+74.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+9.518&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+8.499&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1.019&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+4.082&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+75.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span><br
+ style="font-family: monospace;">
+<span style="font-family: monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*<br>
+</span><br>
+<h3><a class="mozTocH3" name="mozTocId275765"></a><a name="Results_"></a>Results</h3>
+Several platforms were used in the development of this method. Table 1
+summarizes the platforms, and Figures 2 through 5 graph results for
+MPI_Isend() and MPI_Irecv() operations.<br>
+<div style="text-align: center;">
+<h4><a class="mozTocH4" name="mozTocId774887"></a>Table 1: Platform
+Summary</h4>
+</div>
+<table
+ style="height: 172px; width: 781px; text-align: left; margin-right: auto; margin-left: 40px;"
+ border="1" cellpadding="2" cellspacing="2">
+  <tbody>
+    <tr>
+      <td><br>
+      </td>
+      <td> Red Storm</td>
+      <td> Thunderbird</td>
+      <td> CBC-B</td>
+      <td> Odin</td>
+      <td> Red Squall</td>
+    </tr>
+    <tr>
+      <td>Interconnect</td>
+      <td> Seastar 1.2</td>
+      <td> InfiniBand</td>
+      <td> InfiniBand</td>
+      <td> Myrinet 10G</td>
+      <td> QsNetII</td>
+    </tr>
+    <tr>
+      <td>Manufacturer</td>
+      <td> Cray</td>
+      <td> Cisco/Topspin</td>
+      <td> PathScale</td>
+      <td> Myricom</td>
+      <td> Quadrics</td>
+    </tr>
+    <tr>
+      <td>Adapter</td>
+      <td> Custom</td>
+      <td> PCI-Express HCA</td>
+      <td> InfiniPath</td>
+      <td> Myri-10G</td>
+      <td> Elan4</td>
+    </tr>
+    <tr>
+      <td>Host Interface</td>
+      <td> HT 1.0</td>
+      <td> PCI-Express</td>
+      <td> HT 1.0</td>
+      <td> PCI-Express</td>
+      <td> PCI-X</td>
+    </tr>
+    <tr>
+      <td>Programmable coprocessor</td>
+      <td> Yes</td>
+      <td> No</td>
+      <td> No</td>
+      <td> Yes</td>
+      <td> Yes</td>
+    </tr>
+    <tr>
+      <td>MPI</td>
+      <td> MPICH-1</td>
+      <td> MVAPICH</td>
+      <td> InfiniPath</td>
+      <td> MPICH-MX</td>
+      <td> MPICH QsNet</td>
+    </tr>
+  </tbody>
+</table>
+<br>
+<div style="text-align: left; margin-left: 40px;">&nbsp;<img
+ alt="Figure 2." src="s-over.png" style="width: 752px; height: 457px;"
+ vspace="12"><br>
+</div>
+<div style="margin-left: 40px;">Fig. 2. Overhead as a function of
+message size for MPI_Isend().<br>
+</div>
+<div style="text-align: left; margin-left: 40px;">&nbsp;<img
+ alt="Figure 3." src="s-avail.png" style="width: 751px; height: 458px;"
+ vspace="12"><br>
+</div>
+<div style="margin-left: 40px;">Fig. 3. Application availability as a
+function of message size for MPI_Isend().<br>
+</div>
+<div style="text-align: left; margin-left: 40px;">&nbsp;<img
+ alt="Figure 4" src="r-over.png" style="width: 749px; height: 454px;"
+ vspace="12"><br>
+</div>
+<div style="margin-left: 40px;">Fig. 4. Overhead as a function of
+message size for MPI_Irecv().<br>
+</div>
+<div style="text-align: left; margin-left: 40px;">&nbsp;<img
+ alt="Figure 5." src="r-avail.png" style="width: 750px; height: 454px;"
+ vspace="12"><br>
+</div>
+<div style="margin-left: 40px;">Fig. 5. Application availability as a
+function of message size for MPI_Irecv().<br>
+</div>
+<br>
+<br>
+<h3><a class="mozTocH3" name="mozTocId269148"></a><a name="References_"></a>References</h3>
+1.&nbsp; W. Lawry, C. Wilson, A. Maccabe, R. Brightwell. COMB: A
+Portable Benchmark Suite for Assessing MPI Overlap. In <span
+ style="font-style: italic;">Proceedings of the IEEE International
+Conference on Cluster Computing (CLUSTER 2002)</span>, p. 472, 2002.<br>
+<br>
+2.&nbsp; D. Culler, R. Karp, D. Patterson, A. Sahay, K. E. Schauser, E.
+Santos, R. Subramonian and T. von Eicken. LogP: Towards a Realistic
+Model of Parallel Computation. In <span style="font-style: italic;">Fourth
+ACM SIGPLAN symposium on Principles and Practice of Parallel Programming</span>,
+pp. 262-273, 1993.<br>
+<h3><a class="mozTocH3" name="mozTocId316713"></a><a
+ name="Contact_Information_"></a>Contact Information</h3>
+Douglas Doerfler<br>
+Sandia National Laboratories<br>
+Albuquerque, NM<br>
+dwdoerf@sandia.gov<br>
+(505)844-9528<br>
+</body>
+</html>
