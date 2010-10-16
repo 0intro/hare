@@ -159,7 +159,8 @@ MPI_Comm_size(MPI_Comm x, int *s)
 			*s = nproc;
 			break;
 		default:
-			panic("comm size only implements MPI_COMM_WORLD\n");
+			*s = nproc;
+//			panic("comm size only implements MPI_COMM_WORLD\n");
 	}
 	return MPI_SUCCESS;
 }
@@ -246,6 +247,23 @@ MPI_Send( void *buf, int num, MPI_Datatype datatype, int dest,
 	return MPI_SUCCESS;
 }
 
+/* we don't do anything with the request yet. Sorry. */
+int MPI_Isend( void *buf, int num, MPI_Datatype datatype, int dest, int tag,
+               MPI_Comm comm, MPI_Request *request )
+{
+	unsigned char nbytes = datatype >> 8;
+	unsigned long torustag[TAG];
+	int count;
+	int x, y, z;
+	count = num * nbytes;
+	torustag[TAGcomm] = comm;
+	torustag[TAGtag] = tag;
+	torustag[TAGsource] = myproc;
+	ranktoxyz(dest, &x, &y, &z);
+	torussend(buf, count, x, y, z, 0, torustag, sizeof(torustag));
+
+	return MPI_SUCCESS;
+}
 /* the kernel is catching these things. So just queue them up and WaitAll
  * will pick them up via MPI_Recv
  */
@@ -660,3 +678,12 @@ int MPI_Barrier (MPI_Comm comm )
 	unsigned long sum[1], nsum[1];
 	MPI_Allreduce (sum, nsum, 1, MPI_INT, MPI_SUM, comm);
 }
+
+int MPI_Bcast ( void *buf, int count, MPI_Datatype datatype, int root, 
+               MPI_Comm comm )
+{
+	int status;
+	reduce_end(buf, count, datatype, root, comm, status);
+	return status;
+}
+
