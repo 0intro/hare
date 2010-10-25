@@ -41,14 +41,21 @@ struct bufpacket {
 	unsigned long tag[TAG];
 	void *userdata; /* for irecv */
 	int count; /* for irecv */
+	MPI_Datatype datatype;
+	int num; /* redundant, but we'll figure it out later. */
+	int source;
+	int itag;
+	MPI_Comm comm;
+	MPI_Status status;
+	int xmit; /* if this was an xmit request. */
 	unsigned char data[];
 };
 
 
 int myproc = -1, nproc = -1, maxrank = -1;
-int rompidebug = 0; /* 2: recv, 1: send */
+int rompidebug = 0; /* 16: print # packets read, 2: recv, 1: send */
 char *myname = nil;
-static int torusfd = -1;
+extern int torusfd;
 struct bufpacket buffered = {&buffered, &buffered};
 
 void torussend(void *buf, int length, int x, int y, int z, int deposit, void *tag, int taglen);
@@ -89,6 +96,7 @@ buf_empty(void)
 void
 panic(char *s)
 {
+    void exits(char *);
 	char *m = smprint("Fatal: %s", s);
 	print("%s\n", m);
 	exits(m);
@@ -113,6 +121,7 @@ int MPI_Comm_dup (
 int MPI_Comm_split ( MPI_Comm comm, int color, int key, MPI_Comm *comm_out )
 {
 	panic("no split yet. Or ever. \n");
+	return -1;
 }
 
 int MPI_Comm_free ( MPI_Comm *commp )
@@ -184,6 +193,7 @@ MPI_Wtime(void)
 	unsigned long long t;
 	double f;
 	static int fd = -1;
+	extern int pread(int, void *, int, unsigned long long);
 
 	if (fd < 0) {
 		fd = open("/dev/bintime", 0);
@@ -191,8 +201,8 @@ MPI_Wtime(void)
 			panic("Can't open /dev/bintime");
 	}
 
-	read(fd, &t, sizeof(t));
-	f = t / 1000;
+	pread(fd, &t, sizeof(t), 0ULL);
+	f = t / 1000000000;
 	return f;
 }
 
@@ -255,6 +265,12 @@ int MPI_Isend( void *buf, int num, MPI_Datatype datatype, int dest, int tag,
 	unsigned long torustag[TAG];
 	int count;
 	int x, y, z;
+	struct bufpacket *b;
+
+	b = calloc(sizeof(*b), 1);
+	if (! b) {
+		panic("calloc in recv returned 0");
+	}
 	count = num * nbytes;
 	torustag[TAGcomm] = comm;
 	torustag[TAGtag] = tag;
@@ -262,10 +278,12 @@ int MPI_Isend( void *buf, int num, MPI_Datatype datatype, int dest, int tag,
 	ranktoxyz(dest, &x, &y, &z);
 	torussend(buf, count, x, y, z, 0, torustag, sizeof(torustag));
 
+	b->xmit = 1;
+	*request = (MPI_Request )b;	
 	return MPI_SUCCESS;
 }
-/* the kernel is catching these things. So just queue them up and WaitAll
- * will pick them up via MPI_Recv
+/* the kernel is catching these things. 
+ * Just create the descriptors and save them in the request array. 
  */
 int
 MPI_Irecv( void *buf, int num, MPI_Datatype datatype, int source, 
@@ -273,71 +291,45 @@ MPI_Irecv( void *buf, int num, MPI_Datatype datatype, int source,
 {
 	unsigned char nbytes = datatype >> 8;
 	int count;
-	int size;
+
 	count = num * nbytes;
 	struct bufpacket *b;
-	switch(comm) {
-		case MPI_COMM_WORLD:
-			break;
-		default:
-			panic("MPI_Recv only implements MPI_COMM_WORLD\n");
-	}
 
-	b = calloc(sizeof(*b) + 1048576, 1);
+	b = calloc(sizeof(*b), 1);
 	if (! b) {
 		panic("calloc in recv returned 0");
 	}
 	b->userdata = buf;
 	b->count = count;
+	b->num = num;
+	b->source = source;
+	b->itag = tag;
+	b->comm = comm;
 
-	buf_add(b);
 	*request = (MPI_Request )b;	
 	return MPI_SUCCESS;
 }
 
-/* for now, any non-posted receives are discarded. You're not supposed
- * to do that. 
- */
 int MPI_Waitall(
         int count, 
         MPI_Request array_of_requests[], 
         MPI_Status array_of_statuses[] )
 {
-	int i, size;
+
 	/* just allocate a bufpacket with room for headers and data and such  -- make it a nice page-multiple*/
-	struct bufpacket *b, *req;
+	struct bufpacket *req;
 	MPI_Request *curreq;
-	b = calloc(1048576 + 4096, 1);
-	if (! b) {
-		panic("calloc in recv returned 0");
-	}
-	for(i = 0; i < count; i++, req++) {
-		/* receive something. */
-		size = torusrecv(b->data, 1048576, b->tag, sizeof(b->tag));
-		if (rompidebug &2){
-			int rx, ry, rz;
-			ranktoxyz(b->tag[TAGsource], &rx, &ry, &rz);
-			print("REcv comm %lx tag %ld source %ld(%d, %d, %d)\n", b->tag[TAGcomm],b->tag[TAGtag], b->tag[TAGsource], rx, ry, rz);
-		}
-		/* OK, we got it. Find the matching request and then remove
-		 * that buf. 
-		 */
-		if (size < 0)
-			panic("torusrecv -1: %r");
-//print("WANT %d, buffer %s\n", source, buf_empty() ? "empty":"");
-		/* Well, first, let's see if it's here somewhere. */
-		for(curreq = array_of_requests; curreq - array_of_requests < count; curreq++) {
-			req = (struct bufpacket *) *curreq;
-			if (rompidebug &2) print("Check %p tag %ld source %ld\n", b, b->tag[TAGtag] , b->tag[TAGsource]);
-			if ((b->tag[TAGcomm] == req->tag[TAGcomm]) && (b->tag[TAGtag] == req->tag[TAGtag]) && (b->tag[TAGsource] == req->tag[TAGsource])){
-				memcpy(req->userdata, b->data, req->count);
-				buf_del(req);
-			}
-		}
+	for(curreq = array_of_requests; curreq - array_of_requests < count; curreq++) {
+		req = (struct bufpacket *) *curreq;
+		/* if it's a send, we're done; no way to check yet */
+		if (req->xmit)
+			continue;
+		MPI_Recv(req->userdata, req->num, req->datatype, 
+				req->source, req->itag, req->comm, &req->status);
+		free(req);
 	}
 
 	if (rompidebug &2)print("MPI WaitAll: done\n");
-	free(b);
 	return MPI_SUCCESS;
 }
 
@@ -348,6 +340,7 @@ int
 MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source, 
               int tag, MPI_Comm comm, MPI_Status *status )
 {
+	static int nthpacket = 0;
 	unsigned char nbytes = datatype >> 8;
 	int count;
 	int size;
@@ -383,6 +376,9 @@ MPI_Recv( void *buf, int num, MPI_Datatype datatype, int source,
 		size = torusrecv(b->data, 1048576, b->tag, sizeof(b->tag));
 		if (size < 0)
 			panic("torusrecv -1: %r");
+		nthpacket++;
+		if (rompidebug & 16)
+			print("%d'th packet\n", nthpacket);
 		/* tag matching. */
 		if (rompidebug &2){
 			int rx, ry, rz;
@@ -417,16 +413,17 @@ datatype	data type of elements of send buffer (handle)
 op	reduce operation (handle) 
 root	rank of root process (integer) 
 comm	communicator (handle)  */
-int reduce_end_slow ( void *buf, int num, MPI_Datatype datatype, int root, 
+
+int
+reduce_end_slow ( void *buf, int num, MPI_Datatype datatype, int root, 
                MPI_Comm comm,  MPI_Status *status)
 {
-	unsigned char typesize = datatype >> 8;
-	int i, tox, toy, toz;
+	int tox, toy, toz;
 	int torank, fromrank;
-	void *tmp;
-	int *sum, *nsum; // hack 
+
+
 	unsigned long torustag[TAG];
-	int reducetag = 1;
+	int reducetag = 0xcafebabe;
 
 	torustag[TAGcomm] = comm;
 	torustag[TAGtag] = reducetag;
@@ -483,16 +480,13 @@ int reduce_end_slow ( void *buf, int num, MPI_Datatype datatype, int root,
 			}
 		}
 	}
+	return MPI_SUCCESS;
 
 }
 int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
                MPI_Comm comm,  MPI_Status *status)
 {
-	unsigned char typesize = datatype >> 8;
-	int i, tox, toy, toz;
-	int torank, fromrank;
-	void *tmp;
-	int *sum, *nsum; // hack 
+	int fromrank;
 	unsigned long torustag[TAG];
 	int reducetag = 1;
 
@@ -540,21 +534,34 @@ int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root,
 			MPI_Sendxyz(buf, num, datatype, x, y, zsize-1, Hzp|Dp, 1, comm);
 		}
 	}
-
+	return MPI_SUCCESS;
 }
 
-typedef int (*mpi_op)(void *, void *, int);
+typedef void (*mpi_op)(void *, void *, int, MPI_Datatype);
 
 /* int sum -- length matters not */
-int
-opsum(void *dst, void *src, int len)
+void
+opsum(void *dst, void *src, int len, MPI_Datatype datatype)
 {
-	int *is = src;
-	int *id = dst;
-	int tmp = *is;
-	if (rompidebug & 4) print("%lld %d(%d,%d,%d): SUM %d+%d=%d\n", tbget(), myproc, x,y,z,*id, *is, *id+tmp);
-	*id += tmp;
-	return *id;
+	switch(datatype) {
+	    case MPI_INT:{
+		int *is = src;
+		int *id = dst;
+		int tmp = *is;
+		if (rompidebug & 4) print("%lld %d(%d,%d,%d): ISUM %d+%d=%d\n", tbget(), myproc, x,y,z,*id, *is, *id+tmp);
+		*id += tmp;
+		    break;
+	    }
+	case MPI_DOUBLE:{
+		double *is = src;
+		double *id = dst;
+		double tmp = *is;
+		if (rompidebug & 4) print("%g %d(%d,%d,%d): DSUM %g+%g=", tbget(), myproc, x,y,z,*id, tmp);
+		*id += tmp;
+		if (rompidebug & 4) print("=%g\n", *id);
+		     break;
+	     }
+	}
 }
 
 mpi_op 
@@ -613,7 +620,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 		for(fromz = 1; fromz < zsize; fromz++){
 			fromrank = xyztorank(x, y, fromz);
 			MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
-			op(tmp, recvbuf, count);
+			op(tmp, recvbuf, count, datatype);
 		}
 		if (rompidebug&4)
 			print("%lld RECV Z==0 : %d(%d, %d, %d): %d\n", tbget(), myproc, x, y, z, sum[0]);
@@ -636,7 +643,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 			for(fromy = 1; fromy < ysize; fromy++){
 				fromrank = xyztorank(x, fromy, 0);
 				MPI_Recv(recvbuf, 1, datatype, fromrank, 1, comm, &status);
-				op(tmp, recvbuf, count);
+				op(tmp, recvbuf, count, datatype);
 			}
 			if (rompidebug&4)
 				print("%lld %d RECV Y==0:(%d,%d,%d) gets %d accum %d\n", tbget(), myproc, x, y, z, nsum[0], sum[0]);
@@ -650,7 +657,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,
 					/* sum contains the sum from our y axis above */
 					for(i = 1; i < xsize; i++) {
 						MPI_Recv(recvbuf, 1, datatype, i, 1, comm, &status);
-						op(tmp, recvbuf, count);
+						op(tmp, recvbuf, count, datatype);
 						if (rompidebug&4)
 							print("%lld %d X == 0 :(%d,%d,%d) recv %d to %d\n", tbget(), myproc, x, y, z, sum[0], i);
 				}
@@ -673,17 +680,19 @@ int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,
 	return MPI_Reduce ( sendbuf, recvbuf, count, datatype, op, 0, comm);
 }
 /* use a reduce, it's pretty good. Our barrier driver is broken at this point */
-int MPI_Barrier (MPI_Comm comm )
+int
+MPI_Barrier (MPI_Comm comm )
 {
 	unsigned long sum[1], nsum[1];
 	MPI_Allreduce (sum, nsum, 1, MPI_INT, MPI_SUM, comm);
+	return MPI_SUCCESS;
 }
 
 int MPI_Bcast ( void *buf, int count, MPI_Datatype datatype, int root, 
                MPI_Comm comm )
 {
-	int status;
-	reduce_end(buf, count, datatype, root, comm, status);
-	return status;
+	MPI_Status status;
+	reduce_end(buf, count, datatype, root, comm, &status);
+	return MPI_SUCCESS;
 }
 

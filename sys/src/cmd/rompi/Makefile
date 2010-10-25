@@ -1,6 +1,6 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
 CLIB=rompi.c torus.c
-CFLAGS=-Dcnk
+CFLAGS=-Dcnk -Wall
 ALL=rompihello stupidreduce testmalloc reduce
 all: $(ALL)
 

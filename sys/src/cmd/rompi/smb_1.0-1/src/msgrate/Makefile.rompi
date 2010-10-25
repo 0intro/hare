@@ -4,7 +4,7 @@ LIBS=../../../rompilib.a
 all: msgrate
 
 msgrate: msgrate.o ../../../rompilib.a
-	$(CC) -o msgrate msgrate.o ../../../rompilib.a
+	$(CC) -Wall -o msgrate msgrate.o ../../../rompilib.a
 	cp msgrate ~/rompi
 
 msgrate.o: msgrate.c

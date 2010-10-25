@@ -14,7 +14,7 @@ rm -rf $TASK.error $TASK.output
 echo Processors: nodes $NODES, cores $CORES, mode $MODE
 shift
 qsub -q short -t 0:10:00 -n $NODES --proccount $CORES --mode $MODE -O $TASK \
-   --env BG_MAPPING=$MAPPING $RUN -n 4
+   --env BG_MAPPING=$MAPPING $RUN -n 4   -m 16  -i 512
 qstat -f
 touch $TASK.error
 

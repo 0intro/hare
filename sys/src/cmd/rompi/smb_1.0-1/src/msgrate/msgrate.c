@@ -26,6 +26,9 @@
 #include <string.h>
 #include <unistd.h>
 
+/* REMOve */
+extern int rompidebug;
+/* END REMOFE*/
 /* constants */
 const int magic_tag = 1;
 
@@ -126,11 +129,12 @@ test_one_way(void)
         } else {
             for (i = 0 ; i < niters ; ++i) {
                 cache_invalidate();
-
                 MPI_Barrier(comm);
 
                 tmp = timer();
                 nreqs = 0;
+//if ( 63 == rank) 
+//rompidebug |= 16;
                 for (k = 0 ; k < nmsgs ; ++k) {
                     MPI_Irecv(recv_buf + (nbytes * k),
                               nbytes, MPI_CHAR, rank - (world_size / 2), magic_tag, 
@@ -140,8 +144,9 @@ test_one_way(void)
                 total += (timer() - tmp);
             }
         }
-
         MPI_Allreduce(&total, &tmp, 1, MPI_DOUBLE, MPI_SUM, comm);
+if (0 == rank) printf("niters %d nmsgs %d tmp %g world_size %d\n", niters, nmsgs, tmp, world_size);
+
         display_result("single direction", (niters * nmsgs) / (tmp / world_size));
 
         MPI_Comm_free(&comm);
@@ -160,6 +165,7 @@ test_same_direction(void)
     MPI_Barrier(MPI_COMM_WORLD);
 
     for (i = 0 ; i < niters ; ++i) {
+
         cache_invalidate();
 
         MPI_Barrier(MPI_COMM_WORLD);
@@ -305,7 +311,6 @@ main(int argc, char *argv[])
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-printf("world_size %d my rank %d\n", world_size, rank);
     /* root handles arguments and bcasts answers */
     if (0 == rank) {
         int ch;
@@ -442,8 +447,8 @@ printf("world_size %d my rank %d\n", world_size, rank);
     test_allstart();
 
     if (rank == 0 && machine_output) printf("\n");
-
     /* done */
     MPI_Finalize();
+    if (0 == rank) printf("RANK 0: all done\n");
     return 0;
 }
