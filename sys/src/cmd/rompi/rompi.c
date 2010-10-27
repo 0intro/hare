@@ -51,6 +51,20 @@ struct bufpacket {
 	unsigned char data[];
 };
 
+/* these are rounded to 64 byte boundaries for now. */
+struct ringbuf {
+	unsigned long tag[TAG];
+	void *userdata; /* for irecv */
+	int count; /* number of units; bytecount is computed using datatype*/
+	MPI_Datatype datatype;
+	int source;
+	int itag;
+	MPI_Comm comm;
+	MPI_Status status;
+	int xmit; /* if this was an xmit request. */
+	int done;
+};
+
 
 int myproc = -1, nproc = -1, maxrank = -1;
 int rompidebug = 0; /* 16: print # packets read, 2: recv, 1: send */
