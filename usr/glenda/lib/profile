@@ -13,3 +13,9 @@ bind -a /n/root /
 bind -b /n/root/power/bin /bin
 bind -b /n/root/rc/bin /bin
 bind -a /n/root/sys /sys
+
+# start up the UEM stuff
+csrv
+mpipefs
+execfs
+gangfs
