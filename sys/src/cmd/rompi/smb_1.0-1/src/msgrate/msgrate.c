@@ -96,7 +96,8 @@ void
 test_one_way(void)
 {
     int i, k, nreqs;
-    double tmp, total = 0;
+    double tmp, irtime = 0, istime = 0, total = 0, istotal = 0, irtotal = 0;
+
     MPI_Comm comm;
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -123,6 +124,7 @@ test_one_way(void)
                               nbytes, MPI_CHAR, rank + (world_size / 2), magic_tag, 
                               comm, &reqs[nreqs++]);
                 }
+		istime += (timer() - tmp);
                 MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
                 total += (timer() - tmp);
             }
@@ -133,21 +135,24 @@ test_one_way(void)
 
                 tmp = timer();
                 nreqs = 0;
-//if ( 63 == rank) 
-//rompidebug |= 16;
                 for (k = 0 ; k < nmsgs ; ++k) {
                     MPI_Irecv(recv_buf + (nbytes * k),
                               nbytes, MPI_CHAR, rank - (world_size / 2), magic_tag, 
                               comm, &reqs[nreqs++]);
                 }
+		irtime += (timer() - tmp);
                 MPI_Waitall(nreqs, reqs, MPI_STATUSES_IGNORE);
                 total += (timer() - tmp);
             }
         }
         MPI_Allreduce(&total, &tmp, 1, MPI_DOUBLE, MPI_SUM, comm);
+        MPI_Allreduce(&istime, &istotal, 1, MPI_DOUBLE, MPI_SUM, comm);
+        MPI_Allreduce(&irtime, &irtotal, 1, MPI_DOUBLE, MPI_SUM, comm);
 if (0 == rank) printf("niters %d nmsgs %d tmp %g world_size %d\n", niters, nmsgs, tmp, world_size);
 
         display_result("single direction", (niters * nmsgs) / (tmp / world_size));
+        display_result("single direction Isend", (niters * nmsgs) / (tmp / (world_size/2)));
+        display_result("single direction Irecv", (niters * nmsgs) / (tmp / (world_size/2)));
 
         MPI_Comm_free(&comm);
     }

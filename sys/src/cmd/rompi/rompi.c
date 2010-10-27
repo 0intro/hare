@@ -202,7 +202,8 @@ MPI_Wtime(void)
 	}
 
 	pread(fd, &t, sizeof(t), 0ULL);
-	f = t / 1000000000;
+	f = t;
+	f = f/1000000000.0;
 	return f;
 }
 
