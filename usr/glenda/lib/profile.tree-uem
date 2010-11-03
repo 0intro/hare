@@ -1,0 +1,35 @@
+#!/bin/rc
+
+# fire up a cache
+if(~ $cpunode '0') {
+	ramcfs -a $fsaddr -n /n/cache
+	bind /n/cache/n/local /n/frontend
+	bind -c /n/frontend^$fshome /n/home
+	bind -c /n/frontend^$plan9root /n/root
+}
+
+# bind our shit for now
+bind -a /n/root /
+bind -b /n/root/power/bin /bin
+bind -b /n/root/rc/bin /bin
+bind -a /n/root/sys /sys
+
+# should already be running!
+if(test -e '/net/cs')
+	echo cs already running
+if not 
+	ndb/cs
+
+# start up the UEM stuff
+csrv
+mpipefs
+execfs
+
+# if we are an ionode
+if (~ $cpunode '0'){
+	gangfs -n 11.^$treeip(1)
+}
+if (~ $cpunode '1'){
+	gangfs -p io -n 11.^$treeip(1)
+}
+

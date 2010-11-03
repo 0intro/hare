@@ -46,7 +46,7 @@ n d775 sys sys /tmp/empty
 rc d775 sys sys /tmp/empty
 	bin d775 sys sys /tmp/empty
 		service d775 sys sys /tmp/empty
-			tcp17007 775 sys sys /bin/service/tcp17007
+			tcp17007 775 sys sys ../root/tcp17007
 			tcp17010 775 sys sys /bin/service/tcp17010
 			tcp564 775 sys sys ../root/tcp564
 			tcp23 775 sys sys ../root/tcp23			

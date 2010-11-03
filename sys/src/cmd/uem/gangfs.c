@@ -526,7 +526,7 @@ startimport(void *arg)
 
 	threadsetname("gangfs-startimport");
 	
-	procexecl(nil, "/bin/import", "import", arg, "/", smprint("/n/%s", addr), nil);
+	procexecl(nil, "/bin/import", "import", "-A", arg, "/", smprint("/n/%s", addr), nil);
 
 	DPRINT(DERR, "*ERROR*: startimport: procexecl returned %r\n");
 	threadexits(nil);
@@ -542,6 +542,7 @@ checkmount(char *addr)
 	int retries = 0;
 	int err = 0;
 
+	DPRINT(DCUR, "checking mount %s\n", mtpt);
 	if((tmp = dirstat(mtpt)) != nil) /* dir exists, sweet */
 		goto out;
 	else {
