@@ -421,6 +421,27 @@ enum {
 	DbgIO=		1<<0,
 };
 
+typedef struct Ring Ring;
+
+struct Ring {
+	u32int tag[3];
+	void *userdata; /* for irecv */
+	u32int count; /* number of units; bytecount is computed using datatype*/
+	u32int datatype;
+	u32int source;
+	u32int itag;
+	u32int comm;
+	u32int status;
+	u32int xmit; /* if this was an xmit request. */
+	u32int done;
+};
+
+struct Ringb {
+	u8int *base;
+	int count;
+};
+
+
 static int debug_torus;
 
 static Torus torus;
@@ -678,6 +699,7 @@ enum{
 	Qdir 		= 0,
 	Qdata,
 	Qctl,
+	Qmpi,
 	Qstatus,
 	Qdebug,
 };
@@ -685,10 +707,11 @@ enum{
 #define	QFILE(p)	((uint)(p) & 0xF)
 
 static Dirtab torusdir[] = {
-	{ ".",		{ Qdir, 0, QTDIR }, 0,	0777 },
-	{ "torus",	{ Qdata, 0, 0},	0,	0666 },
-	{ "torusctl", { Qctl, 0, 0},	0,	0666 },
+	{ ".",			{ Qdir, 0, QTDIR }, 0,	0777 },
+	{ "torus",		{ Qdata, 0, 0},	0,	0666 },
+	{ "torusctl", 	{ Qctl, 0, 0},	0,	0666 },
 	{ "torusstatus",	{ Qstatus, 0, 0},	0,	0444 },
+	{ "mpi",		{ Qmpi, 0, 0},	0,	0666 },
 	{ "torusdebug", { Qdebug, 0, 0}, 0,	0444 },
 };
 
@@ -754,6 +777,13 @@ toruswrite(Chan* c, void*a, long n, vlong)
 	Block *b;
 	Cmdbuf *cb;
 	Torus *t = &torus;
+	u32int *cmd;
+	Ring *base;
+	int count;
+	struct Ringb *rb;
+	u8int *data, *kdata;
+	int i;
+	int nbytes;
 
 	switch(QFILE(c->qid.path)){
 	default:
@@ -798,6 +828,62 @@ toruswrite(Chan* c, void*a, long n, vlong)
 		}
 		poperror();
 		free(cb);
+		break;
+	case Qmpi:
+		cmd = a;
+		//print("Command %c %#x %d\n", cmd[0], cmd[1], cmd[2]);
+		switch(cmd[0]) {
+		/* set up a ring buffer. Attach to aux. if there was one there already, well, too bad! */
+		case 'r':
+			/* trust is a wonderful thing. If they're stupid enough to hand in a bad pointer, well,
+			 * their life will suck. 
+			 */
+			data = (u8int *) cmd[1];
+			count = cmd[2];
+			if(!okaddr(PTR2UINT(data), count*64, 1)){
+				pprint("suicide: bad pointer/len pair %#p/%d\n", data, count);
+				pexit("Suicide", 0);
+			}
+			c->aux = rb = malloc(sizeof(struct Ringb));
+			rb->base = data;
+			rb->count = count;
+			print("Set up MPI; base is %p and size is %d\n", data, count);
+			break;
+		case 'g':
+			/* scan it and pretend to do IO */
+			rb = c->aux;
+			count = rb->count;
+			//print("Run it %d times\n", count);
+			for (i = 0, data = rb->base; i < count; i++, data += 64) {
+				base = (Ring *) data;
+				//print("Ring entry is %p\n", base);
+				if(!okaddr(PTR2UINT(data), 64, 1)){
+					pprint("suicide: bad pointer/len pair %#p/%d\n", data, 64);
+					pexit("Suicide", 0);
+				}
+				//print("ring %p userdata %p count %d\n", base, base->userdata, base->count);
+
+				if (base->done)
+					continue;
+				nbytes = base->count * base->datatype;
+				if(!okaddr(PTR2UINT(base->userdata), nbytes, 1)){
+					pprint("suicide: bad pointer/len pair %#p/%d\n", base->userdata, nbytes);	
+						pexit("Suicide", 0);
+				}
+				//print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, nil);
+
+				kdata = malloc(nbytes);
+				//print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, kdata);
+				if (base->xmit) {
+					memmove(kdata, base->userdata, nbytes);
+				} else {
+					memmove(base->userdata, kdata, nbytes);
+				}
+				base->done = 1;
+				free(kdata);
+			}
+			break;
+		}
 		break;
 	}
 	return n;
