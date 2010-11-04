@@ -355,9 +355,10 @@ sysexecstack(uintptr stack, int argc)
 	 * e.g. 32-bit SPARC, where the stack must be 8-byte
 	 * aligned although pointers and integers are 32-bits.
 	 */
-	USED(argc);
-
-	return STACKALIGN(stack);
+	stack = STACKALIGN(stack);
+	if((stack-(sizeof(char*)*(argc+1)+sizeof(int))) & 7)
+		stack -= 4;
+	return stack;
 }
 
 void*
