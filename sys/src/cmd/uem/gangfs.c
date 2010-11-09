@@ -58,16 +58,20 @@ char Estderr[] = "problem binding gang stderr";
 char Enores[] = "insufficient resources";
 char Echeckmount[] = "could not check mount";
 char Eclosing[] = "gang is closing or broken";
+char Estatfind[] = "could not allocate or find child";
+char Ebadstat[] = "bad status message";
+char Estatparse[] = "problem parsing status write";
+
 
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
 	DCUR = 1,	/* current - temporary trace */
-	DFID = 2,	/* fid tracking */
+	DPIP = 2,	/* interactions with multipipes */
 	DGAN = 3,	/* gang tracking */
 	DEXE = 4,	/* execfs interactions */
 	DBCA = 5,	/* broadcast operations */
 	DCLN = 7,	/* cleanup tracking */
-	DPIP = 8,	/* interactions with multipipes */
+	DFID = 8,	/* fid tracking */
 	DREF = 9,	/* ref count tracking */
 	DARG = 10,	/* arguments */
 };
@@ -215,11 +219,11 @@ enum
 	InIntr,
 };
 
-/* TODO: we'll need a lock to protect the linked list */
+/* BUG: we'll need a lock to protect the linked list */
 typedef struct Status Status;
 struct Status
 {
-	char	*name;
+	char	name[16];
 	long	lastup;	/* last time this was updated */
 
 	int		nproc;
@@ -241,8 +245,9 @@ struct Status
 };
 
 static Status avgstats;	/* composite statistics */
-static Status mystats;	/* my statistics */
 static char *canonpath; /* canonical path */
+static Status mystats;	/* my statistics */
+RWLock statslock; /* protect stat updates and additions */ 
 
 static int
 loadbuf(Status *m, int *fd)
@@ -291,12 +296,36 @@ readnums(Status *m, int n, uvlong *a, int spanlines)
 	return i == n;
 }
 
+/* read one line of text from buffer and process integers */
+static int
+readints(char *buf, int n, int *a)
+{
+	int i;
+	char *p, *ep;
+
+	p = buf;
+	ep = buf+strlen(buf);
+
+	for(i=0; i<n && p<ep; i++){
+		while(p<ep && (!isascii(*p) || !isdigit(*p)) && *p!='-')
+			p++;
+		if(p == ep)
+			break;
+		a[i] = strtol(p, &p, 10);
+	}
+	if(i != n) {
+		DPRINT(DERR, "i=%d, n=%d\n", i, n);
+	}
+	return i == n;
+}
+
+
 int
 readnum(ulong off, char *buf, ulong n, ulong val, int size)
 {
 	char tmp[64];
 
-	snprint(tmp, sizeof(tmp), "%*lud", size-1, val);
+	snprint(tmp, sizeof(tmp), "%*.*lud", size-1, size-1, val);
 	tmp[size-1] = ' ';
 	if(off >= size)
 		return 0;
@@ -328,7 +357,8 @@ refreshstatus(Status *m)
 	int n;
 	int i;
 	uvlong a[nelem(m->devsysstat)];
-
+	
+	rlock(&statslock);
 	if(m->next) { /* aggregation node */
 		Status *c;
 		/* go through all the children and add the important bits up */
@@ -339,7 +369,7 @@ refreshstatus(Status *m)
 		m->devswap[Maxmem] = 0;
 		m->devsysstat[Load] = 0;
 		m->devsysstat[Idle] = 0;
-		c=m->next;
+		c = m->next;
 		while(c != nil) {
 			m->nproc += c->nproc;
 			/* if child is an aggregation node only count its children */
@@ -371,6 +401,8 @@ refreshstatus(Status *m)
 
 		m->lastup = time(0);
 	}
+
+	runlock(&statslock);
 	return 1;
 }
 
@@ -385,8 +417,8 @@ fillstatbuf(Status *m, char *statbuf)
 	if(t-m->lastup > updateinterval)
 		refreshstatus(m);
 
-	bp+=snprint(bp, 16, "%15s ", mystats.name);
-			
+	bp+=snprint(bp, 17, "%-15.15s ", mystats.name);
+
 	readnum(0, bp, NUMSIZE, m->nproc, NUMSIZE);
 	bp+=NUMSIZE;
 	readnum(0, bp, NUMSIZE, m->nchild, NUMSIZE);
@@ -401,6 +433,8 @@ fillstatbuf(Status *m, char *statbuf)
 	bp+=NUMSIZE;
 	readnum(0, bp, NUMSIZE, m->devswap[Maxmem], NUMSIZE);
 	bp+=NUMSIZE;
+	*bp = ' '; /* space at the end to help parse things */
+	bp++;
 	*bp = 0;	
 }
 
@@ -408,13 +442,14 @@ static Status *
 findchild(Status *m, char *name)
 {	
 	Status *current = m;
-
+	
+	rlock(&statslock);
 	while(current != nil) {
 		if(strcmp(name, current->name) == 0) 
 			break;
 		current = current->next;
 	}
-
+	runlock(&statslock);
 	return current;
 }
 
@@ -426,40 +461,67 @@ idlechild(Status *m)
 	Status *current = m->next;
 	Status *lowest = current;
 
+	rlock(&statslock);
 	while(current != nil) {
 		if(current->njobs < lowest->njobs)
 			lowest = current;
 		current = current->next;
 	}
+	runlock(&statslock);
 
 	return lowest;
 }
 
-static void
+static char *
 statuswrite(char *buf)
 {
 	char name[16];
 	Status *m;
-
+	int ret;
+	char *bp;
+	int a[7];
+	
 	/* grab name and match it to our children */
-	sscanf(buf, "%15s", name);
+	strecpy(name, name+sizeof name, buf);
+	/* trunk name to first space */
+	bp = strchr(name, ' ');
+	if(bp != 0)
+		*bp = 0;
+
 	m = findchild(&mystats, name);
 	if(m == nil) {
 		m = emalloc9p(sizeof(Status));
 		memset(m, 0, sizeof(Status));
-		/* TODO: lock */
+		strncpy(m->name, name, 16);
+		wlock(&statslock);
 		m->next = mystats.next;
 		mystats.next = m;
 		mystats.nchild++;
-		m->name = estrdup9p(name);
-		/* TODO: unlock */
+		wunlock(&statslock);
 	}
-	assert(m != nil);
-	sscanf(buf, "%15s %12d %12d %12d %12llud %12llud %12llud %12llud", 
-			m->name, &m->nproc, &m->nchild, &m->njobs, &m->devsysstat[Load], 
-			&m->devsysstat[Idle], &m->devswap[Mem], &m->devswap[Maxmem]);
+
+	if(m == nil)
+		return Estatfind;
+
+	ret = readints(buf+16, 7, a);
+	if(ret == 0) {
+		DPRINT(DERR, "readints returned %d\n", ret);
+		return Estatparse;
+	} else {
+		m->nproc = a[0];
+		m->nchild = a[1];
+		m->njobs = a[2];
+		m->devsysstat[Load] = a[3];
+		m->devsysstat[Idle] = a[4];
+		m->devswap[Mem] = a[5];
+		m->devswap[Maxmem] = a[6];
+	}
+
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
-	xgangpath = smprint("/n/%s%s", mysysname, procpath);	
+	if(xgangpath == procpath)
+		xgangpath = smprint("/n/%s%s", mysysname, procpath);
+
+	return nil;
 }
 
 static void
@@ -467,7 +529,7 @@ updatestatus(void *arg)
 {
 	int n;
 	char *parent = (char *) arg;
-	char *statbuf=emalloc9p((NUMSIZE*11+1) + 1);
+	char *statbuf = emalloc9p((NUMSIZE*11+1) + 1);
 	char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
 	int parentfd = open(parentpath, OWRITE);
 			
@@ -497,7 +559,8 @@ initstatus(Status *m)
 	uvlong a[nelem(m->devsysstat)];
 
 	memset(m, 0, sizeof(Status));
-	m->name = mysysname;
+	strncpy(m->name, mysysname, 15);
+	m->name[15] = 0;
 	m->swapfd = open("/dev/swap", OREAD);
 	assert(m->swapfd > 0);
 	m->statsfd = open("/dev/sysstat", OREAD);
@@ -542,7 +605,6 @@ checkmount(char *addr)
 	int retries = 0;
 	int err = 0;
 
-	DPRINT(DCUR, "checking mount %s\n", mtpt);
 	if((tmp = dirstat(mtpt)) != nil) /* dir exists, sweet */
 		goto out;
 	else {
@@ -1526,6 +1588,7 @@ fswrite(void *arg)
 	Fid *f = r->fid;
 	Qid *q = &f->qid;
 	Gang *g = f->aux;
+	char *err;
 	char e[ERRMAX];
 	char *buf;
 	Cmdbuf *cb;
@@ -1539,9 +1602,25 @@ fswrite(void *arg)
 		break;
 	case Qgstat:
 		buf = estrdup9p(r->ifcall.data);
-		statuswrite(buf);	/* TODO: add error checking & reporting */
-		r->ofcall.count = r->ifcall.count;
-		respond(r, nil);
+		buf[r->ifcall.count] = 0;
+		if(buf == nil) {
+			respond(r, Ebadstat);
+			return;
+		}
+		if(r->ifcall.count < 20) {
+			DPRINT(DCUR, "weird status write: size: %d buf: %p\n", r->ifcall.count, buf);
+			respond(r, Ebadstat);
+			free(buf);
+			return;	
+		}
+		err = statuswrite(buf);	/* TODO: add error checking & reporting */
+		free(buf);
+		if(err) {
+			respond(r, err);
+		} else {	
+				r->ofcall.count = r->ifcall.count;
+				respond(r, nil);
+		}		
 		return;
 	case Qctl:
 		if(r->ifcall.count >= 1024) {
@@ -1804,8 +1883,6 @@ threadmain(int argc, char **argv)
 	gangpath = procpath;
 	xgangpath = procpath; /* until we get a statuswrite */
 	
-	DPRINT(DGAN, "Ganpath=%s procpath=%s\n", gangpath, procpath);
-
 	/* initialize status */
 	initstatus(&mystats);
 	
