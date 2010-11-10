@@ -411,7 +411,8 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 			if(len == 0)
 				error("len is zero");
 			/* if this segment is in the P==V range, make it SG_PHYSICAL, otherwise, not */
-			if (cnkbase && va > cnkbase*MiB){
+			if (cnkbase && va >= cnkbase*MiB){
+iprint("IT's a PHYS SEGMENT. So hand it off\n");
 				g->s = newseg(SG_PHYSICAL, va, len);
 				g->s->pseg = &cnkmbseg;
 			} else
