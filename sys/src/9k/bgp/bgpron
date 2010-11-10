@@ -30,7 +30,7 @@ rootdir
 	bgp.rc boot
 
 conf
-	u32int cnkbase = 0;
+	u32int cnkbase = 512;
 	int cpuserver = 1;
 	#include "version.h"
 	

@@ -267,10 +267,16 @@ sendRAS(int a1, int a2, int a3, int x1, int x2, int x3)
  	splx(s);
 }
 
+/* a slight change here. For all memory above cnkbase, 
+ * reserve it into the cnkmbmap
+ */
 void
 meminit(unsigned cnsbase)
 {
-	unsigned n;
+	extern u32int cnkbase;
+	unsigned n, cnkmem;
+	void cnkmbinit(int, int);
+	void cnkmbfree(unsigned);
 
 #define TMFM	(64)					/* Too Many F'ing MiB */
 	/*
@@ -287,6 +293,14 @@ meminit(unsigned cnsbase)
 	n = sys->mb*MiB;
 	if(n > cnsbase)
 		n = cnsbase;
+
+	if (cnkbase){
+		cnkmbinit(cnkbase, n/MiB-cnkbase);
+		for(cnkmem = cnkbase*MiB; cnkmem < n; cnkmem += MiB){
+			cnkmbfree(cnkmem);
+		}
+		n = cnkbase*MiB;
+	} 
 
 	sys->tom = n/MiB;
 
