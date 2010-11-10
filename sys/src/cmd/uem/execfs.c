@@ -43,7 +43,7 @@ static char Ewtf[] = "I have no idea what could be going wrong here";
 enum {	/* DEBUG LEVELS */
 	DERR = 0,	/* error */
 	DCUR = 1,	/* current - temporary trace */
-	DFID = 2,	/* fid tracking */
+	DFID = 9,	/* fid tracking */
 	DARG = 10,	/* arguments */
 };
 
