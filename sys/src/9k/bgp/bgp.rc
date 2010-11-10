@@ -71,9 +71,9 @@ if not {
 ip=(`{cat /dev/ioip})
 if(~ $cpunode '0'){
 	i=`{cat /net/ipifc/clone}
-	echo bind gbe /net/ether0 > /net/ipifc/$i/ctl
-	echo add $ip(1) $ip(2) $ip(3) > /net/ipifc/$i/ctl
-	echo add 0 0 $ip(4) >>/net/iproute
+	echo bind gbe /net/ether0 > /net/ipifc/$i/ctl &&
+	echo add $ip(1) $ip(2) $ip(3) > /net/ipifc/$i/ctl &&
+	echo add 0 0 $ip(4) >>/net/iproute &&
 	echo Ether: I am $ip(1)^, default route $ip(4)
 }
 

@@ -57,6 +57,39 @@ static	int	cmddone(void*);
 static	void	segmentkproc(void*);
 static	void	docmd(Globalseg *g, int cmd);
 
+/* the megabyte map used for P==V in cnk program heap */
+u32int mbmap[4096];
+struct Physseg cnkmbseg = {
+	.attr = 0, .size = 0, .pa = 0, .name = "P==V segment"
+};
+
+void
+cnkmbinit(int basemb, int sizemb)
+{
+	cnkmbseg.pa = basemb * MiB;
+	cnkmbseg.size = BY2PG*sizemb/MiB;
+	cnkmbseg.attr = SG_PHYSICAL;
+}
+void
+cnkmbfree(u32int addr)
+{
+	mbmap[addr>>20] = 1;
+}
+
+/* find a physically contiguous bunch of mb. For now, just do 1 */
+void *
+cnkmbmalloc(int){
+	extern u32int cnkbase;
+	int i;
+
+	for(i = cnkbase; mbmap[i] && i < sys->tom; i++)
+		;
+	if (i < sys->tom)
+		return (void *) (i <<20);
+
+	return nil;
+}
+
 /*
  *  returns with globalseg incref'd
  */
@@ -356,6 +389,7 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 	Cmdbuf *cb;
 	Globalseg *g;
 	ulong va, len, top;
+	extern u32int cnkbase;
 
 	if(c->qid.type == QTDIR)
 		error(Eperm);
@@ -376,7 +410,12 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 			len = (top - va) / BY2PG;
 			if(len == 0)
 				error("len is zero");
-			g->s = newseg(SG_SHARED, va, len);
+			/* if this segment is in the P==V range, make it SG_PHYSICAL, otherwise, not */
+			if (cnkbase && va > cnkbase*MiB){
+				g->s = newseg(SG_PHYSICAL, va, len);
+				g->s->pseg = &cnkmbseg;
+			} else
+				g->s = newseg(SG_SHARED, va, len);
 		} else if(strcmp(cb->f[0], "heap") == 0){
 			int i;
 			if (!g)
