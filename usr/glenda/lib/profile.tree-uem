@@ -13,23 +13,33 @@ bind -a /n/root /
 bind -b /n/root/power/bin /bin
 bind -b /n/root/rc/bin /bin
 bind -a /n/root/sys /sys
-
 # should already be running!
+
 if(test -e '/net/cs')
 	echo cs already running
 if not 
 	ndb/cs
 
-# start up the UEM stuff
-csrv
-mpipefs
-execfs
+@{
+	rfork n
+	
+	# start up the UEM stuff
+	execfs
 
-# if we are an ionode
-if (~ $cpunode '0'){
-	gangfs -n 11.^$treeip(1)
+	# if we are an ionode
+	if (~ $cpunode '0'){
+		gangfs -v 4 -n 11.^$treeip(1)
+	}
+	if (~ $cpunode '1'){
+		gangfs -v 4 -p io -n 11.^$treeip(1)
+	}
+
+	#csrv
+	mpipefs
+	# adds an extra hop but allows visibility of mpipefs
+	srvfs uem /proc
 }
-if (~ $cpunode '1'){
-	gangfs -p io -n 11.^$treeip(1)
-}
+
+mount -c /srv/uem /proc
+echo okay squidboy?
 
