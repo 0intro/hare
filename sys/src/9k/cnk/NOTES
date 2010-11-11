@@ -1,0 +1,284 @@
+experimenting with shared heap. 
+
+Goal is no modifications via #ifdef and friends. Should be able to set one compile-time variable to
+change behavior. 
+
+Variable is 
+conf
+	u32int cnkbase = 512;
+
+Affects behavior in several places, here is the diff: 
+
+# HG changeset patch -- Bitbucket.org
+# Project hare
+# URL http://bitbucket.org/ericvh/hare/overview
+# User rminnich@gmail.com
+# Date 1289348878 0
+# Node ID 782a1830b90d5718f9dbb1cdd252df9fede93f17
+# Parent  54449f52d195630cc8f6e43f380721010a36053f
+add P==V segment support for cnk.
+
+
+--- a/sys/src/9k/cnk/devsegment.c
++++ b/sys/src/9k/cnk/devsegment.c
+@@ -57,6 +57,39 @@ static	int	cmddone(void*);
+ static	void	segmentkproc(void*);
+ static	void	docmd(Globalseg *g, int cmd);
+ 
++/* the megabyte map used for P==V in cnk program heap */
++u32int mbmap[4096];
++struct Physseg cnkmbseg = {
++	.attr = 0, .size = 0, .pa = 0, .name = "P==V segment"
++};
++
++void
++cnkmbinit(int basemb, int sizemb)
++{
++	cnkmbseg.pa = basemb * MiB;
++	cnkmbseg.size = BY2PG*sizemb/MiB;
++	cnkmbseg.attr = SG_PHYSICAL;
+
+This just sets up an SG_PHYSICAL segment which will be used later for sbrk. 
+
+
++}
++void
++cnkmbfree(u32int addr)
++{
++	mbmap[addr>>20] = 1;
++}
++
++/* find a physically contiguous bunch of mb. For now, just do 1 */
++void *
++cnkmbmalloc(int){
++	extern u32int cnkbase;
++	int i;
++
++	for(i = cnkbase; mbmap[i] && i < sys->tom; i++)
++		;
++	if (i < sys->tom)
++		return (void *) (i <<20);
++
++	return nil;
++}
++
+
+An experiment we probably won't use -- 
+just realized that mallocs in shared heap procs should return pointers to same physical memory. 
+
+ /*
+  *  returns with globalseg incref'd
+  */
+@@ -356,6 +389,7 @@ segmentwrite(Chan *c, void *a, long n, v
+ 	Cmdbuf *cb;
+ 	Globalseg *g;
+ 	ulong va, len, top;
++	extern u32int cnkbase;
+ 
+ 	if(c->qid.type == QTDIR)
+ 		error(Eperm);
+@@ -376,7 +410,12 @@ segmentwrite(Chan *c, void *a, long n, v
+ 			len = (top - va) / BY2PG;
+ 			if(len == 0)
+ 				error("len is zero");
+-			g->s = newseg(SG_SHARED, va, len);
++			/* if this segment is in the P==V range, make it SG_PHYSICAL, otherwise, not */
++			if (cnkbase && va > cnkbase*MiB){
++				g->s = newseg(SG_PHYSICAL, va, len);
++				g->s->pseg = &cnkmbseg;
++			} else
++				g->s = newseg(SG_SHARED, va, len);
+ 		} else if(strcmp(cb->f[0], "heap") == 0){
+ 			int i;
+ 			if (!g)
+
+
+Simple, eh? If it's P==V region, use that PHYSICAL seg you set up earlier. 
+
+--- a/sys/src/9k/bgp/archbgp.c
++++ b/sys/src/9k/bgp/archbgp.c
+@@ -267,10 +267,16 @@ sendRAS(int a1, int a2, int a3, int x1, 
+  	splx(s);
+ }
+ 
++/* a slight change here. For all memory above cnkbase, 
++ * reserve it into the cnkmbmap
++ */
+ void
+ meminit(unsigned cnsbase)
+ {
+-	unsigned n;
++	extern u32int cnkbase;
++	unsigned n, cnkmem;
++	void cnkmbinit(int, int);
++	void cnkmbfree(unsigned);
+ 
+ #define TMFM	(64)					/* Too Many F'ing MiB */
+ 	/*
+@@ -288,6 +294,14 @@ meminit(unsigned cnsbase)
+ 	if(n > cnsbase)
+ 		n = cnsbase;
+ 
++	if (cnkbase){
++		cnkmbinit(cnkbase, n/MiB-cnkbase);
++		for(cnkmem = cnkbase*MiB; cnkmem < n; cnkmem += MiB){
++			cnkmbfree(cnkmem);
++		}
++		n = cnkbase*MiB;
++	} 
++
+ 	sys->tom = n/MiB;
+ 
+ 	/* was 48, try 64 */
+
+just change meminit a tiny bit -- if cnkbase is non-zero, reduce the memory size by the 
+needed amount. Use cnkmbinit to set up the PHY seg. The call to cnkmbfree will probably go away.
+
+
+--- a/sys/src/9k/bgp/bgp
++++ b/sys/src/9k/bgp/bgp
+@@ -30,6 +30,7 @@ rootdir
+ 	bgp.rc boot
+ 
+ conf
++	u32int cnkbase = 0;
+ 	int cpuserver = 1;
+ 	#include "version.h"
+ 	
+In this case, you have no shared BSS. 
+
+--- /dev/null
++++ b/sys/src/9k/bgp/bgpron
+@@ -0,0 +1,132 @@
++power +dev
++	l
++	lfpu
++	hummer
++	clock
++	kmap
++	main
++	arch
++	mmu
++	random
++	fpu
++	syscall
++	trap
++	ppcmul64fract
++	bic
++	qmalloc
++
++	cnksyscall cnksysemu
++
++boot cpu
++	tcp
++
++rootdir
++	bgp.rr
++	/power/bin/echo
++	/power/bin/test
++	/power/bin/paqfs
++	/power/bin/rc
++	../root/rcmain
++	bgp.rc boot
++
++conf
++	u32int cnkbase = 512;
++	int cpuserver = 1;
++	#include "version.h"
++	
++dev +dev
++	root
++	cons		archbgp
++	env
++	pipe
++	proc
++	mnt
++	srv
++	dup
++	ssl
++	cap
++	kprof
++	trace		trace
++#	probe		probe probepower
++
++	ip		arp chandial ip ipv6 ipaux iproute netif netlog nullmedium pktmedium ptclbsum inferno
++
++	ether		netif
++	
++	sd
++	aoe
++
++	uart
++
++	arch
++
++	gib
++	torus		frag
++	tree		tree
++	segment
++	
++sd +dev
++	sdaoe	sdscsi
++
++uart +dev
++	uartcns		archbgp uartmb
++	
++ip +dev
++	tcp
++	udp
++	ipifc
++	icmp
++	icmp6
++
++link +dev
++	etherx	toe ethermii xgxspcs
++
++	ethermedium
++	netdevmedium
++	treemedium
++	torusmedium
++	loopbackmedium
++
++misc +dev
++	cache
++
++dir
++	cnk
++	ip
++	port
++
++lib
++	libc
++	libip
++	libsec
++
++port
++	alarm
++	allocb
++	chan
++	dev
++	devtab
++	edf
++	fault
++	image
++	latin1
++	page
++	parse
++	pgrp
++	portclock
++	print
++	proc
++	ps
++	qio
++	qlock
++	rebootcmd
++	segment
++	noswap
++	sysauth
++	syscallfmt
++	sysfile
++	sysproc
++	sysseg
++	systab
++	taslock
++	tod
