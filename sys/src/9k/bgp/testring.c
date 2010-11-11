@@ -70,7 +70,7 @@ main(int argc, char *argv[])
 		ring->userdata = malloc(1048576);
 		ring->count = 1048576/4;
 		ring->datatype = 4;
-		print("ring %p userdata %p count %\n", ring, ring->userdata, ring->count);
+//		print("ring %p userdata %p count %d\n", ring, ring->userdata, ring->count);
 	}
 	cmd[0] = 'r';
 	cmd[1] = (u32int) rings;

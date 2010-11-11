@@ -394,9 +394,12 @@ struct Torus {
 	uint	rcvqread;
 	uint	rcvpause;
 	uint	rcvresume;
+	uint  rcvring;
+	uint  rcvringdrop;
 	uint	injintr;
 	uint	injgetfifo;
 	uint	injgetstatus;
+	uint  injring;
 	uint	memfifofull;
 	uint	unreachable;
 	uint	self;
@@ -416,6 +419,8 @@ struct Torus {
 };
 
 enum {
+	DbgRingR=	1<<5,
+	DbgRingX=	1<<4,
 	DbgDMA=	1<<2,
 	DbgSetup=	1<<1,
 	DbgIO=		1<<0,
@@ -434,6 +439,7 @@ struct Ring {
 	u32int status;
 	u32int xmit; /* if this was an xmit request. */
 	u32int done;
+	u32int x, y, z;
 };
 
 struct Ringb {
@@ -441,14 +447,16 @@ struct Ringb {
 	int count;
 };
 
-
-static int debug_torus;
+static u8int *onering = nil;
+static int ringsize;
+static int debug_torus = DbgRingR;
 
 static Torus torus;
 int torus_dump_cons = 1;
 
 static void torusdisable(int cause);
 static void torusinject(Torus*, TxRing*, Block*);
+static void quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data);
 
 /* sorry for the ugliness, I'll search and replace it eventually */
 #define DUMP_DCR(desc, x) p = seprint(p, e, " " desc "(%ux): %ux\n", (unsigned int)x, dcrget(x))
@@ -781,9 +789,10 @@ toruswrite(Chan* c, void*a, long n, vlong)
 	Ring *base;
 	int count;
 	struct Ringb *rb;
-	u8int *data, *kdata;
+	u8int *data;
 	int i;
 	int nbytes;
+	Tpkt pkt;
 
 	switch(QFILE(c->qid.path)){
 	default:
@@ -831,7 +840,9 @@ toruswrite(Chan* c, void*a, long n, vlong)
 		break;
 	case Qmpi:
 		cmd = a;
-		//print("Command %c %#x %d\n", cmd[0], cmd[1], cmd[2]);
+			if(debug_torus & DbgRingX){
+				print("Command %c %#x %d\n", cmd[0], cmd[1], cmd[2]);
+			}
 		switch(cmd[0]) {
 		/* set up a ring buffer. Attach to aux. if there was one there already, well, too bad! */
 		case 'r':
@@ -847,21 +858,31 @@ toruswrite(Chan* c, void*a, long n, vlong)
 			c->aux = rb = malloc(sizeof(struct Ringb));
 			rb->base = data;
 			rb->count = count;
-			print("Set up MPI; base is %p and size is %d\n", data, count);
+			if(debug_torus & DbgRingX){
+				print("Set up MPI; base is %p and size is %d\n", data, count);
+			}
+			ringsize = count;
+			onering = data;
 			break;
 		case 'g':
-			/* scan it and pretend to do IO */
+			/* scan it and do IO */
 			rb = c->aux;
 			count = rb->count;
-			//print("Run it %d times\n", count);
+			if(debug_torus & DbgRingX){
+				print("Run it %d times\n", count);
+			}
 			for (i = 0, data = rb->base; i < count; i++, data += 64) {
 				base = (Ring *) data;
-				//print("Ring entry is %p\n", base);
+				if(debug_torus & DbgRingX){
+					print("Ring entry is %p\n", base);
+				}
 				if(!okaddr(PTR2UINT(data), 64, 1)){
 					pprint("suicide: bad pointer/len pair %#p/%d\n", data, 64);
 					pexit("Suicide", 0);
 				}
-				//print("ring %p userdata %p count %d\n", base, base->userdata, base->count);
+				if(debug_torus & DbgRingX){
+					print("ring %p userdata %p count %d\n", base, base->userdata, base->count);
+				}
 
 				if (base->done)
 					continue;
@@ -870,17 +891,18 @@ toruswrite(Chan* c, void*a, long n, vlong)
 					pprint("suicide: bad pointer/len pair %#p/%d\n", base->userdata, nbytes);	
 						pexit("Suicide", 0);
 				}
-				//print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, nil);
-
-				kdata = malloc(nbytes);
-				//print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, kdata);
-				if (base->xmit) {
-					memmove(kdata, base->userdata, nbytes);
-				} else {
-					memmove(base->userdata, kdata, nbytes);
+				if(debug_torus & DbgRingX){
+					print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, nil);
 				}
+				memset(&pkt, 0, sizeof(pkt));
+				pkt.dst[X] = base->x;
+				pkt.dst[Y] = base->y;
+				pkt.dst[Z] = base->z;
+				if(misguided(t, &pkt))
+					error("bad destination");
+
+				quicktorusinject(t, &torus.txr[KernelGroup][KernelTxFifo], &pkt, base->userdata);
 				base->done = 1;
-				free(kdata);
 			}
 			break;
 		}
@@ -982,6 +1004,9 @@ torusread(Chan* c, void *a, long n, vlong off)
 		p = seprint(p, e, "rcvqpass: %d\n", t->rcvqpass);
 		p = seprint(p, e, "rcvqbread: %d\n", t->rcvqbread);
 		p = seprint(p, e, "rcvqread: %d\n", t->rcvqread);
+		p = seprint(p, e, "rcvring: %d\n", t->rcvring);
+		p = seprint(p, e, "rcvringdrop: %d\n", t->rcvringdrop);
+		p = seprint(p, e, "injring: %d\n", t->injring);
 		//p = seprint(p, e, "rcvpause: %d\n", t->rcvpause);
 		//p = seprint(p, e, "rcvresume: %d\n", t->rcvresume);
 
@@ -1161,7 +1186,9 @@ torus_process_rx(Torus *t, int group)
 	Block *b;
 	Fifoctl *dma;
 	int index;
-
+	if(debug_torus & DbgRingR){
+		print("torus_process_rx: onering %p\n", onering);
+	}
 	ilock(&t->rxlock);	/* TODO: Switch to a more granular lock */
 
 	/*
@@ -1207,26 +1234,52 @@ torus_process_rx(Torus *t, int group)
 				}
 				t->rcvpackets++;
 				tpkt = desc;
-				if(tpkt->seq != 0 || nhgets(tpkt->off) != 0){
-					/* protocol with fragments */
-					b = ttpreassemble(t->frags, (uchar*)desc, 256);	/* TO DO: 256? */
-				}else{
-					b = iallocb(256);
-					if(b != nil){
-						memmove(b->rp, desc, 256);
-						b->wp += 256;
-					}else
-						t->rcvtoss++;
-				}
-				if(b != nil){
-					if(qpass(t->rcvq, b) < 0){
-						print("torus overrun\n");
-						/* torusrcvpause();  EVH: this would be a very bad thing */
-						t->rcvqfull++;
-					} else {
-						t->rcvqpass++;
+				if (onering) {
+					Ring *base;
+					int i, nbytes;
+					t->rcvring++;
+					for (i = 0; i < ringsize; i++) {
+						base = (Ring *) (&onering[i*64]);
+						if(debug_torus & DbgRingR){
+							print("RXring: Ring entry is %p\n", base);
+							print("RXring: ring %p userdata %p count %d\n", base, base->userdata, base->count);
+						}
+						continue;
+	
+		//				if (base->done)
+		//				continue;
+						if (base->xmit)
+							continue;
+	
+						/* later on match header. */
+						nbytes = base->count * base->datatype;
+						if(debug_torus & DbgRingR){
+							print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, desc);
+						}
 					}
- 				}
+
+				} else {
+					if(tpkt->seq != 0 || nhgets(tpkt->off) != 0){
+						/* protocol with fragments */
+						b = ttpreassemble(t->frags, (uchar*)desc, 256);	/* TO DO: 256? */
+					}else{
+						b = iallocb(256);
+						if(b != nil){
+							memmove(b->rp, desc, 256);
+							b->wp += 256;
+						}else
+							t->rcvtoss++;
+					}
+					if(b != nil){
+						if(qpass(t->rcvq, b) < 0){
+							print("torus overrun\n");
+							/* torusrcvpause();  EVH: this would be a very bad thing */
+							t->rcvqfull++;
+						} else {
+							t->rcvqpass++;
+						}
+	 				}
+				}
 				rx->head_idx = NEXT(rx->head_idx, Nrx);
 				if(debug_torus & DbgIO)
 					print("new head idx: %x, tail idx: %x\n",
@@ -1359,6 +1412,62 @@ torusinject(Torus *t, TxRing *tx, Block *b)
 	tx->np++;
 }
 
+/* test code for trying out very fast inject from ring -- for now, 240 bytes */
+static void
+quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
+{
+	Injdesc *desc;
+	u32int *w;
+	int len =240;
+	while (txspaceavail(tx) <= 0)
+		sleep(&tx->r, txspaceavail, tx);
+	desc = &tx->desc[tx->tail_idx];
+	memmove(&desc->hdrs, pkt, Tpkthdrlen);	/* user provides both headers, for now */
+	desc->flags = 0;
+	desc->counter = tx->ctrid;
+	desc->length = len;	/* payload size */
+	desc->base = (u32int) data; /* p == v */
+
+	/* force certain header bits, at least for now */
+	memmove(desc->hdrs.src, t->addr, N);
+	desc->hdrs.sk = Sk;	/* was SKIP(4) on BG/L */
+	/* we only let them set Dp */
+	/* oh let them hang themselves. 
+	if (desc->hdrs.hint & Dp) {
+		desc->hdrs.hint = Dp | Hxp | Hyp | Hzp;
+	}
+	*/
+	desc->hdrs.hint |= PID0(KernelPid);
+	desc->hdrs.size = SIZE(7) | PID1(KernelPid)|Dy|Vcd0;
+	/* TO DO: SIZE(7) was SIZE(chunks-1) in BG/L */
+	/* can't change that until the handling of Rx fifo memory is sorted out */
+
+	/* don't want to leave it nil; use a sentinal value which can be ignored in the interrupt */
+	tx->blocks[tx->tail_idx] = (void *) 0xcafebabe;;
+
+	if(debug_torus & DbgIO){
+		iprint("tquickinject: ailidx=%d, desc=%p, P == V vdata=%p\n",
+			tx->tail_idx, desc, data);
+
+		w = (u32int*)desc;
+		iprint("inj %p D: [%8.8ux %8.8ux %8.8ux %8.8ux] H: [%8.8ux %8.8ux] S: [%8.8ux %8.8ux]\n",
+			desc, w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
+	}
+
+	tx->tail_idx = NEXT(tx->tail_idx, tx->ntd);
+	imb();   /* was wmb() in kh and mb() previously */
+
+	t->injpackets++;
+	t->injring++;
+
+	/* arm inject fifo */
+	*tx->incr = 240;
+	imb();
+	tx->fifo->tail = tx->start + tx->tail_idx*(sizeof(Injdesc) >> 4);
+	imb();
+	tx->np++;
+}
+
 /*
  * injection (tx) interrupts
  */
@@ -1382,7 +1491,8 @@ torus_process_tx(TxRing *tx)
 		if(b == nil)
 			panic("torus_process_tx: expected block");
 		tx->blocks[tx->pending_idx] = nil;
-		freeb(b);
+		if (b != (void *) 0xcafebabe)
+			freeb(b);
 		tx->np--;
 		tx->pending_idx = NEXT(tx->pending_idx, tx->ntd);
 	}

@@ -1,3 +1,8 @@
+The ring experiment showed I can move data, kernel to user and back, and memory. So now to set up
+a ring with p==v so that even interrupt routines can move data direct to user space. 
+
+First we need p==v.
+
 experimenting with shared heap. 
 
 Goal is no modifications via #ifdef and friends. Should be able to set one compile-time variable to
