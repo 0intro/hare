@@ -1,0 +1,18 @@
+The OpenMP implementation of NPB 3.2 (NPB3.2-OMP)
+--------------------------------------------------
+
+For problem reports and suggestions on the implementation, 
+please contact:
+
+   NAS Parallel Benchmark Team
+   npb@nas.nasa.gov
+
+NPB3.2-OMP includes a new benchmark 'DC' that was included
+in the serial version of NPB3.1, but not in NPB3.1-OMP.
+
+For changes from different versions, see the Changes.log file
+included in the upper directory of this distribution.
+
+For explanation of compilation and running of the benchmarks,
+please refer to README-3.1.
+
