@@ -1,0 +1,19 @@
+The MPI implementation of NPB 3.2 (NPB3.2-MPI)
+--------------------------------------------------
+
+For problem reports and suggestions on the implementation, 
+please contact:
+
+   NAS Parallel Benchmark Team
+   npb@nas.nasa.gov
+
+NPB3.2-MPI includes a new benchmark 'DT' that was not present
+in the previous releases.
+
+For changes from different versions, see the Changes.log file
+included in the upper directory of this distribution.
+
+For explanation of compilation and running of the benchmarks,
+please refer to README-3.1.  For a special note on DT, please
+see the README file in the DT subdirectory.
+
