@@ -72,6 +72,9 @@ main(int argc, char *argv[])
 		ring->datatype = 4;
 //		print("ring %p userdata %p count %d\n", ring, ring->userdata, ring->count);
 	}
+	print("Sleeping a billion counts to let everyone catch up\n");
+	{ int i; for(i = 0; i < 1000000000; i++);}
+	print("Proceeding\n");
 	cmd[0] = 'r';
 	cmd[1] = (u32int) rings;
 	cmd[2] = (u32int) nring;

@@ -449,7 +449,7 @@ struct Ringb {
 
 static u8int *onering = nil;
 static int ringsize;
-static int debug_torus = DbgRingR;
+static int debug_torus = 0;
 
 static Torus torus;
 int torus_dump_cons = 1;
@@ -881,7 +881,7 @@ toruswrite(Chan* c, void*a, long n, vlong)
 					pexit("Suicide", 0);
 				}
 				if(debug_torus & DbgRingX){
-					print("ring %p userdata %p count %d\n", base, base->userdata, base->count);
+					print("ring %p userdata %p count %d done %d\n", base, base->userdata, base->count, base->done);
 				}
 
 				if (base->done)
@@ -891,15 +891,19 @@ toruswrite(Chan* c, void*a, long n, vlong)
 					pprint("suicide: bad pointer/len pair %#p/%d\n", base->userdata, nbytes);	
 						pexit("Suicide", 0);
 				}
-				if(debug_torus & DbgRingX){
-					print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, nil);
-				}
+				if (!base->xmit)
+					continue;
 				memset(&pkt, 0, sizeof(pkt));
 				pkt.dst[X] = base->x;
 				pkt.dst[Y] = base->y;
 				pkt.dst[Z] = base->z;
-				if(misguided(t, &pkt))
+				if(debug_torus & DbgRingX){
+					print("=>[%d,%d,%d]\n", base->x, base->y, base->z);
+				}
+				if(misguided(t, &pkt)){
+					print("That is a bad destination? \n");
 					error("bad destination");
+				}
 
 				quicktorusinject(t, &torus.txr[KernelGroup][KernelTxFifo], &pkt, base->userdata);
 				base->done = 1;
@@ -1237,17 +1241,25 @@ torus_process_rx(Torus *t, int group)
 				if (onering) {
 					Ring *base;
 					int i, nbytes;
+				//	if (t->rcvring == 0) tlbdump("ring");
 					t->rcvring++;
+					continue;
+					debug_torus |= DbgRingR;
 					for (i = 0; i < ringsize; i++) {
+						if(debug_torus & DbgRingR){
+							print("RXring: onering is %p\n", onering);
+						}
+
 						base = (Ring *) (&onering[i*64]);
 						if(debug_torus & DbgRingR){
 							print("RXring: Ring entry is %p\n", base);
+continue;
 							print("RXring: ring %p userdata %p count %d\n", base, base->userdata, base->count);
 						}
-						continue;
-	
-		//				if (base->done)
-		//				continue;
+continue;
+
+						if (base->done)
+							continue;
 						if (base->xmit)
 							continue;
 	
@@ -1443,14 +1455,14 @@ quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
 	/* can't change that until the handling of Rx fifo memory is sorted out */
 
 	/* don't want to leave it nil; use a sentinal value which can be ignored in the interrupt */
-	tx->blocks[tx->tail_idx] = (void *) 0xcafebabe;;
+	tx->blocks[tx->tail_idx] = (void *) 0xcafebabe;
 
-	if(debug_torus & DbgIO){
-		iprint("tquickinject: ailidx=%d, desc=%p, P == V vdata=%p\n",
+	if(debug_torus & DbgRingX){
+		print("tquickinject: ailidx=%d, desc=%p, P == V vdata=%p\n",
 			tx->tail_idx, desc, data);
 
 		w = (u32int*)desc;
-		iprint("inj %p D: [%8.8ux %8.8ux %8.8ux %8.8ux] H: [%8.8ux %8.8ux] S: [%8.8ux %8.8ux]\n",
+		print("inj %p D: [%8.8ux %8.8ux %8.8ux %8.8ux] H: [%8.8ux %8.8ux] S: [%8.8ux %8.8ux]\n",
 			desc, w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
 	}
 

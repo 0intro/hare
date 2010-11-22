@@ -211,7 +211,7 @@ struct Softtlb {
 
 Lock phystlblock;
 int phystlbhi;
-Tlb phystlb[8];
+Tlb phystlb[9];
 
 struct Sys {					/*  */
 	u32int	vectorbase[16*KiB/sizeof(u32int)];

@@ -54,7 +54,7 @@ tlbdump(char* s)
 	int i, p;
 
 	p = pidget();
-	iprint("cpu%d:\ntlb[%s] pid %d lastpid %d utlbnext %d\n",
+	print("cpu%d:\ntlb[%s] pid %d lastpid %d utlbnext %d\n",
 		m->machno, s, p, m->lastpid, m->utlbnext);
 	for(i=0; i<NTLB; i++){
 		hi = tlbrehi(i);
@@ -62,7 +62,7 @@ tlbdump(char* s)
 			stid = stidget();
 			lo = tlbrelo(i);
 			md = tlbremd(i);
-			iprint("%.2d %8.8ux %8.8ux %8.8ux %3d %2d\n",
+			print("%.2d %8.8ux %8.8ux %8.8ux %3d %2d\n",
 				i, hi, md, lo, stid, lookstlb(i, TLBEPN(hi)));
 		}
 		if(i == m->utlbhi)
@@ -99,6 +99,8 @@ alltlbdump(void)
 void
 mmuinit(void)
 {
+	extern u32int cnkbase;
+	u32int attr;
 	int i;
 	Tlb *entry;
 
@@ -129,6 +131,18 @@ mmuinit(void)
 
 	if(DEBUG)
 		tlbdump("init2");
+	if (cnkbase){
+		u8int *x;
+		attr = TLBUW|TLBUR|TLBSW|TLBSR;
+		print("MMUINIT:kmappphys(0, %p, %#x, %#x);\n", (void *)(cnkbase*MiB), 0x10000000 /*n-cnkbase*MiB*/,attr);
+		x = kmapphys(0, cnkbase*MiB, 0x10000000/*n-cnkbase*MiB*/,attr);
+		print("Did a kmapphys , got %p,  do a store\n", x);
+		*x = 0;
+	} 
+
+	if(DEBUG)
+		tlbdump("init3");
+
 }
 
 void

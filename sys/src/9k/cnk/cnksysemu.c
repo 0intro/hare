@@ -106,6 +106,7 @@ cnkgetpersonality(Ar0*ar, va_list list)
 void
 cnksbrk(Ar0* ar0, uintptr addr, int allocate)
 {
+	extern u32int cnkbase;
 	uintptr ibrk(uintptr addr, int seg);
 	Segment *heapseg;
 	uintptr oldtop;
@@ -125,6 +126,16 @@ cnksbrk(Ar0* ar0, uintptr addr, int allocate)
 		return;
 	}
 
+	if (cnkbase) {
+		uintptr newtop;
+		long newsize;
+		newtop = PGROUND(addr);
+		newsize = (newtop-heapseg->base)/BY2PG;
+		heapseg->top = newtop;
+		heapseg->size = newsize;
+		ar0->p = newtop;
+		return;
+	}
 	if (addr < oldtop){
 		/* just ignore it *
 		print("cnksbrk: can't shrink heap\n");

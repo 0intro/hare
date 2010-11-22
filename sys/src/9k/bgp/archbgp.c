@@ -294,12 +294,23 @@ meminit(unsigned cnsbase)
 	if(n > cnsbase)
 		n = cnsbase;
 
+	/* should make this cleaner, but for now ... ignore the last
+	 * 256MB of memory. We need BIG ptes. user should round 
+	 * to nearest 256 MB but we don't enforce that yet. 
+	 * we "know" that KSEG0 is 0xf000000 or higher. 
+	 */
+	if (n > 0xf0000000)
+		n = 0xf0000000;
 	if (cnkbase){
+		/* and further round it down ... */
+		n &= ~(256*1024*1024);
 		cnkmbinit(cnkbase, n/MiB-cnkbase);
+		/*
 		for(cnkmem = cnkbase*MiB; cnkmem < n; cnkmem += MiB){
 			cnkmbfree(cnkmem);
 		}
-		n = cnkbase*MiB;
+		*/
+		n = cnkbase * MiB;
 	} 
 
 	sys->tom = n/MiB;

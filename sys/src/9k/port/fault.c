@@ -21,6 +21,7 @@ if(up->nlocks) print("fault nlocks %d\n", up->nlocks);
 	for(;;) {
 		s = seg(up, addr, 1);		/* leaves s->lk qlocked if seg != nil */
 		if(s == 0) {
+print("NO seg for fault at %p\n", addr);
 			up->psstate = sps;
 			return -1;
 		}

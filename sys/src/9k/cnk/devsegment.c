@@ -67,8 +67,9 @@ void
 cnkmbinit(int basemb, int sizemb)
 {
 	cnkmbseg.pa = basemb * MiB;
-	cnkmbseg.size = BY2PG*sizemb/MiB;
+	cnkmbseg.size = (MiB*sizemb)/BY2PG;
 	cnkmbseg.attr = SG_PHYSICAL;
+print("cnkbase %#lx pages %ld \n", cnkmbseg.pa, cnkmbseg.size);
 }
 void
 cnkmbfree(u32int addr)
@@ -408,12 +409,12 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 			top = PGROUND(va + len);
 			va = va&~(BY2PG-1);
 			len = (top - va) / BY2PG;
-			if(len == 0)
-				error("len is zero");
+	//		if(len == 0)
+	//			error("len is zero");
 			/* if this segment is in the P==V range, make it SG_PHYSICAL, otherwise, not */
 			if (cnkbase && va >= cnkbase*MiB){
-iprint("IT's a PHYS SEGMENT. So hand it off\n");
 				g->s = newseg(SG_PHYSICAL, va, len);
+				g->s->nozfod = 1;
 				g->s->pseg = &cnkmbseg;
 			} else
 				g->s = newseg(SG_SHARED, va, len);
@@ -428,6 +429,7 @@ iprint("IT's a PHYS SEGMENT. So hand it off\n");
 			else
 				up->heapseg = g->s;
 			/* pre-fault the pages in */
+			if (! cnkbase)
 			for(i = 0; i < g->s->size; i++) {
 				print("Pre-fault %#ulx\n", g->s->base + i*BY2PG);
 				fault(g->s->base + i*BY2PG, 0);
@@ -535,8 +537,10 @@ globalsegattach(Proc *p, char *name)
 	s = g->s;
 	if(s == nil)
 		error("global segment not assigned a virtual address");
-	if(isoverlap(p, s->base, s->top - s->base) != nil)
-		error("overlaps existing segment");
+	if(isoverlap(p, s->base, s->top - s->base) != nil){
+		//error("overlaps existing segment");
+		print("overlap: %p->%p\n", s->base, s->top);
+	}
 	incref(s);
 	unlock(&globalseglock);
 	poperror();

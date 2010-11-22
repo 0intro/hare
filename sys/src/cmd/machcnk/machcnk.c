@@ -13,6 +13,7 @@ enum {
 
 #define RND(size,up) (((size)+(up)-1) & ~((up)-1))
 #define RNDM(size) ((size+0xfffff)&0xfff00000)
+
 int
 verbose(void){
 	return 1;
@@ -31,7 +32,7 @@ void ssize(int fd, u32int va, u32int size)
 		errexit("Setting size");
 }
 
-unsigned char *makeseg(char *name, u32int addr, u32int size, int markheap)
+unsigned char *makeseg(char *name, u32int addr, u32int size, int markheap, u32int pv)
 {
 	char *segname = smprint("/n/cnk/%s", name);
 	char *ctl = smprint("/n/cnk/%s/ctl", name);
@@ -42,23 +43,25 @@ unsigned char *makeseg(char *name, u32int addr, u32int size, int markheap)
 
 	if (create(segname, 0, DMDIR|0777)<0)
 		errexit(segname);
-
+print("SEGMENT CREATE OK!\n");
 	if ((ctlfd = open(ctl, ORDWR)) < 0) errexit(ctl);	
 	/* round size up to nearest MB *
 	size += 0xfffff;
 	size &= ~0xfffff;
 	*/
 	ssize(ctlfd, addr, size);
-
+print("SSIZE DONE\n");
 	if (markheap) {
 		if (write(ctlfd, "heap", 4) < 0)
 			errexit("Setting heap");
 	}
-
+print("DONE MARKHEAP\n");
 	ptr = segattach(0, name, (void *)addr,size);
 	if (ptr == (unsigned char *)-1)
 		errexit(smprint("segattach(0, %s, %p, %d): %r", name, (void *)addr, size));
+print("DONE SEGATTACH\n");
 	memset(ptr, 0, size);
+print("DONE MEMSET\n");
 	return ptr;
 }
 
@@ -127,7 +130,7 @@ hdr(void)
 void
 usage(void)
 {
-	errexit(smprint("usage: machcnk [-b] [breakpoint] [a]rgstosyscall [s]yscall [u]regsbefore [U]uregsafter [f]aultpower [F]aultpowerregs elf\n"));
+	errexit(smprint("usage: machcnk [-b] [breakpoint] [-p p==v base] [a]rgstosyscall [s]yscall [u]regsbefore [U]uregsafter [f]aultpower [F]aultpowerregs elf\n"));
 }
 
 main(int argc, char *argv[])
@@ -145,6 +148,9 @@ main(int argc, char *argv[])
 	char *av[256];
 	int cnk = 2;
 	char cmd[2];
+	u32int pv = 0; /* are we in a P==V world? */
+	u32int bssbase = 512 * 1024 * 1024;
+	u32int bsssize = 0x100000;
 
 	ARGBEGIN{
 	case 'b':	breakpoint = strtoul(EARGF(usage()), 0, 0); break;
@@ -156,11 +162,19 @@ main(int argc, char *argv[])
 	case 'U':	cnk |= DumpUregsAfter; break;
 	case 'a':	cnk |= PersyscallInfo; break;
 	case 'A':	cnk |= 0xfc; break;
+	case 'p':	pv = strtoul(EARGF(usage()), 0, 0); break;
+	case 'S': 	bsssize = strtoul(EARGF(usage()), 0, 0); break;
 	default:	usage(); break;
 	}ARGEND
 
 	if (argc < 1)
 		errexit("usage: elfcnk filename");
+
+	if (pv) {
+		print("We're supposed to be in P==V at %p\n", (void *)pv);
+		*(unsigned char *)pv = 0;
+		print("Store to pv worked\n");
+	}
 
 	fd = open(argv[0], OREAD);
 	if (fd < 0)
@@ -204,10 +218,19 @@ main(int argc, char *argv[])
 	if (bind("#g", "/n/cnk", MREPL|MCREATE) < 0)
 		errexit("bind segdriver");
 
-	textp = makeseg("0", fp.txtaddr, RNDM(fp.txtsz), 0);
-	datap = makeseg("1", fp.dataddr, RNDM( fp.datsz + fp.bsssz), 0);
-	bssp = makeseg("3",512*1024*1024, 0x1000, 1);
+	textp = makeseg("0", fp.txtaddr, RNDM(fp.txtsz), 0, 0);
+	datap = makeseg("1", fp.dataddr, RNDM( fp.datsz + fp.bsssz), 0, 0);
+	if (pv) {
+		bssbase = pv;
+		print("Memory at pv is %ld\n", *(unsigned long *)pv);
+		memset((void *)bssbase, 0, bsssize);
+		print("Zero memory BEFORE makeseg\n");
+	}
+	bssp = makeseg("3", bssbase, bsssize, 1, pv);
 	print("bssp is %p\n", bssp);
+	print("zero bss\n");
+	memset((void *)bssp, 0, bsssize);
+	print("BSS zero\n");
 
 	/* now the big fun. Just copy it out */
 	pread(fd, textp, fp.txtsz, fp.txtoff);
@@ -257,7 +280,7 @@ main(int argc, char *argv[])
 	}
 
 //	callcnk(f, argc, argv);
-
+	print("Call CNK!\n");
 	f = (void *)fp.entry;
 	callcnk(f, argc, &av[1], av);
 	return 0;
@@ -266,4 +289,7 @@ main(int argc, char *argv[])
 /* qc -wF machcnk.c; ql -o machcnk machcnk.q */
 /* 8c -wF  machcnk.c; 8l -o machcnk machcnk.8 */
 
-/* fcp q.out /mnt/term/tmp/machcnk */
+/* fcp q.out /mnt/term/tmp/machcnk 
+qc -wF machcnk.c; ql -o machcnk machcnk.q
+/usr/rminnich//bin/386/scp q.machcnk surveyor.alcf.anl.gov:rompi
+*/
