@@ -865,6 +865,7 @@ toruswrite(Chan* c, void*a, long n, vlong)
 			onering = data;
 			break;
 		case 'g':
+//tlbdump("QMPI write");
 			/* scan it and do IO */
 			rb = c->aux;
 			count = rb->count;
@@ -1032,7 +1033,8 @@ torusread(Chan* c, void *a, long n, vlong off)
 		p = seprint(p, e, "  avail: %x %x\n", t->dma[KernelGroup].rcv.available[0], t->dma[KernelGroup].rcv.available[1]);
 		p = seprint(p, e, "  thresh: %x %x\n", t->dma[KernelGroup].rcv.threshold[0], t->dma[KernelGroup].rcv.threshold[1]);
 		p = seprint(p, e, "  status: %x\n", t->dma[KernelGroup].rcv.counter_group_status);
-		
+		p = seprint(p, e, "  onering: %ulx\n", onering);
+	
 		USED(p, e);
 
 		n = readstr(off, a, n, alloc);
@@ -1191,7 +1193,7 @@ torus_process_rx(Torus *t, int group)
 	Fifoctl *dma;
 	int index;
 	if(debug_torus & DbgRingR){
-		print("torus_process_rx: onering %p\n", onering);
+		if (onering) print("O\n");
 	}
 	ilock(&t->rxlock);	/* TODO: Switch to a more granular lock */
 
@@ -1241,22 +1243,10 @@ torus_process_rx(Torus *t, int group)
 				if (onering) {
 					Ring *base;
 					int i, nbytes;
-				//	if (t->rcvring == 0) tlbdump("ring");
+						
 					t->rcvring++;
-					continue;
-					debug_torus |= DbgRingR;
 					for (i = 0; i < ringsize; i++) {
-						if(debug_torus & DbgRingR){
-							print("RXring: onering is %p\n", onering);
-						}
-
 						base = (Ring *) (&onering[i*64]);
-						if(debug_torus & DbgRingR){
-							print("RXring: Ring entry is %p\n", base);
-continue;
-							print("RXring: ring %p userdata %p count %d\n", base, base->userdata, base->count);
-						}
-continue;
 
 						if (base->done)
 							continue;
@@ -1265,9 +1255,7 @@ continue;
 	
 						/* later on match header. */
 						nbytes = base->count * base->datatype;
-						if(debug_torus & DbgRingR){
-							print("nbytes %d userdata %p data %p\n", nbytes, base->userdata, desc);
-						}
+						base->done = 1;
 					}
 
 				} else {
@@ -1438,6 +1426,7 @@ quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
 	desc->flags = 0;
 	desc->counter = tx->ctrid;
 	desc->length = len;	/* payload size */
+	/* OOPS! Fix L1 coherency issue */
 	desc->base = (u32int) data; /* p == v */
 
 	/* force certain header bits, at least for now */

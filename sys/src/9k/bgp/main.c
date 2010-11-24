@@ -275,6 +275,7 @@ main(u32int r3, u32int r4, u32int r5, u32int r6, u32int r7)
 	pageinit();
 	swapinit();
 	kmapinit();
+	cnkinit();
 	userinit();
 
 	sys->coremask = mask;

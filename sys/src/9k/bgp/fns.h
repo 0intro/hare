@@ -10,6 +10,7 @@ u32int	ccr0get(void);
 u32int	ccr1get(void);
 void	clockinit(void);
 void	clockintr(Ureg*);
+void cnkinit(void);
 #define coherence()	imb()
 void	cpuidprint(void);
 void	critintrvec(void);

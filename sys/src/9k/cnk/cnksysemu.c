@@ -63,6 +63,24 @@ struct utsname cnkutsname = {
 };
 
 void
+cnkinit(void)
+{
+	extern u32int cnkbase;
+	u32int attr;
+	print("CNKINIT: machno %d cnkbase %p\n", m->machno, (void *)cnkbase);
+	if(m->machno != 0)
+		return;
+	if (cnkbase){
+		u8int *x;
+		attr = TLBUW|TLBUR|TLBWR;
+		//attr |= TLBI|TLBG;
+		print("cnkinit:kmappphys(0, %p, %#x, %#x);\n", (void *)(cnkbase*MiB), 0x10000000 /*n-cnkbase*MiB*/,attr);
+		x = kmapphys(0, cnkbase*MiB, 0x10000000/*n-cnkbase*MiB*/,attr);
+		print("Did a kmapphys , got %p,  do a store\n", x);
+		*x = 0;
+	} 
+}
+void
 cnkexit(Ar0*, va_list list)
 {
 	int val;
