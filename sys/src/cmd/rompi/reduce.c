@@ -25,12 +25,12 @@ main(int argc, char **argv)
 	print("%lld Hello World from Node %d of %d\n", tbget(),node, nproc);
 
 	if (1)
-		rompidebug |= 128;
+		rompidebug |= 0xff;
 	if (1)
 		rompidebug |= 4;
-	if (0)
+	if (1)
 		rompidebug |= 12;
-	if (0)
+	if (1)
 		torusdebug |= 2;
 	if (0 && (rompidebug & 128) && (! node)) {
 		int x, y, z;

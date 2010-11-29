@@ -8,216 +8,158 @@
  *  between runs.  For more accurate measurements, grab NetPIPE from
  *  http://www.scl.ameslab.gov/ .
  */
-#include "mpi.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "rompi.h"
 
-void 
-main (int argc, char **argv)
+typedef struct Ring Ring;
+typedef unsigned long u32int;
+
+struct Ring {
+	u32int tag[3];
+	void *userdata; /* for irecv */
+	u32int count; /* number of units; bytecount is computed using datatype*/
+	u32int datatype;
+	u32int source;
+	u32int itag;
+	u32int comm;
+	u32int status;
+	u32int xmit; /* if this was an xmit request. */
+	u32int done;
+};
+
+typedef uvlong ticks;
+
+static __inline__ ticks getticks(void)
 {
-   int myproc, size, other_proc, nprocs, i, last;
-   double t0, t1, time;
-   double *a, *b;
-   double max_rate = 0.0, min_latency = 10e6;
-   MPI_Request request, request_a, request_b;
-   MPI_Status status;
+     unsigned int tbl, tbu0, tbu1;
 
-#if defined (_CRAYT3E)
-   a = (double *) shmalloc (132000 * sizeof (double));
-   b = (double *) shmalloc (132000 * sizeof (double));
-#else
-   a = (double *) malloc (132000 * sizeof (double));
-   b = (double *) malloc (132000 * sizeof (double));
-#endif
+     do {
+	  __asm__ __volatile__ ("mftbu %0" : "=r"(tbu0));
+	  __asm__ __volatile__ ("mftb %0" : "=r"(tbl));
+	  __asm__ __volatile__ ("mftbu %0" : "=r"(tbu1));
+     } while (tbu0 != tbu1);
 
-   for (i = 0; i < 132000; i++) {
-      a[i] = (double) i;
-      b[i] = 0.0;
-   }
-
-   MPI_Init(&argc, &argv);
-   MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-   MPI_Comm_rank(MPI_COMM_WORLD, &myproc);
-
-   printf("Hello from %d of %d\n", myproc, nprocs);
-   if (nprocs != 2) exit (1);
-   other_proc = (myproc + 1) % 2;
-
-   printf("Hello from %d of %d\n", myproc, nprocs);
-   MPI_Barrier(MPI_COMM_WORLD);
-
-/* Timer accuracy test */
-
-   t0 = MPI_Wtime();
-   t1 = MPI_Wtime();
-
-   while (t1 == t0) t1 = MPI_Wtime();
-
-   if (myproc == 0)
-      printf("Timer accuracy of ~%f usecs\n\n", (t1 - t0) * 1000000);
-
-/* Communications between nodes 
- *   - Blocking sends and recvs
- *   - No guarantee of prepost, so might pass through comm buffer
- */
-
-   for (size = 8; size <= 1048576; size *= 2) {
-      for (i = 0; i < size / 8; i++) {
-         a[i] = (double) i;
-         b[i] = 0.0;
-      }
-      last = size / 8 - 1;
-
-      MPI_Barrier(MPI_COMM_WORLD);
-      t0 = MPI_Wtime();
-
-      if (myproc == 0) {
-
-         MPI_Send(a, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD);
-         MPI_Recv(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD, &status);
-
-      } else {
-
-         MPI_Recv(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD, &status);
-
-         b[0] += 1.0;
-         if (last != 0)
-         b[last] += 1.0;
-
-         MPI_Send(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD);
-
-      }
-
-      t1 = MPI_Wtime();
-      time = 1.e6 * (t1 - t0);
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      if ((b[0] != 1.0 || b[last] != last + 1)) {
-         printf("ERROR - b[0] = %f b[%d] = %f\n", b[0], last, b[last]);
-         exit (1);
-      }
-      for (i = 1; i < last - 1; i++)
-         if (b[i] != (double) i)
-            printf("ERROR - b[%d] = %f\n", i, b[i]);
-      if (myproc == 0 && time > 0.000001) {
-         printf(" %7d bytes took %9.0f usec (%8.3f MB/sec)\n",
-                     size, time, 2.0 * size / time);
-         if (2 * size / time > max_rate) max_rate = 2 * size / time;
-         if (time / 2 < min_latency) min_latency = time / 2;
-      } else if (myproc == 0) {
-         printf(" %7d bytes took less than the timer accuracy\n", size);
-      }
-   }
-
-/* Async communications
- *   - Prepost receives to guarantee bypassing the comm buffer
- */
-
-   MPI_Barrier(MPI_COMM_WORLD);
-   if (myproc == 0) printf("\n  Asynchronous ping-pong\n\n");
-
-   for (size = 8; size <= 1048576; size *= 2) {
-      for (i = 0; i < size / 8; i++) {
-         a[i] = (double) i;
-         b[i] = 0.0;
-      }
-      last = size / 8 - 1;
-
-      MPI_Irecv(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD, &request);
-      MPI_Barrier(MPI_COMM_WORLD);
-      t0 = MPI_Wtime();
-
-      if (myproc == 0) {
-
-         MPI_Send(a, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD);
-         MPI_Wait(&request, &status);
-
-      } else {
-
-         MPI_Wait(&request, &status);
-
-         b[0] += 1.0;
-         if (last != 0)
-         b[last] += 1.0;
-
-         MPI_Send(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD);
-      }
-
-      t1 = MPI_Wtime();
-
-      time = 1.e6 * (t1 - t0);
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      if ((b[0] != 1.0 || b[last] != last + 1))
-         printf("ERROR - b[0] = %f b[%d] = %f\n", b[0], last, b[last]);
-
-      for (i = 1; i < last - 1; i++)
-         if (b[i] != (double) i)
-            printf("ERROR - b[%d] = %f\n", i, b[i]);
-      if (myproc == 0 && time > 0.000001) {
-         printf(" %7d bytes took %9.0f usec (%8.3f MB/sec)\n",
-                  size, time, 2.0 * size / time);
-         if (2 * size / time > max_rate) max_rate = 2 * size / time;
-         if (time / 2 < min_latency) min_latency = time / 2;
-      } else if (myproc == 0) {
-         printf(" %7d bytes took less than the timer accuracy\n", size);
-      }
-   }
-
-/* Bidirectional communications
- *   - Prepost receives to guarantee bypassing the comm buffer
- */
-
-   MPI_Barrier(MPI_COMM_WORLD);
-   if (myproc == 0) printf("\n  Bi-directional asynchronous ping-pong\n\n");
-
-   for (size = 8; size <= 1048576; size *= 2) {
-      for (i = 0; i < size / 8; i++) {
-         a[i] = (double) i;
-         b[i] = 0.0;
-      }
-      last = size / 8 - 1;
-
-      MPI_Irecv(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD, &request_b);
-      MPI_Irecv(a, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD, &request_a);
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      t0 = MPI_Wtime();
-
-      MPI_Send(a, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD);
-      MPI_Wait(&request_b, &status);
-
-      b[0] += 1.0;
-      if (last != 0)
-      b[last] += 1.0;
-
-      MPI_Send(b, size/8, MPI_DOUBLE, other_proc, 0, MPI_COMM_WORLD);
-      MPI_Wait(&request_a, &status);
-
-      t1 = MPI_Wtime();
-      time = 1.e6 * (t1 - t0);
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      if ((a[0] != 1.0 || a[last] != last + 1))
-         printf("ERROR - a[0] = %f a[%d] = %f\n", a[0], last, a[last]);
-      for (i = 1; i < last - 1; i++)
-      if (a[i] != (double) i)
-         printf("ERROR - a[%d] = %f\n", i, a[i]);
-      if (myproc == 0 && time > 0.000001) {
-         printf(" %7d bytes took %9.0f usec (%8.3f MB/sec)\n",
-                    size, time, 2.0 * size / time);
-         if (2 * size / time > max_rate) max_rate = 2 * size / time;
-         if (time / 2 < min_latency) min_latency = time / 2;
-      } else if (myproc == 0) {
-         printf(" %7d bytes took less than the timer accuracy\n", size);
-      }
-   }
-
-   if (myproc == 0)
-      printf("\n Max rate = %f MB/sec  Min latency = %f usec\n",
-               max_rate, min_latency);
-
-   MPI_Finalize();
+     return (((unsigned long long)tbu0) << 32) | tbl;
 }
 
+uvlong
+mynsec(void)
+{
+	uvlong t;
+	static int fd = -1;
+	extern int pread(int, void *, int, unsigned long long);
+
+	if (fd < 0) {
+		fd = open("/dev/bintime", 0);
+		if (fd < 0)
+			panic("Can't open /dev/bintime");
+	}
+
+	pread(fd, &t, sizeof(t), 0ULL);
+	return t;
+}
+
+int
+main (int argc, char **argv)
+{
+    double bw;
+    int myproc, nprocs, done;
+	/* weird issue: malloc gets wrong address. Don't use it for now */
+    unsigned char *b = (void *) 0x20000000;
+    int datablocksize = 32768;
+    unsigned char *d = malloc(1024);
+printf("d is %p\n", d);
+
+    int fd = open("/dev/mpi", 2);
+    int cfd = open("/dev/torusctl", 2);
+	 int nring = 512;
+	 int niter = 1;
+	 Ring *ring;
+	 u8int *rings;
+	 u32int cmd[3];
+	 vlong start, end, totalbytes;
+	 int i, j, ringsize;
+	char *debugcmd = "debug 48";
+	int debuglen = strlen(debugcmd);
+
+	 if (fd < 0)
+		 panic("no /dev/mpi");
+	 if (cfd < 0)
+		 panic("no /dev/torusctl");
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myproc);
+
+   printf("Hello from %d of %d\n", myproc, nprocs);
+
+	if (argc > 1)
+		nring = strtoul(argv[1], 0, 0);
+
+	if (argc > 2)
+		niter = strtoul(argv[2], 0, 0);
+
+	/* allocate "num" ring structs */
+	ringsize = 64 * nring * sizeof(*ring);
+	rings = malloc(ringsize);
+print("Rings %p\n", rings);
+	memset(rings, 0, ringsize);
+	/* for this test, just simulate nring 1M  reads */
+	for(i = 0; i < nring; i++) {
+		ring = (Ring *)&rings[i*64];
+		ring->userdata = malloc(datablocksize);
+		ring->count = datablocksize/4;
+		ring->datatype = 4;
+		ring->xmit = myproc;
+//		printf("ring %p userdata %p count %ld\n", ring, ring->userdata, ring->count);
+	}
+	cmd[0] = 'r';
+	cmd[1] = (u32int) rings;
+	cmd[2] = (u32int) nring;
+	printf("Command %ld %#lx %ld\n", cmd[0], cmd[1], cmd[2]);
+   MPI_Barrier(MPI_COMM_WORLD);
+	if (myproc > 1) 
+		goto done;
+//	if (!myproc)
+	if (0)
+	if (write(cfd, debugcmd, debuglen) < debuglen) {
+		printf("Debug %s failed\n", debugcmd);
+		goto done;
+	}
+	printf("after barrier, proceed\n");
+	write(fd, cmd, sizeof(cmd));
+	start = getticks();
+	cmd[0] = 'g';
+	for (i = 0; i < niter; i++){
+		if (myproc)
+		if (write(fd, cmd, sizeof(cmd[0])) < sizeof(cmd[0])) {
+			print("Things did not go so well\n");
+		}
+		//if (!myproc)
+		for(done = 0; done < nring;) {
+			for(j = 0; j < nring; j++) {
+				if (ring->done) {
+					if (! done && ! myproc) start = getticks();
+					done++;
+				}
+			}
+		}
+		for(j = 0; j < nring; j++) {
+			ring = (Ring *)&rings[j*64];
+			ring->done = 0;
+		}
+	}
+	end = getticks();
+	printf("Start %#llx end %#llx Total nsecs %#llx\n", start, end, end - start);
+	printf("total bytes transferred: %dB\n", nring * niter*256);
+	totalbytes = nring * niter * 256;
+/*	seconds = (end - start);
+	seconds /= 1e9;
+	bw = totalbytes;
+	bw /= seconds;*/
+	printf("nring %d niter %d %lld bytes in %lld nanoseconds\n", nring, niter, totalbytes, end-start);
+	printf("Bandwidth: %g\n", bw);
+done:
+    /* just spin so we don't get lots of output crap ... */
+    while (myproc > 1) ;
+    return 0;
+}
 
