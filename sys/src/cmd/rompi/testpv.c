@@ -8,8 +8,10 @@
 void 
 main (int argc, char **argv)
 {
-	unsigned char *c = malloc(1024);
+	unsigned char *c = 0x20000000; //malloc(1024);
+	unsigned char *b = malloc(1024);
 
+	printf("b is %p\n", b);
 	printf("c is %p\n", c);
 	if (argc > 1)
 		sprintf(c, "HI THERE!\n");

@@ -415,8 +415,9 @@ got:
 	status->MPI_SOURCE = b->tag[TAGsource];
 	status->MPI_TAG = b->tag[TAGtag];
 	status->MPI_ERROR = 0;
+	if (rompidebug &2)print("MPI recv: memcpy(%p,%p,%d)\n", buf, b->data, count);
 	memcpy(buf, b->data, count);
-	free(b);
+	//free(b);
 	return MPI_SUCCESS;
 }
 
