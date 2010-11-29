@@ -96,11 +96,11 @@ echo add 127.0.0.1 255.0.0.0 127.0.0.0 > /net/ipifc/$i/ctl
 #
 # NOTE: for now, if you are going to setup torus, do it in your lib/profile
 #
-#if(~ $cpunode '1'){
-#	i=`{cat /net/ipifc/clone}
-#	echo bind torus /dev/torus > /net/ipifc/$i/ctl
-#	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
-#}
+if(~ $cpunode '1'){
+	i=`{cat /net/ipifc/clone}
+	echo bind torus /dev/torus > /net/ipifc/$i/ctl
+	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
+}
 #
 # Set up authentication if necessary.
 # Factotum has to be allowed to mount on /mnt here because
