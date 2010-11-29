@@ -1376,10 +1376,9 @@ resgang(Gang *g)
 	/* TODO: implement other modes (block, time-share) */
 	if(size > (mystats.nproc-mystats.njobs)) {
 		DPRINT(DEXE, "insufficient resources for %d\n", size);
-		return Enores;
+		return estrdup9p(Enores);
 	}
 	
-	/* TODO: CRUX: determine how many subsessions we'll need */
 	/* Lock down gang */
 	njobs = emalloc9p(sizeof(int)*mystats.nchild);
 	remaining = size;
@@ -1415,6 +1414,7 @@ resgang(Gang *g)
 		DPRINT(DEXE, "Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
 		setupsess(g, &g->sess[count], current->name, njobs[count]);
 		proccreate(cloneproc, &g->sess[count], STACK);
+	/* BUG: NEED current = current->next */
 	}
 
 	DPRINT(DEXE, "waiting on %d sessions\n", scount);
@@ -1430,7 +1430,6 @@ resgang(Gang *g)
 		}
 			/* MAYBE: retry here? for reliability ? */
 	}
-
 
 	return err;
 }

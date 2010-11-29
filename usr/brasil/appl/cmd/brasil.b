@@ -187,6 +187,7 @@ init()
 	sys->bind("#C", "/", sys->MAFTER);
 	sys->bind("#e", "/env", sys->MREPL|sys->MCREATE);
 	sys->bind("#U*", "/n/local", sys->MREPL|sys->MCREATE);
+	sys->bind("#U*/home", "/n/home", sys->MREPL|sys->MCREATE);
 	if(sys->bind("#I", "/net", sys->MREPL) < 0) {
 		# no net might mean we are on Plan 9
 		if(sys->bind("/n/local/net", "/net", sys->MREPL) < 0) {
