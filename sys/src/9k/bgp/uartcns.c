@@ -28,7 +28,7 @@ int chatty = 0;
 static Lock cnsconslock;
 
 struct cnslog cnslog;
-
+extern int mbconsputs(char*, int);
 extern PhysUart cnsphysuart;
 
 static Uart cnsuart[1] = {
@@ -74,20 +74,20 @@ static void
 cnsputc(Uart*, int c)
 {
 	char cbuf = (char) c;
-	cnslog.buf[cnslog.write] = cbuf;
-	cnslog.write++;
 
-	if((cnslog.write > MAXLOG) || (cbuf=='\n')) {
-		if(m->chatty) {
-			CNS(writeToMailboxConsole, int, cnslog.buf, cnslog.write);
-			cnslog.write = 0;
-		}
-	}
-
-	if (cnslog.write > MAXLOG){
+	if (cnslog.write >= MAXLOG){
 		cnslog.write = 0;
 	}
 
+	cnslog.buf[cnslog.write] = cbuf;
+	cnslog.write++;
+
+	if((cnslog.write >= MAXLOG) || (cbuf=='\n')) {
+		if(m->chatty) {
+			mbconsputs(cnslog.buf, cnslog.write);
+			cnslog.write = 0;
+		}
+	}
 }
 
 static long
@@ -120,8 +120,6 @@ cnsstub_noret(Uart* uart, int ignore)
 static void
 cnskick(Uart* uart)
 {
-	extern int mbconsputs(char*, int);
-
 	if(uart->cts == 0 || uart->blocked)
 		return;
 
