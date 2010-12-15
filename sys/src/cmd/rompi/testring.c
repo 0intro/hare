@@ -80,6 +80,10 @@ printf("d is %p\n", d);
 	 int i, j, ringsize;
 	char *debugcmd = "debug 48";
 	int debuglen = strlen(debugcmd);
+	int ctlfd;
+	char ctlcmd[128];
+	char *wire="wired 1";
+	int wlen = strlen(wire);
 
 	 if (fd < 0)
 		 panic("no /dev/mpi");
@@ -115,6 +119,19 @@ print("Rings %p\n", rings);
 	cmd[1] = (u32int) rings;
 	cmd[2] = (u32int) nring;
 	printf("Command %ld %#lx %ld\n", cmd[0], cmd[1], cmd[2]);
+	/* wire us to core 3 */
+	sprintf(ctlcmd, "/proc/%d/ctl", getpid());
+	print("ctlcmd is %s\n", ctlcmd);
+	ctlfd = open(ctlcmd, 2);
+	print("ctlfd  is %d\n", ctlfd);
+	if (ctlfd < 0) {
+		perror(ctlcmd);
+		exit(1);
+	}
+	if (write(ctlfd, wire, wlen) < wlen) {
+		perror(wire);
+		exit(1);
+	}
    MPI_Barrier(MPI_COMM_WORLD);
 	if (myproc > 1) 
 		goto done;
@@ -124,10 +141,23 @@ print("Rings %p\n", rings);
 		printf("Debug %s failed\n", debugcmd);
 		goto done;
 	}
-	printf("after barrier, proceed\n");
+	//printf("after barrier, proceed\n");
 	write(fd, cmd, sizeof(cmd));
 	start = getticks();
 	cmd[0] = 'g';
+
+	if (myproc)
+	for(j = 0; j < nring; j++) {
+		int i;
+		unsigned long long *u;
+		ring = (Ring *)&rings[j*64];
+		u = ring->userdata;
+		u[0] = getticks();
+		for(i = 1; i < 30; i++)
+			u[i] = j*30+i;
+//printf("%lld\n", u[0]);
+		u[1] = 1234567890;
+	}
 	for (i = 0; i < niter; i++){
 		if (myproc)
 		if (write(fd, cmd, sizeof(cmd[0])) < sizeof(cmd[0])) {
@@ -137,14 +167,22 @@ print("Rings %p\n", rings);
 		for(done = 0; done < nring;) {
 			for(j = 0; j < nring; j++) {
 				if (ring->done) {
-					if (! done && ! myproc) start = getticks();
 					done++;
+					/* this did not help. Setting CI on 
+					 * TLB did. 
+					if (! myproc) 
+						__asm__ __volatile__ ("msync");
+					 */
 				}
 			}
 		}
 		for(j = 0; j < nring; j++) {
+			unsigned long long *u;
 			ring = (Ring *)&rings[j*64];
 			ring->done = 0;
+			u = ring->userdata;
+			if (! myproc)
+				u[3] = getticks();
 		}
 	}
 	end = getticks();
@@ -157,6 +195,23 @@ print("Rings %p\n", rings);
 	bw /= seconds;*/
 	printf("nring %d niter %d %lld bytes in %lld nanoseconds\n", nring, niter, totalbytes, end-start);
 	printf("Bandwidth: %g\n", bw);
+	for(j = 0; j < nring; j++) {
+		unsigned long long *u;
+		ring = (Ring *)&rings[j*64];
+		u = ring->userdata;
+		printf("%llu %llu %llu %llu\n", u[0], u[1], u[2], u[3]);
+	}
+	/* DUMP */
+	if (1)
+	for(j = 0; j < nring; j++) {
+		int i;
+		unsigned long long *u;
+		ring = (Ring *)&rings[j*64];
+		u = ring->userdata;
+		for(i = 0; i < 31; i++) 
+			printf("%llu ", u[i]);
+		printf("\n");
+	}
 done:
     /* just spin so we don't get lots of output crap ... */
     while (myproc > 1) ;
