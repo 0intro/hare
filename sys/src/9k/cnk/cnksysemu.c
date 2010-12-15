@@ -72,7 +72,7 @@ cnkinit(void)
 		return;
 	if (cnkbase){
 		u8int *x;
-		attr = TLBUW|TLBUR|TLBWR;
+		attr = TLBUW|TLBUR|TLBWR|TLBM|TLBCI;
 		//attr |= TLBI|TLBG;
 		print("cnkinit:kmappphys(0, %p, %#x, %#x);\n", (void *)(cnkbase*MiB), 0x10000000 /*n-cnkbase*MiB*/,attr);
 		x = kmapphys(0, cnkbase*MiB, 0x10000000/*n-cnkbase*MiB*/,attr);
@@ -961,4 +961,10 @@ void getrusage(Ar0 *ar0, va_list list)
 	if (up->cnk & 128) print("%#x:%#x\n", r->ru_utime.tv_sec, r->ru_stime.tv_sec);
 
 	ar0->i = 0;	
+}
+
+void cnkgetpid(Ar0 *ar0, va_list)
+{
+	if (up->cnk & 128) print("%d:getpid\n",up->pid);
+	ar0->i = up->pid;	
 }

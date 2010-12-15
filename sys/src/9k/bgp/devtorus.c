@@ -883,6 +883,7 @@ toruswrite(Chan* c, void*a, long n, vlong)
 				}
 				if(debug_torus & DbgRingX){
 					print("ring %p userdata %p count %d done %d\n", base, base->userdata, base->count, base->done);
+					print("Q: %p %#lx\n", base->userdata, *(ulong *) base->userdata);
 				}
 
 				if (base->done)
@@ -1033,7 +1034,7 @@ torusread(Chan* c, void *a, long n, vlong off)
 		p = seprint(p, e, "  avail: %x %x\n", t->dma[KernelGroup].rcv.available[0], t->dma[KernelGroup].rcv.available[1]);
 		p = seprint(p, e, "  thresh: %x %x\n", t->dma[KernelGroup].rcv.threshold[0], t->dma[KernelGroup].rcv.threshold[1]);
 		p = seprint(p, e, "  status: %x\n", t->dma[KernelGroup].rcv.counter_group_status);
-		p = seprint(p, e, "  onering: %ulx\n", onering);
+		p = seprint(p, e, "  onering: %p\n", onering);
 	
 		USED(p, e);
 
@@ -1178,6 +1179,19 @@ dma_inj_fifo_threshold(Ureg* ureg, void*)
 	panic("torus: inject fifo watermark (IRQ %#8.8lux)\n", ureg->cause);
 }
 
+uvlong getticks(void)
+{
+     u32int tbl, tbu0, tbu1;
+
+	do {
+		tbu0 = gettbu();
+		tbl = gettbl();
+		tbu1 = gettbu();
+	} while (tbu0 != tbu1);
+
+	return (((unsigned long long)tbu0) << 32) | tbl;
+}
+
 static void
 torus_process_rx(Torus *t, int group)
 {
@@ -1246,6 +1260,8 @@ torus_process_rx(Torus *t, int group)
 						
 					t->rcvring++;
 					for (i = 0; i < ringsize; i++) {
+						uvlong u;
+						u8int *p;
 						base = (Ring *) (&onering[i*64]);
 
 						if (base->done)
@@ -1255,7 +1271,13 @@ torus_process_rx(Torus *t, int group)
 	
 						/* later on match header. */
 						nbytes = base->count * base->datatype;
+						p = desc->packet;
+						u = getticks();
+						memmove(&p[16], &u, sizeof(u));
+						memmove(base->userdata, desc->packet, nbytes > 240 ? 240 : nbytes);
+						// no effect imb(); /* try it ... */
 						base->done = 1;
+						mb();
 					}
 
 				} else {
@@ -1416,6 +1438,8 @@ torusinject(Torus *t, TxRing *tx, Block *b)
 static void
 quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
 {
+	uvlong u;
+	u8int *p = data;
 	Injdesc *desc;
 	u32int *w;
 	int len =240;
@@ -1428,6 +1452,9 @@ quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
 	desc->length = len;	/* payload size */
 	/* OOPS! Fix L1 coherency issue */
 	desc->base = (u32int) data; /* p == v */
+	u = getticks();
+	memmove(&p[8], &u, sizeof(u));
+	imb();
 
 	/* force certain header bits, at least for now */
 	memmove(desc->hdrs.src, t->addr, N);

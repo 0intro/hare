@@ -26,6 +26,7 @@ Syscall cnkclone;
 Syscall gasm;
 Syscall cnkcga;
 Syscall getrusage;
+Syscall cnkgetpid;
 
 extern Syscall sys_write;
 extern Syscall syspwrite;
@@ -74,7 +75,7 @@ struct syscall cnksystab[] = {
 	[17]	{"STUBbreak", returnok, 1, {.i = 0}},
 	[18]	{"STUBoldstat", returnok, 1, {.i = 0}},
 	[19]	{"STUBlseek", returnok, 1, {.i = 0}},
-	[20]	{"STUBgetpid", returnok, 1, {.i = 0}},
+	[20]	{"cnkgetpid", cnkgetpid, 0, {.i = -1}},
 	[21]	{"STUBmount", returnok, 1, {.i = 0}},
 	[22]	{"STUBumount", returnok, 1, {.i = 0}},
 	[23]	{"STUBsetuid", returnok, 1, {.i = 0}},
