@@ -1,12 +1,20 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
 CLIB=rompi.c torus.c
 CFLAGS=-Dcnk -Wall
-ALL=rompihello stupidreduce testmalloc reduce testpv testring
+ALL=rompihello stupidreduce testmalloc reduce testpv testring timesyscall testfastinject
 all: $(ALL)
 
 reduce: reduce.o rompilib.a
 	$(CC) -I . -o reduce reduce.o rompilib.a
 	cp reduce ~/rompi
+
+timesyscall: timesyscall.o rompilib.a
+	$(CC) -I . -o timesyscall timesyscall.o rompilib.a
+	cp timesyscall ~/rompi
+
+testfastinject: testfastinject.o rompilib.a
+	$(CC) -I . -o testfastinject testfastinject.o rompilib.a
+	cp testfastinject ~/rompi
 
 testring: testring.o rompilib.a
 	$(CC) -I . -o testring testring.o rompilib.a

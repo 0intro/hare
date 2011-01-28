@@ -152,11 +152,10 @@ print("Rings %p\n", rings);
 		unsigned long long *u;
 		ring = (Ring *)&rings[j*64];
 		u = ring->userdata;
-		u[0] = getticks();
-		for(i = 1; i < 30; i++)
+		u[2] = getticks();
+		for(i = 3; i < 30; i++)
 			u[i] = j*30+i;
 //printf("%lld\n", u[0]);
-		u[1] = 1234567890;
 	}
 	for (i = 0; i < niter; i++){
 		if (myproc)
@@ -182,7 +181,7 @@ print("Rings %p\n", rings);
 			ring->done = 0;
 			u = ring->userdata;
 			if (! myproc)
-				u[3] = getticks();
+				u[5] = getticks();
 		}
 	}
 	end = getticks();
@@ -208,6 +207,7 @@ print("Rings %p\n", rings);
 		unsigned long long *u;
 		ring = (Ring *)&rings[j*64];
 		u = ring->userdata;
+		printf("%p ", u);
 		for(i = 0; i < 31; i++) 
 			printf("%llu ", u[i]);
 		printf("\n");
