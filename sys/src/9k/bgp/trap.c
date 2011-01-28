@@ -179,6 +179,9 @@ trap(Ureg *ur)
 
 	ur->cause &= 0xFFE0;
 	ecode = ur->cause;
+	if (ecode == INT_SYSCALL && ur->r0 == 667)
+		return;
+
 	if(ecode < 0 || ecode >= 0x2000)
 		ecode = 0x3000;
 	esr = getesr();
@@ -305,7 +308,8 @@ trapinit(void)
 {
 	int i;
 	uintptr vb;
-
+	void systrapvec(void);
+	extern int fastsyscall;
 	/*
 	 * Hold off on initializing the bic until after print is setup
 	 */
@@ -333,7 +337,10 @@ trapinit(void)
 	sethvec(vb+INT_ALIGN, trapvec);
 	sethvec(vb+INT_PROG, trapvec);
 	sethvec(vb+INT_FPU, trapvec);
-	sethvec(vb+INT_SYSCALL, trapvec);
+	if (fastsyscall)
+		sethvec(vb+INT_SYSCALL, systrapvec);
+	else
+		sethvec(vb+INT_SYSCALL, trapvec);
 	sethvec(vb+INT_APU, trapvec);
 	sethvec(vb+INT_PIT, trapvec);
 //	sethvec(vb+INT_FIT, trapvec);
