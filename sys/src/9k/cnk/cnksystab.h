@@ -27,6 +27,7 @@ Syscall gasm;
 Syscall cnkcga;
 Syscall getrusage;
 Syscall cnkgetpid;
+Syscall systorussend;
 
 extern Syscall sys_write;
 extern Syscall syspwrite;
@@ -351,6 +352,9 @@ struct syscall cnksystab[] = {
 	[298]	{"STUBfaccessat", returnok, 1, {.i = 0}},
 	[299]	{"STUBget_robust_list", returnok, 1, {.i = 0}},
 	[300]	{"STUBset_robust_list", returnok, 1, {.i = 0}},
+	/* experiment */
+//	[301]	{"systorussend", systorussend, 1, {.i = 0}},
+
 	/* these numbers released under the CPL */
 	[1024 + 0]	{"BGP_SYSCALL_NR_GET_PERSONALITY", cnkgetpersonality, 1, {.i = 0}},
 	[1024 + 1]	{"STUB_BGP_SYSCALL_NR_DMA", returnok, 0, {.i = 0}},

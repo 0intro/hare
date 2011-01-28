@@ -10,6 +10,7 @@
 #include <tos.h>
 #include "ureg.h"
 
+/* a system call to returnok (i.e. # 0) takes 898 microseconds. */
 void
 cnksyscall(Ureg* ureg)
 {
@@ -19,6 +20,12 @@ cnksyscall(Ureg* ureg)
 	int i, s, scallnr;
 	static Ar0 zar0;
 	uintptr linuxargs[6];
+
+	/* with this short circuit in place we're down to 460 ns. Time to start short circuiting assembly code. */
+	if (ureg->r0 == 666) {
+		kexit(ureg);
+		return;
+	}
 
 	m->syscall++;
 	up->insyscall = 1;

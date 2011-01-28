@@ -1,4 +1,4 @@
-/*
+/*
  *
  * Copyright (C) 2007-2009, IBM Corporation, 
  *                     Eric Van Hensbergen (bergevan@us.ibm.com)
@@ -396,6 +396,12 @@ struct Torus {
 	uint	rcvresume;
 	uint  rcvring;
 	uint  rcvringdrop;
+	uint	activemsg;
+	uint	activemsgreply;
+	uint	activemsgmm;
+	/* last active message x,y,z -- since iprint does not work */
+	uint ax, ay, az;
+	uint	lastactiveptr;
 	uint	injintr;
 	uint	injgetfifo;
 	uint	injgetstatus;
@@ -447,6 +453,10 @@ struct Ringb {
 	int count;
 };
 
+/* active messages -- if this is on, the rx interrupt will manage the message and not enqueue it */
+/* enabled by writing a to /dev/torusctl and disabled by writing i to /dev/torusctl
+ */
+int activemessages = 0; 
 static u8int *onering = nil;
 static int ringsize;
 static int debug_torus = 0;
@@ -456,7 +466,7 @@ int torus_dump_cons = 1;
 
 static void torusdisable(int cause);
 static void torusinject(Torus*, TxRing*, Block*);
-static void quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data);
+static void quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data, int kaddr);
 
 /* sorry for the ugliness, I'll search and replace it eventually */
 #define DUMP_DCR(desc, x) p = seprint(p, e, " " desc "(%ux): %ux\n", (unsigned int)x, dcrget(x))
@@ -832,7 +842,13 @@ toruswrite(Chan* c, void*a, long n, vlong)
 						debug_torus = 0;
 				}else
 					debug_torus = strtol(cb->f[1], nil, 0);
-			}else
+			}else if(strcmp(cb->f[0], "a") == 0){
+				activemessages = 1;
+				print("Active messages enabled\n");
+			} else if(strcmp(cb->f[0], "i") == 0){
+				activemessages = 0;
+				print("Active messages disabled\n");
+			}  else
 				cmderror(cb, "invalid request");
 		}
 		poperror();
@@ -841,10 +857,12 @@ toruswrite(Chan* c, void*a, long n, vlong)
 	case Qmpi:
 		cmd = a;
 			if(debug_torus & DbgRingX){
-				print("Command %c %#x %d\n", cmd[0], cmd[1], cmd[2]);
+				print("Command '%c' %#x %d\n", cmd[0], cmd[1], cmd[2]);
 			}
 		switch(cmd[0]) {
-		/* set up a ring buffer. Attach to aux. if there was one there already, well, too bad! */
+		default: 
+			error("invalid command");
+			break;		/* set up a ring buffer. Attach to aux. if there was one there already, well, too bad! */
 		case 'r':
 			/* trust is a wonderful thing. If they're stupid enough to hand in a bad pointer, well,
 			 * their life will suck. 
@@ -907,7 +925,7 @@ toruswrite(Chan* c, void*a, long n, vlong)
 					error("bad destination");
 				}
 
-				quicktorusinject(t, &torus.txr[KernelGroup][KernelTxFifo], &pkt, base->userdata);
+				quicktorusinject(t, &torus.txr[KernelGroup][KernelTxFifo], &pkt, base->userdata, 0);
 				base->done = 1;
 			}
 			break;
@@ -1012,6 +1030,12 @@ torusread(Chan* c, void *a, long n, vlong off)
 		p = seprint(p, e, "rcvqread: %d\n", t->rcvqread);
 		p = seprint(p, e, "rcvring: %d\n", t->rcvring);
 		p = seprint(p, e, "rcvringdrop: %d\n", t->rcvringdrop);
+		p = seprint(p, e, "activemessages: %d\n", activemessages);
+		p = seprint(p, e, "activemessagecount: %d\n", t->activemsg);
+		p = seprint(p, e, "activemessagereply: %d\n", t->activemsgreply);
+		p = seprint(p, e, "activemessagemm: %d\n", t->activemsgmm);
+		p = seprint(p, e, "lastactiveptr: %p\n", (void *)t->lastactiveptr);
+		p = seprint(p, e, "lastactive:(%d,%d,%d)\n", t->ax, t->ay, t->az);
 		p = seprint(p, e, "injring: %d\n", t->injring);
 		//p = seprint(p, e, "rcvpause: %d\n", t->rcvpause);
 		//p = seprint(p, e, "rcvresume: %d\n", t->rcvresume);
@@ -1254,11 +1278,55 @@ torus_process_rx(Torus *t, int group)
 				}
 				t->rcvpackets++;
 				tpkt = desc;
-				if (onering) {
+				if (activemessages) {
+					u8int *p;
+					uvlong u;
+					static unsigned char packet[240];
+					static Tpkt pkt;
+					t->activemsg++;
+					/* debug: print won't work in rx interrupt any more. To verify something, store the pointer value so we
+					 * can see it later. 
+					 */
+					
+					p = desc->packet+16;
+					/* use memmove, else, if you are not careful, you can get alignment traps */
+					u = getticks();
+					//memmove(&p[32], &u, sizeof(u));
+					memset(&pkt, 0, sizeof(pkt));
+					memmove(packet, p, sizeof(packet));
+					/* the first four bytes of an active message are always a pointer. */
+					/* NOTE: in future versions, always increment pointer by some number (four?) so packet xmission advances pointer. 
+					 * or make second word an offset. 
+					 */
+					memmove(&t->lastactiveptr, p, 4);
+
+					/* now the fun begins. If packet[5] is 0, don't echo, else ... */
+					t->ax = desc->src[X];
+					t->ay = desc->src[Y];
+					t->az = desc->src[Z];
+					if (packet[5]) {
+						packet[5] = 0;
+						pkt.dst[X] = desc->src[0];
+						pkt.dst[Y] = desc->src[1];
+						pkt.dst[Z] = desc->src[2];
+						t->activemsgreply++;
+						quicktorusinject(&torus, &torus.txr[KernelGroup][KernelTxFifo], &pkt, packet, 1);
+					} else {
+						uvlong *v = (uvlong *) t->lastactiveptr;
+						t->activemsgmm++;
+						
+						if (v != (uvlong *) 0xcafebabe)
+							memmove(v, &u, sizeof(u));
+					}
+					/* note: in future versions, opcode tells us whether to ack the packet. Opcode is modified in this case to avoid 
+					 * infinite ack loops of course. 
+					 */
+					mb();
+				} else if (onering) {
 					Ring *base;
 					int i, nbytes;
-						
-					t->rcvring++;
+					int didit = 0;
+
 					for (i = 0; i < ringsize; i++) {
 						uvlong u;
 						u8int *p;
@@ -1272,13 +1340,19 @@ torus_process_rx(Torus *t, int group)
 						/* later on match header. */
 						nbytes = base->count * base->datatype;
 						p = desc->packet;
+						/* use memmove, else, if you are not careful, you can get alignment traps */
 						u = getticks();
-						memmove(&p[16], &u, sizeof(u));
-						memmove(base->userdata, desc->packet, nbytes > 240 ? 240 : nbytes);
-						// no effect imb(); /* try it ... */
+						memmove(&p[32], &u, sizeof(u));
+						memmove(base->userdata, desc->packet+16, nbytes > 240 ? 240 : nbytes);
+						// no effect imb(); /* try it ... */ // we resolved all this by making a tlb that bypasses L1 & L2. L2 bypass may not be needed. 
 						base->done = 1;
+						didit =1;
 						mb();
+						t->rcvring++;
+						break;
 					}
+					if (! didit) 
+						t->rcvringdrop++;
 
 				} else {
 					if(tpkt->seq != 0 || nhgets(tpkt->off) != 0){
@@ -1436,7 +1510,7 @@ torusinject(Torus *t, TxRing *tx, Block *b)
 
 /* test code for trying out very fast inject from ring -- for now, 240 bytes */
 static void
-quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
+quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data, int kaddr)
 {
 	uvlong u;
 	u8int *p = data;
@@ -1451,9 +1525,12 @@ quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
 	desc->counter = tx->ctrid;
 	desc->length = len;	/* payload size */
 	/* OOPS! Fix L1 coherency issue */
-	desc->base = (u32int) data; /* p == v */
+	if (kaddr)
+		desc->base = PADDR(data);
+	else 
+		desc->base = (u32int) data; /* p == v */
 	u = getticks();
-	memmove(&p[8], &u, sizeof(u));
+	memmove(&p[24], &u, sizeof(u));
 	imb();
 
 	/* force certain header bits, at least for now */
@@ -1495,6 +1572,16 @@ quicktorusinject(Torus *t, TxRing *tx, Tpkt *pkt, void *data)
 	imb();
 	tx->np++;
 }
+
+/* if called via syscall test, assumed called with p==v addresses!*/
+void
+fastinject(Ureg* ureg)
+{
+	Tpkt *pkt = (Tpkt *)ureg->r3;
+	void *data = (void *)ureg->r4;
+	quicktorusinject(&torus, &torus.txr[KernelGroup][KernelTxFifo], pkt, data, 0);
+}
+
 
 /*
  * injection (tx) interrupts
@@ -2010,7 +2097,7 @@ torusreset(void)
 		virq = desc->irq;
 
 		for(i = 0; i < desc->count; i++){
-			if(desc->percore)
+			if(0 && desc->percore)
 				intrenable(virq, desc->handler, (void *)i, desc->name, 0);
 			else
 				intrenable(virq, desc->handler, nil, desc->name, i);
