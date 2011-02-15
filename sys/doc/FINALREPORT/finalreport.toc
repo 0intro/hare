@@ -1,0 +1,12 @@
+\contentsline {chapter}{\numberline {1}Commercial Impact}{2}
+\contentsline {section}{\numberline {1.1}Cray}{2}
+\contentsline {section}{\numberline {1.2}IBM}{2}
+\contentsline {subsection}{\numberline {1.2.1}9p}{2}
+\contentsline {chapter}{\numberline {2}Fixed Time Quantum}{3}
+\contentsline {chapter}{\numberline {3}Operating Systems Developments}{7}
+\contentsline {section}{\numberline {3.1}Plan 9 Port to Blue Gene /L and /P}{7}
+\contentsline {subsection}{\numberline {3.1.1}Large Pages}{7}
+\contentsline {subsection}{\numberline {3.1.2}Shared Heap}{7}
+\contentsline {section}{\numberline {3.2}New network communications models}{7}
+\contentsline {subsection}{\numberline {3.2.1}Active Message Support}{7}
+\contentsline {subsection}{\numberline {3.2.2}What are we calling Charles stuff?}{7}
