@@ -1,4 +1,4 @@
-/*
+/*
  *
  * Copyright (C) 2007-2009, IBM Corporation, 
  *                     Eric Van Hensbergen (bergevan@us.ibm.com)
@@ -157,10 +157,10 @@ struct Tpkt {
 	union{
 		struct{	/* direct-put DMA mode */
 			u8int	paoff[4];		/* put address offset (updated by hw for large packets) */
-			u8int	rdmaid;		/* RDMA counter ID */
+			u8int	rdma;		/* RDMA counter ID */
 			u8int	valid;		/* valid bytes in payload (updated by hw) */
 			u8int	rgflags;		/* remote get flags */
-			u8int	idmaid;		/* IDMA FIFO ID */
+			u8int	idma;		/* IDMA FIFO ID */
 		};
 		struct{	/* memory FIFO mode */
 			u8int	putoff[4];		/* put offset (updated by hw) */
@@ -732,6 +732,71 @@ static Dirtab torusdir[] = {
 	{ "mpi",		{ Qmpi, 0, 0},	0,	0666 },
 	{ "torusdebug", { Qdebug, 0, 0}, 0,	0444 },
 };
+
+/* "RDMA" stuff */
+/*
+ * build a direct-put packet to send a block to base(rctr)+roffset
+ */
+static void
+mkputpkt(Block *b, uchar *dst, int rctr, u32int roffset)
+{
+	Tpkt *pkt;
+
+	pkt = (Tpkt*)b->wp;	/* MAC-level header, then RDMA header */
+	pkt->sk = Sk;
+	pkt->hint = PID0(KernelPid);
+	pkt->size = SIZE(7) | Dm | PID1(KernelPid)|Dy|Vcd0;	/* TO DO: assumes >= 240 */
+	pkt->dst[0] = dst[0];
+	pkt->dst[1] = dst[1];
+	pkt->dst[2] = dst[2];
+	pkt->paoff[0] = roffset>>24;	/* receive address offset; base is in Counter */
+	pkt->paoff[1] = roffset>>16;
+	pkt->paoff[2] = roffset>>8;
+	pkt->paoff[3] = roffset;
+	pkt->rdma = rctr;
+	pkt->valid = 0;
+	pkt->rgflags = 0;	/* remote put */
+	pkt->idma = 0;		/* unused */
+	b->wp += Tpkthdrlen;
+}
+
+/*
+ * build a remote get packet to cause the `remote' node to send a block
+ * of count bytes at base(rctr)+offset there to base(lctr) here, using fifo `idma' there.
+ */
+static void
+mkgetpkt(Block *b, uchar *local, uchar *remote, int rctr, int lctr, int idma, u32int offset, u32int count)
+{
+	Injdesc *i;
+	Tpkt *pkt;
+
+	pkt = (Tpkt*)b->wp;
+	pkt->sk = Sk;
+	pkt->hint = PID0(KernelPid);
+	pkt->size = SIZE(1) | Dm | PID1(KernelPid)|Dy|Vcd0;
+	pkt->dst[0] = remote[0];
+	pkt->dst[1] = remote[1];
+	pkt->dst[2] = remote[2];
+	pkt->paoff[0] = 0;	/* unused */
+	pkt->paoff[1] = 0;
+	pkt->paoff[2] = 0;
+	pkt->paoff[3] = 0;
+	pkt->rdma = 0;		/* unused */
+	pkt->valid = 32;
+	pkt->rgflags = 1;	/* remote get */
+	pkt->idma = idma;
+	b->wp += Tpkthdrlen;
+
+	/* payload is iDMA injection descriptor for remote and associated direct-put to send to us */
+	i = (Injdesc*)b->wp;	/* reasonable to assume byte ordering and p aligned */
+	i->flags = 0;
+	i->counter = rctr;
+	i->base = offset;	/* byte offset from base in rctr */
+	i->length = count;
+	b->wp += 16;
+	mkputpkt(b, local, lctr, 0);	/* ie, direct-put back to us */
+	/* padding mentioned on p. 11 is actually added by dma engine */
+}
 
 /*
  * TO DO: handle self-addressed messages
