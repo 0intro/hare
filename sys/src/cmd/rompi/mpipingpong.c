@@ -45,6 +45,7 @@ main (int argc, char **argv)
 
    printf("Hello from %d of %d\n", myproc, nprocs);
    MPI_Barrier(MPI_COMM_WORLD);
+   printf("barrier done from %d of %d\n", myproc, nprocs);
 
 /* Timer accuracy test */
 
@@ -55,6 +56,7 @@ main (int argc, char **argv)
 
    if (myproc == 0)
       printf("Timer accuracy of ~%f usecs\n\n", (t1 - t0) * 1000000);
+printf("timer acc done\n");
 
 /* Communications between nodes 
  *   - Blocking sends and recvs

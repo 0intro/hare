@@ -356,6 +356,13 @@ returnok(Ar0*, va_list)
 	return;
 }
 
+void
+systorussend(Ar0*a, va_list)
+{
+	a->i = 0;
+	return;
+}
+
 /* void  *  mmap(void *start, size_t length, int prot , int flags, int fd,
        off_t offset); */
 

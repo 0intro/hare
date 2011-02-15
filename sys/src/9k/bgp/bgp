@@ -31,6 +31,8 @@ rootdir
 
 conf
 	u32int cnkbase = 0;
+# syscall support with no safety valves -- disable on normal kernels
+	int fastsyscall = 0;
 	int cpuserver = 1;
 	#include "version.h"
 	

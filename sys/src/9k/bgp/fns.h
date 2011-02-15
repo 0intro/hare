@@ -151,3 +151,6 @@ u32int	getfpscr(void);
 /* CNK emulation */
 void	cnksyscall(Ureg*);
 void*	cnksysexecregs(uintptr, ulong, ulong);
+
+/* special bits called from quick system calls */
+void fastinject(Ureg* ureg);

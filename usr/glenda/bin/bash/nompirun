@@ -100,7 +100,7 @@ shift $((OPTIND - 1))
 # SET DEFAULTS IF USER DOESNT SPECIFY
 if [ -z $aflag ]
 then
-	aflag=BGPPlan9Meas
+	aflag=BGPPlan9Meas_DD
 fi
 if [ -z $rflag ]
 then

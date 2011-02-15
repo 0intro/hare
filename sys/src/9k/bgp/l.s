@@ -867,6 +867,73 @@ tlbtrap:
 	MOVW	R0, SPR(SAVELR)
 	BR	trapcommon
 
+sysfastinject: 
+	MOVW	LR, R0
+	MOVW	R0, SPR(SAVEXX)			/* save interrupt vector offset */
+	MOVW	R1, SPR(SAVER1)			/* save stack pointer */
+
+	/* did we come from user space? */
+	MOVW	SPR(SPR_SRR1), R0
+	MOVW	CR, R1
+	MOVW	R0, CR
+	BC	4,17,ktrap			/* if MSR[PR]=0, we are in kernel space */
+
+	/* was user mode, switch to kernel stack and context */
+	MOVW	R1, CR
+	MOVW	SPR(SPR_SPRG7R), R1		/* up->kstack+KSTACK-UREGSPACE, set in touser and sysrforkret */
+	BL	saveureg(SB)
+	BL	fastinject(SB)
+	BR	restoreureg
+/*
+ * fastsyscall trap. Lots of checking turned off. 
+ *	MOVW R0, SPR(SAVER0)
+ *	(critical interrupts disabled in MSR, using R0)
+ *	MOVW LR, R0
+ *	MOVW R0, SPR(SAVELR)
+ *	bl	trapvec(SB)
+ * time with this unmodified from trap is 390 ns to the "return immediately" call in cnk
+ * time to get tricky. Let's bounce right back if the # is 667
+ * If we bounce back earlier in trap itself it's still 300 ns. This damn function is too fat. 
+ * How much of saveureg can we get rid of? 
+ * OK, here is a lower bound. IF we use system call 668, then we do one system call per 72 ns. Better than this we can not do.
+ */
+TEXT	systrapvec(SB), 1, $-4
+	MOVW	SPR(SAVER0), R0
+	CMP	R0, $668
+	BNE	testquickinject
+	MOVW	SPR(SAVELR), R0
+	MOVW	R0,LR
+	RFI
+testquickinject: 
+	CMP	R0, $669
+	BNE	realsyscall
+	BR	sysfastinject
+realsyscall: 
+	MOVW	LR, R0
+	MOVW	R0, SPR(SAVEXX)			/* save interrupt vector offset */
+	MOVW	R1, SPR(SAVER1)			/* save stack pointer */
+
+	/* did we come from user space? */
+	MOVW	SPR(SPR_SRR1), R0
+	MOVW	CR, R1
+	MOVW	R0, CR
+	BC	4,17,ktrap			/* if MSR[PR]=0, we are in kernel space */
+
+	/* was user mode, switch to kernel stack and context */
+	MOVW	R1, CR
+	MOVW	SPR(SPR_SPRG7R), R1		/* up->kstack+KSTACK-UREGSPACE, set in touser and sysrforkret */
+	BL	saveureg(SB)
+
+	MOVW	$machptr(SB), R(MACH)		/* pointer array */
+	MOVW	SPR(SPR_PIR), R4		/* PIN */
+	SLW	$2, R4				/* offset into pointer array */
+	ADD	R4, R(MACH)			/* pointer to array element */
+	MOVW	(R(MACH)), R(MACH)		/* m-> */
+	MOVW	8(R(MACH)), R(USER)		/* up-> */
+
+	BL	trap(SB)
+	BR	restoreureg
+
 /*
  * following Book E, traps thankfully leave the mmu on.
  * the following code has been executed at the exception
