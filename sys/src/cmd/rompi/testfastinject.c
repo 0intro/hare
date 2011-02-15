@@ -97,27 +97,26 @@ main (int argc, char **argv)
 	vlong start, end;
         int ctlfd;
         char ctlcmd[128];
-	vlong *result;
+	volatile vlong *result, *resultbase;
 	unsigned long ptr;
 	/* the wiring is crucial. We only got to about 2.9 microseconds 
-	 * per send without wiring. With wirin, we got to 1.165 microseconds
+	 * per send without wiring. With wiring, we got to 1.165 microseconds
 	 * per send. What is likely going on is inj interrupts taking time
 	 * and slowing down the rest of the work. 
 	 */
-        char *wire="wired 1";
-        int wlen = strlen(wire);
-
-	int num = 512/8, i;
-    unsigned char *d = malloc(1024);
-printf("d is %p\n", d);
+        char wire[32];
+        int wlen;
+	int core = 0;
+	int num = 1, i;
 
 	Tpkt *pkt = (Tpkt *) b;
 	unsigned char *data = &b[1024];
-	result = (vlong *)(&b[2048]);
-	ptr = (unsigned long) result;
-	*result = 0;
+	result = (vlong *)(&b[128*1024]);
 
-        /* wire us to core 3 */
+	if (argc > 1) {
+		core = strtoul(argv[1], 0, 0);
+	}
+        /* wire us to core 'core' */
         sprintf(ctlcmd, "/proc/%d/ctl", getpid());
         print("ctlcmd is %s\n", ctlcmd);
         ctlfd = open(ctlcmd, 2);
@@ -126,6 +125,8 @@ printf("d is %p\n", d);
                 perror(ctlcmd);
                 exit(1);
         }
+	sprintf(wire, "wired %d", core);
+	wlen = strlen(wire);
         if (write(ctlfd, wire, wlen) < wlen) {
                 perror(wire);
                 exit(1);
@@ -136,34 +137,37 @@ printf("d is %p\n", d);
 	pkt->dst[Y] = 0;
 	pkt->dst[Z] = 0;
 
-	data[0] = ptr>>24;
-	data[1] = ptr>>16;
-	data[2] = ptr>>8;
-	data[3] = ptr;
 /*
 	for(i = 0; i < 240; i++)
 		data[i] = i + 1;
  */
-	data[5] = 1;
 
 	start = getticks();
-/*
 	for(i = 0; i < num; i++) {
+		*result = getticks();
+		result++;
+		ptr = (unsigned long) result;
+		result++;
+		data[0] = ptr>>24;
+		data[1] = ptr>>16;
+		data[2] = ptr>>8;
+		data[3] = ptr;
+		data[5] = 1;
 		syscall(669, pkt, data);
-		syscall(669, pkt, data);
-		syscall(669, pkt, data);
-		syscall(669, pkt, data);
-		syscall(669, pkt, data);
-		syscall(669, pkt, data);
-		syscall(669, pkt, data);
-		syscall(669, pkt, data);
+		/* wait for a return */
+		while (! *(volatile uvlong *)ptr)
+			;
+		//*(volatile uvlong *)ptr = getticks();
 	}
- */
-	syscall(669, pkt, data);
 	end = getticks();
+	result = (vlong *)(&b[128*1024]);
+	for(i = 0; i < num; i++) {
+		print("%lld %lld - p\n", result[i*2+1], result[i*2]);
+	}
+
 
 	print("result %lld\n", result);
-	print("%lld %lld - %d / p\n", end, start, num*8);
+	print("%lld %lld - %d / p\n", end, start, num);
 
 }
 
