@@ -4,9 +4,26 @@
 \contentsline {subsection}{\numberline {1.2.1}9p}{2}
 \contentsline {chapter}{\numberline {2}Fixed Time Quantum}{3}
 \contentsline {chapter}{\numberline {3}Operating Systems Developments}{7}
-\contentsline {section}{\numberline {3.1}Plan 9 Port to Blue Gene /L and /P}{7}
-\contentsline {subsection}{\numberline {3.1.1}Large Pages}{7}
-\contentsline {subsection}{\numberline {3.1.2}Shared Heap}{7}
-\contentsline {section}{\numberline {3.2}New network communications models}{7}
-\contentsline {subsection}{\numberline {3.2.1}Active Message Support}{7}
-\contentsline {subsection}{\numberline {3.2.2}What are we calling Charles stuff?}{7}
+\contentsline {section}{\numberline {3.1}Plan 9 Port to Blue Gene /L and /P}{8}
+\contentsline {subsection}{\numberline {3.1.1}Large Pages}{8}
+\contentsline {subsection}{\numberline {3.1.2}Shared Heap}{8}
+\contentsline {subsection}{\numberline {3.1.3}Currying}{8}
+\contentsline {section}{\numberline {3.2}File Systems}{8}
+\contentsline {subsection}{\numberline {3.2.1}Compute Node Caches}{8}
+\contentsline {section}{\numberline {3.3}New network communications models}{8}
+\contentsline {subsection}{\numberline {3.3.1}Active Message Support}{8}
+\contentsline {subsection}{\numberline {3.3.2}What are we calling Charles stuff?}{8}
+\contentsline {section}{\numberline {3.4}Kittyhawk Linux Kernel}{8}
+\contentsline {subsection}{\numberline {3.4.1}Hybrid Networks}{8}
+\contentsline {subsection}{\numberline {3.4.2}Communication Domains}{8}
+\contentsline {subsection}{\numberline {3.4.3}Heterogenous Compute Node Kernels}{8}
+\contentsline {section}{\numberline {3.5}Kittyhawk L4 Kernels}{8}
+\contentsline {subsection}{\numberline {3.5.1}Virtual Machine Monitor for BG/P}{8}
+\contentsline {chapter}{\numberline {4}Run Time Developments}{9}
+\contentsline {section}{\numberline {4.1}XCPU^3}{9}
+\contentsline {section}{\numberline {4.2}UEM}{9}
+\contentsline {section}{\numberline {4.3}PUSH}{9}
+\contentsline {chapter}{\numberline {5}Infrastructure Developments}{10}
+\contentsline {section}{\numberline {5.1}Blue Gene Debug File System}{10}
+\contentsline {section}{\numberline {5.2}nompirun}{10}
+\contentsline {section}{\numberline {5.3}Kittyhawk Cloud Provisioning}{10}
