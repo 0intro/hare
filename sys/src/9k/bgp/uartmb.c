@@ -126,7 +126,7 @@ mbputs(int core, char* s, int n)
 			dcbi(&mm->cmd);
 		}while(!(mm->cmd & 0x8000));
 
-		dcrput(BGP_DCR_GLOB_ATT_WRITE_CLEAR, BGP_ALERT_OUT(core));
+		//dcrput(BGP_DCR_GLOB_ATT_WRITE_CLEAR, BGP_ALERT_OUT(core));
 
 		n -= len;
 		s += len;

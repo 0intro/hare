@@ -459,7 +459,7 @@ struct Ringb {
 int activemessages = 0; 
 static u8int *onering = nil;
 static int ringsize;
-static int debug_torus = 0;
+static int debug_torus = 1;
 
 static Torus torus;
 int torus_dump_cons = 1;
