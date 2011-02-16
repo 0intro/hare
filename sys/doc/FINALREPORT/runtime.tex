@@ -1,0 +1,58 @@
+\chapter{Runtimes}
+Developing runtimes for processes on Plan~9 was challenging, because we did not opt for the 
+traditional HPC approach of placing device drivers in user level libraries. From the beginning of this 
+project, we had decided to have the kernel control communications and  
+resource management tasks that have 
+been relegated to user level runtimes for decades. Returning control of these tasks to  the kernel
+makes the HPC resource available to a much wider set of applications than just MPI programs. On 
+many traditional HPC systems, high performance networks are not even visible to non-MPI 
+applications. On Plan~9 on BG/P, even the command shell has access to the fastest networks: hence
+it is 
+possible to run a shell pipeline between compute nodes, without rewriting all the 
+programs involved to use MPI. Parallel programs become more portable, and much easier to 
+write and use. 
+
+Removing device drivers from libraries removed all the attendant complexity from those libraries; 
+many user-level libraries have more complex code than the Plan~9 kernel, and even the smallest 
+of those libraries is larger than our kernel. Our limited-function MPI supports many MPI applications 
+in less than 5000 lines.
+
+User-level runtimes are not without their advantages. Most MPI libraries are thread-safe, and 
+incorporate an activity scheduler that can choose activities with very low overhead. Because the 
+device driver is contained in the process, pointers to data are valid for all the operations the runtime 
+performs, including setting up DMA. There is no need to translate addresses, and 
+on a simple system like Blue Gene, there is no need for complex page pinning software. 
+These MPI runtimes in essence create a single-address-space operating system, complete with drivers 
+and scheduling, that is "booted" by the host operating system and then left to run in control of the
+node. Again, the advantages of the runtime include the implementation  of system call functionality 
+with function calls; and a single
+address space, with the attendant elimination of address translations and page faults and 
+elimination of unnecessary copies. 
+
+Leaving device drivers in the kernel requires reduced overhead in some areas. 
+A system call takes 1-2 microseconds, on average; this time must be 
+reduced when latency-sensitive operations take place. User-level 
+addresses must be mapped into the kernel address space. In interrupt handlers, user-level 
+memory is not easily accessed in Plan~9, since interrupt handlers have no user context. 
+
+In this section we describe the research we have undertaken to address these needs. 
+
+\section{Currying and Process-private system calls}
+Extensive measurement of the kernel, using the tool developed and described in \cite{plan9trace}, showed
+that for read and write system calls a great deal of overhead was repeated for each iteration of the 
+call. Two of the biggest overheads are validation of the file descriptor and the read/write pointer and 
+length validation. We also found in most cases that the pointers are being reused for each call: it is extremely rare for these parameters to be wrong, yet programs pay the full overhead for checking them 
+each time. For the Blue Gene global barrier device, the overhead for the system call was 3.529 microseconds. 
+
+In \cite{currying} we describe the possible approaches to resolving this problem. We developed two 
+several extensions to Plan~9 that allowed the kernel to Curry the arguments to the read and write
+system calls. The result: the file descriptor and point/length information is checked once, and the
+result stored in a cache held in the proc struct (per-process information) in the kernel. The per-process structure is 
+also extended with a private system call table. When the process makes a private system
+call, all the standard checking is skipped and the cached values are used instead. This 
+new system call path resulted in a 5-fold reduction in overhead, to 729 nanoseconds. 
+
+The Currying and per-process system calls together form a new type of interface to operating system
+kernels. 
+
+
