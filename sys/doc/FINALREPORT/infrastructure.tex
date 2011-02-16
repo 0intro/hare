@@ -1,4 +1,65 @@
 \chapter{Infrastructure Developments}
 \section{Blue Gene Debug File System}
+
+The Blue Gene incorporates a management network with JTAG level access to every
+core on the system which is uses for loading, monitoring and control.
+Our Plan 9 infrastructure represents the external interface to this JTAG infrastructure as
+a file system. This file system is served by a special application on an external system
+that connects to a management port on the service node which accepts JTAG and system
+management commands. Directory hierarchies are used to organize racks, midplanes,
+node cards, nodes, and cores. Each core has its own subdirectory with a set of files rep­
+resenting the core's state and control interfaces.
+
+This has the effect of representing the entire machine\'s state as well as special files
+for interacting with per-node consoles as a single file hierarchy with leaf nodes
+reminicent of the the /proc file system from Linux (except more powerful).
+The monitoring network and debug file system were vital contributors to the speed with
+which we were able to bring up the system.  Since all nodes and state are represented, 
+it eases the job of writing parallel debuggers and profilers.  Indeed, the Plan 9
+debuggers are already written to work against such file systems and so this allowed us
+to debug multi-node kernelcode as easily as we would have debugged a multi-process
+applications.
+
 \section{nompirun}
-\section{Kittyhawk Cloud Provisioning}
+
+While the debug file system provided us a great environment for bring-up, it
+did not play well with the existing management infrastructures in production 
+environments.  To accomodate production environments we wrote management daemons
+for our IO nodes which interacted with the production management infrastructure for
+status reporting, parameter passing, and notification of termination of applications.
+We also constructed a number of scripts for interacting with the cobalt job submission
+system used at Argonne National Labs which automated launch of Plan 9 jobs including
+configuration of back-links to the front-end file servers and reporting channels for
+the aggreagted standard output and standard error of the jobs running on all the 
+compute nodes.  This alternate infrastructure was critical to allowing us to bring up
+applications with alternate (non-MPI-based) runtimes while still playing nicely with 
+the production management software and job schedulers and was reused to enable the
+Kittyhawk profiles. 
+
+\section{Kittyhawk u-boot and cloud provisioning}
+
+The production Blue Gene control system only
+allows booting a single image on all nodes of a block. 
+Initial firmware which initializes the hardware is loaded 
+via the control network into each node of the machine.
+
+For Kittyhawk profiles, we take over the node from the 
+firmware via a generic boot loader which is placed on all 
+nodes by the existing control system. The boot loader, U-Boot, 
+offers rich functionality including a scripting language, 
+network booting via NFS and TFTP, and a network console. We extended
+U-Boot with the necessary device drivers for the Blue Gene
+hardware and integrated the Lightweight IP stack [6, 7] to
+provide support for TCP as a reliable network transport.
+
+With this base functionality, individual nodes can be controlled 
+remotely, boot sequences can be scripted, and specialized kernel 
+images can be uploaded on a case-by-case, node-by-node basis. 
+Users can then use simple command line tools to request a node
+or a group of nodes from the free pool and push kernels to the
+newly allocated group.  The kittyhawk infrastructure allows
+users to construct powerful scripted environments and
+bootstrap large numbers of nodes in a controlled, flexible,
+and secure way.  Simple extensions to this model can also be used
+to reclaim and restart nodes from failure or simply to reprovision
+them with different base software.
