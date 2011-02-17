@@ -1,0 +1,38 @@
+.PS
+define plan9  {[L:box "plan9 proc (addresses < 16 MB)"  ht $1 wid $2
+	S:box "stack" with .n at last box .s ht $1 wid $2
+	B:box "bss" with .n at last box.s ht $1 wid $2
+	D:box "data" with .n at last box.s ht $1 wid $2
+	C:box "code"with .n at last box.s ht $1 wid $2
+]}
+define cnk  {[L:box "cnk proc (addresses > 16 MB)" "Rounded to nearest 1M" "BSS set to 256MB base" ht $1+.15 wid $2 
+	S:box "stack" with .n at last box .s ht $1 wid $2
+	B:box "bss" with .n at last box.s ht $1 wid $2
+	D:box "data" with .n at last box.s ht $1 wid $2
+	C:box "code" with .n at last box.s ht $1 wid $2
+]}
+
+define page {$1: box "4k page" ht .2i wid 2i with .n at M.n - (0,$2); line from $3  to $1.w}
+define bigpage {$1: box "256MB page" "Shared among all" "CNK processes" "virtual==physical address" ht 1i wid 1.5i}
+
+bigpage(A)
+T1: box "Torus" with .w at A.e + (.5,0) ht 1i wid .3i
+X: box "Program" with .ne at A.sw - (0,1)
+XO: box "Plan 9" with .nw at A.se - (0,1)
+
+arrow "1. " "init" "packet" from X.n to X.n + (0,1) then to A.w
+arrow "2. System call" "667(20000000)" from X.e to XO.w
+arrow "3." "Kick Torus" "with P==V" from XO.n to T1.s
+
+T2: box "Torus" with .w at T1.e + (.75,0) ht 1i wid .3i
+bigpage(B) with .w at T2.e + (.5,0)
+YO: box "Plan 9" with .ne at B.sw - (0,1)
+Y: box "Program" with .ne at B.se - (0,1)
+R: box "Ring Buffer" with .ne at B.se
+
+arrow "4. Packet" "over Torus" from T1.e to T2.w
+arrow "5. Plan 9" "Interrupt handler" from T2.s to YO.n
+arrow "6. Store data" "into ring" from YO.e to R.w
+arrow "7. Read" "from ring" from Y.n to R.s
+..PE
+
