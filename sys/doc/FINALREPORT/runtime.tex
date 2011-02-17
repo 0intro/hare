@@ -55,7 +55,54 @@ new system call path resulted in a 5-fold reduction in overhead, to 729 nanoseco
 The Currying and per-process system calls together form a new type of interface to operating system
 kernels. 
 
+\section{Unified Execution Model}
 
-\section{XCPU$^3$}
-\section{UEM}
-\section{PUSH}
+In order to address the need for a more dynamic model of interacting with large scale machines,
+we built the unified execution model (UEM)~\cite{uem} which combined interfaces for logical provisioning 
+and distributed command execution with integrated mechanisms for establishing and maintaining 
+communication, synchronization, and control.  The intent was to provide an environment which
+would allow the end-user to treat the supercomputer as a seamless extension of his desktop
+workstation -- making elements of his local environment and file system available on the 
+supercomputer as well as providing interfaces for interactive control and management of 
+processes running on top of the high-performance system.
+
+Our initial attempt at providing the UEM infrastructure was based around an extension of 
+some of our previous work in cluster workload management~\cite{xcpu}~\cite{xcpu2}.  This 
+initial infrastructure, named XCPU$^3$ was built on top of the Inferno virtual machine which could be
+hosted on a variety of platforms (Windows, Linux, Mac, Plan 9), while providing secure 
+communication channels and dynamic name space management.  It functioned as a server
+for the purposes of providing access to the elements of the end-users desktop as well
+as an gateway to the interfaces for job control and management on the supercomputer.
+The management interface was structured as a synthetic file system built into the 
+Inferno virtual machine, which could be accessed by applications running on the host
+either directly via a library or by mounting a 9P exported name space (using the Linux
+v9fs 9P client support built into the Linux kernel).
+
+A key aspect which allowed the UEM to scale was a hierarchical organization of node
+aggregation which on bluegene matched the topology of the collective network.  It became
+clear that at the core of the interaction of the UEM infrastructure were one to many
+communication pipelines which were used to broadcast control messages and aggregate
+response communication and reporting.  We extracted that key functionality into a new
+system primitive called a multipipe~\cite{multipipe}.  The result dramatically simplified
+the infrastructure and improved overall system performance.  It also became clear that
+multipipes were a useful primitive for the construction of applications and other system
+services.  We extended the design to incorperate many to many communication as well as
+support for collective operations and barriers.
+
+While Inferno provided a great environment on top of end-user desktops, we didn't want
+to incur the overhead of running Inferno on all the compute nodes of the supercomputer.
+Using multipipes as the core primative, we built a pair of synthetic file systems for 
+Plan 9 which provided an interface for initiating execution on a node named execfs and
+a second file system whose purpose was to coordinate groups of remote processes to allow
+for fan-out computation and aggregate control named gangfs.  The gangfs file systems
+were built to organize themselves hierarchically in a fashion similar to XCPU$^3$.  This
+could then be mounted by front-end systems or end user workstations and interacted with
+using Inferno as a gateway and server.
+
+In order to make interactions with the UEM file system a bit more straightforward
+we developed a new shell which incorporated support for multi-pipes and interactions
+with the taskfs and gangfs interfaces.  
+Push is a dataflow shell which uses two new pipe operators, fan out('|<') and 
+fanin('>|') to create Directed Acyclic Graphs of processes.
+This allows construction of complicated computational workflows 
+in the same fashion one would create UNIX shell script pipelines.
