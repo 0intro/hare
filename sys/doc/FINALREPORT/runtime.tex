@@ -1,0 +1,90 @@
+\chapter{Run Time Developments}
+Developing runtimes for processes on Plan~9 was challenging, because we did not opt for the 
+traditional HPC approach of placing device drivers in user level libraries. From the beginning of this 
+project, we had decided to have the kernel control communications and  
+resource management tasks that have 
+been relegated to user level runtimes for decades. Returning control of these tasks to  the kernel
+makes the HPC resource available to a much wider set of applications than just MPI programs. On 
+many traditional HPC systems, high performance networks are not even visible to non-MPI 
+applications. On Plan~9 on BG/P, even the command shell has access to the fastest networks: hence
+it is 
+possible to run a shell pipeline between compute nodes, without rewriting all the 
+programs involved to use MPI. Parallel programs become more portable, and much easier to 
+write and use. 
+
+Removing device drivers from libraries removed all the attendant complexity from those libraries; 
+many user-level libraries have more complex code than the Plan~9 kernel, and even the smallest 
+of those libraries is larger than our kernel. Our limited-function MPI supports many MPI applications 
+in less than 5000 lines.
+
+User-level runtimes are not without their advantages. Most MPI libraries are thread-safe, and 
+incorporate an activity scheduler that can choose activities with very low overhead. Because the 
+device driver is contained in the process, pointers to data are valid for all the operations the runtime 
+performs, including setting up DMA. There is no need to translate addresses, and 
+on a simple system like Blue Gene, there is no need for complex page pinning software. 
+These MPI runtimes in essence create a single-address-space operating system, complete with drivers 
+and scheduling, that is "booted" by the host operating system and then left to run in control of the
+node. Again, the advantages of the runtime include the implementation  of system call functionality 
+with function calls; and a single
+address space, with the attendant elimination of address translations and page faults and 
+elimination of unnecessary copies. 
+
+Leaving device drivers in the kernel requires reduced overhead in some areas. 
+A system call takes 1-2 microseconds, on average; this time must be 
+reduced when latency-sensitive operations take place. User-level 
+addresses must be mapped into the kernel address space. In interrupt handlers, user-level 
+memory is not easily accessed in Plan~9, since interrupt handlers have no user context. 
+
+In this section we describe the research we have undertaken to address these needs. 
+
+\section{Unified Execution Model}
+
+In order to address the need for a more dynamic model of interacting with large scale machines,
+we built the unified execution model (UEM)~\cite{uem} which combined interfaces for logical provisioning 
+and distributed command execution with integrated mechanisms for establishing and maintaining 
+communication, synchronization, and control.  The intent was to provide an environment which
+would allow the end-user to treat the supercomputer as a seamless extension of his desktop
+workstation -- making elements of his local environment and file system available on the 
+supercomputer as well as providing interfaces for interactive control and management of 
+processes running on top of the high-performance system.
+
+Our initial attempt at providing the UEM infrastructure was based around an extension of 
+some of our previous work in cluster workload management~\cite{xcpu}~\cite{xcpu2}.  This 
+initial infrastructure, named XCPU$^3$ was built on top of the Inferno virtual machine which could be
+hosted on a variety of platforms (Windows, Linux, Mac, Plan 9), while providing secure 
+communication channels and dynamic name space management.  It functioned as a server
+for the purposes of providing access to the elements of the end-users desktop as well
+as an gateway to the interfaces for job control and management on the supercomputer.
+The management interface was structured as a synthetic file system built into the 
+Inferno virtual machine, which could be accessed by applications running on the host
+either directly via a library or by mounting a 9P exported name space (using the Linux
+v9fs 9P client support built into the Linux kernel).
+
+A key aspect which allowed the UEM to scale was a hierarchical organization of node
+aggregation which on bluegene matched the topology of the collective network.  It became
+clear that at the core of the interaction of the UEM infrastructure were one to many
+communication pipelines which were used to broadcast control messages and aggregate
+response communication and reporting.  We extracted that key functionality into a new
+system primitive called a multipipe~\cite{multipipe}.  The result dramatically simplified
+the infrastructure and improved overall system performance.  It also became clear that
+multipipes were a useful primitive for the construction of applications and other system
+services.  We extended the design to incorperate many to many communication as well as
+support for collective operations and barriers.
+
+While Inferno provided a great environment on top of end-user desktops, we didn't want
+to incur the overhead of running Inferno on all the compute nodes of the supercomputer.
+Using multipipes as the core primative, we built a pair of synthetic file systems for 
+Plan 9 which provided an interface for initiating execution on a node named execfs and
+a second file system whose purpose was to coordinate groups of remote processes to allow
+for fan-out computation and aggregate control named gangfs.  The gangfs file systems
+were built to organize themselves hierarchically in a fashion similar to XCPU$^3$.  This
+could then be mounted by front-end systems or end user workstations and interacted with
+using Inferno as a gateway and server.
+
+In order to make interactions with the UEM file system a bit more straightforward
+we developed a new shell which incorporated support for multi-pipes and interactions
+with the taskfs and gangfs interfaces.  
+Push is a dataflow shell which uses two new pipe operators, fan out('|<') and 
+fanin('>|') to create Directed Acyclic Graphs of processes.
+This allows construction of complicated computational workflows 
+in the same fashion one would create UNIX shell script pipelines.

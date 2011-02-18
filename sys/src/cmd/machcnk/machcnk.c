@@ -53,7 +53,7 @@ print("SEGMENT CREATE OK!\n");
 print("SSIZE DONE\n");
 	if (markheap) {
 		if (write(ctlfd, "heap", 4) < 0)
-			errexit("Setting heap");
+			errexit("Error Setting heap");
 	}
 print("DONE MARKHEAP\n");
 	ptr = segattach(0, name, (void *)addr,size);
@@ -61,7 +61,7 @@ print("DONE MARKHEAP\n");
 		errexit(smprint("segattach(0, %s, %p, %d): %r", name, (void *)addr, size));
 print("DONE SEGATTACH\n");
 	memset(ptr, 0, size);
-print("DONE MEMSET\n");
+print("DONE MEMSET %p for %d bytes\n", ptr, size);
 	return ptr;
 }
 
@@ -234,7 +234,9 @@ main(int argc, char *argv[])
 
 	/* now the big fun. Just copy it out */
 	pread(fd, textp, fp.txtsz, fp.txtoff);
+	print("Text copied out\n");
 	pread(fd, datap, fp.datsz, fp.datoff);
+	print("Data copied out\n");
 	/* DEBUGGING
 	hangpath = smprint("/proc/%d/ctl", getpid());
 

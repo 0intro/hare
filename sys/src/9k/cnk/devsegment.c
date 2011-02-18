@@ -116,6 +116,7 @@ getgseg(Chan *c)
 static void
 putgseg(Globalseg *g)
 {
+	up->heapseg = nil;
 	if(decref(g) > 0)
 		return;
 	if(g->s != nil)
@@ -420,14 +421,21 @@ segmentwrite(Chan *c, void *a, long n, vlong voff)
 				g->s = newseg(SG_SHARED, va, len);
 		} else if(strcmp(cb->f[0], "heap") == 0){
 			int i;
-			if (!g)
+			/* CNK mode: no errstr. So print these too, they're critical and you need to know.   */
+			if (!g){
+				print("%d: no globalseg\n", up->pid);
 				error("no globalseg");
-			if (!g->s)
+			}
+			if (!g->s){
+				print("%d: no segment\n", up->pid);
 				error("no segment");
-			if (up->heapseg)
+			}
+			if (up->heapseg){
+				print("%d: heap already set\n", up->pid);
 				error("heap already set");
-			else
-				up->heapseg = g->s;
+			}
+
+			up->heapseg = g->s;
 			/* pre-fault the pages in */
 			if (! cnkbase)
 			for(i = 0; i < g->s->size; i++) {
