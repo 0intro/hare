@@ -61,7 +61,7 @@ print("DONE MARKHEAP\n");
 		errexit(smprint("segattach(0, %s, %p, %d): %r", name, (void *)addr, size));
 print("DONE SEGATTACH\n");
 	memset(ptr, 0, size);
-print("DONE MEMSET\n");
+print("DONE MEMSET %p for %d bytes\n", ptr, size);
 	return ptr;
 }
 

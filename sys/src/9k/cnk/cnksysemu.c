@@ -77,7 +77,7 @@ cnkinit(void)
 		print("cnkinit:kmappphys(0, %p, %#x, %#x);\n", (void *)(cnkbase*MiB), 0x10000000 /*n-cnkbase*MiB*/,attr);
 		x = kmapphys(0, cnkbase*MiB, 0x10000000/*n-cnkbase*MiB*/,attr);
 		print("Did a kmapphys , got %p,  do a store\n", x);
-		*x = 0;
+		*x = 0xdeadbeef;
 	} 
 }
 void
@@ -149,6 +149,9 @@ cnksbrk(Ar0* ar0, uintptr addr, int allocate)
 		long newsize;
 		newtop = PGROUND(addr);
 		newsize = (newtop-heapseg->base)/BY2PG;
+		/* needs to be zero'd out */
+		/* may need to revisit this however. */
+		memset((void *)(heapseg->top+1), 0, newtop-heapseg->top);
 		heapseg->top = newtop;
 		heapseg->size = newsize;
 		ar0->p = newtop;
