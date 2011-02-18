@@ -43,9 +43,45 @@ kernels.
 \section{New network communications models}
 \subsection{Active Message Support}
 \subsection{What are we calling Charles stuff?}
-\section{Kittyhawk Linux Kernel}
-\subsection{Hybrid Networks}
-\subsection{Communication Domains}
-\subsection{Heterogenous Compute Node Kernels}
-\section{Kittyhawk L4 Kernels}
-\subsection{Virtual Machine Monitor for BG/P}
+\section{Kittyhawk Kernels and VMM}
+
+Supercomputers and clouds both strive to make a large number of 
+computing cores available for computation. 
+However, current cloud infrastructure does not yield the performance 
+sought by many scientific applications. A source of the performance 
+loss comes from virtualization and virtualization of the network in 
+particular. 
+Project Kittyhawk~\cite{kh-sciencecloud} was an undertaking at IBM Research 
+to explore the use of a hybrid supercomputer software infrastructure
+on top of a BlueGene/P which allows direct hardware access to the 
+communication hardware for the necessary components while providing 
+the standard elastic cloud infrastructure for other components.
+
+Beyond the enabling infrastructure for cloud provisioning and dynamic
+boot of multiple images across compute nodes within a single BG/P
+allocation, the Kittyhawk team also ported a Linux compute node
+implementation complete with an Ethernet interface to the high-performance
+collective and torus networks~\cite{kh-systemsjournal}.  
+This allowed Linux applications to run unmodified om Blue Gene compute 
+nodes without incurring the performance 
+overhead of reflecting sockets and I/O operations thorugh user space
+helpers as in ZeptoOS.  It also enabled more conventional storage solutions
+including SAN and NAS to be extended into the compute node network for
+I/O intensive solutions.  While the Kittyhawk Linux kernel provided this
+Ethernet interface, it also provided an API allowing the allocation of
+torus channels directly to high performance applications which knew how to
+interact with them allowing even greater degrees of performance and flexibility.
+These allocated application channels co-existed with the kernel-space channels
+providing a good hybrid trade off between system provided networking and
+OS bypass.
+
+The Kittyhawk environment was not limited to Linux kernel targets.  
+It also supported execution of the L4 microkernel operating system.  
+In addition to providing an alternative execution platform for applications,
+the L4 Kittyhawk port also supported a virtual machine monitor which could
+be used to further virtualize the BG/P nodes and network providing additional
+protection in cloud deployment environments.
+
+The Kittyhawk infrastructure, the linux kernel patches, and the L4 kernel
+and virtual machine monitor have all been released as open source and are
+available from http://kittyhawk.bu.edu.
