@@ -168,7 +168,7 @@ main (int argc, char **argv)
 	print("amr is %p\n", amr);
 	memset(amr, 0, sizeof(*amr));
 	amr->base = &amr[1];
-	amr->size = 1 << 16;
+	amr->size = 1 << 20;
 	/* moved here so we can easily test some things on IO nodes
 	 * after CN have all crashed :-)
 	 */
