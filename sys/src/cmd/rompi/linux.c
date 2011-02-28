@@ -12,7 +12,8 @@ void fprint(int fd, const char *fmt, ...)
 	char *s;
 	va_list ap;
 	va_start(ap, fmt);
-	s = smprint(fmt, ap);
+	s = malloc(1024);
+	vsnprintf(s, 1024, fmt, ap);
 	write(fd, s, strlen(s));
 	free(s);
 }
@@ -40,7 +41,7 @@ void exits(char *s)
 {
 	if (s == NULL) 
 		exit(0);
-	fprint(2, s);
+	fprint(2, "%s\n", s);
 	exit(1);
 }
 

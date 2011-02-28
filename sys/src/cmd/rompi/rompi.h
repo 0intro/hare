@@ -20,6 +20,7 @@ void fprint(int fd, const char *fmt, ...);
 void print(const char *fmt, ...);
 void *mallocz(size_t size, int zero);
 void panic(char *s);
+void exits(char *s);
 static __inline__ u64int tbget(void)
 {
      unsigned int tbl, tbu0, tbu1;

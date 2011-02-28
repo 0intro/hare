@@ -17,13 +17,14 @@ int
 main(int argc, char **argv)
 {
 	unsigned int *p;
-	printf("Hello, from CNK r2 is 0x%x\n", getr2());
-	printf("pid %d\n", getpid());
-	p = malloc(2048);
-	printf("p %p\n", p);
+	print("Hello, from CNK r2 is 0x%x\n", getr2());
+	print("pid %d\n", getpid());
+	p = mallocz(2048, 1);
+	print("p %p\n", p);
 	free(p);
-	p = malloc(412);
-	printf("p %p\n", p);
+	p = mallocz(412, 0);
+	print("p %p\n", p);
+	exits("ALL DONE");
 	
 	return 0;
 }
