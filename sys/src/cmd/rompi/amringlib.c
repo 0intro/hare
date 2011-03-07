@@ -1,5 +1,3 @@
-typedef uvlong ticks;
-
 typedef struct Tpkt Tpkt;
 struct Tpkt {
 	/* hardware header */
@@ -39,49 +37,49 @@ int logN; /* consider adding to ring later; but we have to change kernel too */
 
 int amringsetup(void *where, int logN, int core)
 {
-    int myproc, nprocs, done;
-    /* weird issue: malloc gets wrong address. Don't use it for now */
-    unsigned char *b = (void *) 0x20000000;
-    int datablocksize = 32768;
-    vlong start, end;
-    int ctlfd;
-    char ctlcmd[128];
-    volatile vlong *result, *resultbase;
-    unsigned long ptr;
-    int amt;
-    /* the wiring is crucial. We only got to about 2.9 microseconds 
+	int myproc, nprocs, done;
+	/* weird issue: malloc gets wrong address. Don't use it for now */
+	unsigned char *b = (void *) 0x20000000;
+	int datablocksize = 32768;
+	vlong start, end;
+	int ctlfd;
+	char ctlcmd[128];
+	volatile vlong *result, *resultbase;
+	unsigned long ptr;
+	int amt;
+	/* the wiring is crucial. We only got to about 2.9 microseconds 
      * per send without wiring. With wiring, we got to 1.165 microseconds
      * per send. What is likely going on is inj interrupts taking time
      * and slowing down the rest of the work. 
      */
-    char wire[32];
-    int wlen;
-    int core = 0;
-    int num = 1024, i;
-    int role;
-    
-    Tpkt *pkt = (Tpkt *) b;
-    unsigned char *data = &b[1024];
-    result = (vlong *)(&b[128*1024]);
-    struct AmRing *amr;
+	char wire[32];
+	int wlen;
+	int core = 0;
+	int num = 1024, i;
+	int role;
+
+	Tpkt *pkt = (Tpkt *) b;
+	unsigned char *data = &b[1024];
+	result = (vlong *)(&b[128*1024]);
+	struct AmRing *amr;
 	unsigned long amrbase;
-	
-    
-        /* wire us to core 'core' */
-        sprintf(ctlcmd, "/proc/%d/ctl", getpid());
-        print("ctlcmd is %s\n", ctlcmd);
-        ctlfd = open(ctlcmd, 2);
-        print("ctlfd  is %d\n", ctlfd);
-        if (ctlfd < 0) {
-                perror(ctlcmd);
-                exit(1);
-        }
+
+
+	/* wire us to core 'core' */
+	sprintf(ctlcmd, "/proc/%d/ctl", getpid());
+	print("ctlcmd is %s\n", ctlcmd);
+	ctlfd = open(ctlcmd, 2);
+	print("ctlfd  is %d\n", ctlfd);
+	if (ctlfd < 0) {
+		perror(ctlcmd);
+		exit(1);
+	}
 	sprintf(wire, "wired %d", core);
 	wlen = strlen(wire);
-        if (write(ctlfd, wire, wlen) < wlen) {
-                perror(wire);
-                exit(1);
-        }
+	if (write(ctlfd, wire, wlen) < wlen) {
+		perror(wire);
+		exit(1);
+	}
 
 	/* set up amr  ... just make the base the next page. */
 	amrbase = (unsigned int) malloc(2*1024*1024);
@@ -95,11 +93,11 @@ int amringsetup(void *where, int logN, int core)
 	/* moved here so we can easily test some things on IO nodes
 	 * after CN have all crashed :-)
 	 */
-    	cfd = open("/dev/torusctl", 2);
-    if (cfd < 0) {
-	    perror("cfd");
-	    exit(1);
-    }
+	cfd = open("/dev/torusctl", 2);
+	if (cfd < 0) {
+		perror("cfd");
+		exit(1);
+	}
 	sprintf(ctlcmd, "r %p", amr);
 	print("ctlcmd is %s\n", ctlcmd);
 	amt = write(cfd, ctlcmd, strlen(ctlcmd));
@@ -113,11 +111,11 @@ int amringsetup(void *where, int logN, int core)
 int
 amrsend(void *i, int size, int rank)
 {
-			memset(pkt, 0, sizeof(*pkt));
-			pkt->dst[X] = 0;
-			pkt->dst[Y] = 0;
-			pkt->dst[Z] = 0;
-			res = syscall(669, pkt, data);
+	memset(pkt, 0, sizeof(*pkt));
+	pkt->dst[X] = 0;
+	pkt->dst[Y] = 0;
+	pkt->dst[Z] = 0;
+	res = syscall(669, pkt, data);
 	return res;
 }
 
@@ -131,13 +129,13 @@ amrrecv(int *num)
 {
 	Tpkt *t = (Tpkt *)amr->base;
 
-			if (amr->con != amr->prod){
-				tpkt = &tpkt[amr->prod & logN];
-				*num = 1;
-				amr->con++;
-			} else {
-				*num = 0;
-			}
+	if (amr->con != amr->prod){
+		tpkt = &tpkt[amr->prod & logN];
+		*num = 1;
+		amr->con++;
+	} else {
+		*num = 0;
+	}
 	return null;
 }
 
