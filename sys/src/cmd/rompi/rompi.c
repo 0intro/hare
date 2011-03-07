@@ -153,8 +153,10 @@ MPI_Init(int *argc, char ***argv)
 	myname = av[0];
 //print( "myname %s av[1] %s\n", myname, av[1]);
 	nproc = strtoul(av[1], 0, 10);
-	*argc = *argc - 2;
-	*argv = av + 2;
+	/* fix up args so av[0] is my name */
+	av[1] = av[0];
+	*argc = *argc - 1;
+	*argv = av + 1;
 	torusinit(&myproc, nproc);
 //print( "x %d y %d z %d myproc %d xyztorank() %d\n", x, y, z, myproc, xyztorank(x,y,z));
 

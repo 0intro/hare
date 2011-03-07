@@ -6,6 +6,7 @@
 /*                                                                         */
 /*  Authors: Jeremiah Willcock                                             */
 /*           Andrew Lumsdaine                                              */
+/* get rid of all that mpi crap. No need for 2 queues either		 */
 
 #include "common.h"
 #include <mpi.h>
@@ -25,12 +26,6 @@ void run_mpi_bfs(const csr_graph* const g, int64_t root, int64_t* pred, int64_t*
   const size_t nlocalverts = g->nlocalverts;
   int64_t nvisited_local = 0;
 
-  /* Set up the queues. */
-  int64_t* oldq = (int64_t*)xmalloc(nlocalverts * sizeof(int64_t));
-  int64_t* newq = (int64_t*)xmalloc(nlocalverts * sizeof(int64_t));
-  size_t oldq_count = 0;
-  size_t newq_count = 0;
-
   /* Set up the visited bitmap. */
   const int ulong_bits = sizeof(unsigned long) * CHAR_BIT;
   int64_t visited_size = (nlocalverts + ulong_bits - 1) / ulong_bits;
@@ -40,14 +35,6 @@ void run_mpi_bfs(const csr_graph* const g, int64_t root, int64_t* pred, int64_t*
 
   /* Set up buffers for message coalescing, MPI requests, etc. for
    * communication. */
-  const int coalescing_size = 256;
-  int64_t* outgoing = (int64_t*)xMPI_Alloc_mem(coalescing_size * size * 2 * sizeof(int64_t));
-  size_t* outgoing_counts = (size_t*)xmalloc(size * sizeof(size_t)) /* 2x actual count */;
-  MPI_Request* outgoing_reqs = (MPI_Request*)xmalloc(size * sizeof(MPI_Request));
-  int* outgoing_reqs_active = (int*)xcalloc(size, sizeof(int)); /* Uses zero-init */
-  int64_t* recvbuf = (int64_t*)xMPI_Alloc_mem(coalescing_size * 2 * sizeof(int64_t));
-  MPI_Request recvreq;
-  int recvreq_active = 0;
 
   /* Termination counter for each level: this variable counts the number of
    * ranks that have said that they are done sending to me in the current
@@ -120,15 +107,14 @@ void run_mpi_bfs(const csr_graph* const g, int64_t root, int64_t* pred, int64_t*
     num_ranks_done = 1; /* I never send to myself, so I'm always done */
     
     /* Start the initial receive. */
-    if (num_ranks_done < size) {
-      MPI_Irecv(recvbuf, coalescing_size * 2, INT64_T_MPI_TYPE, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &recvreq);
-      recvreq_active = 1;
-    }
+    /* this moves outside the loop and is always active -- no need to call */
 
     /* Step through the current level's queue. */
     size_t i;
     for (i = 0; i < oldq_count; ++i) {
+      /* most of this nonsense not needed
       CHECK_MPI_REQS;
+	*/
       assert (VERTEX_OWNER(oldq[i]) == rank);
       assert (pred[VERTEX_LOCAL(oldq[i])] >= 0 && pred[VERTEX_LOCAL(oldq[i])] < g->nglobalverts);
       ++nvisited_local;
@@ -149,7 +135,7 @@ void run_mpi_bfs(const csr_graph* const g, int64_t root, int64_t* pred, int64_t*
             newq[newq_count++] = tgt;
           }
         } else {
-          while (outgoing_reqs_active[owner]) CHECK_MPI_REQS; /* Wait for buffer to be available */
+         // NOP now while (outgoing_reqs_active[owner]) CHECK_MPI_REQS; /* Wait for buffer to be available */
           size_t c = outgoing_counts[owner];
           outgoing[owner * coalescing_size * 2 + c] = tgt;
           outgoing[owner * coalescing_size * 2 + c + 1] = src;

@@ -81,7 +81,7 @@ void run_mpi_bfs(const csr_graph* const g, int64_t root, int64_t* pred, int64_t*
          * (using MPI's non-overtaking rules to keep that signal after all
          * "real" messages. */ \
         if (count == 0) { \
-          ++num_ranks_done; \
+          printf("num_ranks_done %d\n"); ++num_ranks_done; \
         } else { \
           int j; \
           for (j = 0; j < count; j += 2) { \
@@ -92,7 +92,7 @@ void run_mpi_bfs(const csr_graph* const g, int64_t root, int64_t* pred, int64_t*
             if (!TEST_VISITED(tgt)) { \
               SET_VISITED(tgt); \
               pred[VERTEX_LOCAL(tgt)] = src; \
-              newq[newq_count++] = tgt; \
+              printf("visited %d src %d\n", tgt, src);newq[newq_count++] = tgt; \
             } \
           } \
         } \
