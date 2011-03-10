@@ -1,5 +1,5 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
-CLIB=rompi.c torus.c
+LIB=rompi.o torus.o amring.o linux.o
 CFLAGS=-Dcnk -Wall
 ALL=rompihello stupidreduce testmalloc reduce testpv testring timesyscall testfastinject hello testamring
 all: $(ALL)
@@ -44,50 +44,8 @@ testmalloc: testmalloc.o rompilib.a
 	$(CC) -I . -o testmalloc testmalloc.o rompilib.a
 	cp testmalloc ~/rompi
 
-rompilib.a: rompi.o torus.o linux.o
-	ar r rompilib.a rompi.o torus.o linux.o
+rompilib.a: $(LIB)
+	ar r rompilib.a $(LIB)
 
 clean: 
 	rm -f *.a *.o   $(ALL) tags
-#
-##
-##		programs
-##
-#all: ${TARG}
-#
-#TARG=\
-#	rompihello\
-#	ring \
-#	stupidreduce \
-#	reduce \
-#
-#DIRS=\
-#
-#OTHEROFILES=\
-#	torus.o\
-#	rompi.o\
-#	support.o\
-#
-#HFILES=mpi.h
-#
-#LIB=lib.a
-#BIN=.
-#
-##UPDATE=\
-##	mkfile\
-##	$HFILES\
-##	${OTHEROFILES}\
-##	${TARGc}\
-#
-#clean:
-#	rm -f *.[oS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG
-#
-#nuke:
-#	rm -f *.[oS] *.[$OS].a [$OS].* y.tab.? y.debug y.output $TARG *.acid
-#
-#o.o: lib.a
-#
-#${LIB}: ${OTHEROFILES}
-#	ar r $LIB oTHEROFILES
-#
-#
