@@ -76,15 +76,7 @@ enum {
  * 128-bit boundary for loading into the HUMMER.
  */
 typedef struct Tpkt Tpkt;
-struct Tpkt {
-	u8int	sk;				/* Skip Checksum Control */
-	u8int	hint;				/* Hint|Dp|Pid0 */
-	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
-	u8int	dst[N];				/* Destination Coordinates */
-	u8int	_6_[2];				/* reserved */
-	u8int	_8_[8];				/* protocol header */
-	u8int	payload[];
-};
+typedef struct Hdr Hdr;
 
 struct Hdr {
 	uchar	len[2];	/* byte length - 1 */
@@ -92,6 +84,17 @@ struct Hdr {
 	uchar	seq;		/* low order bits of sequence (zero if raw) */
 	uchar	src[3];	/* source node address */
 };
+
+struct Tpkt {
+	u8int	sk;				/* Skip Checksum Control */
+	u8int	hint;				/* Hint|Dp|Pid0 */
+	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
+	u8int	dst[N];				/* Destination Coordinates */
+	u8int	_6_[2];				/* reserved */
+	Hdr     Hdr;
+	u8int	payload[];
+};
+
 
 
 static __inline__ u64int tbget(void)

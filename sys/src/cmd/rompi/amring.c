@@ -6,10 +6,12 @@ struct AmRing {
 	int size;
 	int prod;
 	int logN;
-	u8int _116[128-16];
+	u8int _112[128-16];
 	int con;
 	u8int _124[128-4];
 };
+
+extern int myproc, nproc;
 
 /* stuff we might as well keep around for the duration. */
 static int cfd, ctlfd;
@@ -49,6 +51,7 @@ amringsetup(int logN, int core)
 
 	/* set up amr  ... just make the base the next page. */
 	amrbase = (unsigned int) malloc(2*1024*1024);
+	amrbase = (unsigned int) malloc(2*1024*1024);
 	print("amrbase is %#x", amrbase);
 	amrbase = (amrbase+255)&(~0xff);
 	amr = (void *)amrbase;
@@ -77,31 +80,134 @@ amringsetup(int logN, int core)
 	return amr;
 }
 
-Tpkt *waitamrpacket(struct AmRing *amr, u8int type)
+int
+amrsend(struct AmRing *amr, void *data, int size, int rank)
 {
+	void ranktoxyz(int rank, int *x, int *y, int *z);
+    
+	int x, y, z;
+	ranktoxyz(rank, &x, &y, &z);
+	Tpkt *pkt;
+	int res;
+	pkt = mallocz(sizeof(*pkt), 1);
+	pkt->dst[X] = x;
+	pkt->dst[Y] = y;
+	pkt->dst[Z] = z;
+	res = syscall(669, pkt, data);
+	free(pkt);
+	return res;
+}
+
+
+/* return pointer to the set of config packets; set *size to the number 
+ * that are there. 
+ * later. For now we just return the next. 
+ */
+Tpkt *
+amrrecv(struct AmRing *amr, int *num, Tpkt *p, int *x, int *y, int *z)
+{
+	Tpkt *tpkt = (Tpkt *)amr->base, ap;
+
+	if (amr->con != amr->prod){
+		tpkt = &tpkt[amr->prod & (amr->size-1)];
+
+		ap = *tpkt;
+		amr->con++;
+		if (p)
+			*p = ap;
+		*x = ap.Hdr.src[X];
+		*y = ap.Hdr.src[Y];
+		*z = ap.Hdr.src[Z];
+		*num = 1;
+	} else {
+		*num = 0;
+		tpkt = NULL;
+	}
+	return tpkt;
+}
+
+/* just one for now */
+unsigned char *amrrecvbuf(struct AmRing *amr, unsigned char *p, int *rank)
+{
+    int xyztorank(int x, int y, int z);
+
+    int num = 1;
+    int x, y, z;
+    Tpkt *pkt = amrrecv(amr, &num, NULL, &x, &y, &z);
+    if (pkt) {
+	memcpy(p, pkt, 240);
+	*rank = xyztorank(x,y,z);
+	return p;
+    }
+    return NULL;
+}
+
+void waitamrpacket(struct AmRing *amr, u8int type, Tpkt *pkt, 
+		    int *x, int *y, int *z)
+{
+	int num;
 	/* eat packets until packet type 'type' is found. */
 	do {
-	} until (pkt->data[16] == type);
+		amrrecv(amr, &num, pkt, x, y, z);
+	} while (num < 1 || pkt->payload[16] != type);
+	print("waitamrpacket: returing for %d from (%d, %d, %d)\n", type, x,y,z);
 }
-void
-beacon(struct AmRing *arm, int *nodes)
+
+int
+beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 {
+	u8int *data;
+	Tpkt pkt;
+	int num;
+	int x, y, z;
+	int rank;
+	int i;
+
+	data = mallocz(256, 1);
+	data[0] = 'B';
 	/* go ahead and send the beacon. */
+	for(num = i = 1; i < numnodes; i++) {
+		if (! nodestatus[i]){
+			amrsend(amr, data, 240, i);
+			print("0: send %d\n", i);
+		} else {
+			num++;
+		}
+	}
 	/* gather any responses */
+	while (amrrecv(amr, &num, &pkt, &x, &y, &z)) {
+	    int 	xyztorank(int x, int y, int z);
+		rank = xyztorank(x, y, z);
+		print("beacon: one from (%d,%d,%d)\n", x,y,z);
+		if (nodestatus[rank] == 0) {
+			num++;
+		}
+		nodestatus[rank]++;
+	}
+	free(data);
 	/* return total responses contained in 'nodes' */
+	return num;
 }
 
 void
 waitbeacon(struct AmRing *amr)
 {
-	/* receive a packet */
-	/* see if first char is 'B' --> beacon */
+	int x, y, z;
+	Tpkt pkt;
+	waitamrpacket(amr, 'B', &pkt, &x, &y, &z);
+	print("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
 }
 
 void
 respondbeacon(struct AmRing *amr)
 {
-	/* send a rsponse to a packet -- first char is 'b' */
+	unsigned char *data;
+	data = mallocz(256, 1);
+	data[0] = 'b';
+	print("Respondbeacon to 0\n");
+	/* send a response to a packet -- first char is 'b' */
+	amrsend(amr, data, 240, 0);
+	free(data);
 }
 
 void
@@ -118,65 +224,28 @@ intreduce(struct AmRing *amr)
 }
 
 void
-waitbeacon(struct AmRing *amr)
-void
-amrstartu(struct AmRing *amr)
+amrstartup(struct AmRing *amr)
 {
 	if (! myproc) {
 		/* node 0 beacons once per second. It collects responses. 
 		 * once all nodes have checked in it sends a start message. 
 		 */
 		int numresponded = 0;
-		int *nodes = mallocz(nprocs);
-		while (numresponded < nprocs) {
-			numresponded = beacon(nodes);
+		int *nodes = mallocz(nproc, 1);
+		while (numresponded < nproc-1) {
+			numresponded = beacon(amr, nodes, nproc);
+			print("amrstartup: %d to date\n", numresponded);
 			sleep(1);
 		}
 	} else {
 		/* wait for the beacon */
 		waitbeacon(amr);
+		print("waitbeacon returns\n");
 		/* send our response */
 		respondbeacon(amr);
+		print("responded\n");
 	}
 
 	/* amring is now usable for normal work */
-}
-
-int
-amrsend(struct AmRing *amr, void *data, int size, int rank)
-{
-	void ranktoxyz(int rank, int *x, int *y, int *z);
-    
-	int x, y, z;
-	ranktoxyz(rank, &x, &y, &z);
-	Tpkt pkt;
-	int res;
-	memset(&pkt, 0, sizeof(pkt));
-	pkt.dst[X] = x;
-	pkt.dst[Y] = y;
-	pkt.dst[Z] = z;
-	res = syscall(669, pkt, data);
-	return res;
-}
-
-
-/* return pointer to the set of config packets; set *size to the number 
- * that are there. 
- * later. For now we just return the next. 
- */
-void *
-amrrecv(struct AmRing *amr, int *num)
-{
-	Tpkt *tpkt = (Tpkt *)amr->base;
-
-	if (amr->con != amr->prod){
-		tpkt = &tpkt[amr->prod & (amr->size-1)];
-		*num = 1;
-		amr->con++;
-	} else {
-		*num = 0;
-		tpkt = NULL;
-	}
-	return tpkt;
 }
 
