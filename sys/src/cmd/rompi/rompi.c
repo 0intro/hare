@@ -1,27 +1,6 @@
 #include "rompi.h"
 
 enum {
-	Sk		= 0x01,			/* Skip Checksum */
-
-	Pid0		= 0x01,			/* Destination Group FIFO MSb */
-	Dp		= 0x02,			/* Multicast Deposit */
-	Hzm		= 0x04,			/* Z- Hint */
-	Hzp		= 0x08,			/* Z+ Hint */
-	Hym		= 0x10,			/* Y- Hint */
-	Hyp		= 0x20,			/* Y+ Hint */
-	Hxm		= 0x40,			/* X- Hint */
-	Hxp		= 0x80,			/* X+ Hint */
-
-	Vcd0		= 0x00,			/* Dynamic 0 VC */
-	Vcd1		= 0x01,			/* Dynamic 1 VC */
-	Vcbn		= 0x02,			/* Deterministic Bubble VC */
-	Vcbp		= 0x03,			/* Deterministic Priority VC */
-	Dy		= 0x04,			/* Dynamic Routing */
-	Dm		= 0x08,			/* DMA Mode */
-	Pid1		= 0x10,			/* Destination Group FIFO LSb */
-};
-
-enum {
 	TAGcomm = 0,
 	TAGtag,
 	TAGsource,

@@ -112,6 +112,8 @@ amrrecv(struct AmRing *amr, int *num, Tpkt *p, int *x, int *y, int *z)
 		tpkt = &tpkt[amr->prod & (amr->size-1)];
 
 		ap = *tpkt;
+		printf("Con %d, tpkt %p, prod %d, payloadbyte %02x\n", 
+			amr->con, tpkt, amr->prod, ap.payload[0]);
 		amr->con++;
 		if (p)
 			*p = ap;
@@ -149,6 +151,16 @@ void waitamrpacket(struct AmRing *amr, u8int type, Tpkt *pkt,
 	/* eat packets until packet type 'type' is found. */
 	do {
 		amrrecv(amr, &num, pkt, x, y, z);
+		if (num) {
+		print("waitamrpacket gets %d, wants %d\n", pkt->payload[16], type);
+	{ int i,j; for(i = 0; i < 15; i++) 
+			for(j = 0; j < 16; j++)
+				printf("%02x ", pkt->payload[i*16+j]);
+			
+			printf("\n");
+		}
+	}
+
 	} while (num < 1 || pkt->payload[16] != type);
 	print("waitamrpacket: returing for %d from (%d, %d, %d)\n", type, x,y,z);
 }
@@ -164,8 +176,12 @@ beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 	int i;
 
 	data = mallocz(256, 1);
+	for(i = 0; i < 256; i++)
+		data[i] = 'a' + i;
 	data[0] = 'B';
+	data[16] = 'B';
 	/* go ahead and send the beacon. */
+	print("0: beacon. numnodes %d\n", numnodes);
 	for(num = i = 1; i < numnodes; i++) {
 		if (! nodestatus[i]){
 			amrsend(amr, data, 240, i);

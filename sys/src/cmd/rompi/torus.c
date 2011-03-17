@@ -176,7 +176,7 @@ dumptpkt(Tpkt* tpkt, int hflag, int dflag)
 		print("\n");
 
 		print("Sw:");
-		t = (u8int*)tpkt->_8_;
+		t = (u8int*)&tpkt->Hdr;
 		for(i = 0; i < 8; i++)
 			print(" %#2.2ux", t[i]);
 	}
@@ -214,6 +214,7 @@ torussend(void *buf, int length, int x, int y, int z, int hint, void *tag, int t
 {
 	int n;
 	/* OMG! We're gonna copy AGAIN. Mantra: right then fast. */
+	int pwrite(int, void *, int, off_t);
 	Tpkt *tpkt;
 	u8int *packet;
 	int want;
@@ -250,6 +251,7 @@ torusrecv(void *buf, long buflen, void *tag, long taglen)
 	int total;
 	char *m = buf;
 	int mlen;
+	int pread(int, void *, int, off_t);
 	if (torusdebug&2)
 		print("TR: buf %p tag %p\n", buf, tag);
 	/* more copies. We can fix this later but we really ought to 
