@@ -9,49 +9,9 @@
  *  http://www.scl.ameslab.gov/ .
  */
 #include "rompi.h"
-enum {
-        X               = 0,                    /* dimension */
-        Y               = 1,
-        Z               = 2,
-        N               = 3,
-
-        Chunk           = 32,                   /* granularity of FIFO */
-        Pchunk          = 8,                    /* Chunks in a packet */
-
-        Quad            = 16,
-        Tpkthdrlen      = 16,
-};
-
 
 
 typedef uvlong ticks;
-
-typedef struct Tpkt Tpkt;
-struct Tpkt {
-	/* hardware header */
-	u8int	sk;					/* Skip Checksum Control */
-	u8int	hint;				/* Hint|Dp|Pid0 */
-	u8int	size;				/* Size|Pid1|Dm|Dy|VC */
-	u8int	dst[N];				/* Destination Coordinates */
-	u8int	_6_[2];				/* reserved */
-
-	/* hardware and software headers */
-	union{
-		struct{	/* direct-put DMA mode */
-			u8int	paoff[4];		/* put address offset (updated by hw for large packets) */
-			u8int	rdmaid;		/* RDMA counter ID */
-			u8int	valid;		/* valid bytes in payload (updated by hw) */
-			u8int	rgflags;		/* remote get flags */
-			u8int	idmaid;		/* IDMA FIFO ID */
-		};
-		struct{	/* memory FIFO mode */
-			u8int	putoff[4];		/* put offset (updated by hw) */
-			u8int	other[4];		/* software */
-		};
-	};
-	u8int	payload[];
-};
-
 
 static __inline__ ticks getticks(void)
 {
@@ -89,15 +49,13 @@ mynsec(void)
 int
 main (int argc, char **argv)
 {
-    double bw;
-    int myproc, nprocs, done;
-	/* weird issue: malloc gets wrong address. Don't use it for now */
+    /* weird issue: malloc gets wrong address. Don't use it for now */
     unsigned char *b = (void *) 0x20000000;
-    int datablocksize = 32768;
+
 	vlong start, end;
         int ctlfd;
         char ctlcmd[128];
-	volatile vlong *result, *resultbase;
+	volatile vlong *result;
 	unsigned long ptr;
 	/* the wiring is crucial. We only got to about 2.9 microseconds 
 	 * per send without wiring. With wiring, we got to 1.165 microseconds
@@ -168,6 +126,6 @@ main (int argc, char **argv)
 
 	print("result %lld\n", result);
 	print("%lld %lld - %d / p\n", end, start, num);
-
+	return 0;
 }
 

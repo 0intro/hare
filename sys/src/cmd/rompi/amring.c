@@ -86,15 +86,15 @@ amrsend(struct AmRing *amr, void *data, int size, int rank)
 	void ranktoxyz(int rank, int *x, int *y, int *z);
     
 	int x, y, z;
-	ranktoxyz(rank, &x, &y, &z);
-	Tpkt *pkt;
+	u8int *coord;
 	int res;
-	pkt = mallocz(sizeof(*pkt), 1);
-	pkt->dst[X] = x;
-	pkt->dst[Y] = y;
-	pkt->dst[Z] = z;
-	res = syscall(669, pkt, data);
-	free(pkt);
+	ranktoxyz(rank, &x, &y, &z);
+	coord = mallocz(3, 0);
+	coord[0] = x;
+	coord[1] = y;
+	coord[2] = z;
+	printf("SEND TO [%d, %d, %d] %p\n", x,y,z,data);
+	res = syscall(669, coord, data);
 	return res;
 }
 

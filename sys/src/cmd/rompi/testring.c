@@ -64,7 +64,7 @@ main (int argc, char **argv)
     double bw;
     int myproc, nprocs, done;
 	/* weird issue: malloc gets wrong address. Don't use it for now */
-    unsigned char *b = (void *) 0x20000000;
+
     int datablocksize = 32768;
     unsigned char *d = malloc(1024);
 printf("d is %p\n", d);

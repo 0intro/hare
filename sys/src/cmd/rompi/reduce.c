@@ -9,7 +9,7 @@ int xyztorank(int x, int y, int z);
 int reduce_end ( void *buf, int num, MPI_Datatype datatype, int root, 
                MPI_Comm comm,  MPI_Status *status);
 void torusstatus(int fd);
-void
+int
 main(int argc, char **argv)
 {
 	int node, nproc;
@@ -60,4 +60,5 @@ main(int argc, char **argv)
 		printf("DOT:%lld }\n", tbget());
 	//while (1);
 	exits("All done");
+	return 0;
 }
