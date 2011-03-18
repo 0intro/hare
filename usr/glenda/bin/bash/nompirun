@@ -44,7 +44,6 @@ rflag=$PLAN9_ROOT
 hflag=$BRASIL_HOST
 aflag=$COBALT_ACCOUNT
 release=$HARE_RELEASE
-dflag=0
 Dflag=
 oflag=
 
@@ -75,8 +74,6 @@ do
 	A)	aflag="$OPTARG"
 		;;
 	D)	Dflag=1
-		;;
-	d)  dflag=1
 		;;
 	r)	rflag="$OPTARG"
 		;;
@@ -123,7 +120,7 @@ then
 	release=/bgsys/argonne-utils/profiles/plan9/release/LATEST
 fi
 
-eflag+=":HOME=$HOME:BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag:debug=$dflag"
+eflag+=":HOME=$HOME:BRASIL_ADDR=tcp!$hflag!$pflag:PLAN9_ROOT=$rflag"
 
 #
 # Make sure the user is trying to execute something, otherwise just 
