@@ -15,7 +15,7 @@
 #	-p: port running brasil daemon (should be unique per user)
 #	-n: number of cpu nodes to provision 
 #	-t: length of time to request
-#	-k: kernel profile (default's to user's name
+#	-k: kernel profile (default's to user's name)
 #	-e key=value: specify an environment variable to pass (can be repeated)
 #	cmd args: command to run on I/O nodes (eventually compute nodes maybe)
 #			(default to /bin/rc)

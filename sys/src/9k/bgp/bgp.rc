@@ -230,9 +230,10 @@ if(test -e '/env/MODE') {
 	
 	# redirect IO node log and console
 	@{
-		rfork
-		cat /dev/kmesg /dev/kprint | prefix_log > /n/error/data 
+			rfork
+			cat /dev/kmesg /dev/kprint | prefix_log > /n/error/data 
 	} &
+
 }
 if not {
 	#echo No mode detected
@@ -264,6 +265,7 @@ if(~ $cpunode '1'){
 		rfork
 		cat /dev/kmesg /dev/kprint | prefix_log > /n/io/n/error/data
 	}&
+
 	
 	#echo done.
 }
