@@ -1,36 +1,30 @@
 \section{Overhead Evaluation}
 
-This section presents the evaluation of the XCPU3 infrastructure from the
-perspective of quicker deployment of a large number of small jobs while giving
-clean interfaces and abstractions.
-
-We have performed our evaluations on a Blue Gene setup with 512 nodes.  This
-setup is visually presented in a figure \ref{fig:hare}.  We run hosted Inferno
-on all the compute nodes, IO nodes and the controller node.  The user interacts 
-with the XCPU3 instance on the controller node for job submission.
-
-\begin{figure}[h]
-  \begin{center}
-    \leavevmode
-      \includegraphics[height=0.2\textheight,width=0.4\textwidth]
-		{./img/EvaluationSetup}
-    \caption{Setup for evaluation}
-    \label{fig:hare}
-  \end{center}
-\end{figure}
+In order to assess the overhead of our execution deployment and communication
+mechanisms as scale, we deployed our infrastructure on a BlueGene/P system
+with resources provided by the Department of Energy's INCITE program.
+For the purposes of our initial prototype we limited our evaluation to a
+BlueGene/P configuration with only 512 nodes (comprising 2048 cores).
+We run hosted Inferno on the PowerPC Linux based controller node and on
+the Plan 9 based I/O and Compute nodes.
+The user interacts with the XCPU3 instance via shell scripts which 
+interact with file system interfaces exported by Inferno and mounted 
+under linux with the v9fs file system.
 
 \subsection{Execution}
 
-Our first objective is to show how quickly we can do deployment and execution
-of a large number of small applications. We have avoided using larger
-applications as the bigger runtimes of larger applications tend to amortize the
-overhead in the deployment of the application.  We have used the \texttt{date}
-command as the application for deployment.  This is a small application and does
-not need any external inputs and produces small output. Each deployment involves
-session creation, reservation, execution, output aggregation and termination
-of the session.  We deployed varying numbers of execution of this application on
-the cluster of 512 nodes.  The number of requested executions increased
-exponentially from 1 to 2048 executions.
+Our first objective is to meaure the overhead of deployment and execution
+of pipeline components as the number of components increases.  Since we 
+are only interested in the overhead of deployment we chose to execute the
+\texttt{date} command as our example pipeline component.
+This is a small application which does not require any external inputs 
+and produces small output. 
+While this is hardly a characteristic workload, its short execution and
+minimal requirements will give us a better sense of the latency overheads
+of the infrastructure versus measuring the performance of any particular
+applicaiton.
+Each deployment involves
+session creation, reservation, execution, output aggregation and termination.
 
 \begin{figure}[h]
   \begin{center}
@@ -42,6 +36,9 @@ exponentially from 1 to 2048 executions.
   \end{center}
 \end{figure}
 
+%
+% We may end up losing this graph as its kinda bogus
+%
 Figure \ref{fig:sequential} gives an initial perspective of how XCPU3 performs
 relative to sequential performance.  This graph plots the total time taken by
 XCPU3 and the hypothetical time it may take for performing the same amount of
