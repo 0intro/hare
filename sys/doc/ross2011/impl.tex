@@ -4,6 +4,72 @@ This section discusses the implementation issues in more detail.  This chapter
 concentrates on how XCPU3 was implemented and discusses implementation
 decisions which have proven to be important.
 
+\subsection{Service Oriented File Systems}
+\emph{EVH: as this is largely irrelevant to the end user, we may trim this
+to be just a reference to xcpu and some text around that...}
+We want to keep XCPU3 interface agnostic from language, runtime and middleware.
+Plan 9 has proven that the filesystem interface is very flexible and yet
+powerful in the world of distributed applications.  We aim to follow the same
+principle of \textbf{Everything is a file} from Plan 9.
+
+Every node will provide access to its services via filesystem interfaces.
+This interface will be exported as the filesystem over the network so that other
+nodes can use it. Other nodes can mount this filesystem and use it as
+interface for interacting with that node.  Multiple remote nodes can be
+aggregated into the filesystem hierarchy providing a clean and easy way to
+access them.
+
+Multiple overlay views can be created by \textit{binding} the same filesystem
+at multiple locations with different names.  This ability of creating ad-hoc
+overlays allow users to arrange remote resources as per his needs without
+worrying about their actual locations.
+
+Other advantages of using filesystem interfaces are that
+\begin{enumerate}
+\item Existing tools/commands used with traditional filesystem can be directly
+used with XCPU3.
+
+\item filesystems come with their own mechanism for access control list for
+providing the security.  We can leave the security to these already proven
+mechanisms instead of implementing our own.
+
+\item We inherit the ability to export, mount and bind the filesystem
+without writing any explicit code for it.
+
+\item Filesystem interfaces are simpler to program than socket interfaces.  This
+can lead to simpler code and hence lesser bugs.
+
+\item Users don't need special privileges or administrative access to interact
+with the filesystem.  This simplifies the user experience in running XCPU3 based
+applications.
+\end{enumerate}
+
+The filesystem interface has following limitations which affect our system
+design.
+\begin{enumerate}
+
+\item The critical limitation concerns the POSIX standard for failure
+reporting in filesystem.  POSIX standard dictates that file operations should
+report their success or failure in the form of a single number which may not be
+enough to provide the information about the reason behind failures.  Plan 9
+overcomes this limitation by returning a string which can provide more
+verbose information instead of a single number.  But this breaks the POSIX
+compatibility.  So, we need to find an alternate way to report information
+about failures in POSIX compatible way.
+
+\item Another drawback is the way a failure of remote services is detected.
+The filesystem interface relies on the underlying networking protocol for
+detecting failures by waiting for timeouts, and then reporting them back to
+users as an error.  This makes the filesystem interface less desirable where
+quick failure detection and recovery is needed.
+\end{enumerate}
+
+Our decision to choose the filesystem interface despite of it's drawbacks is the
+trade-off we are willing to do for flexibility and simplicity.  We limit
+ourself with the assumption that failures will be infrequent.  With this
+assumption, we are willing to accept the delays in reporting failures at the
+remote end.
+
 \subsection{Brasil}
 \emph{TODO: we need to recast this to talk about brasil as a daemon providing
 the taskfs services, dynamic namespace, and serving of the local namespace --
