@@ -82,7 +82,7 @@
 % without further effort on your part as the last section in
 % the body of your article BEFORE References or any Appendices.
 
-\numberofauthors{2} %  in this sample file, there are a *total*
+\numberofauthors{3} %  in this sample file, there are a *total*
 % of EIGHT authors. SIX appear on the 'first-page' (for formatting
 % reasons) and the remaining two appear in the \additionalauthors section.
 %
@@ -101,29 +101,29 @@
 \alignauthor
 Eric Van Hensbergen \\
        \affaddr{IBM Research}\\
-       \affaddr{Austin, Texas}\\
        \email{bergevan@us.ibm.com}
 % 2nd. author
 \alignauthor
 Pravin Shinde \\
-       \affaddr{Parallel and Distributed Systems (PDCS)}\\
-       \affaddr{Vrije Universiteit, Amsterdam}\\
+       \affaddr{ETH Zurich}\\
        \email{pse220@few.vu.nl}
-}
 \alignauthor
 Noah Evans \\
-       \affaddr{Alcatel-Lucent Bell Laboratories}\\
-       \affaddr{Antwerp, Belgium}\\
+       \affaddr{Alcatel-Lucent Bell Labs}\\
        \email{noah.evans@plan9.bell-labs.com}
 }
+
+\maketitle
 
 \begin{abstract}
 TBD: One paragraph summary, this paper can't fit any more than that.
 \end{abstract}
 
-\maketitle
-
 \input{intro}
+\input{design}
+\input{impl}
+\input{eval}
+\input{discuss}
 
 \bibliographystyle{plain}
 \bibliography{references}
