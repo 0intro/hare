@@ -12,12 +12,18 @@ visualization capabilities~\cite{ma:in-site}.
 
 Our experiences with existing tools for constructing dataflow workflows
 for simulation, transformation, analysis and visualization were frustrating.
-
-* tight coupling of language, runtime, and workflow methodology
-* overly complex and difficult to deploy on petascale clusters or 
-dynamic resources
-* primarily targeted at post-processing
-
+This was primarily due to the tight coupling of language, runtime, and
+workflow tools which proved difficult to integrate with existing
+applications.  
+We also found many of these systems difficult (if not impossible)
+to deploy on petascale clusters, particularly those with dynamic
+resources such as clouds (where nodes might be added or removed based
+on load, failure, or different system priorities).
+% These might be other points to cover:
+%%* tight coupling of language, runtime, and workflow methodology
+%%* overly complex and difficult to deploy on petascale clusters or 
+%%dynamic resources
+%%* primarily targeted at post-processing
 %This has lead to data flow systems emerging
 %as the standard tool for solving research problems using these vast
 %datasets.  In typical dataflow systems,
@@ -39,7 +45,7 @@ dynamic resources
 %written in many different languages or runtimes which may be available
 %on several different architectures or operating systems.
 
-We observe that UNIX pipes were designed to get around many of these
+We observed that UNIX pipes were designed to get around many of these
 incompatibilities, allowing developers to hook together tools written
 in different languages and runtimes in ad-hoc fashions.  This allowed
 tool developers to focus on doing one thing well, and enabled code
@@ -55,16 +61,19 @@ One to one pipelines such as those used by a typical UNIX shell,
 can not be trivially mapped to streaming workflows which incorporate
 one-to-many, many-to-many, and many-to-one data flows.  Additionally,
 typical UNIX pipeline tools write data according to buffer boundaries
-instead of record boundaries.  As \cite{pike2005idp} notes dataflow
-systems need to be able to cleanly separate input streams into
-records and then show that the order of these records is independent.
-By separating input and output into discrete unordered records data
-can be easily distributed and coalesced.
-
+instead of record boundaries.  
+%As \cite{pike2005idp} notes dataflow
+%systems need to be able to cleanly separate input streams into
+%records and then show that the order of these records is independent.
+%By separating input and output into discrete unordered records data
+%can be easily distributed and coalesced.
 To address these issues we have implemented a prototype shell, which
 we call PUSH, using dataflow principles and incorporating extended
 pipeline operators to establish distributed workflows ---potentially
-running on clusters of machines--- and correlate results.  
+running on clusters of machines--- and correlate results. 
+In order to scale this approach to large clusters of servers we 
+implemented a workload distribution infrastructure which incorperated
+dataflow communication constructs which we call \emph{XCPU3}.
 %Our
 %implementation is based on extending an existing shell, MASH\cite{mashman},
 %from which we inherited a rich interpreted scripting language.  It
@@ -89,12 +98,15 @@ running on clusters of machines--- and correlate results.
 %of their communication channels between machines transparently.
 %This work is taking place as part of the HARE project\cite{van2008holistic} 
 
-This paper is organized as follows. The next section 
-covers our core design elements of the PUSH shell and the distributed
-infrastructure we use to deploy PUSH workflows on systems ranging from
-single nodes to bluegene.  Section 3 will discuss some of the implementation
-details and experiences of our initial prototype.  In Section 4 we will 
-evalute the overhead of our infrastructure and in section 5 we will discuss
-the results and explore opportunities for improvement in both the design
+The rest of this paper describes our design and implementation experience
+for the XCPU3 infrastructure. The next section 
+covers our core design principles behind the PUSH shell and how those are
+reflected in the distribution and communication infrastructure.
+Section 3 discusses our prototype implementation in more detail including
+lessons learned while attempting to scale the prototype to thousands of cores.
+Section 4 contains our evaluation of the overhead of the infrastructure 
+when deployed on leadership class high-performance computing environments.
+In Section 5 we will discuss potential improvements to address the overheads
+measured results and explore opportunities for improvement in both the design 
 and implementation of our approach.
 
