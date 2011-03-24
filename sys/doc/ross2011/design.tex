@@ -67,8 +67,8 @@ is as follows:
 %   >| sort -rn
 %}'
 \begin{verbatim}
-ORS=blm find . -type f |< \\
-xargs chasen | sort | uniq -c >| sort -rn
+    ORS=blm find . -type f |< \\
+    xargs chasen | sort | uniq -c >| sort -rn
 \end{verbatim}
 
 The first variable, ORS, declares our record multiplexor module, 
@@ -114,13 +114,28 @@ infrastructure a degree of elasticity that seemed to missing from
 previously available tools.
 
 In order to scale such a system we decided to go with a hierarchical
-organization of nodes.  The aggregation points primary responsibility...
-TODO: talk about aggregation in a bit more detail
+organization of nodes.  
+Aggregation points scale command and communication between nodes.  
+When a node or its children have insufficient resources to satisfy a request,
+the request is propagated to the parent aggregation point.
+This form of hierarchical aggregation also seems to map well with the 
+physical topology of many leadership class systems.
+The hierarchical topology not only helps scale communication and control,
+but it also can help users and application components traverse multiple
+network domains in a seamless fashion.
+We intend to use this property to create an environment which seamlessly
+extends the user's desktop experience and environment to the supercomputer.
 
-TODO: discuss command based aggregation/treespawn
-
-TODO: discuss I/O based aggregation
-
-TODO: talk about logical and physical hierarchy mappings
-
-TODO: Multi-Participant Pipelining (aka Splice)
+The two forms of I/O integration match the new pipeline primatives which
+are part of the PUSH shell.
+By default, input to each master pipeline component thread is fanned out 
+to sub-session threads and output from those sub-sessions in fanned back
+into the master component.
+It is intended that this behavior be setup and controlled by the XCPU
+infrastructure which spawns the sub-session threads (whether they be local
+or remote).
+For multi-stage pipelines, we need the ability to direct the output of
+a pipeline component to another pipeline component without necessarily
+passing that data through the master thread (for efficiency reasons).
+In order to accomplish that we've added the ability to splice input or
+output of individual subsessions threads to eachother.
