@@ -21,7 +21,7 @@ may reduce this even further.
 
 Another unforseen performance problem was caused by the overhead
 incurred by the transitive mount methodology of central services.
-While elegant it introduces overhead at each transitive mount point.
+While elegant, it introduces overhead at each transitive mount point.
 As such, deep hierarchies and large scale workloads can involve 
 many transitive hops for every communication which introduces latency
 and load across the system.  We have identified the need to augment
@@ -118,3 +118,7 @@ such we are currently investigating implementations which
 add multipipes as a core system primitive to the Plan 9
 and Linux operating systems and reimplementing the Brasil
 infrastructure using the new core system primitive.
+
+Our current work as well as our past prototypes are
+avaialble as open source via 
+http://bitbucket.org/ericvh/hare.

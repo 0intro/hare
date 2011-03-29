@@ -1,13 +1,13 @@
 \section{Overhead Evaluation}
 In order to assess the overhead of our execution deployment and communication
-mechanisms as scale, we deployed our infrastructure on a BlueGene/P system
+mechanisms at scale, we deployed our infrastructure on a BlueGene/P system
 with resources provided by the Department of Energy's INCITE program.
 For the purposes of our initial prototype we limited our evaluation to a
 BlueGene/P configuration with only 512 nodes (comprising 2048 cores).
-We run hosted Inferno on the PowerPC Linux based controller node and on
+We run Brasil on the PowerPC Linux based controller node and on
 the Plan 9 based I/O and Compute nodes.
 The user interacts with the Brasil instance via shell scripts which 
-interact with file system interfaces exported by Inferno and mounted 
+interact with file system interfaces exported by Brasil and mounted 
 under linux with the v9fs file system.
 
 \subsection{Execution}

@@ -94,7 +94,7 @@ to the originating machine which then sorts them.
 
 While PUSH works perfectly well on a stand-alone machine, the original
 intent was to use it to drive workloads and workflows across a cluster of
-machines.  In particular, we were interested on deploying on leadership
+machines.  In particular, we were interested in deploying on leadership
 class high performance computing machines and as such
 a key requirement for us was scalability to a large number of nodes.  
 Instead of traditional client/server models we opted for a peer based
@@ -103,7 +103,7 @@ workflows of computation and managing the newly created pipeline.
 This allows workflows and component applications to initiate new branches
 of computation or analysis at any stage of the pipeline or in reaction to
 data produced by a previous portion of the pipeline giving the entire
-infrastructure a degree of elasticity that seemed to missing from 
+infrastructure a degree of elasticity that seemed to be missing from 
 previously available tools.
 In order to accomplish this we designed the system without any central
 component which required knowledge of the entire system.
@@ -131,7 +131,7 @@ which are part of the PUSH shell.
 By default, input to each master pipeline component thread is fanned out 
 to sub-session threads and output from those sub-sessions in fanned back
 into the master component.
-It is intended that this behavior be setup and controlled by the XCPU
+It is intended that this behavior be setup and controlled by the Brasil
 infrastructure which spawns the sub-session threads (whether they be local
 or remote).
 For multi-stage pipelines, we need the ability to direct the output of

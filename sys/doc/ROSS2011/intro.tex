@@ -8,7 +8,35 @@ in a reasonable amount of time on isolated machines.
 In the near future petascale and exascale simulation will make 
 the involvement of secondary storage and disks impractical, driving
 the need for infrastructures which provide in-situ analytics and
-visualization capabilities~\cite{ma:in-site}.
+visualization capabilities~\cite{in-situ}.
+
+% These might be other points to cover:
+%%* tight coupling of language, runtime, and workflow methodology
+%%* overly complex and difficult to deploy on petascale clusters or 
+%%dynamic resources
+%%* primarily targeted at post-processing
+
+This has lead to data flow systems emerging
+as the standard tool for solving research problems using these vast
+datasets.  In typical dataflow systems,
+runtimes~\cite{dean2008msd}~\cite{bialecki:hfr}~\cite{isard2007ddd}
+define graphs of processes, the edges of the graphs
+representing pipes and their vertices representing computation on a
+system.  Within these runtimes a new class of
+languages~\cite{pike2005idp}~\cite{yu2008dsg}~\cite{olston2008pln} can
+be used by researchers to solve "pleasantly parallel" problems
+(problems where the individual elements of datasets are considered
+to be independent of any other element) more quickly without worrying
+about explicit concurrency.
+
+These languages provide automated control flow(typically matched
+to the architecture of the underlying runtime) and channels of
+communication between systems.  In existing systems, these workflows
+and the underlying computation are tightly linked, tying solutions
+to a particular runtime, workflow and language.  This creates
+difficulties for analytics researchers who wish to draw upon tools
+written in many different languages or runtimes which may be available
+on several different architectures or operating systems.
 
 Our experiences with existing tools for constructing workflows
 for simulation, transformation, analysis and visualization were frustrating.
@@ -19,31 +47,6 @@ We also found many of these systems difficult (if not impossible)
 to deploy on petascale clusters, particularly those with dynamic
 resources such as clouds where nodes might be added or removed based
 on load, failure, or different system priorities.
-% These might be other points to cover:
-%%* tight coupling of language, runtime, and workflow methodology
-%%* overly complex and difficult to deploy on petascale clusters or 
-%%dynamic resources
-%%* primarily targeted at post-processing
-%This has lead to data flow systems emerging
-%as the standard tool for solving research problems using these vast
-%datasets.  In typical dataflow systems,
-%runtimes~\cite{dean2008msd}~\cite{bialecki:hfr}~\cite{isard2007ddd}
-%~\cite{streamit} and  define graphs of processes, the edges of the graphs
-%representing pipes and their vertices representing computation on a
-%system.  Within these runtimes a new class of
-%languages~\cite{pike2005idp}~\cite{yu2008dsg}~\cite{olston2008pln} can
-%be used by researchers to solve "pleasantly parallel" problems(problems where the individual elements of datasets are considered
-%to be independent of any other element) more quickly without worrying
-%about explicit concurrency.
-%
-%These languages provide automated control flow(typically matched
-%to the architecture of the underlying runtime) and channels of
-%communication between systems.  In existing systems, these workflows
-%and the underlying computation are tightly linked, tying solutions
-%to a particular runtime, workflow and language.  This creates
-%difficulties for analytics researchers who wish to draw upon tools
-%written in many different languages or runtimes which may be available
-%on several different architectures or operating systems.
 
 We observed that UNIX pipes were perfectly designed to allow 
 developers to hook together tools written
@@ -53,7 +56,7 @@ tool developers to focus on doing one thing well, and enabled code
 portability and reuse in ways not originally conceived by the tool
 authors.  The UNIX shell incorporated a model for tersely composing
 these smaller tools into pipelines (e.g. 'sort $|$ uniq -c'), 
-creating
+creating a
 coherent workflow to solve more complicated problems quickly.  Tools
 read from standard input and wrote to standard output, allowing
 programs to work together in streams \emph{with no explicit knowledge

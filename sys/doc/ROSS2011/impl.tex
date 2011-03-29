@@ -87,7 +87,7 @@ level provide the aggregate interfaces to the sub-session directory.
 The core of Brasil is a self-contained daemon which is based on a fork of
 Inferno.
 Inferno\cite{inferno} is an open source distributed operating system 
-which is a direct descendant of the \textbf{Plan 9} operating system.  
+which is a direct descendant of the Plan 9 operating system~\cite{pike1995pbl}.  
 It runs natively on
 multiple hardware platforms and can also run as a user-space application on
 top of other operating systems.
@@ -111,7 +111,7 @@ back to the application via the local filesystem interface.
 \subsection{Central Services}
 
 The ability to configure many Brasil nodes into hierarchy is provided by the
-\textit{central services}.  In contrary to the name, central services is
+\textit{central services}.  Contrary to the name, central services is
 highly distributed and every Brasil runs an independent instance of the central
 services.  
 
@@ -126,8 +126,8 @@ hierarchy by binding a parent's central service directory to the name
 \texttt{[/csrv/parent]} and then tell the parent to back-mount their name space
 (allowing two way traversal).  In this way children register with parents
 triggering the cross-mounts and establishing a two way link between them. Each
-Brasil instance need to know only the information about its parent and children
-in the hierarchy and the all Brasil nodes initiate these connections leading to
+Brasil instance needs only to know the information about its parent and children
+in the hierarchy and all Brasil nodes initiate these connections leading to
 the distributed creation of the Brasil node hierarchy.
  
 Figure \ref{fig:xcpu3FSTopo} tries to give a simple overview of how this 
