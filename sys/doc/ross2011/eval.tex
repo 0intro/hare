@@ -10,7 +10,7 @@ For the purposes of our initial prototype we limited our evaluation to a
 BlueGene/P configuration with only 512 nodes (comprising 2048 cores).
 We run hosted Inferno on the PowerPC Linux based controller node and on
 the Plan 9 based I/O and Compute nodes.
-The user interacts with the XCPU3 instance via shell scripts which 
+The user interacts with the Brasil instance via shell scripts which 
 interact with file system interfaces exported by Inferno and mounted 
 under linux with the v9fs file system.
 
@@ -34,7 +34,7 @@ session creation, reservation, execution, output aggregation and termination.
     \leavevmode
       \includegraphics[height=0.2\textheight,width=0.5\textwidth]
 		{./img/linear}
-    \caption{Comparison if XCPU3 with sequential deployment}
+    \caption{Comparison if Brasil with sequential deployment}
     \label{fig:sequential}
   \end{center}
 \end{figure}
@@ -42,20 +42,20 @@ session creation, reservation, execution, output aggregation and termination.
 %
 % We may end up losing this graph as its kinda bogus
 %
-Figure \ref{fig:sequential} gives an initial perspective of how XCPU3 performs
+Figure \ref{fig:sequential} gives an initial perspective of how Brasil performs
 relative to sequential performance.  This graph plots the total time taken by
-XCPU3 and the hypothetical time it may take for performing the same amount of
-work on one machine.  This graph shows that the XCPU3 is successfully able to
-exploit the parallelism for deploying the jobs quickly. The XCPU3 deploys 2048
+Brasil and the hypothetical time it may take for performing the same amount of
+work on one machine.  This graph shows that the Brasil is successfully able to
+exploit the parallelism for deploying the jobs quickly. The Brasil deploys 2048
 jobs in 12.66 seconds whereas sequential execution would take upto 510 seconds.
 In the graph, the line showing sequential scaling looks exponential, but that is
 because number of requested executions increase exponentially.
 
 \subsection{Communication}
 
-This section aims to further analyze the performance of XCPU3.  Again we are 
+This section aims to further analyze the performance of Brasil.  Again we are 
 concentrating on similar deployment.  We have recorded the time taken by each
-of the following stages in the deployment on the XCPU3 infrastructure.
+of the following stages in the deployment on the Brasil infrastructure.
 
 \begin{enumerate}
 \item Reservation: Create a new session, and request the reservation by writing
@@ -88,7 +88,7 @@ session.  We have taken the average value over multiple runs for our analysis.
 
 Figure \ref{fig:date_graph} presents the results of deployment of the date
 command in the form of graph.  This graph presents the breakup time for various
-stages of the deployment using the XCPU3 infrastructure.
+stages of the deployment using the Brasil infrastructure.
 
 From this graph we can observe that the session termination and the housekeeping
 overheads are negligible compared to the time taken by reservation, execution
@@ -145,7 +145,7 @@ deployment involves the distribution of inputs to all the sessions.  This
 introduces a new stage in the deployment process in addition to the 5 stages we
 described in the above section.  This stage will be the \textbf{input} stage and
 involves distributing the input data to all the sessions which are responsible
-for execution.  By default XCPU3 will broadcast the input to all the compute
+for execution.  By default Brasil will broadcast the input to all the compute
 nodes, but we have plans to introduce filters in the PUSH shell which can
 partition the input given to the compute  nodes. 
 
@@ -179,7 +179,7 @@ requested}
 
 \subsection{Dataflow}
 The evaluations presented in this chapter helps us in understanding how fast
-XCPU3 can deploy small jobs and aggregate the results produced by them.  Now
+Brasil can deploy small jobs and aggregate the results produced by them.  Now
 let us relate how these observations can justify our claims about dataflow
 applications. Typical deployments of the dataflow applications are similar to
 the above experiments as it involves starting up a large number of small jobs.
@@ -188,23 +188,23 @@ involve the input distribution and output aggregation stages.  These deployments
 work by feeding the output of one computation as input for other computation. 
 At the end of the computation, a user needs to read the output of only selected
 compute sessions which does not need any aggregation.  What we can conclude from
-the above description is that XCPU3 performs really well in the stages like
+the above description is that Brasil performs really well in the stages like
 reservation which are important for dataflow deployments.  The stages like input
-distributions are output aggregation where XCPU3 is relatively slow are not
-needed by dataflow deployments.  This makes XCPU3 ideal for rapid deployment of
+distributions are output aggregation where Brasil is relatively slow are not
+needed by dataflow deployments.  This makes Brasil ideal for rapid deployment of
 dataflow workloads.
 
 Unfortunately we do not have concrete measurements and evaluations to back our
-predictions.  XCPU3 is one of the piece in the envisioned solution for problem
+predictions.  Brasil is one of the piece in the envisioned solution for problem
 of efficient and easy deployment of large-scale dataflow applications.   We are
 still working on the integration of userspace applications like
-PUSH\cite{PODC:Push} with XCPU3 which will further simplify the dataflow
+PUSH\cite{PODC:Push} with Brasil which will further simplify the dataflow
 deployment.
 
-XCPU3 is an infrastructure which provides the needed flexibility, speed and 
+Brasil is an infrastructure which provides the needed flexibility, speed and 
 ease of use for dataflow workloads.  This chapter demonstrates the speed that
 can be achieved.  It is difficult to measure the properties like \textit{ease of
 use} and \textit{flexibility} but the examples presented in the filesystem
 interface chapter should give some insights of all the possibilities opened up
-by the XCPU3.
+by the Brasil.
 

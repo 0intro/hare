@@ -1,80 +1,73 @@
 \section{Implementation}
 
-\emph{TODO: this whole section needs to turn into a discussion of brasil
-which will incorporate the hosted daemon with file system backmount as well
-as file system export, centeral services, and service oriented file systems.
-}
+\subsection{Interface}
 
+The external interface to our infrastructure is a synthetic file system
+much like the interface to the Xcpu~\cite{xcpu} workload distribution
+system.  
+Figure \ref{fig:xcpu3Local} gives the the high-level view of the hierarchy 
+of the Brasil namespace.
 
-This section discusses the implementation issues in more detail.  This chapter
-concentrates on how XCPU3 was implemented and discusses implementation
-decisions which have proven to be important.
+\begin{figure}[h]
+  \begin{center}
+    \leavevmode
+      \includegraphics[height=0.25\textheight,width=0.4\textwidth]
+		{./img/local_session_subsessions}
+    \caption{Filesystem interface in Brasil}
+    \label{fig:xcpu3Local}
+  \end{center}
+\end{figure}
 
-\subsection{Service Oriented File Systems}
-\emph{EVH: as this is largely irrelevant to the end user, we may trim this
-to be just a reference to xcpu and some text around that...}
-We want to keep XCPU3 interface agnostic from language, runtime and middleware.
-Plan 9 has proven that the filesystem interface is very flexible and yet
-powerful in the world of distributed applications.  We aim to follow the same
-principle of \textbf{Everything is a file} from Plan 9.
+Each node in the system has a \emph{local} directory in the root of their
+namespace which contains pointers to the resources
+available on the node and control files which allows managing 
+jobs deployed on the node.
+A few files here provide information about the system, like the
+\texttt{[arch]} file which tells the architecture and operating system of 
+the node while the \texttt{[status]} file provides information about total 
+amount of resources currently available, including the remote resources which 
+are directly or indirectly decedents of this node.  
+Files like \texttt{[env]} and \texttt{[ns]}
+allow controlling the default environment and the namespace of the processes
+created on this node.  \texttt{[fs]} and \texttt{[net]} are links to the local
+filesystem and networking resources available on the node.  The
+\texttt{[clone]} file provides the interface to create new sessions which is
+the unit of the workload management.
 
-Every node will provide access to its services via filesystem interfaces.
-This interface will be exported as the filesystem over the network so that other
-nodes can use it. Other nodes can mount this filesystem and use it as
-interface for interacting with that node.  Multiple remote nodes can be
-aggregated into the filesystem hierarchy providing a clean and easy way to
-access them.
+The sessions are represented as directories with the session-id number as 
+the directory name.
+Each directory is  self-contained and provides interfaces to manage the
+execution of the session.  Files like \texttt{[env]} and \texttt{[ns]} are
+present in the session directory also, and can be used to overwrite the 
+default environment and namespace specifically for this session.  
+The \texttt{[ctl]} file is used for controlling the execution and 
+the \texttt{[stdio]} file is used to manipulate standard input and output.  
 
-Multiple overlay views can be created by \textit{binding} the same filesystem
-at multiple locations with different names.  This ability of creating ad-hoc
-overlays allow users to arrange remote resources as per his needs without
-worrying about their actual locations.
-
-Other advantages of using filesystem interfaces are that
-\begin{enumerate}
-\item Existing tools/commands used with traditional filesystem can be directly
-used with XCPU3.
-
-\item filesystems come with their own mechanism for access control list for
-providing the security.  We can leave the security to these already proven
-mechanisms instead of implementing our own.
-
-\item We inherit the ability to export, mount and bind the filesystem
-without writing any explicit code for it.
-
-\item Filesystem interfaces are simpler to program than socket interfaces.  This
-can lead to simpler code and hence lesser bugs.
-
-\item Users don't need special privileges or administrative access to interact
-with the filesystem.  This simplifies the user experience in running XCPU3 based
-applications.
-\end{enumerate}
-
-The filesystem interface has following limitations which affect our system
-design.
-\begin{enumerate}
-
-\item The critical limitation concerns the POSIX standard for failure
-reporting in filesystem.  POSIX standard dictates that file operations should
-report their success or failure in the form of a single number which may not be
-enough to provide the information about the reason behind failures.  Plan 9
-overcomes this limitation by returning a string which can provide more
-verbose information instead of a single number.  But this breaks the POSIX
-compatibility.  So, we need to find an alternate way to report information
-about failures in POSIX compatible way.
-
-\item Another drawback is the way a failure of remote services is detected.
-The filesystem interface relies on the underlying networking protocol for
-detecting failures by waiting for timeouts, and then reporting them back to
-users as an error.  This makes the filesystem interface less desirable where
-quick failure detection and recovery is needed.
-\end{enumerate}
-
-Our decision to choose the filesystem interface despite of it's drawbacks is the
-trade-off we are willing to do for flexibility and simplicity.  We limit
-ourself with the assumption that failures will be infrequent.  With this
-assumption, we are willing to accept the delays in reporting failures at the
-remote end.
+%Whenever any session receives the reservation request, it evaluates it by 
+%considering, if it can execute locally or it should break it and divide 
+%between its available children.  Depending on the decision,
+%it can play one of the following two roles.
+%\begin{enumerate}
+%  \item \textbf{Execution session}: When the reservation requested is 
+%  small enough, the session performs all the requested operations locally.  
+%  
+%  \item \textbf{Aggregation session}: When request is bigger than what session
+%  can handle, it divides the request between children nodes.  The session does
+%  this by creating new session and sending the divided
+%  reservation request to the each child node available in it's \textbf{CSRV}
+%  hierarchy.  These newly created sessions will be binded as directories in the
+%  directory of the current session hence making them the sub-sessions of the
+%  current session.  The current session now acts as in aggregation point for
+%  these sub-sessions by passing the any execution request or input to all
+%  sub-sessions and merging the output from all sub-sessions to produce the final
+%  output.  These aggregation sessions constitute the non-leaf nodes in the
+%  session tree.
+%\end{enumerate}
+%This way, recursive tree of sessions is created whenever new reservation request
+%is received.  This tree of the session is then used to request the execution and
+%collect back the results.  This design not only distributes the actual
+%execution, but also it distributes the distribution and aggregation process as
+%this work is divided between all aggregation sessions.
 
 \subsection{Brasil}
 \emph{TODO: we need to recast this to talk about brasil as a daemon providing
@@ -82,83 +75,43 @@ the taskfs services, dynamic namespace, and serving of the local namespace --
 we will mention that it is based on Inferno, but otherwise we'll tone down
 the language and change the representative illustrations to match}
 
-Inferno\cite{inferno} is an open source distributed operating system which is a 
-direct descendant of the \textbf{Plan 9} operating system.  It runs natively on
+The core of Brasil is a self-contained daemon which is based on a fork of
+Inferno.
+Inferno\cite{inferno} is an open source distributed operating system 
+which is a direct descendant of the \textbf{Plan 9} operating system.  
+It runs natively on
 multiple hardware platforms and can also run as a user-space application on
-top of other operating systems.  For the purpose of this document
-\textit{"hosted Inferno OS"} or \textit{"userspace Inferno"} refers to Inferno
-running as user-space application on top of other operating systems.
+top of other operating systems.
+Brasil is based on the hosted version of the Inferno platform.
 
-As we are aiming for a flexible heterogeneous environment with different
-operating systems and different architectures, we found the Inferno operating
-system to be an attractive platform.  It allowed us to develop XCPU3 once and
-easily deploy it on different platforms while enjoying the Plan 9 features
-on all those platforms.
+\emph{TODO: new figure needed for brasil}
 
-This decision does come with the cost of performance loss.  Each node needs
-to run hosted Inferno in user-space which takes up some resources of the node. 
-Our choice of Inferno gave us the flexibility and features of the Plan 9
-operating system on other operating systems.  It allowed us to quickly
-implement and deploy our filesystem on multiple platforms easily at the cost
-of some performance.
-
-XCPU3 is implemented as the filesystem in the Inferno kernel.  Figure 
-\ref{fig:XCPU3} shows the placement of XCPU3 in the context of applications,
-host operating system and the Inferno.
-
-\begin{figure}[h]
-  \begin{center}
-    \leavevmode
-      \includegraphics[height=0.2\textheight,width=0.5\textwidth]
-		{./img/XCPU3Structure}
-    \caption{XCPU3 Structure}
-    \label{fig:XCPU3}
-  \end{center}
-\end{figure}
-
-The XCPU3 filesystem is exported by Inferno using the \texttt{9P} protocol. 
+The Brasil namespace is exported using the \texttt{9P} protocol. 
 This protocol is used by Plan 9 and Inferno extensively to access any file. 
 Recently the Linux kernel has added support for the \texttt{9P}
 protocol\cite{graverobbers}.  This allows Linux to mount filesystems
 exported over the 9P protocol.  Other Unix based operating systems can use
 FUSE\cite{FUSE} for accessing the 9P based filesystems. 
 
-In a typical setup, Inferno runs in the hosted environment on an operating
-system like Linux or Plan 9.  The hosted inferno will export the XCPU3
-filesystem which can be mounted by the local host operating system. The 
-applications interact with this mounted XCPU3 filesystem using the native
-filesystem interfaces (e.g. VFS for Linux). Any interaction with this XCPU3
-filesystem is communicated to Inferno using \textit{9P}. The XCPU3 kernel module
-inside the inferno kernel then receives and interprets the user actions.  If
-needed, it uses services from the host operating system or from other XCPU3
-filesystems deployed on remote locations.  The XCPU3 filesystem then sends the
+The applications interact with this mounted Brasil filesystem using the native
+filesystem interfaces (e.g. VFS for Linux). Any interaction with this Brasil
+filesystem is communicated to Brasil using \textit{9P}. 
+If needed, it uses services from the host operating system or from other Brasil
+filesystems deployed on remote locations.  The Brasil filesystem then sends the
 prepared response over 9P. The host operating system will relay this response
 back to the application via the local filesystem interface.
 
+\subsection{Central Services}
 
-\subsection{The big picture (connecting multiple XCPU3 nodes)}
-The real power of the XCPU3 is the ability to connect with each other and form
-bigger instance of XCPU3.  XCPU3 filesystem is exported over \texttt{9P}
-providing same functionality and interface to both local and remote
-applications.  This allows XCPU3 instances to connect with other XCPU3
-instances and distribute some of their responsibilities among them.
-The \texttt{9P} protocol shields the XCPU3 from complications of remote
-filesystem access and works as transparent glue for connecting multiple XCPU3
-instances together.
-
-\subsubsection{Central Services}
-
-The ability to configure many XCPU3 nodes into hierarchy is provided by the
+The ability to configure many Brasil nodes into hierarchy is provided by the
 \textit{central services}.  In contrary to the name, central services is
-highly distributed and every XCPU3 runs an independent instance of the central
+highly distributed and every Brasil runs an independent instance of the central
 services.  
 
-
-%\subsubsection{Implementation}  
 The central services synthetic file server which provides a simple hierarchy of
 directory mount points representing remote nodes.  Mounts of the remote nodes
 or binds of previously mounted remote nodes are accomplished within this file
-system such that anyone who mounts our name space can also see (and
+system such that anyone who mounts our namespace can also see (and
 access) anyone we have mounted transitively,  in such a way a child
 node can access a parent nodes, other children, or the parents nodes
 parent and so forth. Any node could establish themselves within a
@@ -166,9 +119,9 @@ hierarchy by binding a parent's central service directory to the name
 \texttt{[/csrv/parent]} and then tell the parent to back-mount their name space
 (allowing two way traversal).  In this way children register with parents
 triggering the cross-mounts and establishing a two way link between them. Each
-XCPU3 instance need to know only the information about its parent and children
-in the hierarchy and the all XCPU3 nodes initiate these connections leading to
-the distributed creation of the XCPU3 node hierarchy.
+Brasil instance need to know only the information about its parent and children
+in the hierarchy and the all Brasil nodes initiate these connections leading to
+the distributed creation of the Brasil node hierarchy.
  
 Figure \ref{fig:xcpu3FSTopo} tries to give a simple overview of how this 
 synthetic filesystem view is populated based on the underlying mount
@@ -179,7 +132,7 @@ connections between the nodes.
     \leavevmode
       \includegraphics[height=0.3\textheight,width=0.4\textwidth]
 		{./img/xcpu3FSTopo}
-    \caption{Sample filesystem interface for sample the topology in XCPU3}
+    \caption{Sample filesystem interface for sample the topology in Brasil}
     \label{fig:xcpu3FSTopo}
   \end{center}
 \end{figure}
@@ -187,10 +140,10 @@ connections between the nodes.
 Assuming the links between the nodes are created by the remote node mounts in
 central services, this diagram shows how the filesystem views at different
 nodes encompasses the whole network, even though each node is only connected to
-its neighbours. The XCPU3 filesystem starts with the \texttt{[/csrv]}
+its neighbours. The Brasil filesystem starts with the \texttt{[/csrv]}
 directory. The location \texttt{[/csrv/local/]} presents the local resources
-whereas \texttt{[/csrv/parent/]} presents the XCPU3 filesystem of the parent
-node. All other directories in the represents the XCPU3 filesystem of the
+whereas \texttt{[/csrv/parent/]} presents the Brasil filesystem of the parent
+node. All other directories in the represents the Brasil filesystem of the
 children nodes.  It can be easily seen that both \textit{App-1} and
 \textit{App-2} have access to all the nodes even though they are running on
 different nodes.  In this design, every node has to worry about only its
@@ -206,86 +159,5 @@ must use this global view for making any decision or performing a typical
 operation. The nodes mostly use only the local view for decision making and
 operations. This local view includes the parent node and the children nodes.
 
-
-\subsection{Filesystem Interface}
-
-This section discusses the filesystem interface and how it can be used for
-managing the local and remote resources. Figure \ref{fig:xcpu3Local} gives the
-the high-level view of the hierarchy of the XCPU3 filesystem.  This section
-will discuss the overall hierarchy and few important files in the XCPU3.
-
-\begin{figure}[h]
-  \begin{center}
-    \leavevmode
-      \includegraphics[height=0.25\textheight,width=0.4\textwidth]
-		{./img/local_session_subsessions}
-    \caption{Filesystem interface in XCPU3}
-    \label{fig:xcpu3Local}
-  \end{center}
-\end{figure}
-
-The location \texttt{[/csrv/local/]} points to the local resources available on
-the node and the files present in this directory allows managing these local
-resource. Few files here provide information about the system, like
-\texttt{[arch]} file tells the architecture and operating system of the node
-while \texttt{[status]} file provides information about total amount of
-resources available, including the remote resources which are direct or
-indirect decedents of this node.  Files like \texttt{[env]} and \texttt{[ns]}
-allowed controlling the default environment and the namespace of the processes
-created on this node.  \texttt{[fs]} and \texttt{[net]} are links to the local
-filesystem and networking resources available on the node.  The
-\texttt{[clone]} file provides the interface to create new sessions which is
-the unit of the execution.
-
-The sessions are represented as directories with session-id number as a name. 
-These sessions are self-contained and provide interfaces to manage the
-execution of the session.  Files like \texttt{[env]} and \texttt{[ns]} are
-present is session directory also, and can be used to overwrite the default
-environment and namespace specifically for this session.  File \texttt{[ctl]} is
-used for controlling the execution and file \texttt{[stdio]} is used to
-manipulate standard input and output.  Sessions can play one of the two roles
-between \textit{single execution unit} and \textit{aggregation} of other
-sessions. Following is the attempt to define these two modes.
-\begin{verbatim}
-SESSION -> AGGREGATION | execution
-AGGREGATION -> SESSION+
-\end{verbatim}
-The \textbf{execution mode} executes the requested program and provides the
-output.  The \textbf{aggregation} mode aggregates and manages the multiple
-sessions which are created as sub-sessions for this session.  In other words,
-aggregation session creates sub-sessions, divide the work among them and
-aggregate back the output.  These sub-sessions are nothing but sessions created
-by using \texttt{[clone]} file on local or remote systems.  These newly created
-sessions are binded as sub-directories inside the current session directory.
-
-\subsection{Workload distribution and aggregation}
-The workload distribution and aggregation works by using the dual nature of
-the sessions.  The first step in this is reservation, which is responsible for
-creating the tree of the sessions.  Whenever any session receives the reservation
-request, it evaluates it by considering, if it can execute locally or it should
-break it and divide between its available children.  Depending on the decision,
-it can play one of the following two roles.
-\begin{enumerate}
-  \item \textbf{Execution session}: When reservation is request is small enough
-  or there are no children nodes available, then session behave as execution
-  session by performing the requested operations locally.  The execution
-  sessions are the leaf node in the session tree.
-  
-  \item \textbf{Aggregation session}: When request is bigger than what session
-  can handle, it divides the request between children nodes.  The session does
-  this by creating new session and sending the divided
-  reservation request to the each child node available in it's \textbf{CSRV}
-  hierarchy.  These newly created sessions will be binded as directories in the
-  directory of the current session hence making them the sub-sessions of the
-  current session.  The current session now acts as in aggregation point for
-  these sub-sessions by passing the any execution request or input to all
-  sub-sessions and merging the output from all sub-sessions to produce the final
-  output.  These aggregation sessions constitute the non-leaf nodes in the
-  session tree.
-\end{enumerate}
-This way, recursive tree of sessions is created whenever new reservation request
-is received.  This tree of the session is then used to request the execution and
-collect back the results.  This design not only distributes the actual
-execution, but also it distributes the distribution and aggregation process as
-this work is divided between all aggregation sessions.
-
+\emph{TODO: describe sub-sessions and sub-session directory.  we also need
+to compare/contrast to the xcpu design}

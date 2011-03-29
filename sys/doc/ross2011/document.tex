@@ -9,7 +9,7 @@
 
 
 \begin{document}
-\title{XCPU3: Workload distribution and aggregation}
+\title{Brasil: Basic Resource Aggregation System Infrastructure Layer}
 
 
 \author{\IEEEauthorblockN{Pravin Shinde}
@@ -42,13 +42,13 @@ middleware support and/or language dependence.
 We have explored an alternate approach for simplifying workload
 distribution and aggregation based on synthetic filesystems and the private
 namespace concepts of Plan 9.  Instead of sending workloads to a remote
-cluster, XCPU3 works by bringing the remote cluster to the user's desktop,
-leading to full control over the compute environment.   XCPU3 provides
+cluster, Brasil works by bringing the remote cluster to the user's desktop,
+leading to full control over the compute environment.   Brasil provides
 a filesystem interface, making it runtime and language agnostic.  It also
 allows executing multiple jobs simultaneously in isolation, leading to
-better resource utilization.  XCPU3 makes all nodes independent and
+better resource utilization.  Brasil makes all nodes independent and
 equivalent in functionality leading to the ability to localize the
-decision making and ability to handle dynamic workloads.  XCPU3 provides easy to
+decision making and ability to handle dynamic workloads.  Brasil provides easy to
 use, flexible and scalable infrastructure for workload distribution and
 aggregation that can be used by dynamic workloads, many-task workloads and
 dataflow applications.
@@ -125,12 +125,12 @@ the design and the reasoning behind it. \textit{Implementation section} will
 discuss how system is implemented. The \textit{Filesystem interface section}
 explains the use of synthetic filesystem and presents few examples to show how
 easily this interface can be used. Evaluations section presents some results
-showing that this approach is feasible. Related work section positions XCPU3 in
+showing that this approach is feasible. Related work section positions Brasil in
 the context of other related projects. Conclusion section will conclude this
 project.
 
 \section{Background}
-This section discusses the the previous work from which XCPU3 is evolved.
+This section discusses the the previous work from which Brasil is evolved.
 
 \subsection{Plan 9}
 Plan 9 is an operating system which was specifically designed for dealing with
@@ -187,7 +187,7 @@ The XCPU2 lacks fine-grained granularity of the control.  It only supports
 managing all \textit{compute nodes} together in identical way, and does not
 give any mechanism to control each \textit{compute node} individually.  This
 lack of control on every node is a major deterrent for dataflow applications.
-This limitation was major motivation for us to develop XCPU3 for providing much
+This limitation was major motivation for us to develop Brasil for providing much
 needed flexibility and fine grained control over over all compute nodes using
 simple interface.
 
@@ -250,7 +250,7 @@ and provides the flexibility to build any structure with these building blocks.
 There are a few downsides in making every node independent.  With independence
 of every node, each node can be a source of failures and faults.
 One will need to come up with better ways to deal with faults and
-failures when so many sources of them are present.  This takes the XCPU3 in
+failures when so many sources of them are present.  This takes the Brasil in
 realms of \textbf{Distributed Systems} opening many more possibilities and
 questions.
 
@@ -261,7 +261,7 @@ be in-frequent, so aborting and restarting operation should be acceptable for
 such infrequent failures.
 
 \subsubsection{Filesystem Interface}
-We want to keep XCPU3 interface agnostic from language, runtime and middleware.
+We want to keep Brasil interface agnostic from language, runtime and middleware.
 Plan 9 has proven that the filesystem interface is very flexible and yet
 powerful in the world of distributed applications.  We aim to follow the same
 principle of \textbf{Everything is a file} from Plan 9.
@@ -281,7 +281,7 @@ worrying about their actual locations.
 Other advantages of using filesystem interfaces are that 
 \begin{enumerate}
 \item Existing tools/commands used with traditional filesystem can be directly
-used with XCPU3.
+used with Brasil.
 
 \item filesystems come with their own mechanism for access control list for
 providing the security.  We can leave the security to these already proven 
@@ -294,7 +294,7 @@ without writing any explicit code for it.
 can lead to simpler code and hence lesser bugs.
 
 \item Users don't need special privileges or administrative access to interact
-with the filesystem.  This simplifies the user experience in running XCPU3 based
+with the filesystem.  This simplifies the user experience in running Brasil based
 applications.
 \end{enumerate}
 
@@ -331,7 +331,7 @@ remote end.
 \section{Implementation}
 
 This section discusses the implementation issues in more detail.  This chapter
-concentrates on how XCPU3 was implemented and discusses implementation
+concentrates on how Brasil was implemented and discusses implementation
 decisions which have proven to be important.
 
 
@@ -345,7 +345,7 @@ running as user-space application on top of other operating systems.
 
 As we are aiming for a flexible heterogeneous environment with different
 operating systems and different architectures, we found the Inferno operating
-system to be an attractive platform.  It allowed us to develop XCPU3 once and
+system to be an attractive platform.  It allowed us to develop Brasil once and
 easily deploy it on different platforms while enjoying the Plan 9 features
 on all those platforms.
 
@@ -358,21 +358,21 @@ of some performance.
 
 \subsection{Implementation details}
 
-XCPU3 is implemented as the filesystem in the Inferno kernel.  Figure 
-\ref{fig:XCPU3} shows the placement of XCPU3 in the context of applications,
+Brasil is implemented as the filesystem in the Inferno kernel.  Figure 
+\ref{fig:Brasil} shows the placement of Brasil in the context of applications,
 host operating system and the Inferno.
 
 \begin{figure}[h]
   \begin{center}
     \leavevmode
       \includegraphics[height=0.2\textheight,width=0.5\textwidth]
-		{./img/XCPU3Structure}
-    \caption{XCPU3 Structure}
-    \label{fig:XCPU3}
+		{./img/BrasilStructure}
+    \caption{Brasil Structure}
+    \label{fig:Brasil}
   \end{center}
 \end{figure}
 
-The XCPU3 filesystem is exported by Inferno using the \texttt{9P} protocol. 
+The Brasil filesystem is exported by Inferno using the \texttt{9P} protocol. 
 This protocol is used by Plan 9 and Inferno extensively to access any file. 
 Recently the Linux kernel has added support for the \texttt{9P}
 protocol\cite{graverobbers}.  This allows Linux to mount filesystems
@@ -380,33 +380,33 @@ exported over the 9P protocol.  Other Unix based operating systems can use
 FUSE\cite{FUSE} for accessing the 9P based filesystems. 
 
 In a typical setup, Inferno runs in the hosted environment on an operating
-system like Linux or Plan 9.  The hosted inferno will export the XCPU3
+system like Linux or Plan 9.  The hosted inferno will export the Brasil
 filesystem which can be mounted by the local host operating system. The 
-applications interact with this mounted XCPU3 filesystem using the native
-filesystem interfaces (e.g. VFS for Linux). Any interaction with this XCPU3
-filesystem is communicated to Inferno using \textit{9P}. The XCPU3 kernel module
+applications interact with this mounted Brasil filesystem using the native
+filesystem interfaces (e.g. VFS for Linux). Any interaction with this Brasil
+filesystem is communicated to Inferno using \textit{9P}. The Brasil kernel module
 inside the inferno kernel then receives and interprets the user actions.  If
-needed, it uses services from the host operating system or from other XCPU3
-filesystems deployed on remote locations.  The XCPU3 filesystem then sends the
+needed, it uses services from the host operating system or from other Brasil
+filesystems deployed on remote locations.  The Brasil filesystem then sends the
 prepared response over 9P. The host operating system will relay this response
 back to the application via the local filesystem interface.
 
 
-\subsection{The big picture (connecting multiple XCPU3 nodes)}
-The real power of the XCPU3 is the ability to connect with each other and form
-bigger instance of XCPU3.  XCPU3 filesystem is exported over \texttt{9P}
+\subsection{The big picture (connecting multiple Brasil nodes)}
+The real power of the Brasil is the ability to connect with each other and form
+bigger instance of Brasil.  Brasil filesystem is exported over \texttt{9P}
 providing same functionality and interface to both local and remote
-applications.  This allows XCPU3 instances to connect with other XCPU3
+applications.  This allows Brasil instances to connect with other Brasil
 instances and distribute some of their responsibilities among them.
-The \texttt{9P} protocol shields the XCPU3 from complications of remote
-filesystem access and works as transparent glue for connecting multiple XCPU3
+The \texttt{9P} protocol shields the Brasil from complications of remote
+filesystem access and works as transparent glue for connecting multiple Brasil
 instances together.
 
 \subsubsection{Central Services}
 
-The ability to configure many XCPU3 nodes into hierarchy is provided by the
+The ability to configure many Brasil nodes into hierarchy is provided by the
 \textit{central services}.  In contrary to the name, central services is
-highly distributed and every XCPU3 runs an independent instance of the central
+highly distributed and every Brasil runs an independent instance of the central
 services.  
 
 
@@ -422,9 +422,9 @@ hierarchy by binding a parent's central service directory to the name
 \texttt{[/csrv/parent]} and then tell the parent to back-mount their name space
 (allowing two way traversal).  In this way children register with parents
 triggering the cross-mounts and establishing a two way link between them. Each
-XCPU3 instance need to know only the information about its parent and children
-in the hierarchy and the all XCPU3 nodes initiate these connections leading to
-the distributed creation of the XCPU3 node hierarchy.
+Brasil instance need to know only the information about its parent and children
+in the hierarchy and the all Brasil nodes initiate these connections leading to
+the distributed creation of the Brasil node hierarchy.
  
 Figure \ref{fig:xcpu3FSTopo} tries to give a simple overview of how this 
 synthetic filesystem view is populated based on the underlying mount
@@ -435,7 +435,7 @@ connections between the nodes.
     \leavevmode
       \includegraphics[height=0.3\textheight,width=0.4\textwidth]
 		{./img/xcpu3FSTopo}
-    \caption{Sample filesystem interface for sample the topology in XCPU3}
+    \caption{Sample filesystem interface for sample the topology in Brasil}
     \label{fig:xcpu3FSTopo}
   \end{center}
 \end{figure}
@@ -443,10 +443,10 @@ connections between the nodes.
 Assuming the links between the nodes are created by the remote node mounts in
 central services, this diagram shows how the filesystem views at different
 nodes encompasses the whole network, even though each node is only connected to
-its neighbours. The XCPU3 filesystem starts with the \texttt{[/csrv]}
+its neighbours. The Brasil filesystem starts with the \texttt{[/csrv]}
 directory. The location \texttt{[/csrv/local/]} presents the local resources
-whereas \texttt{[/csrv/parent/]} presents the XCPU3 filesystem of the parent
-node. All other directories in the represents the XCPU3 filesystem of the
+whereas \texttt{[/csrv/parent/]} presents the Brasil filesystem of the parent
+node. All other directories in the represents the Brasil filesystem of the
 children nodes.  It can be easily seen that both \textit{App-1} and
 \textit{App-2} have access to all the nodes even though they are running on
 different nodes.  In this design, every node has to worry about only its
@@ -467,15 +467,15 @@ operations. This local view includes the parent node and the children nodes.
 
 This section discusses the filesystem interface and how it can be used for
 managing the local and remote resources. Figure \ref{fig:xcpu3Local} gives the
-the high-level view of the hierarchy of the XCPU3 filesystem.  This section
-will discuss the overall hierarchy and few important files in the XCPU3.
+the high-level view of the hierarchy of the Brasil filesystem.  This section
+will discuss the overall hierarchy and few important files in the Brasil.
 
 \begin{figure}[h]
   \begin{center}
     \leavevmode
       \includegraphics[height=0.25\textheight,width=0.4\textwidth]
 		{./img/local_session_subsessions}
-    \caption{Filesystem interface in XCPU3}
+    \caption{Filesystem interface in Brasil}
     \label{fig:xcpu3Local}
   \end{center}
 \end{figure}
@@ -548,14 +548,14 @@ this work is divided between all aggregation sessions.
 \subsection{Examples}
 It is hard to measure the \textit{ease of use} and \textit{simplicity}
 factor.  So, we are presenting following examples to show how easy it is
-to use XCPU3 infrastructure.  We are giving these examples of using the bash
+to use Brasil infrastructure.  We are giving these examples of using the bash
 shell in Linux.
 
 \subsubsection{Traditional application deployment}
-This example presents how the default aggregation behaviour of the XCPU3 can
+This example presents how the default aggregation behaviour of the Brasil can
 used to deploy large number of applications.
 
-We assume that the XCPU3 filesystem is mounted on \texttt{./mpoint/} directory. 
+We assume that the Brasil filesystem is mounted on \texttt{./mpoint/} directory. 
 This can be done by using FUSE or 9VFS\cite{v9fseric}.
 \begin{verbatim}
 $ less ./mpoint/csrv/local/clone
@@ -583,9 +583,9 @@ This approach can be used in the \textit{trivially parallelizable applications}
 where the same application is deployed on all the nodes.
 
 \subsubsection{Dataflow deployment}
-In this mode the role of XCPU3 is limited to the reservation. An application
+In this mode the role of Brasil is limited to the reservation. An application
 is given the capability of doing the workload distribution and aggregation
-with the help of the filesystem interfaces provided by the XCPU3. Instead of
+with the help of the filesystem interfaces provided by the Brasil. Instead of
 interacting with the aggregation points, these dataflow applications can
 interact directly with the sessions responsible for the actual execution using
 the filesystem hierarchy of that session.
@@ -620,13 +620,13 @@ The above example is equivalent of executing \texttt{date | wc} on the shell,
 but with the difference that both commands are executed on a different remote
 machines while sharing the same namespace.
 
-The XCPU3 infrastructure relies on userspace applications like the \textbf{PUSH
+The Brasil infrastructure relies on userspace applications like the \textbf{PUSH
 shell}\cite{PODC:Push} for creating more complicated DAG and mapping them on
-underlying XCPU3 infrastructure.
+underlying Brasil infrastructure.
 
 \section{Evaluation}
 
-This section presents the evaluation of the XCPU3 infrastructure from the
+This section presents the evaluation of the Brasil infrastructure from the
 perspective of quicker deployment of a large number of small jobs while giving
 clean interfaces and abstractions.
 
@@ -635,7 +635,7 @@ clean interfaces and abstractions.
 We have performed our evaluations on a Blue Gene setup with 512 nodes.  This
 setup is visually presented in a figure \ref{fig:hare}.  We run hosted Inferno
 on all the compute nodes, IO nodes and the controller node.  The user interacts 
-with the XCPU3 instance on the controller node for job submission.
+with the Brasil instance on the controller node for job submission.
 
 
 \begin{figure}[h]
@@ -649,7 +649,7 @@ with the XCPU3 instance on the controller node for job submission.
 \end{figure}
 
 
-\subsubsection{Scalability of XCPU3}
+\subsubsection{Scalability of Brasil}
 Our first objective is to show how quickly we can do deployment and execution
 of a large number of small applications. We have avoided using larger
 applications as the bigger runtimes of larger applications tend to amortize the
@@ -666,25 +666,25 @@ exponentially from 1 to 2048 executions.
     \leavevmode
       \includegraphics[height=0.2\textheight,width=0.5\textwidth]
 		{./img/linear}
-    \caption{Comparison if XCPU3 with sequential deployment}
+    \caption{Comparison if Brasil with sequential deployment}
     \label{fig:sequential}
   \end{center}
 \end{figure}
 
-Figure \ref{fig:sequential} gives an initial perspective of how XCPU3 performs
+Figure \ref{fig:sequential} gives an initial perspective of how Brasil performs
 relative to sequential performance.  This graph plots the total time taken by
-XCPU3 and the hypothetical time it may take for performing the same amount of
-work on one machine.  This graph shows that the XCPU3 is successfully able to
-exploit the parallelism for deploying the jobs quickly. The XCPU3 deploys 2048
+Brasil and the hypothetical time it may take for performing the same amount of
+work on one machine.  This graph shows that the Brasil is successfully able to
+exploit the parallelism for deploying the jobs quickly. The Brasil deploys 2048
 jobs in 12.66 seconds whereas sequential execution would take upto 510 seconds.
 In the graph, the line showing sequential scaling looks exponential, but that is
 because number of requested executions increase exponentially.
 
 
 \subsubsection{Job deployment without input}
-This section aims to further analyze the performance of XCPU3.  Again we are 
+This section aims to further analyze the performance of Brasil.  Again we are 
 concentrating on similar deployment.  We have recorded the time taken by each
-of the following stages in the deployment on the XCPU3 infrastructure.
+of the following stages in the deployment on the Brasil infrastructure.
 
 \begin{enumerate}
 \item Reservation: Create a new session, and request the reservation by writing
@@ -717,7 +717,7 @@ session.  We have taken the average value over multiple runs for our analysis.
 
 Figure \ref{fig:date_graph} presents the results of deployment of the date
 command in the form of graph.  This graph presents the breakup time for various
-stages of the deployment using the XCPU3 infrastructure.
+stages of the deployment using the Brasil infrastructure.
 
 From this graph we can observe that the session termination and the housekeeping
 overheads are negligible compared to the time taken by reservation, execution
@@ -776,7 +776,7 @@ deployment involves the distribution of inputs to all the sessions.  This
 introduces a new stage in the deployment process in addition to the 5 stages we
 described in the above section.  This stage will be the \textbf{input} stage and
 involves distributing the input data to all the sessions which are responsible
-for execution.  By default XCPU3 will broadcast the input to all the compute
+for execution.  By default Brasil will broadcast the input to all the compute
 nodes, but we have plans to introduce filters in the PUSH shell which can
 partition the input given to the compute  nodes. 
 
@@ -811,7 +811,7 @@ requested}
 
 \subsection{Dataflow workloads}
 The evaluations presented in this chapter helps us in understanding how fast
-XCPU3 can deploy small jobs and aggregate the results produced by them.  Now
+Brasil can deploy small jobs and aggregate the results produced by them.  Now
 let us relate how these observations can justify our claims about dataflow
 applications. Typical deployments of the dataflow applications are similar to
 the above experiments as it involves starting up a large number of small jobs.
@@ -820,34 +820,34 @@ involve the input distribution and output aggregation stages.  These deployments
 work by feeding the output of one computation as input for other computation. 
 At the end of the computation, a user needs to read the output of only selected
 compute sessions which does not need any aggregation.  What we can conclude from
-the above description is that XCPU3 performs really well in the stages like
+the above description is that Brasil performs really well in the stages like
 reservation which are important for dataflow deployments.  The stages like input
-distributions are output aggregation where XCPU3 is relatively slow are not
-needed by dataflow deployments.  This makes XCPU3 ideal for rapid deployment of
+distributions are output aggregation where Brasil is relatively slow are not
+needed by dataflow deployments.  This makes Brasil ideal for rapid deployment of
 dataflow workloads.
 
 Unfortunately we do not have concrete measurements and evaluations to back our
-predictions.  XCPU3 is one of the piece in the envisioned solution for problem
+predictions.  Brasil is one of the piece in the envisioned solution for problem
 of efficient and easy deployment of large-scale dataflow applications.   We are
 still working on the integration of userspace applications like
-PUSH\cite{PODC:Push} with XCPU3 which will further simplify the dataflow
+PUSH\cite{PODC:Push} with Brasil which will further simplify the dataflow
 deployment.
 
 
-XCPU3 is an infrastructure which provides the needed flexibility, speed and 
+Brasil is an infrastructure which provides the needed flexibility, speed and 
 ease of use for dataflow workloads.  This chapter demonstrates the speed that
 can be achieved.  It is difficult to measure the properties like \textit{ease of
 use} and \textit{flexibility} but the examples presented in the filesystem
 interface chapter should give some insights of all the possibilities opened up
-by the XCPU3.
+by the Brasil.
 
 
 \section{Related work}
 
 
-This section tries to put XCPU3 in the context of other work which 
+This section tries to put Brasil in the context of other work which 
 has been done in this area.  We will briefly discuss the various related
-projects and how they differ from XCPU3.
+projects and how they differ from Brasil.
 
 \subsection{Historical solutions}
 The concept of workload distribution between multiple machines was introduced in
@@ -890,15 +890,15 @@ The MRNet\cite{MRNet} is designed for efficient multicast and data aggregation.
 This project concentrates on optimizing group communication but it is language
 dependent.  The MRNet API is in C++ and one needs to develop the applications
 using this API leading to lot more efforts from the developer side to use this
-infrastructure in comparison to XCPU3.
+infrastructure in comparison to Brasil.
 
 \subsection{Streamline}
 The idea of using filesystem interface for data-streams is also used by the
 \textit{pipefs}\cite{1400104} which is part of the streamline\cite{streamline}
 project.  This approach of using filesystem interface is quite similar to
-XCPU3, but the objectives of both these projects are different. Pipefs
+Brasil, but the objectives of both these projects are different. Pipefs
 concentrates on faster I/O with filesystem interface for the Linux kernel
-while XCPU3 concentrate on the flexible workload management.
+while Brasil concentrate on the flexible workload management.
 
 \subsection{Condor}
 Condor\cite{condor-practice} is \textit{high-throughput distributed batch
@@ -926,8 +926,8 @@ not provide way to dynamically adjust the reservations to deal with changing
 workloads.    
 
 Dryad addresses the issues like fault tolerance which are currently ignored by
-XCPU3, but XCPU3 is more flexible as it can support dynamic workload and
-changing DAG of dataflow deployments. Also the filesystem interface of the XCPU3
+Brasil, but Brasil is more flexible as it can support dynamic workload and
+changing DAG of dataflow deployments. Also the filesystem interface of the Brasil
 is much simpler and cleaner compared to the class based C++ interface of Dryad.
 
 \subsection{Hadoop}
@@ -938,7 +938,7 @@ relocate the data.  This localization of the computation leads to the better
 overall performance.  It is mainly used for map-reduce style of applications,
 but there are work going on to extend it for other approaches also.
 
-Hadoop streaming is one of such approach, which is also similar to XCPU3.
+Hadoop streaming is one of such approach, which is also similar to Brasil.
 Hadoop streaming is a utility which allows users to create and run jobs as any
 executable as the mapper and/or the reducer.  It can be also viewed as way to
 create pipeline multiple instances of mapper and multiple instances of reducer
@@ -965,23 +965,23 @@ the resource management and job submission/scheduling, but they do not try to
 simplify the communication issues within applications.
 
 \section{Future work}
-The XCPU3 is an infrastructure which we plan to extend it further to support
+The Brasil is an infrastructure which we plan to extend it further to support
 fault tolerance and add capability to selectively restarting the sub-sessions
 for environment where faults are more frequent.
 
-As XCPU3 is filesystem interface and can be implemented by any filesystem, we
+As Brasil is filesystem interface and can be implemented by any filesystem, we
 plan to implement this interface natively on traditional operating systems to
 improve the performance by avoiding the virtualization layer added by the
 Inferno.
 
 \section{Conclusion}
-XCPU3 project was initiated with the goal of creating alternate job deployment
+Brasil project was initiated with the goal of creating alternate job deployment
 mechanism primarily for menytask and dataflow deployments which can deal with
 dynamic workloads. We have kept the design simple with the assumption that
 simple design leads to the better scalability and flexibility.  We have tried
-to show that from examples that the XCPU3 interfaces are easy to use in
+to show that from examples that the Brasil interfaces are easy to use in
 language and runtime independent way. And with evaluation section we have
-tried to prove that the XCPU3 is viable option for scalable deployment of
+tried to prove that the Brasil is viable option for scalable deployment of
 many-task and dataflow workloads.
 \newline
 \newline

@@ -1,12 +1,5 @@
 \section{Desgin}
 
-\begin{figure}[htp]
-\centering
-\includegraphics[width=3in]{pipestruct.eps}
-\caption{The structure of the PUSH shell}
-\label{fig:pipestruct}
-\end{figure}
-
 The PUSH shell is a conventional UNIX shell with 
 two additional pipeline operators, a multiplexing 
 fan-out(\verb!|<![\emph{n}]), and a coalescing fan-in(\verb!>|!).
@@ -24,6 +17,13 @@ nothing within our implementation which enforces it.
 Normal redirections as well as application specific sources and sinks
 can provide alternate data paths.
 
+\begin{figure}[htp]
+\centering
+\includegraphics[width=3in]{pipestruct.eps}
+\caption{The structure of the PUSH shell}
+\label{fig:pipestruct}
+\end{figure}
+
 PUSH also differs from traditional shells by implementing native support for
 record based input handling over pipelines. This facility is similar to the
 argument field separators, IFS and OFS, in traditional shells which use a
@@ -34,7 +34,8 @@ individual records that the system distributes and coalesces.
 The choice of which \emph{multipipe}, an ordered set of pipes, to target is
 left as a decision to the module.
 
-Different data formats may have different output requirements.Demultiplexing from a multipipe is performed by creating a many to one
+Different data formats may have different output requirements.  
+Demultiplexing from a multipipe is performed by creating a many to one
 communications channel within the shell. The shell creates a reader processes
 which connects to each pipe in the multipipe. When the data reaches an
 appropriate record boundary a buffer is passed from the reader to the shell
@@ -49,7 +50,7 @@ They then tokenize the sentence into words, finding the part of speech and
 morphology of the words that make up the sentence.
 There are a large number of discrete sets of data whose order is not 
 necessarily important. We need to perform a computationally intensive task 
-on each of the sentences, which are small, discrete records and ideal target 
+on each of the sentences, which are small, discrete records an ideal target 
 for parallelization.
 
 PUSH was designed to exploit this mapping. For example, to get a histogram of
@@ -75,10 +76,10 @@ The first variable, ORS, declares our record multiplexor module,
 the intermediary used to ensure that the input and output to 
 distributed pipes are correctly aligned to record boundaries. 
 In many cases a default which splits based on atomic writes can
-be used or one of several built-ins which split based on a field
-separator or newline can be used.
+be used.  Alternatively one of several built-ins which split based on 
+a field separator or newline can be used.
 
-emph{find . -type f} gives a list of the files
+\emph{find . -type f} gives a list of the files
 which are then "fanned out"(\verb!|<!) using a combination
 of a multipipes, and a \emph{multiplexor}
 which determines which pipes are the targets of each unit of output.
@@ -96,14 +97,6 @@ intent was to use it to drive workloads and workflows across a cluster of
 machines.  In particular, we were interested on deploying on leadership
 class high performance computing machines and as such
 a key requirement for us was scalability to a large number of nodes.  
-In order to accomplish this we designed the system without any central
-component which required knowledge of the entire system.
-All knowledge is distributed and then aggregated at certain points.
-Descisions like scheduling and job management are also made in a
-distributed fashion, utilizing the hierarchy of aggregation points
-to eliminate the need for all-to-all communication during workload
-distribution.
-
 Instead of traditional client/server models we opted for a peer based
 model where every node within the system is capable of initiating new
 workflows of computation and managing the newly created pipeline.
@@ -112,6 +105,13 @@ of computation or analysis at any stage of the pipeline or in reaction to
 data produced by a previous portion of the pipeline giving the entire
 infrastructure a degree of elasticity that seemed to missing from 
 previously available tools.
+In order to accomplish this we designed the system without any central
+component which required knowledge of the entire system.
+All knowledge is distributed and then aggregated at certain points.
+Descisions like scheduling and job management are also made in a
+distributed fashion, utilizing the hierarchy of aggregation points
+to eliminate the need for all-to-all communication during workload
+distribution.
 
 In order to scale such a system we decided to go with a hierarchical
 organization of nodes.  
@@ -126,8 +126,8 @@ network domains in a seamless fashion.
 We intend to use this property to create an environment which seamlessly
 extends the user's desktop experience and environment to the supercomputer.
 
-The two forms of I/O integration match the new pipeline primatives which
-are part of the PUSH shell.
+The forms of communication aggregation match the new pipeline primatives 
+which are part of the PUSH shell.
 By default, input to each master pipeline component thread is fanned out 
 to sub-session threads and output from those sub-sessions in fanned back
 into the master component.
