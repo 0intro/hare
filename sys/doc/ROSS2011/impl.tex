@@ -1,9 +1,18 @@
 \section{Implementation}
 
+This section describes the internals of the implementation in more
+detail.  It is important to remember that these details are entirely
+hidden by the PUSH shell so users and their applications are never
+really exposed to the complexity expressed herein.  It is possible
+to provide alternate front-ends to the underlying Brasil infrastructure
+and applications may choose to interact directly with it and its control
+interfaces, but it is not expected that this will be the default mode of 
+operation.
+
 \subsection{Interface}
 
 The external interface to our infrastructure is a synthetic file system
-much like the interface to the Xcpu~\cite{xcpu} workload distribution
+much like the interface to the Xcpu~\cite{lucho-xcpu} workload distribution
 system.  
 Figure \ref{fig:xcpu3Local} gives the the high-level view of the hierarchy 
 of the Brasil namespace.
@@ -43,6 +52,10 @@ default environment and namespace specifically for this session.
 The \texttt{[ctl]} file is used for controlling the execution and 
 the \texttt{[stdio]} file is used to manipulate standard input and output.  
 
+Since sessions themselves can have children, each session directory may have
+subsession directories with similar files.  The files at the session directory
+level provide the aggregate interfaces to the sub-session directory.
+
 %Whenever any session receives the reservation request, it evaluates it by 
 %considering, if it can execute locally or it should break it and divide 
 %between its available children.  Depending on the decision,
@@ -70,10 +83,6 @@ the \texttt{[stdio]} file is used to manipulate standard input and output.
 %this work is divided between all aggregation sessions.
 
 \subsection{Brasil}
-\emph{TODO: we need to recast this to talk about brasil as a daemon providing
-the taskfs services, dynamic namespace, and serving of the local namespace --
-we will mention that it is based on Inferno, but otherwise we'll tone down
-the language and change the representative illustrations to match}
 
 The core of Brasil is a self-contained daemon which is based on a fork of
 Inferno.
@@ -83,8 +92,6 @@ It runs natively on
 multiple hardware platforms and can also run as a user-space application on
 top of other operating systems.
 Brasil is based on the hosted version of the Inferno platform.
-
-\emph{TODO: new figure needed for brasil}
 
 The Brasil namespace is exported using the \texttt{9P} protocol. 
 This protocol is used by Plan 9 and Inferno extensively to access any file. 
@@ -159,5 +166,4 @@ must use this global view for making any decision or performing a typical
 operation. The nodes mostly use only the local view for decision making and
 operations. This local view includes the parent node and the children nodes.
 
-\emph{TODO: describe sub-sessions and sub-session directory.  we also need
-to compare/contrast to the xcpu design}
+

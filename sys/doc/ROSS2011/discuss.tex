@@ -1,30 +1,120 @@
 \section{Discussion}
 
-\subsection{Weaknesses}
-TODO: Hierarchical mounts mean overhead
+While our initial experiences with using Brasil to deploy
+workloads was positive, we found several areas for improvement
+in both the design and implementation of the infrastructure.
 
-TODO: aggreagtion models too simple
+One systemic flaw involved the design decision to give the PUSH
+shell responsibility for orchestrating record seperation and 
+multiplexing.  In enviornments with a lot of communication 
+adding additional components to the I/O processing pipeline 
+increases overhead due to increased data copying and context
+switching.  By moving record seperation into the infrastructure
+itself (particularly for common default cases) we can eliminate
+a pipeline stage (two copies and two context switches).  By moving
+multiplexor functionality into the infrastructure we remove an
+additional pipeline stage (two copies and two context switches).
+This reduces the overhead of interacting with the infrastructure 
+from 6 copies and context switches down to 2.  Taking advantage
+of techniques such as Willem de Bruijn's Beltway Buffers~\cite{beltway}
+may reduce this even further.
 
-TODO: fault tolerance sucks
+Another unforseen performance problem was caused by the overhead
+incurred by the transitive mount methodology of central services.
+While elegant it introduces overhead at each transitive mount point.
+As such, deep hierarchies and large scale workloads can involve 
+many transitive hops for every communication which introduces latency
+and load across the system.  We have identified the need to augment
+our hierarchical aggregation (which works well for fan-out and fan-in)
+with cut-through models of communication for data-flow operations.
+There may also be opportunities to leverage the collective network
+capabilities of high performance systems such as BG/P to further
+optimize aggregate communication behavior.
 
-TODO: synch dataflow sucks
+While fan-in and fan-out aggregation models do match a large class
+of use-cases we quickly found outselves wanting more primitives to
+support deeper pipelines and more complex workflows.  In addition
+to the two existing extended pipes we identified the need for
+deterministic delivery to/from a particular endpoint as well as
+many-to-many multipipes.  We also quickly found the need to
+incorporate some form of synchronization into the infrastructure
+and even came up with ways of doing MPI-style collective operations
+using abstract pipeline constructs.
 
-TODO: async determinism difficult
+A key failure of our implementation is that it not only lacked
+fault tolerance, it lacked good methods of identifying where
+in a distributed pipeline failures actually occurred.  Early
+debugging was plagued with workflows which would just hang
+waiting on input or waiting to give output.  The multi-stage
+pipelines present within each PUSH pipeline component further
+complicated this.  Part of these problems are inherent in the
+way traditional UNIX pipelines work, but we are now experimenting
+with "rejoinable" pipelines, task-based workqueue models, and
+looking into opportunities for pipeline based work-stealing and
+failover in order to alievate workflow stalls.  Additionally,
+we are adding new out-of-band logging and error reporting
+mechanisms which attach at the same points as the I/O pipelines,
+but are used by the infrastructure to communicate failures.
 
-\subsection{Missed Opportunities}
-TODO: missed opportunity: file system not incorporated
+Early on we had a lot of trouble with stalling due to trying to
+perform dataflow operations in a synchronous manner.  We later
+decoupled these operations into asynchronous threads within
+Brasil, but this introduced a number of race conditions which
+made traditional pipe semantics difficult to maintain.  We are
+left with the opinion that the only way to successfully implement
+multipipe semantics is to introduce control sequences to the 
+pipelines to assist with identification of when communication
+begins and ends.  This detracts from the elegance of pipeline
+based solutions, but it also prevents a host of race conditions
+and spurious failures.  The good thing is that the complexity 
+of dealing with these out of band control messages is hidden 
+entirely within the infrastructure, hiding the details from
+the end user.
 
-TODO: need dynamic behavior within session
+In addition to the design and implementation flaws mentioned
+above we realized there were several missed opportunities in
+the approach we took with our initial prototype.  
+As mentioned in the evaluation section, one of the larger
+components of execution time is the loading of the application
+binary over the distributed file system.  Given the hierarchical
+aggregation of the infrastructure we should be able to provide
+more efficient access to binary files and libraries.  A 
+straightforward approach is to provide cache capabilities at
+aggregation points, but a more aggressive concept is to
+incorporate the idea of collective file system pre-fetching
+based on session behavior utilizing underlying interconnect
+hardware features.  Regardless of implementation, we'd like
+to hook distributed file system semantics and capabilities
+in more tightly with the infrastructure in the future.
 
-\subsection{Future Work} 
-TODO: Multipipe as a system primitive
+Another set of features we overlooked in our initial 
+implementation was adding capabilites which facilitated
+more dynamic behavior within sessions or within the
+infrastructure itself.  In future implementations we
+plan to have a more seamless approach to nodes entering
+and leaving the infrastructure, which should enable
+cloud deployments and also ease issues with fault tolerance.
+In addition to dynamic behavior of the infrastructure, we
+also want to better support dynamic behavior within the
+workflow.  The existing infrastructure supports spawning
+new workflows within the cluster as part of a workflow,
+but it would also be nice for workflows to be able to
+dynamicly request and release resources from their own
+workflow based on workload phase or dependencies
+within the data stream.
 
-TODO: Rebuild in terms of multipipes
-
-TODO: need direct communication cut-through for splice
-
-TODO: Need more aggregation features (collective, etc.)
-
-TODO: Need additional operators (hash-pipe, etc.)
-
-TODO: Unusual File Objects concepts (maybe?)
+The experience of implementing the Brasil infrastructure
+made it clear to us that the key concept at the core
+of PUSH and Brasil was that of the multipipe.  While we
+originally only used multipipes as the basis for implementing the
+communication aggregation primitives, it became clear to
+us that with a few extensions  we could reimplement the 
+control plane and monitoring subsystems in terms of 
+multipipes as well.  Given the general usefulness of
+the multipipe construct we feel it may be a reasonable
+candidate for addition to the core operating system 
+instead of just being part of a service daemon.  As
+such we are currently investigating implementations which
+add multipipes as a core system primitive to the Plan 9
+and Linux operating systems and reimplementing the Brasil
+infrastructure using the new core system primitive.
