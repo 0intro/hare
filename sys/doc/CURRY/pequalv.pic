@@ -1,0 +1,51 @@
+.PS
+define plan9  {[L:box "plan9 proc (addresses < 16 MB)"  ht $1 wid $2
+	S:box "stack" with .n at last box .s ht $1 wid $2
+	B:box "bss" with .n at last box.s ht $1 wid $2
+	D:box "data" with .n at last box.s ht $1 wid $2
+	C:box "code"with .n at last box.s ht $1 wid $2
+]}
+define cnk  {[L:box "cnk proc (addresses > 16 MB)" "Rounded to nearest 1M" "BSS set to 256MB base" ht $1+.15 wid $2 
+	S:box "stack" with .n at last box .s ht $1 wid $2
+	B:box "bss" with .n at last box.s ht $1 wid $2
+	D:box "data" with .n at last box.s ht $1 wid $2
+	C:box "code" with .n at last box.s ht $1 wid $2
+]}
+
+define page {$1: box "4k page" ht .2i wid 2i with .n at M.n - (0,$2); line from $3  to $1.w}
+define bigpage {$1: box "256MB page" "Shared among all" "CNK processes" "virtual==physical address" ht 1i wid 2i with .n at M.n - (0,$2); line from $3  to $1.w}
+
+down
+C: cnk(.25i, 2.4i) 
+D: cnk(.25i, 2.4i) with .n at C.s - (0,1)
+P: plan9(.25i, 2i)with .n at D.s - (0,1)
+
+box "Top of Memory" wid 2i ht .15i with .ne at (5,0)
+M:box wid 2i ht 8i with .n at last box.s
+
+page(P0,6.6, P.S.e)
+page(P1,6.8i, P.S.e)
+page(P2,6i, P.C.e)
+page(P3, 4i, P.C.e)
+page(P4,3.2i, P.B.e)
+page(P5,5.8i, P.B.e)
+page(P6,6.4i, P.B.e)
+page(P7, 5.2i, P.D.e)
+
+page(C0,5i, C.S.e)
+page(C2,7i, C.C.e)
+bigpage(C4,2i, C.B.e)
+bigpage(C5,1i, C.B.e)
+bigpage(C6,0i, C.B.e)
+page(C7, 7.6i, C.D.e)
+
+page(DEED1,4.4i, D.S.e)
+page(DEED2,5.2i, D.C.e)
+page(DEED3, 3.8i, D.C.e)
+bigpage(DEED4,2i, D.B.e)
+bigpage(DEED5,1i, D.B.e)
+bigpage(DEED6,0i, D.B.e)
+page(DEED7, 4.0i, D.D.e)
+
+.PE
+

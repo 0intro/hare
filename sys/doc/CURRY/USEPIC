@@ -1,0 +1,130 @@
+Drawing Graphs with gpic - Douglas B. West
+
+Various people over the years have asked me how I draw the figures for my books, such as Introduction to Graph Theory, Mathematical Thinking: Problem-Solving and Proofs (with John D'Angelo), and the forthcoming Combinatorial Mathematics. All these figures are drawn using gpic, the GNU (Free Software Foundation) version of the program pic developed originally by AT&T. gpic is part of the freely available groff document formatting system.
+The program pic was developed for drawing pictures in troff documents, I believe in 1984. The original version of gpic was intended as a preprocessor for groff. Sometime in the late 1990s, a command-line option was added to gpic to allow it to serve as a preprocessor for TeX. This allowed me to migrate my books from troff to TeX.
+
+Since mostly I want to draw graphs, I wrote macros that facilitate drawing and labeling graphs of various sorts in a few lines of gpic input. I provide the macro package as a text file with essentially no documentation. On this page I give a brief summary of how to use it, plus a few examples at the end. More extensive reference materials on pic and gpic themselves, including old user manuals, have been gathered by Richard Stevens.
+
+My macro package is inelegant and could be made cleaner and more sophisticated. However, it does enable me to draw the pictures I want to draw rather quickly and with very little code.
+
+Please send feedback on how this page can be improved to west @ math . uiuc . edu. Also, please let me know if you use these macros.
+
+Basics
+
+Locations and arguments
+gpic is coordinate-based. Locations are described as ordered pairs "(a,b)" in the coordinate plane. Locations (or objects) can be named using colons, as in "A:(a,b)". Names remain in effect until reassigned; in particular, they persist into later pictures. To put multiple commands on a single line, end each with a semicolon.
+In order to facilitate placing vertices at grid points, I have defined names for these locations. Available are "p00" through "p99" and "p100" through "p155", where "pij" denotes "(i,j)", and the other locations are from (10,0) through (15,5). Offset locations are also available, using "op00" through "op99" and "op100" through "op155". Here "opij" is defined as "O+(i,j)" for the particular location named as "O", which can be viewed as an "origin". A picture with several copies of the same structure can be produced by using the same commands with a change in the specification of "O".
+
+Lines and arrows are drawn from location to location. gpic macros have a fixed list of up to nine arguments, invoked as macro(arg1,arg2,...,argN). Therefore, many of my macros come in sets indexed up to 9, depending on how many points are being placed or connected by lines. The syntax for macro definitions is 
+"define macroname #command1; command2; etc#"
+
+"spot", "spot2", . . ., "spot9"
+The arguments for these macros are locations in the plane. "spotN" takes N such locations and puts bullets there as vertices. It also names those locations in order, A, B, C, . . . Those names can be used as arguments in later macros. This enables editing of pictures by moving vertices around without retyping lots of locations. If more than nine vertices are needed, than one can save the locations with other names, as in "A1:A;"; each use of a "spotN" macro assigns names starting from "A".
+
+"poly2", . . ., "poly20" 
+"polyN(loc,rad)" places N equally spaced vertices around an invisible circle with center "loc" and radius "rad", naming the locations beginning with A at the top (as in spotN) and moving clockwise. This is done via a small table of sines and cosines present in the macro package. For odd N, only up to N=13 is provided. When N is even, the (invisible) polygon sits on a horizontal base; the version "polyNv" (and maybe also "polyNh" for N=12 and N=16") puts a point at the top and bottom.
+
+"edge", "degr", "matc", "path", "cycl"
+"edge(A,B)" draws a line segment connecting two locations A and B. 
+"degrN" draws edges from its first argument to the other N arguments, up to N=8. 
+"matcN" draws a matching of size N on its 2N arguments, for N\in{2,3,4}. For example, "matc4(A,B,C,D,E,F,G,H)" draws the edges AB, CD, EF, and GH. 
+"pathN" draws a path through the locations of its N arguments in order. 
+"cyclN" draws a cycle through the locations of its N arguments in order. 
+The gpic primitive for these macros is "line", as in "line from A to B to C to D to E".
+
+"call", "call2", "call3"
+These place text at a specified location. In "call(A,"text $v_1$",ne);" the text inside quotation marks is placed near location A, in the northeast direction away from A. There are eight compass directions plus "c" for center. Note that text is passed through unchanged, to be processed by TeX (or troff), and it will be produced in the fonts used by the subsequent program. Thus notation is placed within dollar signs. To place text at locations A,B or A,B,C, use "call2(A,B,"text1","text2",direc1,direc2);" or "call3(A,B,C,"text1","text2","text3",direc1,direc2,direc3);".
+
+"circ", "arch", "elli"
+"circ(A,rad)" draws a circle of radius "rad" centered at location A. 
+"arch(A,B,rad)" draws a circular arc of radius "rad" counterclockwise from location A to location B. 
+"elli(A,ht,wid)" draws an ellips of height "ht" and width "wid" centered at location A. 
+Circless and ellipse are objects with centers and directional corners. The objects can be named, as in "C:circ(p00,2);" and then "C.ne" subsequently refers to the northeast point on C.
+
+"spli3", . . ., "spli9"
+"spliN" draws a curved line (via splines) from A to B to C, etc., those being its N arguments in order. Only the first and last locations are actually touched by the curve. Try it.
+
+Arrow, Bold, Dashed, Dotted
+Generally speaking, many of the macros for edge, path, cycl, degr, matc, spli, can be modified by prepending "a", "b", "f", "d", "t" to obtain lines that are arrows (directed edges), bold (thicker), fat (much thicker), dashed, or dotted, respectively. In combination, daedge, baedge, and dapath are also available. 
+The size of arrowheads is constant, but the extent of coordinates in pictures is not. As a result, arrowheads may appear too large or too small. To fix this, use "sethead(param)" to multiply the scale of arrowheads by "param". At the end of the picture, use "resethead" to restore the original scale; otherwise the new size arrowheads will be used in succeeding pictures.
+
+Invocation in TeX Documents
+
+Within a TeX document, the source for a gpic picture appears as follows: 
+\gpic{ 
+.PS x 
+gpic commands 
+.PE 
+}
+The "\gpic" macro is defined within the macro package. The "x" is the desired width of the picture in inches. When the file is run through the gpic program before sending it to tex or latex, the portion from .PS to .PE will be replaced with the "specials" that direct tex to draw the lines and other elements of the picture. Under tex, the macro "\gpic" then creates a centered box with the picture inside it.
+
+The command-line option "-t" instructs gpic to prepare its output for TeX rather than for troff. To run the preprocessor and then tex, one therefore uses something like the following script: 
+gpic -t gpicmacros texsource > temp.tex 
+tex temp
+
+To get pdf output, the resulting dvi file should be hit with 
+dvips -Ppdf | ps2pdf
+
+Further Macros and Comments
+
+Filled and Invisible
+"icirc(A,rad)" draws an invisible circle, which may be useful when named in order to refer to directional locations. 
+"fcirc(A,rad,fill)" draws a circle of radius "rad" centered at location A with the interior filled to density "fill", between 0 and 1. The use of "fcirc" will overwrite anything that was previous put in the interior of the circle. 
+"ficirc(A,rad,fill)" draw a filled interior without the boundary. 
+"felli, fielli" are the analogues for ellipses.
+"h1,...,h9", "v1,...,v9"
+Like "pij", these are shorthand for coordinate pairs, with "hj" being (.j,0) and "vj" being (0,.j). They can be used for making slight adjustments to locations for placing text labels.
+
+"spoto(A)" puts an open circle (instead of a bullet) at location A. 
+"mark(A)" puts a square at location A (to distinguish a vertex). 
+"cliqN" draws a complete graph with vertices at its N arguments, for N\in{4,5,6}. 
+"k23", "k33", "k34", "k44" draw complete bipartite graphs.
+
+Examples
+
+Below is the gpic code using these macros to produce several of the figures in Section 1.1 of Introduction to Graph Theory, second edition.
+Petersen graph, page 13: 
+\gpic{ 
+.PS 3.8 
+O:p00; poly5(O,2); cycl5(A,B,C,D,E); A1:A; B1:B; C1:C; D1:D; E1:E; 
+poly5(O,1); cycl5(A,C,E,B,D); matc3(A,A1,B,B1,C,C1); matc2(D,D1,E,E1); 
+call3(A1,B1+h1,C1+h1,"12","34","51",n,ne,se); call2(D1-h1,E1-h1,"23","45",sw,nw) 
+call3(A+h1,B-v1,C-h1,"35","52","24",e,s,sw); call2(D,E,"41","13",nw,n); 
+O:(5.5,0)+v1; poly3(op00,-.8); degr3(O,A,B,C); A1:A; B1:B; C1:C; spot(O); 
+poly6(op00,2); cycl6(A,B,C,D,E,F); path3(A,B1,D); path3(B,A1,E); path3(C,C1,F); 
+O:p110+v1; poly9(O,2); cycl9(A,B,C,D,E,F,G,H,I); spot(O); degr3(O,A,D,G); 
+matc3(B,F,E,I,H,C); 
+.PE 
+}
+
+Decomposition of K5 and K4, page 11: 
+\gpic{ 
+.PS 2.6 
+poly5((0,.85),1.15); bcycl5(A,B,C,D,E); cycl5(A,C,E,B,D); 
+spot4(p30,p50,p52,p32); path3(A,B,D); dpath3(B,C,A); bpath3(C,D,A); 
+.PE 
+}
+
+K\"onigsberg Bridge Problem, page 2: 
+\gpic{ 
+.PS 4.0 
+elli(p64,4,6); call3(p64,p96+h2,p92+h2,"$W$","$X$","$Z$",c,ne,se); 
+call3(p124+h2,p55-v3,p75-v3,"$Y$","1","2",e,nw,ne); 
+call3(p53+v1,p73+v1,p84-h2,"3","4","5",sw,se,e); 
+call3(p115+h2,p113+h2,p114,"6","7","$~$",s,n,w); 
+spli7((14,6.4),(12,5.4),(9.8,5.0),(9.2,4),(9.8,3.0),(12,2.6),(14,1.6)); 
+spli7((1.0,3.6),(2.6,3.4),(4,2),(6,1.4),(9.2,2.6),(12,2),(14,.8)); 
+spli7((1.0,4.4),(2.6,4.6),(4,6),(6,6.6),(9.2,5.4),(12,6),(14,7.2)); 
+matc2((8.7,4.1),(9.6,4.1),(8.7,3.9),(9.6,3.9)); 
+matc4((4.7,1.4),(5.0,2.4),(4.5,1.5),(4.8,2.5),(4.7,6.6),(5.0,5.6),(4.5,6.5),(4.8,5.5)); 
+matc4((7.3,1.4),(7.0,2.4),(7.5,1.5),(7.2,2.5),(7.3,6.6),(7.0,5.6),(7.5,6.5),(7.2,5.5)); 
+matc4((11.0,1.8),(11.5,3.1),(11.2,1.7),(11.7,3.0),(11.0,6.2),(11.5,4.9),(11.2,6.3),(11.7,5.0)); 
+O:(17,1); 
+spot4(op30,op03,op36,op63); degr3(D,A,B,C); dbledge(A,B,6.5); dbledge(B,C,6.5); 
+call3(C+v1,D,A-v1,"$x$","$y$","$z$",n,e,s); E1:.5< B,C>; E3:.5< A,B >; 
+E5:.5< B,D>; E6:.5< C,D>; E7:.5< D,A>; 
+call3(B-h2,E1-h3+v3,E1+h2-v2,"$w$","$e_1$","$e_2$",w,nw,se); 
+call3(E3-h2-v2,E3+h2+v2,E5,"$e_3$","$e_4$","$e_5$",sw,ne,n); 
+call3(E6,E7,E5,"$e_6$","$e_7$","$~$",ne,se,s); 
+.PE 
+}

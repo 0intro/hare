@@ -1,0 +1,85 @@
+.PS
+define p00 {(0,0)}; define p01 {(0,1)}; define p02 {(0,2)}; define p03 {(0,3)}
+define p04 {(0,4)}; define p05 {(0,5)}; define p06 {(0,6)}; define p07 {(0,7)}
+define p08 {(0,8)}; define p09 {(0,9)}; define p10 {(1,0)}; define p11 {(1,1)}
+define p12 {(1,2)}; define p13 {(1,3)}; define p14 {(1,4)}; define p15 {(1,5)}
+define p16 {(1,6)}; define p17 {(1,7)}; define p18 {(1,8)}; define p19 {(1,9)}
+define p20 {(2,0)}; define p21 {(2,1)}; define p22 {(2,2)}; define p23 {(2,3)}
+define p24 {(2,4)}; define p25 {(2,5)}; define p26 {(2,6)}; define p27 {(2,7)}
+define p28 {(2,8)}; define p29 {(2,9)}; define p30 {(3,0)}; define p31 {(3,1)}
+define p32 {(3,2)}; define p33 {(3,3)}; define p34 {(3,4)}; define p35 {(3,5)}
+define p36 {(3,6)}; define p37 {(3,7)}; define p38 {(3,8)}; define p39 {(3,9)}
+define p40 {(4,0)}; define p41 {(4,1)}; define p42 {(4,2)}; define p43 {(4,3)}
+define p44 {(4,4)}; define p45 {(4,5)}; define p46 {(4,6)}; define p47 {(4,7)}
+define p48 {(4,8)}; define p49 {(4,9)}; define p50 {(5,0)}; define p51 {(5,1)}
+define p52 {(5,2)}; define p53 {(5,3)}; define p54 {(5,4)}; define p55 {(5,5)}
+define p56 {(5,6)}; define p57 {(5,7)}; define p58 {(5,8)}; define p59 {(5,9)}
+define p60 {(6,0)}; define p61 {(6,1)}; define p62 {(6,2)}; define p63 {(6,3)}
+define p64 {(6,4)}; define p65 {(6,5)}; define p66 {(6,6)}; define p67 {(6,7)}
+define p68 {(6,8)}; define p69 {(6,9)}; define p70 {(7,0)}; define p71 {(7,1)}
+define p72 {(7,2)}; define p73 {(7,3)}; define p74 {(7,4)}; define p75 {(7,5)}
+define p76 {(7,6)}; define p77 {(7,7)}; define p78 {(7,8)}; define p79 {(7,9)}
+define p80 {(8,0)}; define p81 {(8,1)}; define p82 {(8,2)}; define p83 {(8,3)}
+define p84 {(8,4)}; define p85 {(8,5)}; define p86 {(8,6)}; define p87 {(8,7)}
+define p88 {(8,8)}; define p89 {(8,9)}; define p90 {(9,0)}; define p91 {(9,1)}
+define p92 {(9,2)}; define p93 {(9,3)}; define p94 {(9,4)}; define p95 {(9,5)}
+define p96 {(9,6)}; define p97 {(9,7)}; define p98 {(9,8)}; define p99 {(9,9)}
+define p100 {(10,0)}; define p101 {(10,1)}; define p102 {(10,2)}
+define p103 {(10,3)}; define p104 {(10,4)}; define p105 {(10,5)}
+define p110 {(11,0)}; define p111 {(11,1)}; define p112 {(11,2)}
+define p113 {(11,3)}; define p114 {(11,4)}; define p115 {(11,5)}
+define p120 {(12,0)}; define p121 {(12,1)}; define p122 {(12,2)}
+define p123 {(12,3)}; define p124 {(12,4)}; define p125 {(12,5)}
+define p130 {(13,0)}; define p131 {(13,1)}; define p132 {(13,2)}
+define p133 {(13,3)}; define p134 {(13,4)}; define p135 {(13,5)}
+define p140 {(14,0)}; define p141 {(14,1)}; define p142 {(14,2)}
+define p143 {(14,3)}; define p144 {(14,4)}; define p145 {(14,5)}
+define p150 {(15,0)}; define p151 {(15,1)}; define p152 {(15,2)}
+define p153 {(15,3)}; define p154 {(15,4)}; define p155 {(15,5)}
+define op00 {O+(0,0)}; define op01 {O+(0,1)}; define op02 {O+(0,2)};
+define op03 {O+(0,3)}; define op04 {O+(0,4)}; define op05 {O+(0,5)};
+define op06 {O+(0,6)}; define op07 {O+(0,7)}; define op08 {O+(0,8)};
+define op09 {O+(0,9)}; define op10 {O+(1,0)}; define op11 {O+(1,1)};
+define op12 {O+(1,2)}; define op13 {O+(1,3)}; define op14 {O+(1,4)};
+define op15 {O+(1,5)}; define op16 {O+(1,6)}; define op17 {O+(1,7)};
+define op18 {O+(1,8)}; define op19 {O+(1,9)}; define op20 {O+(2,0)};
+define op21 {O+(2,1)}; define op22 {O+(2,2)}; define op23 {O+(2,3)};
+define op24 {O+(2,4)}; define op25 {O+(2,5)}; define op26 {O+(2,6)};
+define op27 {O+(2,7)}; define op28 {O+(2,8)}; define op29 {O+(2,9)};
+define op30 {O+(3,0)}; define op31 {O+(3,1)}; define op32 {O+(3,2)};
+define op33 {O+(3,3)}; define op34 {O+(3,4)}; define op35 {O+(3,5)};
+define op36 {O+(3,6)}; define op37 {O+(3,7)}; define op38 {O+(3,8)};
+define op39 {O+(3,9)}; define op40 {O+(4,0)}; define op41 {O+(4,1)};
+define op42 {O+(4,2)}; define op43 {O+(4,3)}; define op44 {O+(4,4)};
+define op45 {O+(4,5)}; define op46 {O+(4,6)}; define op47 {O+(4,7)};
+define op48 {O+(4,8)}; define op49 {O+(4,9)}; define op50 {O+(5,0)};
+define op51 {O+(5,1)}; define op52 {O+(5,2)}; define op53 {O+(5,3)};
+define op54 {O+(5,4)}; define op55 {O+(5,5)}; define op56 {O+(5,6)};
+define op57 {O+(5,7)}; define op58 {O+(5,8)}; define op59 {O+(5,9)};
+define op60 {O+(6,0)}; define op61 {O+(6,1)}; define op62 {O+(6,2)};
+define op63 {O+(6,3)}; define op64 {O+(6,4)}; define op65 {O+(6,5)};
+define op66 {O+(6,6)}; define op67 {O+(6,7)}; define op68 {O+(6,8)};
+define op69 {O+(6,9)}; define op70 {O+(7,0)}; define op71 {O+(7,1)};
+define op72 {O+(7,2)}; define op73 {O+(7,3)}; define op74 {O+(7,4)};
+define op75 {O+(7,5)}; define op76 {O+(7,6)}; define op77 {O+(7,7)};
+define op78 {O+(7,8)}; define op79 {O+(7,9)}; define op80 {O+(8,0)};
+define op81 {O+(8,1)}; define op82 {O+(8,2)}; define op83 {O+(8,3)};
+define op84 {O+(8,4)}; define op85 {O+(8,5)}; define op86 {O+(8,6)};
+define op87 {O+(8,7)}; define op88 {O+(8,8)}; define op89 {O+(8,9)};
+define op90 {O+(9,0)}; define op91 {O+(9,1)}; define op92 {O+(9,2)};
+define op93 {O+(9,3)}; define op94 {O+(9,4)}; define op95 {O+(9,5)};
+define op96 {O+(9,6)}; define op97 {O+(9,7)}; define op98 {O+(9,8)};
+define op99 {O+(9,9)};
+define op100 {O+(10,0)}; define op101 {O+(10,1)}; define op102 {O+(10,2)}
+define op103 {O+(10,3)}; define op104 {O+(10,4)}; define op105 {O+(10,5)}
+define op110 {O+(11,0)}; define op111 {O+(11,1)}; define op112 {O+(11,2)}
+define op113 {O+(11,3)}; define op114 {O+(11,4)}; define op115 {O+(11,5)}
+define op120 {O+(12,0)}; define op121 {O+(12,1)}; define op122 {O+(12,2)}
+define op123 {O+(12,3)}; define op124 {O+(12,4)}; define op125 {O+(12,5)}
+define op130 {O+(13,0)}; define op131 {O+(13,1)}; define op132 {O+(13,2)}
+define op133 {O+(13,3)}; define op134 {O+(13,4)}; define op135 {O+(13,5)}
+define op140 {O+(14,0)}; define op141 {O+(14,1)}; define op142 {O+(14,2)}
+define op143 {O+(14,3)}; define op144 {O+(14,4)}; define op145 {O+(14,5)}
+define op150 {O+(15,0)}; define op151 {O+(15,1)}; define op152 {O+(15,2)}
+define op153 {O+(15,3)}; define op154 {O+(15,4)}; define op155 {O+(15,5)}
+.PE
