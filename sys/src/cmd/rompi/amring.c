@@ -1,20 +1,31 @@
 #include "rompi.h"
+//#include <asm/io.h>
+typedef uvlong ticks;
 
 /* need to resync kernel to this but for now it's ok */
-struct AmRing {
-	u8int *base;
-	int size;
-	int prod;
-	int logN;
-	u8int _112[128-16];
-	int con;
-	u8int _124[128-4];
-};
-
 extern int myproc, nproc;
 
 /* stuff we might as well keep around for the duration. */
 static int cfd, ctlfd;
+
+/* fucking useless include files! */
+unsigned long readl(unsigned long *l)
+{
+	volatile unsigned long *ll = (volatile unsigned long *)l;
+	return *ll;
+}
+
+void 
+writel(unsigned long new, unsigned long *l)
+{
+	volatile unsigned long *ll = (volatile unsigned long *)l;
+	*ll = new;
+}
+
+static __inline__ void mb(void)
+{
+	__asm__ __volatile__ ("mbar\n");
+}
 
 struct AmRing * 
 amringsetup(int logN, int core)
@@ -76,7 +87,7 @@ amringsetup(int logN, int core)
 		print("r cmd failed\n");
 		exit(1);
 	}
-
+	print("cmd succeeded\n");
 	return amr;
 }
 
@@ -94,7 +105,10 @@ amrsend(struct AmRing *amr, void *data, int size, int rank)
 	coord[1] = y;
 	coord[2] = z;
 	printf("SEND TO [%d, %d, %d] %p\n", x,y,z,data);
-	res = syscall(669, coord, data);
+	//res = syscall(669, coord, data);
+	//res = syscall(666, coord, data);
+	res = syscall(301, coord, data);
+	printf("res is %d\n", res);
 	return res;
 }
 
@@ -103,28 +117,33 @@ amrsend(struct AmRing *amr, void *data, int size, int rank)
  * that are there. 
  * later. For now we just return the next. 
  */
-Tpkt *
-amrrecv(struct AmRing *amr, int *num, Tpkt *p, int *x, int *y, int *z)
+volatile Tpkt *
+amrrecv(struct AmRing *amr, int *num, volatile Tpkt *p, int *x, int *y, int *z)
 {
-	Tpkt *tpkt = (Tpkt *)amr->base, ap;
+	volatile Tpkt *tpkt = NULL;
+	Tpkt  ap;
+	mb();
+	unsigned long con = readl(&amr->con), 
+		prod = readl(&amr->prod);
+	printf("con %ld, %ld\n", con, prod);
+	*num = 0;
 
-	if (amr->con != amr->prod){
-		tpkt = &tpkt[amr->prod & (amr->size-1)];
-
+	if (con != prod) {
+		tpkt = (volatile Tpkt *) &amr->base[amr->con % amr->size];
+		
 		ap = *tpkt;
-		printf("Con %d, tpkt %p, prod %d, payloadbyte %02x\n", 
-			amr->con, tpkt, amr->prod, ap.payload[0]);
-		amr->con++;
+		printf("Con %ld, tpkt %p, prod %ld, payloadbyte %02x\n", 
+		       con, tpkt, prod, ap.payload[0]);
+		writel(con + 256, &amr->con);
 		if (p)
 			*p = ap;
 		*x = ap.Hdr.src[X];
 		*y = ap.Hdr.src[Y];
 		*z = ap.Hdr.src[Z];
 		*num = 1;
-	} else {
-		*num = 0;
-		tpkt = NULL;
 	}
+	printf("amrrecv returns %p\n", tpkt);
+	mb();
 	return tpkt;
 }
 
@@ -135,32 +154,61 @@ unsigned char *amrrecvbuf(struct AmRing *amr, unsigned char *p, int *rank)
 
     int num = 1;
     int x, y, z;
-    Tpkt *pkt = amrrecv(amr, &num, NULL, &x, &y, &z);
+    volatile Tpkt *pkt = amrrecv(amr, &num, NULL, &x, &y, &z);
     if (pkt) {
-	memcpy(p, pkt, 240);
+	memcpy(p, (void *)pkt, 240);
 	*rank = xyztorank(x,y,z);
 	return p;
     }
     return NULL;
 }
 
-void waitamrpacket(struct AmRing *amr, u8int type, Tpkt *pkt, 
+void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt, 
 		    int *x, int *y, int *z)
 {
 	int num;
+
 	/* eat packets until packet type 'type' is found. */
 	do {
 		amrrecv(amr, &num, pkt, x, y, z);
 		if (num) {
-		print("waitamrpacket gets %d, wants %d\n", pkt->payload[16], type);
-	{ int i,j; for(i = 0; i < 15; i++) 
-			for(j = 0; j < 16; j++)
-				printf("%02x ", pkt->payload[i*16+j]);
+			print("waitamrpacket gets %d, wants %d\n", pkt->payload[16], type);
+			{ int i,j; for(i = 0; i < 15; i++) 
+				for(j = 0; j < 16; j++)
+					printf("%02x ", pkt->payload[i*16+j]);
 			
 			printf("\n");
-		}
-	}
+			}
+		} 
+#if 0
+else {
+			printf("NOPE!\n");
+			/* find it. */
 
+			
+/*
+			int i;
+			for(i = 0; i < 256*1024*1024/4-4; i++) {
+				volatile unsigned long *u = (void *)(512*1024*1024);
+				printf("Start search at %p end at %p\n", u, u+256*1024*1024-4);
+				if (u[i] == 0x11 && u[i+1] == 0x12 && u[i+2] == 0x13 && u[i+3] == 0x14) {
+					printf("FOUND IT AT %p\n", &u[i]);
+				}
+			}
+ */
+			cp = amr->base;
+			{ int i,j; for(i = 0; i < 64; i++) 
+				for(j = 0; j < 16; j++)
+					printf("%02x ", cp[i*16+j]);
+			
+			printf("\n");
+			}
+			printf("was it there?\n");
+			sleep(2);	    
+		}
+#endif
+	sleep(5);
+		
 	} while (num < 1 || pkt->payload[16] != type);
 	print("waitamrpacket: returing for %d from (%d, %d, %d)\n", type, x,y,z);
 }
@@ -179,7 +227,6 @@ beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 	for(i = 0; i < 256; i++)
 		data[i] = 'a' + i;
 	data[0] = 'B';
-	data[16] = 'B';
 	/* go ahead and send the beacon. */
 	print("0: beacon. numnodes %d\n", numnodes);
 	for(num = i = 1; i < numnodes; i++) {
@@ -190,11 +237,12 @@ beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 			num++;
 		}
 	}
+	print("all beacons sent\n");
 	/* gather any responses */
 	while (amrrecv(amr, &num, &pkt, &x, &y, &z)) {
 	    int 	xyztorank(int x, int y, int z);
 		rank = xyztorank(x, y, z);
-		print("beacon: one from (%d,%d,%d)\n", x,y,z);
+		printf("beacon: one from (%d,%d,%d)\n", x,y,z);
 		if (nodestatus[rank] == 0) {
 			num++;
 		}
@@ -211,7 +259,7 @@ waitbeacon(struct AmRing *amr)
 	int x, y, z;
 	Tpkt pkt;
 	waitamrpacket(amr, 'B', &pkt, &x, &y, &z);
-	print("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
+	printf("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
 }
 
 void
@@ -220,7 +268,7 @@ respondbeacon(struct AmRing *amr)
 	unsigned char *data;
 	data = mallocz(256, 1);
 	data[0] = 'b';
-	print("Respondbeacon to 0\n");
+	printf("Respondbeacon to 0\n");
 	/* send a response to a packet -- first char is 'b' */
 	amrsend(amr, data, 240, 0);
 	free(data);
@@ -247,19 +295,20 @@ amrstartup(struct AmRing *amr)
 		 * once all nodes have checked in it sends a start message. 
 		 */
 		int numresponded = 0;
-		int *nodes = mallocz(nproc, 1);
+		int *nodes = mallocz(nproc*sizeof(*nodes), 1);
+		printf("amrstartup: time for node 0 to tell everyone\n");
 		while (numresponded < nproc-1) {
 			numresponded = beacon(amr, nodes, nproc);
-			print("amrstartup: %d to date\n", numresponded);
-			sleep(1);
+			printf("amrstartup: %d to date\n", numresponded);
+			sleep(5);
 		}
 	} else {
 		/* wait for the beacon */
 		waitbeacon(amr);
-		print("waitbeacon returns\n");
+		printf("waitbeacon returns\n");
 		/* send our response */
 		respondbeacon(amr);
-		print("responded\n");
+		printf("responded\n");
 	}
 
 	/* amring is now usable for normal work */

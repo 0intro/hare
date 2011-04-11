@@ -21,7 +21,7 @@ void print(const char *fmt, ...);
 void *mallocz(size_t size, int zero);
 void panic(char *s);
 void exits(char *s);
-
+void torusctl(char *cmd, int debug);
 
 #define F(v, o, w)	(((v) & ((1<<(w))-1))<<(o))
 enum {
@@ -96,6 +96,15 @@ struct Tpkt {
 };
 
 
+struct AmRing {
+	unsigned char *base;
+	unsigned long size;
+	unsigned long prod;
+	unsigned long logN;
+	unsigned char _116[128-16];
+	unsigned long con;
+	unsigned char _124[128-4];
+};
 
 static __inline__ u64int tbget(void)
 {

@@ -8,6 +8,28 @@ int lx, ly, lz, xbits, ybits, zbits;
 
 void panic(char *s);
 
+void torusctl(char *ctlcmd, int debug)
+{
+	static int cfd = -1;
+	int amt;
+	if (cfd == -1) {
+		cfd = open("/dev/torusctl", 2);
+		if (cfd < 0) {
+			perror("torusct: can not open /dev/torusctl");
+			exit(1);
+		}
+	}
+	if (debug)
+		print("ctlcmd is %s\n", ctlcmd);
+	amt = write(cfd, ctlcmd, strlen(ctlcmd));
+	if (debug)
+		print("ctlcmd write amt %d\n", amt);
+	if (amt < 0) {
+		print("r cmd failed\n");
+		exit(1);
+	}
+	print("cmd succeeded\n");
+}
 void torusstatus(int pfd)
 {
 	char *buf;

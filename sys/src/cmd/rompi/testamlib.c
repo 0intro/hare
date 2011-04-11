@@ -11,16 +11,13 @@
 #include "rompi.h"
 
 typedef uvlong ticks;
-
-struct AmRing {
-	u8int *base;
-	int size;
-	int prod;
-	u8int _116[128-12];
-	int con;
-	u8int _124[128-4];
-};
-
+struct AmRing * amringsetup(int logN, int core);
+void amrstartup(struct AmRing *amr);
+int amrsend(struct AmRing *amr, void *data, int size, int rank);
+unsigned char *amrrecvbuf(struct AmRing *amr, unsigned char *p, int *rank);
+double MPI_Wtime(void);
+int MPI_Init(int *argc,char ***argv);
+extern int myproc, nproc;
 
 static __inline__ ticks getticks(void)
 {
@@ -52,129 +49,20 @@ mynsec(void)
 	return t;
 }
 
-/* just test the kernel-based fast inject mechanism. Let's hope 
- * it's not going to require we drain it all. Because we're not going to. 
- */
 int
 main (int argc, char **argv)
 {
-    int cfd;
-
- 
-    /* weird issue: malloc gets wrong address. Don't use it for now */
-    unsigned char *b = (void *) 0x20000000;
- 
-    vlong start, end;
-    int ctlfd;
-    char ctlcmd[128];
-    volatile vlong *result;
-
-    int amt;
-    /* the wiring is crucial. We only got to about 2.9 microseconds 
-     * per send without wiring. With wiring, we got to 1.165 microseconds
-     * per send. What is likely going on is inj interrupts taking time
-     * and slowing down the rest of the work. 
-     */
-    char wire[32];
-    int wlen;
-    int core = 0;
-    int num = 1024, i;
-    int role;
-	u8int *coord;
-    
-    coord = (void *) b;
-    unsigned char *data = &b[1024];
-    result = (vlong *)(&b[128*1024]);
-    struct AmRing *amr;
-	unsigned long amrbase;
+	MPI_Init(&argc, &argv);
 	
-    
-	/* reguire our ID */
-	if (argc < 2) {
-		print("%s 0-or-1 [core (default %d) [num-iter (default %d)]]\n", argv[0], core, num);
-		exit(1);
-	}
-	role = strtol(argv[1], 0, 0);
-	if (argc > 2) {
-		core = strtoul(argv[2], 0, 0);
-	}
-	if (argc > 3) {
-		num = strtoul(argv[3], 0, 0);
-	}
-
-        /* wire us to core 'core' */
-        sprintf(ctlcmd, "/proc/%d/ctl", getpid());
-        print("ctlcmd is %s\n", ctlcmd);
-        ctlfd = open(ctlcmd, 2);
-        print("ctlfd  is %d\n", ctlfd);
-        if (ctlfd < 0) {
-                perror(ctlcmd);
-                exit(1);
-        }
-	sprintf(wire, "wired %d", core);
-	wlen = strlen(wire);
-        if (write(ctlfd, wire, wlen) < wlen) {
-                perror(wire);
-                exit(1);
-        }
-
-	/* set up amr  ... just make the base the next page. */
-	amrbase = (unsigned int) malloc(2*1024*1024);
-	print("amrbase is %#x", amrbase);
-	amrbase = (unsigned int) malloc(2*1024*1024);
-	print("amrbase is %#x", amrbase);
-	amrbase = (amrbase+255)&(~0xff);
-	amr = (void *)amrbase;
-	print("amr is %p\n", amr);
-	memset(amr, 0, sizeof(*amr));
-	amr->base = (void *)&amr[1];
-	amr->size = 1 << 20;
-	/* moved here so we can easily test some things on IO nodes
-	 * after CN have all crashed :-)
-	 */
-    	cfd = open("/dev/torusctl", 2);
-    if (cfd < 0) {
-	    perror("cfd");
-	    exit(1);
-    }
-	sprintf(ctlcmd, "r %p", amr);
-	print("ctlcmd is %s\n", ctlcmd);
-	amt = write(cfd, ctlcmd, strlen(ctlcmd));
-	print("ctlcmd write amt %d\n", amt);
-	if (amt < 0) {
-		print("r cmd failed\n");
-		exit(1);
-	}
-
-/*
-	for(i = 0; i < 240; i++)
-		data[i] = i + 1;
- */
-
-	start = getticks();
-	/* we are 1 or 0. 1 sends, 0 eats. */
-	if (role == 0) {
-		/* suck it up */
-		while (amr->prod < 256 * num) 
-			if (amr->con != amr->prod){
-				if (amr->con == 0)	
-					start = getticks();
-				//print("Advance to %d\n", amr->prod);
-				amr->con = amr->prod;
-			}
-	} else {
-		/* do we need to clear out the packet each time through? */
-		for(i = 0; i < num; i++) {
-			int res;
-			memset(coord, 0, 3);
-			print("Call with %p and %p\n", coord, data);
-			res = syscall(669, coord, data);
-			if (! res) 
-				print("Fail @ %d\n", i);
-		}
-	}
-	end = getticks();
-	print("%lld %lld - %d / p\n", end, start, num);
+	struct AmRing *amring = amringsetup(20, 0);
+	print("Call amrstartup, myproc %d nproc %d\n", myproc, nproc);
+	if (myproc < nproc){
+		if (myproc)
+			torusctl("debug 64", 1);
+		amrstartup(amring);	
+	} else
+		while(1);
+	print("amrstartup returns\n");
 	return 0;
 }
 
