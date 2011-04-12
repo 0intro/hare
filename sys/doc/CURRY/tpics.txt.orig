@@ -1,0 +1,467 @@
+% gpic macros for use with "gpic -t" as preprocessor for tex,
+% by Douglas B. West
+% available for non-commercial use.
+\def\bu{\bullet}
+\def\marker{\>\hbox{${\vcenter{\vbox{
+    \hrule height 0.4pt\hbox{\vrule width 0.4pt height 6pt
+    \kern6pt\vrule width 0.4pt}\hrule height 0.4pt}}}$}\>}
+\def\gpic#1{#1
+%     \midinsert\centerline{\box\graph}\endinsert }
+     \medskip\par\noindent{\centerline{\box\graph}} \medskip}
+%gpic picture, centered with space
+.PS
+dashwid = .2; arrowht = .4; arrowwid = .2
+define sethead #arrowht = $1*.4; arrowwid = $1*.2;#
+define resethead #arrowht = .4; arrowwid = .2;#
+define h1 #(.1,0)#; define h2 #(.2,0)#; define h3 #(.3,0)#;
+define h4 #(.4,0)#; define h5 #(.5,0)#; define h6 #(.6,0)#;
+define h7 #(.7,0)#; define h8 #(.8,0)#; define h9 #(.9,0)#;
+define v1 #(0,.1)#; define v2 #(0,.2)#; define v3 #(0,.3)#;
+define v4 #(0,.4)#; define v5 #(0,.5)#; define v6 #(0,.6)#;
+define v7 #(0,.7)#; define v8 #(0,.8)#; define v9 #(0,.9)#;
+define hv1 #(.1,.1);#
+define arch  #arc from $1 to $2 rad $3#
+define darch #arc dashed from $1 to $2 rad $3#
+define tarch #arc dotted from $1 to $2 rad $3#
+define barch #arc thick 2 from $1 to $2 rad $3#
+define circ  #circle at $1 rad $2#
+define dcirc #circle dashed at $1 rad $2#
+define tcirc #circle dotted at $1 rad $2#
+define bcirc #circle thick 2 at $1 rad $2#
+define icirc #circle invis at $1 rad $2#
+define fcirc #circle fill $3 at $1 rad $2#
+define ficirc #circle invis fill $3 at $1 rad $2#
+define dfcirc #circle dashed fill $3 at $1 rad $2#
+define elli  #ellipse thick .8 at $1 ht $2 wid $3#
+define delli #ellipse dashed at $1 ht $2 wid $3#
+define belli #ellipse thick 2 at $1 ht $2 wid $3#
+define felli #ellipse thick .8 fill $4 at $1 ht $2 wid $3#
+define ielli #ellipse invis at $1 ht $2 wid $3#
+define fielli #ellipse invis fill $4 at $1 ht $2 wid $3#
+define sbox #box ht $2 wid $3 at $1 #
+define dbox #box dashed $4 ht $2 wid $3 at $1 #
+define tbox #box dotted $4 ht $2 wid $3 at $1 #
+define bbox #box thick 2 $4 ht $2 wid $3 at $1 #
+define fbox #box fill $4 ht $2 wid $3 at $1 #
+define fibox #box invis fill $4 ht $2 wid $3 at $1 #
+define dfbox #box dashed fill $4 ht $2 wid $3 at $1 #
+define spot #circle invis "$\bu$" at $1#
+define spoto #circle invis "$\circ$" at $1#
+define mark #"$\marker$" at $1#
+define mark2 #mark($1); mark($2)#
+define mark3 #mark($1); mark($2); mark($3);#
+define call #circle invis at $1 rad .4; $2 at last circle.$3#
+define call2 #call($1,$3,$5); call($2,$4,$6)#
+define call3 #call($1,$4,$7); call($2,$5,$8); call($3,$6,$9)#
+define vert #$1: circle invis "$\bu$" at $2 rad .4; $3 at last circle.$4#
+define edge  #line thick .8 from $1 to $2#
+define aedge #arrow from $1 to .6<$1,$2>; line from .6<$1,$2> to $2#
+define dedge #line dashed from $1 to $2#
+define tedge #line dotted thick 1 from $1 to $2#
+define bedge #line thick 2 from $1 to $2#
+define fedge #line thick 4 from $1 to $2#
+define cedge #line chop from $1 to $2 #
+define bdedge #line dashed thick 2 from $1 to $2#
+define daedge #dedge($1,$2); arrow from .4<$1,$2> to .6<$1,$2>#
+define baedge #bedge($1,$2); arrow from .4<$1,$2> to .6<$1,$2>#
+define direct #arrow from .5<$1,$2> to .65<$1,$2>#
+define dbledge #arch($1,$2,$3); arch($2,$1,$3)#
+define tpledge #edge($1,$2); arch($1,$2,$3); arch($2,$1,$3)#
+define qpledge #dbledge($1,$2,$3); dbledge($1,$2,$3*.45)#
+define spli3 #spline thick .8 from $1 to $2 to $3#
+define spli4 #spline thick .8 from $1 to $2 to $3 to $4#
+define spli5 #spline thick .8 from $1 to $2 to $3 to $4 to $5#
+define spli6 #spline thick .8 from $1 to $2 to $3 to $4 to $5 to $6#
+define spli7 #spline thick .8 from $1 to $2 to $3 to $4 to $5 to $6 to $7#
+define spli8 #spline thick .8 from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8#
+define spli9 #spline thick .8 from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9#
+define bspli3 #spline thick 2 from $1 to $2 to $3#
+define bspli4 #spline thick 2 from $1 to $2 to $3 to $4#
+define bspli5 #spline thick 2 from $1 to $2 to $3 to $4 to $5#
+define bspli6 #spline thick 2 from $1 to $2 to $3 to $4 to $5 to $6#
+define bspli7 #spline thick 2 from $1 to $2 to $3 to $4 to $5 to $6 to $7#
+define bspli8 #spline thick 2 from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8#
+define bspli9 #spline thick 2 from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9#
+define dspli3 #spline dashed .8 from $1 to $2 to $3#
+define dspli4 #spline dashed .8 from $1 to $2 to $3 to $4#
+define dspli5 #spline dashed .8 from $1 to $2 to $3 to $4 to $5#
+define dspli6 #spline dashed .8 from $1 to $2 to $3 to $4 to $5 to $6#
+define dspli7 #spline dashed .8 from $1 to $2 to $3 to $4 to $5 to $6 to $7#
+define dspli8 #spline dashed .8 from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8#
+define dspli9 #spline dashed .8 from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9#
+define c05 '.996'; define s05 '.087'; define c10 '.985'; define s10 '.174'
+define c15 '.966'; define s15 '.259'; define c20 '.940'; define s20 '.342'
+define c25 '.906'; define s25 '.423'; define c30 '.866'; define s30 '.500'
+define c35 '.819'; define s35 '.574'; define c40 '.766'; define s40 '.643'
+define c45 '.707'; define s45 '.707'; define c225 '.924'; define s225 '.383'
+define c18 '.951'; define s18 '.309'; define c36 '.809'; define s36 '.588'
+define name2  #A:($1*1.,$1*0.); B:($1*-1.,$1*0.);#
+define name2v #A:($1*0.,$1*1.); B:($1*0.,$1*-1.);#
+define name3 #A:($1*0.,$1*1.); B:($1*.866,$1*-.5); C:($1*-.866,$1*-.5)#
+define name4 #A:($1*c45,$1*s45); B:($1*c45,$1*-s45); \
+  C:($1*-c45,$1*-s45); D:($1*-c45,$1*s45);#
+define name4v #A:($1*0.,$1*1.); B:($1*1.,$1*0.); \
+  C:($1*0.,$1*-1.); D:($1*-1.,$1*0.);#
+define name5 #A:($1*0.,$1*1.); B:($1*c18,$1*s18); \
+  C:($1*s36,$1*-c36); D:($1*-s36,$1*-c36); E:($1*-c18,$1*s18);#
+define name6 #A:($1*s30,$1*c30); B:($1*1.,$1*0.); C:($1*s30,$1*-c30); \
+  D:($1*-s30,$1*-c30); E:($1*-1.,$1*0.); F:($1*-s30,$1*c30);#
+define name6v #A:($1*0.,$1*1.); C:($1*.866,$1*-.5); E:($1*-.866,$1*-.5); \
+  D:($1*0.,$1*-1.); F:($1*-.866,$1*.5);  B:($1*.866,$1*.5);#
+define name7 #A:($1*0.,$1*1.); B:($1*.781,$1*.624); \
+  C:($1*.975,$1*-.222); D:($1*.435,$1*-.901); \
+  E:($1*-.435,$1*-.901); F:($1*-.975,$1*-.222); G:($1*-.781,$1*.624)#
+define name8 #A:($1*s225,$1*c225); B:($1*c225,$1*s225); \
+  C:($1*c225,$1*-s225); D:($1*s225,$1*-c225); E:($1*-s225,$1*-c225); \
+  F:($1*-c225,$1*-s225); G:($1*-c225,$1*s225); H:($1*-s225,$1*c225);#
+define name8v #A:($1*0.,$1*1.); C:($1*1.,$1*0.); \
+  E:($1*0.,$1*-1.); G:($1*-1.,$1*0.); B:($1*c45,$1*s45); \
+  D:($1*c45,$1*-s45); F:($1*-c45,$1*-s45); H:($1*-c45,$1*s45);#
+define name9 #A:($1*0.,$1*1.); B:($1*s40,$1*c40); C:($1*c10,$1*s10); \
+  D:($1*c30,$1*-s30); E:($1*s20,$1*-c20); F:($1*-s20,$1*-c20); \
+  G:($1*-c30,$1*-s30); H:($1*-c10,$1*s10); I:($1*-s40,$1*c40);#
+define name10 #A:($1*s18,$1*c18); B:($1*c36,$1*s36); \
+  C:($1*1.,$1*0.); D:($1*c36,$1*-s36); E:($1*s18,$1*-c18); \
+  F:($1*-s18,$1*-c18); G:($1*-c36,$1*-s36); H:($1*-1.,$1*0.); \
+  I:($1*-c36,$1*s36); J:($1*-s18,$1*c18);#
+define name10v #A:($1*0.,$1*1.); B:($1*s36,$1*c36); \
+  C:($1*c18,$1*s18); D:($1*c18,$1*-s18); E:($1*s36,$1*-c36); \
+  F:($1*0.,$1*-1.); G:($1*-s36,$1*-c36); H:($1*-c18,$1*-s18); \
+  I:($1*-c18,$1*s18); J:($1*-s36,$1*c36);#
+define name12 #ZZ:[name6v($1)]; A:ZZ.A; C:ZZ.B; E:ZZ.C; G:ZZ.D; I:ZZ.E; \
+  K:ZZ.F; ZZ:[name6($1)]; B:ZZ.A; D:ZZ.B; F:ZZ.C; H:ZZ.D; J:ZZ.E; L:ZZ.F;#
+define name12h #ZZ:[name4($1)]; B:ZZ.A; E:ZZ.B; H:ZZ.C; K:ZZ.D; \
+  A:($1*s15,$1*c15); C:($1*c15,$1*s15); D:($1*c15,$1*-s15); F:($1*s15,$1*-c15);\
+  G:($1*-s15,$1*-c15); I:($1*-c15,$1*-s15); J:($1*-c15,$1*s15);\
+  L:($1*-s15,$1*c15);#
+define name13 #A:(0,$1*1); B:($1*.465,$1*.885); C:($1*.823,$1*.568); \
+  D:($1*.993,$1*.120); E:($1*.935,$1*-.355); F:($1*.663,$1*-.749); \
+  G:($1*.238,$1*-.971); H:($1*-.238,$1*-.971); I:($1*-.663,$1*-.749);
+  J:($1*-.935,$1*-.355); K:($1*-.993,$1*.120); L:($1*-.823,$1*.568); \
+  M:($1*-.465,$1*.885);#
+define name14 #ZZ:[name7($1)]; A:ZZ.A; C:ZZ.B; E:ZZ.C; G:ZZ.D; I:ZZ.E; \
+  K:ZZ.F; M:ZZ.G; ZZ:[name7(-1*$1)]; H:ZZ.A; J:ZZ.B; L:ZZ.C; N:ZZ.D; \
+  B:ZZ.E; D:ZZ.F; F:ZZ.G;#
+define name16 #ZZ:[name8v($1)]; A:ZZ.A; C:ZZ.B; E:ZZ.C; G:ZZ.D; I:ZZ.E; \
+  K:ZZ.F; M:ZZ.G; O:ZZ.H; ZZ:[name8($1)]; B:ZZ.A; D:ZZ.B; F:ZZ.C; \
+  H:ZZ.D; J:ZZ.E; L:ZZ.F; N:ZZ.G; P:ZZ.H;#
+define name16h #ZZ:[name8v($1)]; define h '($1*.2,0)'; define v '(0,$1*.2)'; \
+  define s '($1*.14,$1*.14)'; define t '($1*.14,$1*-.14)'; P:ZZ.A-h; A:ZZ.A+h; \
+  B:ZZ.B-t; C:ZZ.B+t; D:ZZ.C+v; E:ZZ.C-v; F:ZZ.D+s; G:ZZ.D-s; H:ZZ.E+h; \
+  I:ZZ.E-h; J:ZZ.F+t; K:ZZ.F-t; L:ZZ.G-v; M:ZZ.G+v; N:ZZ.H-s; O:ZZ.H+s;#
+define name18 #ZZ:[name9($1)]; A:ZZ.A; C:ZZ.B; E:ZZ.C; G:ZZ.D; I:ZZ.E; \
+  K:ZZ.F; M:ZZ.G; O:ZZ.H; Q:ZZ.I; ZZ:[name9(-1*$1)]; J:ZZ.A; L:ZZ.B; \
+  N:ZZ.C; P:ZZ.D; R:ZZ.E; B:ZZ.F; D:ZZ.G; F:ZZ.H; H:ZZ.I;#
+define name20 #ZZ:[name10v($1)]; A:ZZ.A; C:ZZ.B; E:ZZ.C; G:ZZ.D; I:ZZ.E; \
+  K:ZZ.F; M:ZZ.G; O:ZZ.H; Q:ZZ.I; S:ZZ.J; ZZ:[name10($1)]; B:ZZ.A; \
+  D:ZZ.B; F:ZZ.C; H:ZZ.D; J:ZZ.E; L:ZZ.F; N:ZZ.G; P:ZZ.H; R:ZZ.I; T:ZZ.J;#
+define poly2  #ZZ:[name2($2)]  at $1; spot2(ZZ.A,ZZ.B); #
+define poly2v #ZZ:[name2v($2)] at $1; spot2(ZZ.A,ZZ.B); #
+define poly3  #ZZ:[name3($2)]  at $1; spot3(ZZ.A,ZZ.B,ZZ.C); #
+define poly4  #ZZ:[name4($2)]  at $1; spot4(ZZ.A,ZZ.B,ZZ.C,ZZ.D); #
+define poly4v #ZZ:[name4v($2)] at $1; spot4(ZZ.A,ZZ.B,ZZ.C,ZZ.D); #
+define poly5  #ZZ:[name5($2)]  at $1; spot5(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E); #
+define poly6  #ZZ:[name6($2)]  at $1; spot6(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F); #
+define poly6v #ZZ:[name6v($2)] at $1; spot6(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F); #
+define poly7  #ZZ:[name7($2)] at $1; spot7(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G);#
+define poly8  #ZZ:[name8($2)] at $1; \
+  spot8(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H);#
+define poly8v #ZZ:[name8v($2)] at $1; \
+  spot8(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H);#
+define poly9 #ZZ:[name9($2)] at $1; \
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly10 #ZZ:[name10($2)] at $1; J:spot(ZZ.J); \
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly10v #ZZ:[name10v($2)] at $1; J:spot(ZZ.J); \
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly12 #ZZ:[name12($2)] at $1; J:spot(ZZ.J); K:spot(ZZ.K); L:spot(ZZ.L);\
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly12h #ZZ:[name12h($2)] at $1; J:spot(ZZ.J); K:spot(ZZ.K); \
+  L:spot(ZZ.L); spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly13 #ZZ:[name13($2)] at $1; J:spot(ZZ.J); K:spot(ZZ.K); L:spot(ZZ.L);\
+  M:spot(ZZ.M); spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly14 #ZZ:[name14($2)] at $1; spot5(ZZ.J,ZZ.K,ZZ.L,ZZ.M,ZZ.N); J:A; \
+  K:B; L:C; M:D; N:E; spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly16 #ZZ:[name16($2)] at $1; \
+  spot7(ZZ.J,ZZ.K,ZZ.L,ZZ.M,ZZ.N,ZZ.O,ZZ.P); J:A; K:B; L:C; M:D; N:E; O:F; P:G;\
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly16h #ZZ:[name16h($2)] at $1; \
+  spot7(ZZ.J,ZZ.K,ZZ.L,ZZ.M,ZZ.N,ZZ.O,ZZ.P); J:A; K:B; L:C; M:D; N:E; O:F; P:G;\
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly18 #ZZ:[name18($2)] at $1; \
+  spot9(ZZ.J,ZZ.K,ZZ.L,ZZ.M,ZZ.N,ZZ.O,ZZ.P,ZZ.Q,ZZ.R); \
+  J:A; K:B; L:C; M:D; N:E; O:F; P:G; Q:H; R:I; \
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define poly20 #ZZ:[name20($2)] at $1; \
+  spot9(ZZ.J,ZZ.K,ZZ.L,ZZ.M,ZZ.N,ZZ.O,ZZ.P,ZZ.Q,ZZ.R); \
+  J:A; K:B; L:C; M:D; N:E; O:F; P:G; Q:H; R:I; S:spot(ZZ.S); T:spot(ZZ.T); \
+  spot9(ZZ.A,ZZ.B,ZZ.C,ZZ.D,ZZ.E,ZZ.F,ZZ.G,ZZ.H,ZZ.I);#
+define path3 %line from $1 to $2 to $3 %
+define path4 %line from $1 to $2 to $3 to $4 %
+define path5 %line from $1 to $2 to $3 to $4 to $5 %
+define path6 %line from $1 to $2 to $3 to $4 to $5 to $6 %
+define path7 %line from $1 to $2 to $3 to $4 to $5 to $6 to $7 %
+define path8 %line from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 %
+define path9 %line from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9%
+define cycl3 %line from $1 to $2 to $3 to $1%
+define cycl4 %line from $1 to $2 to $3 to $4 to $1%
+define cycl5 %line from $1 to $2 to $3 to $4 to $5 to $1%
+define cycl6 %line from $1 to $2 to $3 to $4 to $5 to $6 to $1%
+define cycl7 %line from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $1%
+define cycl8 %line from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $1%
+define cycl9 %line from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9 to $1%
+define degr3 %line from $2 to $1 to $3 to $1 to $4%
+define degr4 %line from $2 to $1 to $3 to $1 to $4 to $1 to $5%
+define degr5 %line from $2 to $1 to $3 to $1 to $4 to $1 to $5 to $1 to $6%
+define degr6 %degr3($1,$2,$3,$4); degr3($1,$5,$6,$7)%
+define degr7 %degr3($1,$2,$3,$4); degr4($1,$5,$6,$7,$8)%
+define degr8 %degr3($1,$2,$3,$4); degr5($1,$5,$6,$7,$8,$9)%
+define dpath3 %line dashed from $1 to $2 to $3 %
+define dpath4 %line dashed from $1 to $2 to $3 to $4 %
+define dpath5 %line dashed from $1 to $2 to $3 to $4 to $5 %
+define dpath6 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 %
+define dpath7 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $7 %
+define dpath8 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 %
+define dpath9 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9%
+define dcycl3 %line dashed from $1 to $2 to $3 to $1%
+define dcycl4 %line dashed from $1 to $2 to $3 to $4 to $1%
+define dcycl5 %line dashed from $1 to $2 to $3 to $4 to $5 to $1%
+define dcycl6 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $1%
+define dcycl7 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $1%
+define dcycl8 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $1%
+define dcycl9 %line dashed from $1 to $2 to $3 to $4 to $5 to $6 to $7 to $8 to $9 to $1%
+define ddegr3 %line dashed from $2 to $1 to $3 to $1 to $4%
+define ddegr4 %line dashed from $2 to $1 to $3 to $1 to $4 to $1 to $5%
+define ddegr5 %line dashed from $2 to $1 to $3 to $1 to $4 to $1 to $5 to $1 to $6%
+define ddegr6 %ddegr3($1,$2,$3,$4); ddegr3($1,$5,$6,$7)%
+define ddegr7 %ddegr3($1,$2,$3,$4); ddegr4($1,$5,$6,$7,$8)%
+define ddegr8 %ddegr3($1,$2,$3,$4); ddegr5($1,$5,$6,$7,$8,$9)%
+define dapath3 %daedge($1,$2); daedge($2,$3);%
+define dapath4 %daedge($1,$2); dapath3($2,$3,$4);%
+define dapath5 %daedge($1,$2); dapath4($2,$3,$4,$5);%
+define dapath6 %daedge($1,$2); dapath5($2,$3,$4,$5,$6);%
+define dapath7 %daedge($1,$2); dapath6($2,$3,$4,$5,$6,$7);%
+define dapath8 %daedge($1,$2); dapath7($2,$3,$4,$5,$6,$7,$8);%
+define dapath9 %daedge($1,$2); dapath8($2,$3,$4,$5,$6,$7,$8,$9);%
+define bapath3 #baedge($1,$2); baedge($2,$3);#
+define bapath4 #baedge($1,$2); baedge($2,$3); baedge($3,$4);#
+define bapath5 #baedge($1,$2); bapath4($2,$3,$4,$5);#
+define bapath6 #baedge($1,$2); bapath5($2,$3,$4,$5,$6);#
+define bapath7 #baedge($1,$2); bapath6($2,$3,$4,$5,$6,$7);#
+define bapath8 #baedge($1,$2); bapath7($2,$3,$4,$5,$6,$7,$8);#
+define bapath9 #baedge($1,$2); bapath8($2,$3,$4,$5,$6,$7,$8,$9);#
+define tpath3 %tedge($1,$2); tedge($2,$3)%
+define tpath4 %tedge($1,$2); tpath3($2,$3,$4)%
+define tpath5 %tedge($1,$2); tpath4($2,$3,$4,$5)%
+define tpath6 %tedge($1,$2); tpath5($2,$3,$4,$5,$6)%
+define tpath7 %tedge($1,$2); tpath6($2,$3,$4,$5,$6,$7)%
+define tpath8 %tedge($1,$2); tpath7($2,$3,$4,$5,$6,$7,$8)%
+define tpath9 %tedge($1,$2); tpath8($2,$3,$4,$5,$6,$7,$8,$9)%
+define tcycl3 %tedge($3,$1); tpath3($1,$2,$3)%
+define tcycl4 %tedge($4,$1); tpath4($1,$2,$3,$4)%
+define tcycl5 %tedge($5,$1); tpath5($1,$2,$3,$4,$5)%
+define tcycl6 %tedge($6,$1); tpath6($1,$2,$3,$4,$5,$6)%
+define tcycl7 %tedge($7,$1); tpath7($1,$2,$3,$4,$5,$6,$7)%
+define tcycl8 %tedge($8,$1); tpath8($1,$2,$3,$4,$5,$6,$7,$8)%
+define tcycl9 %tedge($9,$1); tpath9($1,$2,$3,$4,$5,$6,$7,$8,$9)%
+define tdegr3 %tedge($1,$4); tpath3($2,$1,$3)%
+define tdegr4 %tedge($1,$5); tdegr3($1,$2,$3,$4)%
+define tdegr5 %tedge($1,$6); tdegr4($1,$2,$3,$4,$5)%
+define tdegr6 %tedge($1,$7); tdegr5($1,$2,$3,$4,$5,$6)%
+define tdegr7 %tedge($1,$8); tdegr6($1,$2,$3,$4,$5,$6,$7)%
+define tdegr8 %tedge($1,$9); tdegr7($1,$2,$3,$4,$5,$6,$7,$8)%
+define apath3 %aedge($1,$2); aedge($2,$3)%
+define apath4 %aedge($1,$2); apath3($2,$3,$4)%
+define apath5 %aedge($1,$2); apath4($2,$3,$4,$5)%
+define apath6 %aedge($1,$2); apath5($2,$3,$4,$5,$6)%
+define apath7 %aedge($1,$2); apath6($2,$3,$4,$5,$6,$7)%
+define apath8 %aedge($1,$2); apath7($2,$3,$4,$5,$6,$7,$8)%
+define apath9 %aedge($1,$2); apath8($2,$3,$4,$5,$6,$7,$8,$9)%
+define acycl3 %aedge($3,$1); apath3($1,$2,$3)%
+define acycl4 %aedge($4,$1); apath4($1,$2,$3,$4)%
+define acycl5 %aedge($5,$1); apath5($1,$2,$3,$4,$5)%
+define acycl6 %aedge($6,$1); apath6($1,$2,$3,$4,$5,$6)%
+define acycl7 %aedge($7,$1); apath7($1,$2,$3,$4,$5,$6,$7)%
+define acycl8 %aedge($8,$1); apath8($1,$2,$3,$4,$5,$6,$7,$8)%
+define acycl9 %aedge($9,$1); apath9($1,$2,$3,$4,$5,$6,$7,$8,$9)%
+define adegr2 %aedge($1,$2); aedge($1,$3)%
+define adegr3 %aedge($1,$4); aedge($1,$2); aedge($1,$3)%
+define adegr4 %aedge($1,$5); adegr3($1,$2,$3,$4)%
+define adegr5 %aedge($1,$6); adegr4($1,$2,$3,$4,$5)%
+define adegr6 %aedge($1,$7); adegr5($1,$2,$3,$4,$5,$6)%
+define adegr7 %aedge($1,$8); adegr6($1,$2,$3,$4,$5,$6,$7)%
+define adegr8 %aedge($1,$9); adegr7($1,$2,$3,$4,$5,$6,$7,$8)%
+define bpath3 %bedge($1,$2); bedge($2,$3)%
+define bpath4 %bedge($1,$2); bpath3($2,$3,$4)%
+define bpath5 %bedge($1,$2); bpath4($2,$3,$4,$5)%
+define bpath6 %bedge($1,$2); bpath5($2,$3,$4,$5,$6)%
+define bpath7 %bedge($1,$2); bpath6($2,$3,$4,$5,$6,$7)%
+define bpath8 %bedge($1,$2); bpath7($2,$3,$4,$5,$6,$7,$8)%
+define bpath9 %bedge($1,$2); bpath8($2,$3,$4,$5,$6,$7,$8,$9)%
+define bcycl3 %bedge($3,$1); bpath3($1,$2,$3)%
+define bcycl4 %bedge($4,$1); bpath4($1,$2,$3,$4)%
+define bcycl5 %bedge($5,$1); bpath5($1,$2,$3,$4,$5)%
+define bcycl6 %bedge($6,$1); bpath6($1,$2,$3,$4,$5,$6)%
+define bcycl7 %bedge($7,$1); bpath7($1,$2,$3,$4,$5,$6,$7)%
+define bcycl8 %bedge($8,$1); bpath8($1,$2,$3,$4,$5,$6,$7,$8)%
+define bcycl9 %bedge($9,$1); bpath9($1,$2,$3,$4,$5,$6,$7,$8,$9)%
+define bdegr2 %bedge($1,$2); bedge($1,$3)%
+define bdegr3 %bedge($1,$4); bedge($1,$2); bedge($1,$3)%
+define bdegr4 %bedge($1,$5); bdegr3($1,$2,$3,$4)%
+define bdegr5 %bedge($1,$6); bdegr4($1,$2,$3,$4,$5)%
+define bdegr6 %bedge($1,$7); bdegr5($1,$2,$3,$4,$5,$6)%
+define bdegr7 %bedge($1,$8); bdegr6($1,$2,$3,$4,$5,$6,$7)%
+define bdegr8 %bedge($1,$9); bdegr7($1,$2,$3,$4,$5,$6,$7,$8)%
+define cpath3 #cedge($1,$2); cedge($2,$3)#
+define cpath4 #cedge($1,$2); cedge($2,$3); cedge($3,$4)#
+define cpath5 #cedge($1,$2); cedge($2,$3); cedge($3,$4); cedge($4,$5)#
+define cpath6 #cedge($1,$2); cedge($2,$3); cedge($3,$4); cedge($4,$5); cedge($5,$6)#
+define ccycl3 #cedge($1,$2); cedge($2,$3); cedge($3,$1)#
+define ccycl4 #cedge($1,$2); cedge($2,$3); cedge($3,$4); cedge($4,$1)#
+define ccycl5 #cedge($1,$2); cedge($2,$3); cedge($3,$4); cedge($4,$5); cedge($5,$1)#
+define ccycl6 #cedge($1,$2); cedge($2,$3); cedge($3,$4); cedge($4,$5); cedge($5,$6); cedge($6,$1)#
+define cdegr3 %cedge($1,$2); cedge($1,$3); cedge($1,$4)%
+define cdegr4 %cedge($1,$2); cedge($1,$3); cedge($1,$4); cedge($1,$5)%
+define cdegr5 %cedge($1,$2); cedge($1,$3); cedge($1,$4); cedge($1,$5); cedge($1,$6)%
+define cdegr6 %cedge($1,$2); cedge($1,$3); cedge($1,$4); cedge($1,$5); cedge($1,$6); cedge($1,$7)%
+define cdegr7 %cedge($1,$2); cedge($1,$3); cedge($1,$4); cedge($1,$5); cedge($1,$6); cedge($1,$7); cedge($1,$8)%
+define cdegr8 %cedge($1,$2); cedge($1,$3); cedge($1,$4); cedge($1,$5); cedge($1,$6); cedge($1,$7); cedge($1,$8); cedge($1,$9)%
+define matc2 %edge($1,$2); edge($3,$4)%
+define matc3 %edge($1,$2); edge($3,$4); edge($5,$6)%
+define matc4 %edge($1,$2); edge($3,$4); edge($5,$6); edge($7,$8)%
+define amatc2 %aedge($1,$2); aedge($3,$4)%
+define amatc3 %aedge($1,$2); aedge($3,$4); aedge($5,$6)%
+define amatc4 %aedge($1,$2); aedge($3,$4); aedge($5,$6); aedge($7,$8)%
+define bmatc2 %bedge($1,$2); bedge($3,$4)%
+define bmatc3 %bedge($1,$2); bedge($3,$4); bedge($5,$6)%
+define bmatc4 %bedge($1,$2); bedge($3,$4); bedge($5,$6); bedge($7,$8)%
+define fmatc2 %fedge($1,$2); fedge($3,$4)%
+define fmatc3 %fedge($1,$2); fedge($3,$4); fedge($5,$6)%
+define fmatc4 %fedge($1,$2); fedge($3,$4); fedge($5,$6); fedge($7,$8)%
+define dmatc2 %dedge($1,$2); dedge($3,$4)%
+define dmatc3 %dedge($1,$2); dedge($3,$4); dedge($5,$6)%
+define dmatc4 %dedge($1,$2); dedge($3,$4); dedge($5,$6); dedge($7,$8)%
+define tmatc2 %tedge($1,$2); tedge($3,$4)%
+define tmatc3 %tedge($1,$2); tedge($3,$4); tedge($5,$6)%
+define tmatc4 %tedge($1,$2); tedge($3,$4); tedge($5,$6); tedge($7,$8)%
+define bdmatc2 %bdedge($1,$2); bdedge($3,$4)%
+define bdmatc3 %bdedge($1,$2); bdedge($3,$4); bdedge($5,$6)%
+define bdmatc4 %bdedge($1,$2); bdedge($3,$4); bdedge($5,$6); bdedge($7,$8)%
+define damatc2 %daedge($1,$2); daedge($3,$4)%
+define damatc3 %daedge($1,$2); daedge($3,$4); daedge($5,$6)%
+define damatc4 %daedge($1,$2); daedge($3,$4); daedge($5,$6); daedge($7,$8)%
+define bamatc2 %baedge($1,$2); baedge($3,$4)%
+define bamatc3 %baedge($1,$2); baedge($3,$4); baedge($5,$6)%
+define bamatc4 %baedge($1,$2); baedge($3,$4); baedge($5,$6); baedge($7,$8)%
+define bcliq4 %bpath4($1,$2,$3,$4); bpath4($2,$4,$1,$3)%
+define bcliq5 %bcycl5($1,$2,$3,$4,$5); bcycl5($1,$3,$5,$2,$4)%
+define bcliq6 %bcycl6($1,$2,$3,$4,$5,$6); bcycl3($1,$3,$5); bcycl3($2,$4,$6); bmatc3($1,$4,$2,$5,$3,$6)%
+define cliq4 %path4($1,$2,$3,$4); path4($2,$4,$1,$3)%
+define cliq5 %cycl5($1,$2,$3,$4,$5); cycl5($1,$3,$5,$2,$4)%
+define cliq6 %cycl6($1,$2,$3,$4,$5,$6); cycl3($1,$3,$5); cycl3($2,$4,$6); matc3($1,$4,$2,$5,$3,$6)%
+define dcliq4 %dpath4($1,$2,$3,$4); dpath4($2,$4,$1,$3)%
+define dcliq5 %dcycl5($1,$2,$3,$4,$5); dcycl5($1,$3,$5,$2,$4)%
+define dcliq6 %dcycl6($1,$2,$3,$4,$5,$6); dcycl3($1,$3,$5); dcycl3($2,$4,$6); dmatc3($1,$4,$2,$5,$3,$6)%
+define k23 #degr3($1,$3,$4,$5); degr3($2,$3,$4,$5);#
+define k33 #cycl6($1,$5,$3,$4,$2,$6); matc3($1,$4,$2,$5,$3,$6);#
+define k34 #cycl6($1,$5,$3,$4,$2,$6); matc3($1,$4,$2,$5,$3,$6); \
+  degr3($7,$1,$2,$3)#
+define k44 #cycl8($1,$5,$2,$6,$3,$7,$4,$8); cycl8($1,$7,$2,$8,$3,$5,$4,$6);#
+define spot2 #A:spot($1); B:spot($2); #
+define spot3 #A:spot($1); B:spot($2); C:spot($3); #
+define spot4 #A:spot($1); B:spot($2); C:spot($3); D:spot($4); #
+define spot5 #A:spot($1); B:spot($2); C:spot($3); D:spot($4); E:spot($5); #
+define spot6 #A:spot($1); B:spot($2); C:spot($3); D:spot($4); E:spot($5); \
+  F:spot($6);#
+define spot7 #A:spot($1); B:spot($2); C:spot($3); D:spot($4); E:spot($5); \
+  F:spot($6); G:spot($7); #
+define spot8 #A:spot($1); B:spot($2); C:spot($3); D:spot($4); E:spot($5); \
+  F:spot($6); G:spot($7); H:spot($8); #
+define spot9 #A:spot($1); B:spot($2); C:spot($3); D:spot($4); E:spot($5); \
+  F:spot($6); G:spot($7); H:spot($8); I:spot($9);#
+.PE
+.PS
+define p00 #(0,0)#; define p01 #(0,1)#; define p02 #(0,2)#; define p03 #(0,3)#
+define p04 #(0,4)#; define p05 #(0,5)#; define p06 #(0,6)#; define p07 #(0,7)#
+define p08 #(0,8)#; define p09 #(0,9)#; define p10 #(1,0)#; define p11 #(1,1)#
+define p12 #(1,2)#; define p13 #(1,3)#; define p14 #(1,4)#; define p15 #(1,5)#
+define p16 #(1,6)#; define p17 #(1,7)#; define p18 #(1,8)#; define p19 #(1,9)#
+define p20 #(2,0)#; define p21 #(2,1)#; define p22 #(2,2)#; define p23 #(2,3)#
+define p24 #(2,4)#; define p25 #(2,5)#; define p26 #(2,6)#; define p27 #(2,7)#
+define p28 #(2,8)#; define p29 #(2,9)#; define p30 #(3,0)#; define p31 #(3,1)#
+define p32 #(3,2)#; define p33 #(3,3)#; define p34 #(3,4)#; define p35 #(3,5)#
+define p36 #(3,6)#; define p37 #(3,7)#; define p38 #(3,8)#; define p39 #(3,9)#
+define p40 #(4,0)#; define p41 #(4,1)#; define p42 #(4,2)#; define p43 #(4,3)#
+define p44 #(4,4)#; define p45 #(4,5)#; define p46 #(4,6)#; define p47 #(4,7)#
+define p48 #(4,8)#; define p49 #(4,9)#; define p50 #(5,0)#; define p51 #(5,1)#
+define p52 #(5,2)#; define p53 #(5,3)#; define p54 #(5,4)#; define p55 #(5,5)#
+define p56 #(5,6)#; define p57 #(5,7)#; define p58 #(5,8)#; define p59 #(5,9)#
+define p60 #(6,0)#; define p61 #(6,1)#; define p62 #(6,2)#; define p63 #(6,3)#
+define p64 #(6,4)#; define p65 #(6,5)#; define p66 #(6,6)#; define p67 #(6,7)#
+define p68 #(6,8)#; define p69 #(6,9)#; define p70 #(7,0)#; define p71 #(7,1)#
+define p72 #(7,2)#; define p73 #(7,3)#; define p74 #(7,4)#; define p75 #(7,5)#
+define p76 #(7,6)#; define p77 #(7,7)#; define p78 #(7,8)#; define p79 #(7,9)#
+define p80 #(8,0)#; define p81 #(8,1)#; define p82 #(8,2)#; define p83 #(8,3)#
+define p84 #(8,4)#; define p85 #(8,5)#; define p86 #(8,6)#; define p87 #(8,7)#
+define p88 #(8,8)#; define p89 #(8,9)#; define p90 #(9,0)#; define p91 #(9,1)#
+define p92 #(9,2)#; define p93 #(9,3)#; define p94 #(9,4)#; define p95 #(9,5)#
+define p96 #(9,6)#; define p97 #(9,7)#; define p98 #(9,8)#; define p99 #(9,9)#
+define p100 #(10,0)#; define p101 #(10,1)#; define p102 #(10,2)#
+define p103 #(10,3)#; define p104 #(10,4)#; define p105 #(10,5)#
+define p110 #(11,0)#; define p111 #(11,1)#; define p112 #(11,2)#
+define p113 #(11,3)#; define p114 #(11,4)#; define p115 #(11,5)#
+define p120 #(12,0)#; define p121 #(12,1)#; define p122 #(12,2)#
+define p123 #(12,3)#; define p124 #(12,4)#; define p125 #(12,5)#
+define p130 #(13,0)#; define p131 #(13,1)#; define p132 #(13,2)#
+define p133 #(13,3)#; define p134 #(13,4)#; define p135 #(13,5)#
+define p140 #(14,0)#; define p141 #(14,1)#; define p142 #(14,2)#
+define p143 #(14,3)#; define p144 #(14,4)#; define p145 #(14,5)#
+define p150 #(15,0)#; define p151 #(15,1)#; define p152 #(15,2)#
+define p153 #(15,3)#; define p154 #(15,4)#; define p155 #(15,5)#
+define op00 #O+(0,0)#; define op01 #O+(0,1)#; define op02 #O+(0,2)#;
+define op03 #O+(0,3)#; define op04 #O+(0,4)#; define op05 #O+(0,5)#;
+define op06 #O+(0,6)#; define op07 #O+(0,7)#; define op08 #O+(0,8)#;
+define op09 #O+(0,9)#; define op10 #O+(1,0)#; define op11 #O+(1,1)#;
+define op12 #O+(1,2)#; define op13 #O+(1,3)#; define op14 #O+(1,4)#;
+define op15 #O+(1,5)#; define op16 #O+(1,6)#; define op17 #O+(1,7)#;
+define op18 #O+(1,8)#; define op19 #O+(1,9)#; define op20 #O+(2,0)#;
+define op21 #O+(2,1)#; define op22 #O+(2,2)#; define op23 #O+(2,3)#;
+define op24 #O+(2,4)#; define op25 #O+(2,5)#; define op26 #O+(2,6)#;
+define op27 #O+(2,7)#; define op28 #O+(2,8)#; define op29 #O+(2,9)#;
+define op30 #O+(3,0)#; define op31 #O+(3,1)#; define op32 #O+(3,2)#;
+define op33 #O+(3,3)#; define op34 #O+(3,4)#; define op35 #O+(3,5)#;
+define op36 #O+(3,6)#; define op37 #O+(3,7)#; define op38 #O+(3,8)#;
+define op39 #O+(3,9)#; define op40 #O+(4,0)#; define op41 #O+(4,1)#;
+define op42 #O+(4,2)#; define op43 #O+(4,3)#; define op44 #O+(4,4)#;
+define op45 #O+(4,5)#; define op46 #O+(4,6)#; define op47 #O+(4,7)#;
+define op48 #O+(4,8)#; define op49 #O+(4,9)#; define op50 #O+(5,0)#;
+define op51 #O+(5,1)#; define op52 #O+(5,2)#; define op53 #O+(5,3)#;
+define op54 #O+(5,4)#; define op55 #O+(5,5)#; define op56 #O+(5,6)#;
+define op57 #O+(5,7)#; define op58 #O+(5,8)#; define op59 #O+(5,9)#;
+define op60 #O+(6,0)#; define op61 #O+(6,1)#; define op62 #O+(6,2)#;
+define op63 #O+(6,3)#; define op64 #O+(6,4)#; define op65 #O+(6,5)#;
+define op66 #O+(6,6)#; define op67 #O+(6,7)#; define op68 #O+(6,8)#;
+define op69 #O+(6,9)#; define op70 #O+(7,0)#; define op71 #O+(7,1)#;
+define op72 #O+(7,2)#; define op73 #O+(7,3)#; define op74 #O+(7,4)#;
+define op75 #O+(7,5)#; define op76 #O+(7,6)#; define op77 #O+(7,7)#;
+define op78 #O+(7,8)#; define op79 #O+(7,9)#; define op80 #O+(8,0)#;
+define op81 #O+(8,1)#; define op82 #O+(8,2)#; define op83 #O+(8,3)#;
+define op84 #O+(8,4)#; define op85 #O+(8,5)#; define op86 #O+(8,6)#;
+define op87 #O+(8,7)#; define op88 #O+(8,8)#; define op89 #O+(8,9)#;
+define op90 #O+(9,0)#; define op91 #O+(9,1)#; define op92 #O+(9,2)#;
+define op93 #O+(9,3)#; define op94 #O+(9,4)#; define op95 #O+(9,5)#;
+define op96 #O+(9,6)#; define op97 #O+(9,7)#; define op98 #O+(9,8)#;
+define op99 #O+(9,9)#;
+define op100 #O+(10,0)#; define op101 #O+(10,1)#; define op102 #O+(10,2)#
+define op103 #O+(10,3)#; define op104 #O+(10,4)#; define op105 #O+(10,5)#
+define op110 #O+(11,0)#; define op111 #O+(11,1)#; define op112 #O+(11,2)#
+define op113 #O+(11,3)#; define op114 #O+(11,4)#; define op115 #O+(11,5)#
+define op120 #O+(12,0)#; define op121 #O+(12,1)#; define op122 #O+(12,2)#
+define op123 #O+(12,3)#; define op124 #O+(12,4)#; define op125 #O+(12,5)#
+define op130 #O+(13,0)#; define op131 #O+(13,1)#; define op132 #O+(13,2)#
+define op133 #O+(13,3)#; define op134 #O+(13,4)#; define op135 #O+(13,5)#
+define op140 #O+(14,0)#; define op141 #O+(14,1)#; define op142 #O+(14,2)#
+define op143 #O+(14,3)#; define op144 #O+(14,4)#; define op145 #O+(14,5)#
+define op150 #O+(15,0)#; define op151 #O+(15,1)#; define op152 #O+(15,2)#
+define op153 #O+(15,3)#; define op154 #O+(15,4)#; define op155 #O+(15,5)#
+.PE

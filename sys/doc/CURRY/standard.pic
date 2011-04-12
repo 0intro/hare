@@ -1,0 +1,53 @@
+.PS
+define plan9  {[L:box "plan9 proc (addresses < 16 MB)"  ht $1 wid $2
+	S:box "stack" with .n at last box .s ht $1 wid $2
+	B:box "bss" with .n at last box.s ht $1 wid $2
+	D:box "data" with .n at last box.s ht $1 wid $2
+	C:box "code"with .n at last box.s ht $1 wid $2
+]}
+define cnk  {[L:box "cnk proc (addresses > 16 MB)" "Rounded to nearest 1M" ht $1+.15 wid $2 
+	S:box "stack" with .n at last box .s ht $1 wid $2
+	B:box "bss" with .n at last box.s ht $1 wid $2
+	D:box "data" with .n at last box.s ht $1 wid $2
+	C:box "code" with .n at last box.s ht $1 wid $2
+]}
+
+define page {$1: box "4k page" ht .2i wid 2i with .n at M.n - (0,$2); line from $3  to $1.w}
+
+down
+C: cnk(.25i, 2i) 
+D: cnk(.25i, 2i) with .n at C.s - (0,1)
+P: plan9(.25i, 2i)with .n at D.s - (0,1)
+
+box "Top of Memory" wid 2i ht .15i with .ne at (5,0)
+M:box wid 2i ht 8i with .n at last box.s
+
+page(P0,1i, P.S.e)
+page(P1,.4i, P.S.e)
+page(P2,6i, P.C.e)
+page(P3, 3.4i, P.C.e)
+page(P4,1.2i, P.B.e)
+page(P5,.8i, P.B.e)
+page(P6,.6i, P.B.e)
+page(P7, 3.6i, P.D.e)
+
+page(C0,5i, C.S.e)
+page(C1,6.4i, C.S.e)
+page(C2,7i, C.C.e)
+page(C3, 0i, C.C.e)
+page(C4,5.6i, C.B.e)
+page(C5,4.6i, C.B.e)
+page(C6,1.6i, C.B.e)
+page(C7, 7.6i, C.D.e)
+
+page(DEED0,7.8i, D.S.e)
+page(DEED1,4.4i, D.S.e)
+page(DEED2,5.2i, D.C.e)
+page(DEED3, 3.8i, D.C.e)
+page(DEED4,5.8i, D.B.e)
+page(DEED5,.2i, D.B.e)
+page(DEED6,1.4i, D.B.e)
+page(DEED7, 4.0i, D.D.e)
+
+.PE
+

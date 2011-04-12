@@ -1,0 +1,315 @@
+.lf 1 pequalv.pic
+.lf 1
+.PS 8.150i 6.200i
+.\" -1.2 -8.15 5 0
+.\" 0.000i 8.150i 6.200i 0.000i
+.nr 00 \n(.u
+.nf
+.nr 0x 1
+\h'6.200i'
+.sp -1
+\D't -1.000p'\h'1.000p'
+.sp -1
+\h'2.400i'\v'0.400i'\D'p 0.000i -0.400i -2.400i 0.000i 0.000i 0.400i'
+.sp -1
+.lf 19
+\h'1.200i-(\w'cnk proc (addresses > 16 MB)'u/2u)'\v'0.200i-(2v/2u)+0v+0.22m'cnk proc (addresses > 16 MB)
+.sp -1
+.lf 19
+\h'1.200i-(\w'Rounded to nearest 1M'u/2u)'\v'0.200i-(2v/2u)+1v+0.22m'Rounded to nearest 1M
+.sp -1
+.lf 19
+\h'1.200i-(\w'BSS set to 256MB base'u/2u)'\v'0.200i-(2v/2u)+2v+0.22m'BSS set to 256MB base
+.sp -1
+\h'2.400i'\v'0.650i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 19
+\h'1.200i-(\w'stack'u/2u)'\v'0.525i-(0v/2u)+0v+0.22m'stack
+.sp -1
+\h'2.400i'\v'0.900i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 19
+\h'1.200i-(\w'bss'u/2u)'\v'0.775i-(0v/2u)+0v+0.22m'bss
+.sp -1
+\h'2.400i'\v'1.150i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 19
+\h'1.200i-(\w'data'u/2u)'\v'1.025i-(0v/2u)+0v+0.22m'data
+.sp -1
+\h'2.400i'\v'1.400i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 19
+\h'1.200i-(\w'code'u/2u)'\v'1.275i-(0v/2u)+0v+0.22m'code
+.sp -1
+\h'2.400i'\v'2.800i'\D'p 0.000i -0.400i -2.400i 0.000i 0.000i 0.400i'
+.sp -1
+.lf 20
+\h'1.200i-(\w'cnk proc (addresses > 16 MB)'u/2u)'\v'2.600i-(2v/2u)+0v+0.22m'cnk proc (addresses > 16 MB)
+.sp -1
+.lf 20
+\h'1.200i-(\w'Rounded to nearest 1M'u/2u)'\v'2.600i-(2v/2u)+1v+0.22m'Rounded to nearest 1M
+.sp -1
+.lf 20
+\h'1.200i-(\w'BSS set to 256MB base'u/2u)'\v'2.600i-(2v/2u)+2v+0.22m'BSS set to 256MB base
+.sp -1
+\h'2.400i'\v'3.050i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 20
+\h'1.200i-(\w'stack'u/2u)'\v'2.925i-(0v/2u)+0v+0.22m'stack
+.sp -1
+\h'2.400i'\v'3.300i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 20
+\h'1.200i-(\w'bss'u/2u)'\v'3.175i-(0v/2u)+0v+0.22m'bss
+.sp -1
+\h'2.400i'\v'3.550i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 20
+\h'1.200i-(\w'data'u/2u)'\v'3.425i-(0v/2u)+0v+0.22m'data
+.sp -1
+\h'2.400i'\v'3.800i'\D'p 0.000i -0.250i -2.400i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 20
+\h'1.200i-(\w'code'u/2u)'\v'3.675i-(0v/2u)+0v+0.22m'code
+.sp -1
+\h'2.200i'\v'5.050i'\D'p 0.000i -0.250i -2.000i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 21
+\h'1.200i-(\w'plan9 proc (addresses < 16 MB)'u/2u)'\v'4.925i-(0v/2u)+0v+0.22m'plan9 proc (addresses < 16 MB)
+.sp -1
+\h'2.200i'\v'5.300i'\D'p 0.000i -0.250i -2.000i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 21
+\h'1.200i-(\w'stack'u/2u)'\v'5.175i-(0v/2u)+0v+0.22m'stack
+.sp -1
+\h'2.200i'\v'5.550i'\D'p 0.000i -0.250i -2.000i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 21
+\h'1.200i-(\w'bss'u/2u)'\v'5.425i-(0v/2u)+0v+0.22m'bss
+.sp -1
+\h'2.200i'\v'5.800i'\D'p 0.000i -0.250i -2.000i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 21
+\h'1.200i-(\w'data'u/2u)'\v'5.675i-(0v/2u)+0v+0.22m'data
+.sp -1
+\h'2.200i'\v'6.050i'\D'p 0.000i -0.250i -2.000i 0.000i 0.000i 0.250i'
+.sp -1
+.lf 21
+\h'1.200i-(\w'code'u/2u)'\v'5.925i-(0v/2u)+0v+0.22m'code
+.sp -1
+\h'6.200i'\v'0.150i'\D'p 0.000i -0.150i -2.000i 0.000i 0.000i 0.150i'
+.sp -1
+.lf 23
+\h'5.200i-(\w'Top of Memory'u/2u)'\v'0.075i-(0v/2u)+0v+0.22m'Top of Memory
+.sp -1
+\h'6.200i'\v'8.150i'\D'p 0.000i -8.000i -2.000i 0.000i 0.000i 8.000i'
+.sp -1
+\h'6.200i'\v'6.950i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 26
+\h'5.200i-(\w'4k page'u/2u)'\v'6.850i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.175i'\D'l 2.000i 1.675i'
+.sp -1
+\h'6.200i'\v'7.150i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 27
+\h'5.200i-(\w'4k page'u/2u)'\v'7.050i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.175i'\D'l 2.000i 1.875i'
+.sp -1
+\h'6.200i'\v'6.350i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 28
+\h'5.200i-(\w'4k page'u/2u)'\v'6.250i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.925i'\D'l 2.000i 0.325i'
+.sp -1
+\h'6.200i'\v'4.350i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 29
+\h'5.200i-(\w'4k page'u/2u)'\v'4.250i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.925i'\D'l 2.000i -1.675i'
+.sp -1
+\h'6.200i'\v'3.550i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 30
+\h'5.200i-(\w'4k page'u/2u)'\v'3.450i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.425i'\D'l 2.000i -1.975i'
+.sp -1
+\h'6.200i'\v'6.150i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 31
+\h'5.200i-(\w'4k page'u/2u)'\v'6.050i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.425i'\D'l 2.000i 0.625i'
+.sp -1
+\h'6.200i'\v'6.750i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 32
+\h'5.200i-(\w'4k page'u/2u)'\v'6.650i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.425i'\D'l 2.000i 1.225i'
+.sp -1
+\h'6.200i'\v'5.550i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 33
+\h'5.200i-(\w'4k page'u/2u)'\v'5.450i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.200i'\v'5.675i'\D'l 2.000i -0.225i'
+.sp -1
+\h'6.200i'\v'5.350i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 35
+\h'5.200i-(\w'4k page'u/2u)'\v'5.250i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'0.525i'\D'l 1.800i 4.725i'
+.sp -1
+\h'6.200i'\v'7.350i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 36
+\h'5.200i-(\w'4k page'u/2u)'\v'7.250i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'1.275i'\D'l 1.800i 5.975i'
+.sp -1
+\h'6.200i'\v'3.150i'\D'p 0.000i -1.000i -2.000i 0.000i 0.000i 1.000i'
+.sp -1
+.lf 37
+\h'5.200i-(\w'256MB page'u/2u)'\v'2.650i-(3v/2u)+0v+0.22m'256MB page
+.sp -1
+.lf 37
+\h'5.200i-(\w'Shared among all'u/2u)'\v'2.650i-(3v/2u)+1v+0.22m'Shared among all
+.sp -1
+.lf 37
+\h'5.200i-(\w'CNK processes'u/2u)'\v'2.650i-(3v/2u)+2v+0.22m'CNK processes
+.sp -1
+.lf 37
+\h'5.200i-(\w'virtual==physical address'u/2u)'\v'2.650i-(3v/2u)+3v+0.22m'virtual==physical address
+.sp -1
+\h'2.400i'\v'0.775i'\D'l 1.800i 1.875i'
+.sp -1
+\h'6.200i'\v'2.150i'\D'p 0.000i -1.000i -2.000i 0.000i 0.000i 1.000i'
+.sp -1
+.lf 38
+\h'5.200i-(\w'256MB page'u/2u)'\v'1.650i-(3v/2u)+0v+0.22m'256MB page
+.sp -1
+.lf 38
+\h'5.200i-(\w'Shared among all'u/2u)'\v'1.650i-(3v/2u)+1v+0.22m'Shared among all
+.sp -1
+.lf 38
+\h'5.200i-(\w'CNK processes'u/2u)'\v'1.650i-(3v/2u)+2v+0.22m'CNK processes
+.sp -1
+.lf 38
+\h'5.200i-(\w'virtual==physical address'u/2u)'\v'1.650i-(3v/2u)+3v+0.22m'virtual==physical address
+.sp -1
+\h'2.400i'\v'0.775i'\D'l 1.800i 0.875i'
+.sp -1
+\h'6.200i'\v'1.150i'\D'p 0.000i -1.000i -2.000i 0.000i 0.000i 1.000i'
+.sp -1
+.lf 39
+\h'5.200i-(\w'256MB page'u/2u)'\v'0.650i-(3v/2u)+0v+0.22m'256MB page
+.sp -1
+.lf 39
+\h'5.200i-(\w'Shared among all'u/2u)'\v'0.650i-(3v/2u)+1v+0.22m'Shared among all
+.sp -1
+.lf 39
+\h'5.200i-(\w'CNK processes'u/2u)'\v'0.650i-(3v/2u)+2v+0.22m'CNK processes
+.sp -1
+.lf 39
+\h'5.200i-(\w'virtual==physical address'u/2u)'\v'0.650i-(3v/2u)+3v+0.22m'virtual==physical address
+.sp -1
+\h'2.400i'\v'0.775i'\D'l 1.800i -0.125i'
+.sp -1
+\h'6.200i'\v'7.950i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 40
+\h'5.200i-(\w'4k page'u/2u)'\v'7.850i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'1.025i'\D'l 1.800i 6.825i'
+.sp -1
+\h'6.200i'\v'4.750i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 42
+\h'5.200i-(\w'4k page'u/2u)'\v'4.650i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'2.925i'\D'l 1.800i 1.725i'
+.sp -1
+\h'6.200i'\v'5.550i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 43
+\h'5.200i-(\w'4k page'u/2u)'\v'5.450i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'3.675i'\D'l 1.800i 1.775i'
+.sp -1
+\h'6.200i'\v'4.150i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 44
+\h'5.200i-(\w'4k page'u/2u)'\v'4.050i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'3.675i'\D'l 1.800i 0.375i'
+.sp -1
+\h'6.200i'\v'3.150i'\D'p 0.000i -1.000i -2.000i 0.000i 0.000i 1.000i'
+.sp -1
+.lf 45
+\h'5.200i-(\w'256MB page'u/2u)'\v'2.650i-(3v/2u)+0v+0.22m'256MB page
+.sp -1
+.lf 45
+\h'5.200i-(\w'Shared among all'u/2u)'\v'2.650i-(3v/2u)+1v+0.22m'Shared among all
+.sp -1
+.lf 45
+\h'5.200i-(\w'CNK processes'u/2u)'\v'2.650i-(3v/2u)+2v+0.22m'CNK processes
+.sp -1
+.lf 45
+\h'5.200i-(\w'virtual==physical address'u/2u)'\v'2.650i-(3v/2u)+3v+0.22m'virtual==physical address
+.sp -1
+\h'2.400i'\v'3.175i'\D'l 1.800i -0.525i'
+.sp -1
+\h'6.200i'\v'2.150i'\D'p 0.000i -1.000i -2.000i 0.000i 0.000i 1.000i'
+.sp -1
+.lf 46
+\h'5.200i-(\w'256MB page'u/2u)'\v'1.650i-(3v/2u)+0v+0.22m'256MB page
+.sp -1
+.lf 46
+\h'5.200i-(\w'Shared among all'u/2u)'\v'1.650i-(3v/2u)+1v+0.22m'Shared among all
+.sp -1
+.lf 46
+\h'5.200i-(\w'CNK processes'u/2u)'\v'1.650i-(3v/2u)+2v+0.22m'CNK processes
+.sp -1
+.lf 46
+\h'5.200i-(\w'virtual==physical address'u/2u)'\v'1.650i-(3v/2u)+3v+0.22m'virtual==physical address
+.sp -1
+\h'2.400i'\v'3.175i'\D'l 1.800i -1.525i'
+.sp -1
+\h'6.200i'\v'1.150i'\D'p 0.000i -1.000i -2.000i 0.000i 0.000i 1.000i'
+.sp -1
+.lf 47
+\h'5.200i-(\w'256MB page'u/2u)'\v'0.650i-(3v/2u)+0v+0.22m'256MB page
+.sp -1
+.lf 47
+\h'5.200i-(\w'Shared among all'u/2u)'\v'0.650i-(3v/2u)+1v+0.22m'Shared among all
+.sp -1
+.lf 47
+\h'5.200i-(\w'CNK processes'u/2u)'\v'0.650i-(3v/2u)+2v+0.22m'CNK processes
+.sp -1
+.lf 47
+\h'5.200i-(\w'virtual==physical address'u/2u)'\v'0.650i-(3v/2u)+3v+0.22m'virtual==physical address
+.sp -1
+\h'2.400i'\v'3.175i'\D'l 1.800i -2.525i'
+.sp -1
+\h'6.200i'\v'4.350i'\D'p 0.000i -0.200i -2.000i 0.000i 0.000i 0.200i'
+.sp -1
+.lf 48
+\h'5.200i-(\w'4k page'u/2u)'\v'4.250i-(0v/2u)+0v+0.22m'4k page
+.sp -1
+\h'2.400i'\v'3.425i'\D'l 1.800i 0.825i'
+.sp -1
+.sp 8.150i+1
+.if \n(00 .fi
+.br
+.nr 0x 0
+.lf 50
+.PE
+.lf 51
+
