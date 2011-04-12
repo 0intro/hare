@@ -54,15 +54,46 @@ main (int argc, char **argv)
 {
 	MPI_Init(&argc, &argv);
 	
-	struct AmRing *amring = amringsetup(20, 0);
+	struct AmRing *amring;
+	extern int amrdebug;
+	amrdebug = 5;
+
 	print("Call amrstartup, myproc %d nproc %d\n", myproc, nproc);
 	if (myproc < nproc){
-		if (myproc)
+		amring = amringsetup(20, 0);
+		if (0 && myproc)
 			torusctl("debug 64", 1);
 		amrstartup(amring);	
 	} else
 		while(1);
 	print("amrstartup returns\n");
+	/* send the message around the ring */
+	Tpkt *p = (void *)mallocz(1024, 1);
+	int rx, ry, rz;
+	int num, rrank;
+	unsigned char data[240];
+	/* the usual 'kick it off cause we're special */
+	/* and we send a different message type for the initial case */
+	if (! myproc) {
+		data[0] = 'p';
+		amrsend(amring, data, 240, 1);
+	} else {
+		/* wait for junior -- message type 'p'*/
+		waitamrpacket(amring, 'p', p, &rx, &ry, &rz);
+		rrank = xyztorank(rx, ry, rz);
+		print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+	}
+
+	/* now send to your superior */
+	if (myproc) {
+		data[0] = 'P';
+		amrsend(amring, data, 240, (myproc+1)%nproc);
+	} else {
+		waitamrpacket(amring, 'P', p, &rx, &ry, &rz);
+		rrank = xyztorank(rx, ry, rz);
+		print("Got 'P' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+	}
+	
 	return 0;
 }
 

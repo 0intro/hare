@@ -23,6 +23,8 @@ void panic(char *s);
 void exits(char *s);
 void torusctl(char *cmd, int debug);
 
+int xyztorank(int x, int y, int z);
+
 #define F(v, o, w)	(((v) & ((1<<(w))-1))<<(o))
 enum {
 	X		= 0,			/* dimension */
@@ -105,6 +107,11 @@ struct AmRing {
 	unsigned long con;
 	unsigned char _124[128-4];
 };
+
+
+
+void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt, 
+		   int *x, int *y, int *z);
 
 static __inline__ u64int tbget(void)
 {

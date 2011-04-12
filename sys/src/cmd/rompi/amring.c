@@ -5,10 +5,16 @@ typedef uvlong ticks;
 /* need to resync kernel to this but for now it's ok */
 extern int myproc, nproc;
 
+int amrdebug = 0;
 /* stuff we might as well keep around for the duration. */
 static int cfd, ctlfd;
 
 /* fucking useless include files! */
+unsigned long read8(unsigned char *l)
+{
+	volatile unsigned char *ll = (volatile unsigned char *)l;
+	return *ll;
+}
 unsigned long readl(unsigned long *l)
 {
 	volatile unsigned long *ll = (volatile unsigned long *)l;
@@ -46,9 +52,11 @@ amringsetup(int logN, int core)
 
 	/* wire us to core 'core' */
 	sprintf(ctlcmd, "/proc/%d/ctl", getpid());
-	print("ctlcmd is %s\n", ctlcmd);
+	if (amrdebug > 2)
+		print("ctlcmd is %s\n", ctlcmd);
 	ctlfd = open(ctlcmd, 2);
-	print("ctlfd  is %d\n", ctlfd);
+	if (amrdebug > 2)
+		print("ctlfd  is %d\n", ctlfd);
 	if (ctlfd < 0) {
 		perror(ctlcmd);
 		exit(1);
@@ -63,10 +71,12 @@ amringsetup(int logN, int core)
 	/* set up amr  ... just make the base the next page. */
 	amrbase = (unsigned int) malloc(2*1024*1024);
 	amrbase = (unsigned int) malloc(2*1024*1024);
-	print("amrbase is %#x", amrbase);
+	if (amrdebug > 2)
+		print("amrbase is %#x", amrbase);
 	amrbase = (amrbase+255)&(~0xff);
 	amr = (void *)amrbase;
-	print("amr is %p\n", amr);
+	if (amrdebug > 2)
+		print("amr is %p\n", amr);
 	memset(amr, 0, sizeof(*amr));
 	amr->base = (u8int *)&amr[1];
 	amr->size = 1 << logN;
@@ -80,14 +90,17 @@ amringsetup(int logN, int core)
 		exit(1);
 	}
 	sprintf(ctlcmd, "r %p", amr);
-	print("ctlcmd is %s\n", ctlcmd);
+	if (amrdebug > 2)
+		print("ctlcmd is %s\n", ctlcmd);
 	amt = write(cfd, ctlcmd, strlen(ctlcmd));
-	print("ctlcmd write amt %d\n", amt);
+	if (amrdebug > 2)
+		print("ctlcmd write amt %d\n", amt);
 	if (amt < 0) {
 		print("r cmd failed\n");
 		exit(1);
 	}
-	print("cmd succeeded\n");
+	if (amrdebug > 2)
+		print("cmd succeeded\n");
 	return amr;
 }
 
@@ -104,11 +117,15 @@ amrsend(struct AmRing *amr, void *data, int size, int rank)
 	coord[0] = x;
 	coord[1] = y;
 	coord[2] = z;
-	printf("SEND TO [%d, %d, %d] %p\n", x,y,z,data);
-	//res = syscall(669, coord, data);
+	if (amrdebug > 3)
+		printf("SEND TO [%d, %d, %d] %p\n", x,y,z,data);
+	res = syscall(669, coord, data);
 	//res = syscall(666, coord, data);
-	res = syscall(301, coord, data);
-	printf("res is %d\n", res);
+	/* calling 301 is hanging up the node? 4/11/ 0912 */
+	//res = syscall(301, coord, data);
+	if (amrdebug > 3)
+		printf("res is %d\n", res);
+	//free(coord);
 	return res;
 }
 
@@ -121,28 +138,51 @@ volatile Tpkt *
 amrrecv(struct AmRing *amr, int *num, volatile Tpkt *p, int *x, int *y, int *z)
 {
 	volatile Tpkt *tpkt = NULL;
-	Tpkt  ap;
 	mb();
 	unsigned long con = readl(&amr->con), 
 		prod = readl(&amr->prod);
-	printf("con %ld, %ld\n", con, prod);
+	if (amrdebug > 3)
+		printf("con %ld, %ld\n", con, prod);
 	*num = 0;
 
 	if (con != prod) {
 		tpkt = (volatile Tpkt *) &amr->base[amr->con % amr->size];
 		
-		ap = *tpkt;
-		printf("Con %ld, tpkt %p, prod %ld, payloadbyte %02x\n", 
-		       con, tpkt, prod, ap.payload[0]);
+		{ 
+			int i,j; 
+			unsigned char * cp = (unsigned char *)&amr->base[amr->con % amr->size];
+			for(i = 0; i < 15 && amrdebug > 4; i++) {
+				printf("%p: ", &cp[i*16+j]);
+				for(j = 0; j < 16; j++)
+					printf("%02lx ", read8(&cp[i*16+j]));
+				printf("\n");
+			}
+		}
+		if (p){
+			unsigned char *cp = (unsigned char *)p;
+			int i, j;
+			if (amrdebug > 4)
+				printf("memcpy(%p, %p, %d);\n", p, &amr->base[amr->con % amr->size], 256);
+			memcpy((void *)p, &amr->base[amr->con % amr->size], 256);
+			for(i = 0; i < 16 && amrdebug > 4; i++) {
+				printf("%p: ", &cp[i*16]);
+				for(j = 0; j < 16; j++)
+					printf("%02lx ", read8(&cp[i*16+j]));
+				printf("\n");
+			}
+		}
+
+		if (amrdebug > 3)
+			printf("Con %ld, tpkt %p, prod %ld, payloadbyte %02x\n", 
+			       con, tpkt, prod, p->payload[0]);
 		writel(con + 256, &amr->con);
-		if (p)
-			*p = ap;
-		*x = ap.Hdr.src[X];
-		*y = ap.Hdr.src[Y];
-		*z = ap.Hdr.src[Z];
+		*x = read8((u8int *)&tpkt->Hdr.src[X]);
+		*y = read8((u8int *)&tpkt->Hdr.src[Y]);
+		*z = read8((u8int *)&tpkt->Hdr.src[Z]);
 		*num = 1;
 	}
-	printf("amrrecv returns %p\n", tpkt);
+	if (amrdebug > 3)
+		printf("amrrecv returns %p\n", tpkt);
 	mb();
 	return tpkt;
 }
@@ -172,84 +212,69 @@ void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt,
 	do {
 		amrrecv(amr, &num, pkt, x, y, z);
 		if (num) {
-			print("waitamrpacket gets %d, wants %d\n", pkt->payload[16], type);
-			{ int i,j; for(i = 0; i < 15; i++) 
-				for(j = 0; j < 16; j++)
-					printf("%02x ", pkt->payload[i*16+j]);
-			
-			printf("\n");
+			if (amrdebug > 4){
+				print("waitamrpacket gets %d, wants %d\n", pkt->payload[0], type);
+				int i,j; 
+				for(i = 0; i < 15 ; i++) 
+					for(j = 0; j < 16; j++)
+						printf("%02lx ", read8((u8int *)&pkt->payload[i*16+j]));
+				
+				printf("\n");
 			}
-		} 
-#if 0
-else {
-			printf("NOPE!\n");
-			/* find it. */
-
-			
-/*
-			int i;
-			for(i = 0; i < 256*1024*1024/4-4; i++) {
-				volatile unsigned long *u = (void *)(512*1024*1024);
-				printf("Start search at %p end at %p\n", u, u+256*1024*1024-4);
-				if (u[i] == 0x11 && u[i+1] == 0x12 && u[i+2] == 0x13 && u[i+3] == 0x14) {
-					printf("FOUND IT AT %p\n", &u[i]);
-				}
-			}
- */
-			cp = amr->base;
-			{ int i,j; for(i = 0; i < 64; i++) 
-				for(j = 0; j < 16; j++)
-					printf("%02x ", cp[i*16+j]);
-			
-			printf("\n");
-			}
-			printf("was it there?\n");
-			sleep(2);	    
-		}
-#endif
-	sleep(5);
+		} 	
+		sleep(5);
 		
-	} while (num < 1 || pkt->payload[16] != type);
-	print("waitamrpacket: returing for %d from (%d, %d, %d)\n", type, x,y,z);
+	} while (num < 1 || read8((u8int *)&pkt->payload[0]) != type);
+	if (amrdebug > 3)
+		print("waitamrpacket: returing for %d from (%d, %d, %d)\n", type, x,y,z);
 }
 
 int
 beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 {
 	u8int *data;
-	Tpkt pkt;
+	Tpkt *pkt;
 	int num;
 	int x, y, z;
 	int rank;
 	int i;
+	int dontcare;
 
+	pkt = mallocz(1024, 1);
 	data = mallocz(256, 1);
 	for(i = 0; i < 256; i++)
 		data[i] = 'a' + i;
 	data[0] = 'B';
 	/* go ahead and send the beacon. */
-	print("0: beacon. numnodes %d\n", numnodes);
+	if (amrdebug > 2)
+		print("0: beacon. numnodes %d\n", numnodes);
 	for(num = i = 1; i < numnodes; i++) {
 		if (! nodestatus[i]){
 			amrsend(amr, data, 240, i);
-			print("0: send %d\n", i);
+			if (amrdebug > 3)
+				print("0: send %d\n", i);
 		} else {
 			num++;
 		}
 	}
-	print("all beacons sent\n");
+	if (amrdebug > 2)
+		print("all beacons sent\n");
 	/* gather any responses */
-	while (amrrecv(amr, &num, &pkt, &x, &y, &z)) {
-	    int 	xyztorank(int x, int y, int z);
+	while (amrrecv(amr, &dontcare, pkt, &x, &y, &z)) {
+	    int xyztorank(int x, int y, int z);
 		rank = xyztorank(x, y, z);
-		printf("beacon: one from (%d,%d,%d)\n", x,y,z);
+		if (amrdebug > 3)
+			printf("beacon: one from %d(%d,%d,%d) status %d\n", rank, x,y,z, nodestatus[rank]);
 		if (nodestatus[rank] == 0) {
 			num++;
+			if (amrdebug > 3) print("num %d\n", num);
 		}
 		nodestatus[rank]++;
 	}
 	free(data);
 	/* return total responses contained in 'nodes' */
+	if (amrdebug > 2)
+		print("beacon: return %d of %d needed\n", num, numnodes);
 	return num;
 }
 
@@ -257,9 +282,12 @@ void
 waitbeacon(struct AmRing *amr)
 {
 	int x, y, z;
-	Tpkt pkt;
-	waitamrpacket(amr, 'B', &pkt, &x, &y, &z);
-	printf("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
+	static Tpkt *pkt = NULL;
+	if (! pkt)
+		pkt = mallocz(1024, 1);
+	waitamrpacket(amr, 'B', pkt, &x, &y, &z);
+	if (amrdebug > 2)
+		printf("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
 }
 
 void
@@ -268,7 +296,8 @@ respondbeacon(struct AmRing *amr)
 	unsigned char *data;
 	data = mallocz(256, 1);
 	data[0] = 'b';
-	printf("Respondbeacon to 0\n");
+	if (amrdebug > 2)
+		printf("Respondbeacon to 0\n");
 	/* send a response to a packet -- first char is 'b' */
 	amrsend(amr, data, 240, 0);
 	free(data);
@@ -296,19 +325,24 @@ amrstartup(struct AmRing *amr)
 		 */
 		int numresponded = 0;
 		int *nodes = mallocz(nproc*sizeof(*nodes), 1);
-		printf("amrstartup: time for node 0 to tell everyone\n");
-		while (numresponded < nproc-1) {
+		if (amrdebug > 2)
+			printf("amrstartup: time for node 0 to tell %d nodes\n", nproc);
+		while (numresponded < nproc) {
 			numresponded = beacon(amr, nodes, nproc);
-			printf("amrstartup: %d to date\n", numresponded);
+			if (amrdebug > 3)
+				printf("amrstartup: %d to date\n", numresponded);
 			sleep(5);
+			if (amrdebug > 3)
+				printf("amrstartup: node 0 starts again\n");
+			//exit(1);
 		}
 	} else {
 		/* wait for the beacon */
 		waitbeacon(amr);
-		printf("waitbeacon returns\n");
 		/* send our response */
 		respondbeacon(amr);
-		printf("responded\n");
+		if (amrdebug > 2)
+			printf("responded\n");
 	}
 
 	/* amring is now usable for normal work */
