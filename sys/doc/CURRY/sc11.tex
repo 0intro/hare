@@ -14,6 +14,8 @@
 }%
 \thanks{Sandia is a multiprogram laboratory operated by Sandia Corporation, a Lockheed Martin Company, for the United States Department of Energy’s National Nuclear Security Administration under contract DE­AC04­94AL85000. SAND- 2009-5156C.}  and John Floren and Jim Mckie
 \thanks{Bell Laboratories, Murray Hill, NJ, USA }
+ and Charles Forsyth
+\thanks{Vita Nuova, Ldt.} and Roger Pearce\thanks{Lawrence Livermore National Laboratory}
 }
 %\institute{Ronald G. Minnich \at Sandia National Labs, Livermore, CA, 94550,
 %    USA\\Tel.: 925-294-4713 %
@@ -422,14 +424,70 @@ That said, it is still too slow -- we're willing to take some hit from the use o
 A set of simple changes to the injection (i.e. transmit) side of the driver shaved 8 microseconds from the total time, 
 reducing send overhead from 11 microseconds to 2.8. We did not break the one microsecond barrier in this case, although work continues, but we did get the one way latency to a much more competitive value. 
 
-\section{shared heap}
-\begin{figure}[htbp]
-\begin{center}
-\scalebox{.25}{\input{standard}}
-\caption{{\bf default}}
-\label{default}
-\end{center}
+\section{Further extensions}
+The modifications described in the previous section can be considered as general purpose, in the sense 
+that any device can be extended to take advantage of them. We have even created Curried pipes. 
+
+In this section we consider specializations that are very specific to the Blue Gene Torus. These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. The extensions are inspired on Active Messages,  and tailored to the needs of a graph application. 
+
+\subsection{The Graph Application}
+
+Discussions with the programmer revealed that due to MPI overheads, the programmer was creating a 
+queue that ran on top of the MPI queue and all the underlying abstraction layers that supported MPI. 
+What the program needed was a very fast send for short messages, and a shared-memory ring for received
+messages. 
+
+We implemented a fast send via a "system call bypass" mechanism, in which the system call trap code
+checks the system call number, and bypasses almost all the system call code to call a low latency 
+Torus injection function. Using this fast send, we achieved Torus injection rates of 862 thousand packets/second, or four times the rate of MPI as measured by injection test from the Sandia Messaging Benchmarks\cite{barrett2009application}. 
+
+The receive side data management is more complex. Data transfer is performed in an interrupt 
+handler in the kernel, requiring a mapping between user space memory ring and kernel interrupt address space. 
+The traditional Linux approach to sharing buffers between kernel and user space is via pinning. Pinning is a complicated 
+operation which consumes a great deal of code -- there are almost as many lines of code to support 
+pinning in Linux as there are in our entire kernel. In our  non-traditional approach the physical and virtual addresses are the same, and are in addition backed by a 256 Mbyte page table entry (TLB in PowerPC terms). We call this address area the "P==V" space. In our kernel, it is used to back the so-called "BSS", or heap, area. 
+
+Only a few processes, and usually only one, need to use the P==V space. Our kernel limits the use of the P==V space to application processes which are compiled for the
+IBM Blue Gene "compute node kernel". These
+processes are run using an emulation environment\cite{plan9bgp}, and are set up with the P=V 
+space as their heap segment. The runtime software such as malloc runs quite normally with this 
+special heap, albeit much more quickly due to BSS being backed by 256 MB TLBs. All other programs,
+compiled with a standard toolchain, run with non-shared heaps.
+
+The shared memory ring struct is shown in Figure \ref{ring}. 
+\begin{figure}
+\begin{verbatim}
+struct AmRing {
+        unsigned char *base;
+        unsigned long size;
+        unsigned long prod;
+        unsigned long logN;
+        unsigned char _116[128-16];
+        unsigned long con;
+        unsigned char _124[128-4];
+};
+\end{verbatim}
+\caption{\label{ring}Shared memory ring for receive packets.}
 \end{figure}
+
+The base is simply a pointer to the base of memory, which consists of a block of 256-byte Torus packets. 
+The size and logN are different descriptions of the size, provided in each form for convenience;
+ the size must be 256 bytes or more, and always a power of 2. Prod
+is the record of bytes produced; con the record of bytes consumed. The padding is done to eliminate any 
+chance of false sharing between cores. Both the base and the AmRing struct itself are kept in the P=V 
+address space. Hence, user mode, kernel mode, and interrupt handlers can manipulate these structures
+with no address translation needed. 
+
+With these changes we measured a packet reception rate, using the same benchmarks, 
+606 thousand packets
+per second. 
+%\begin{figure}[htbp]
+%\begin{center}
+%\includegraphics[width=2.5in]{standard}
+%\caption{{\bf default}}
+%\label{default}
+%\end{center}
+%\end{figure}
 
 
 \section{Conclusions and Future Work}

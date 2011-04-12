@@ -1,19 +1,19 @@
-all: paper.pdf iwp9slides.pdf sc11.pdf 
+all: sc11.pdf 
 
 standard.tex: standard.pic tpics.txt
 	pic standard.pic > standard.troff
 	groff standard.troff > standard.ps
-	open standard.ps
+#	open standard.ps
 
 pequalv.ps: pequalv.pic
 	pic pequalv.pic > pequalv.troff
 	groff pequalv.troff > pequalv.ps
-	open pequalv.ps
+#	open pequalv.ps
 
 standard.ps: standard.pic
 	pic standard.pic > standard.troff
 	groff standard.troff > standard.ps
-	open standard.ps
+#	open standard.ps
 paper.pdf: paper.dvi
 	dvipdf paper
 paper.dvi: paper.tex all.bib
