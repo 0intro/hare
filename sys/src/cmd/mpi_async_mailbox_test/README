@@ -1,0 +1,19 @@
+Simple Test program for asynchronous unbuffered mailbox.
+Roger Pearce -- 2011.03.01
+
+Uses MPI_Isend and MPI_Irecv to exchange messages from
+all-to-all in a random pattern.  
+
+Compiling:
+Edit 'make_me.sh' and set MPICXX and BOOST_INCL as approperate.
+Only Boost header files are needed, tested on Boost 1.33 and 1.45
+
+
+Usage:
+atlas608@pearce7:srun -n8 -ppdebug ./test_mpi_mailbox_unbuffered 100
+Sending 100 unbuffered messages using 8 processes
+Elapsed time = 0.000259, Message rate = 386100 Messages per second
+
+
+
+WARNING: Overflows can occur if MPI eager sends get too 'eager'.

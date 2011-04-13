@@ -82,18 +82,15 @@ main (int argc, char **argv)
 		waitamrpacket(amring, 'p', p, &rx, &ry, &rz);
 		rrank = xyztorank(rx, ry, rz);
 		print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+		data[0] = 'p';
+		amrsend(amring, data, 240, (myproc+1)%nproc);
 	}
 
-	/* now send to your superior */
-	if (myproc) {
-		data[0] = 'P';
-		amrsend(amring, data, 240, (myproc+1)%nproc);
-	} else {
-		waitamrpacket(amring, 'P', p, &rx, &ry, &rz);
+	if (! myproc) {
+		waitamrpacket(amring, 'p', p, &rx, &ry, &rz);
 		rrank = xyztorank(rx, ry, rz);
-		print("Got 'P' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+		print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
 	}
 	
 	return 0;
 }
-
