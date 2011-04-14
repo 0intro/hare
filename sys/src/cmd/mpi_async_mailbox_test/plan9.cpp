@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
 	std::cerr << "myproc " << myproc << " nproc " << nproc << "\n";
 	if (myproc >= nproc)
 		while (1);
+	amrdebug = 5;
 	std::cerr << "call amringsetup\n";
 	struct AmRing *amring = amringsetup(20, 1);
 	std::cerr << "Call amrstartup\n";
@@ -75,7 +76,7 @@ int main(int argc, char** argv) {
 	boost::variate_generator<boost::mt19937&, boost::uniform_int<> > 
 		rand_rank(rng, rr);
 	std::cerr << "----------> start\n";
-	amrdebug = 0 + 4;
+	amrdebug = 0 + 5;
 	//CHK_MPI( MPI_Barrier(MPI_COMM_WORLD) );
 	double start_time = MPI_Wtime();
 	
@@ -99,15 +100,17 @@ int main(int argc, char** argv) {
 		}
 		/* we only get one at a time for now */
 		/* this will probably overrun */
-		int rank, num, rx, ry, rz;
-		amrrecv(amring, &num, buf, &rx, &ry, &rz);
-		rank = xyztorank(rx, ry, rz);
-		if (debug > 4)
+		int rank, num = 0, rx, ry, rz;
+		//amrrecv(amring, &num, buf, &rx, &ry, &rz);
+		if (num) {
+		    rank = xyztorank(rx, ry, rz);
+		    if (debug > 4)
 			std::cerr << "amrrecv gets " << num << " packets from " << rank << "\n";
-		if (num && buf[0] == 'm') {
+		    if (num && buf[0] == 'm') {
 			if (debug > 2)
-				std::cerr << "Got something! from " << rank << "\n";
-			recv_checksum_local += *(uint64_t *)&buf[16];
+			    std::cerr << "Got something! from " << rank << "\n";
+			//recv_checksum_local += *(uint64_t *)&buf[16];
+		    }
 		}
 			
 	} while(!test_for_termination);
