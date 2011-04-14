@@ -1,5 +1,5 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-g++
-CXXFLAGS += -I . -I ../src/boost_1_45_0/~/boostsucks/include
+CXXFLAGS += -I . -I ~/src/boost_1_45_0/~/boostsucks/include
 ALL=plan9
 all: $(ALL)
 

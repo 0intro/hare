@@ -1,0 +1,60 @@
+4/7 us TLB writethrough L1 resolves many problems -- is data ok though? 
+seemingly yes -- verified on receive node. Not verified to user mode 
+yet on receive.
+4/11 testamring works. testamlib gets strange errors -- as though node 1 is
+locking up busy after sends. And the recipient node (node 1) starts running 
+very strangely. Found amring.c using syscall 301 and testamring using 669. 
+669 is the bypass -- try 669 in amring.c 
+Try running rank 0 and nothing else. See if it exits. 
+OK, behavior of rank 0 is fine until rank 1 runs. This makes me 
+wonder if we're not properly getting the beacon and responding 
+incorrectly. Let's bail out from rank 1 if all goes well. 
+Note rank 0 is using 669 and maybe works?
+OK, the problem is weird. The debug print in rank 0 runs at very slow speed. 
+It's like it is stuck. Turn off debug print? Just don't set from testamlib.c
+Also wait for end of scheduling quantum to see if recvr ever continues. 
+Also, rank 0 is running but can't telnet into it -- recvr interrupt thrash?
+NONE of this is seen with testamring -- just amring.c
+Gave up waiting ... rank 1 was unbearable slow and telnet did not work. 
+Something wrong with message sends or ...
+OK, turned off the console debug and all is well again. So, lesson learned. 
+Data is still wrong getting to user mode on rank 1. Fix that now.
+lastambyte17 shows it is good in the kernel. Something bad with copyout?
+Dump packet right out of the ring (can't dump in kernel any more .. )
+It's the fucking struct copy in the amrrecv. Sigh. 
+Put in a copy that uses read8(). Ugly. 
+If that works do a memmove. But not structure assignment.
+Still no good. Do we need reads for pkt->payload in waitamrpacket? 
+wtf. Make the pkt static in waitbeacon? Fuck. that was it. Fucking gcc.
+
+4/12/2011 we got a successful startup. Also, the pkt has a payload of [], not
+240, which was the real problem. testamlib.c extended with a simple ring
+test. If this works, on to the graph application. 
+ah, damn, node 0 is failed on amrstartup. Turn debug back on.
+It was my old friend Tpkt pkt, which is only 16 bytes. 
+Fix this. Also fix volatiles, they're just wrong. 
+Put a ring test in testamlib. The ring test worked. 
+4/13/2011
+building and running the plan 9 test of the mpi async test again. 
+Test added and committed to hare repo. 
+OK, one issue is that the plan9.cpp cerr output first two lines get lost. 
+Makes no sense. It's working. Try a full run.
+oops. It's not getting nprocs right? It's hanging anyway. Time for debugging
+...
+not hanging, but not sending much either. 
+Oh, well, we set messages to 10, and they really need to be at least a
+multiple of nproc. 
+OK, it gets just so far and dies. 55 nodes send all their messages and then 
+just spin (I think). A few laggards start and then 
+it all just collapses. Could be this ought to be done in C, it's
+very simple. One more try with 2 nodes. 
+Ah, fixed the main loop. It was dropping out of even receiving once it had
+sent all its messages. That's wrong. But we still don't know the termination
+condition. Sent note to Roger. 
+Nope, did not help, 0.0.1 starts and we all die. 
+Too many moving parts. Take testamlib and make the ring run for longer and see
+what shakes.
+Works with amrdebug set to 0
+Now for 2 iterations. 
+OK, we're doing 10, there is poor performance unless we wire to core 1. 
+Going to time 100, then 100000 iterations. 

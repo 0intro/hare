@@ -195,16 +195,22 @@ unsigned char *amrrecvbuf(struct AmRing *amr, unsigned char *p, int *rank)
     int num = 1;
     int x, y, z;
     volatile Tpkt *pkt = amrrecv(amr, &num, NULL, &x, &y, &z);
+    if (amrdebug > 3)
+	print("amrrecvbuf: pkt %p\n", pkt);
     if (pkt) {
-	memcpy(p, (void *)pkt, 240);
+	memcpy(p, (void *)pkt, 256);
 	*rank = xyztorank(x,y,z);
+	if (amrdebug > 3)
+	    print("amrrecvbuf: rank %d\n", *rank);
 	return p;
     }
+    if (amrdebug > 3)
+	print("amrrecvbuf: nothing there\n");
     return NULL;
 }
 
 void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt, 
-		    int *x, int *y, int *z)
+		   int *x, int *y, int *z, int secondstimeout)
 {
 	int num;
 
@@ -222,7 +228,8 @@ void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt,
 				printf("\n");
 			}
 		} 	
-		sleep(5);
+		if (secondstimeout)
+		    sleep(secondstimeout);
 		
 	} while (num < 1 || read8((u8int *)&pkt->payload[0]) != type);
 	if (amrdebug > 3)
@@ -285,7 +292,7 @@ waitbeacon(struct AmRing *amr)
 	static Tpkt *pkt = NULL;
 	if (! pkt)
 		pkt = mallocz(1024, 1);
-	waitamrpacket(amr, 'B', pkt, &x, &y, &z);
+	waitamrpacket(amr, 'B', pkt, &x, &y, &z, 5);
 	if (amrdebug > 2)
 		printf("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
 }

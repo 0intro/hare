@@ -111,7 +111,7 @@ struct AmRing {
 
 
 void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt, 
-		   int *x, int *y, int *z);
+		   int *x, int *y, int *z, int secondstimeout);
 
 static __inline__ u64int tbget(void)
 {

@@ -19,6 +19,8 @@ double MPI_Wtime(void);
 int MPI_Init(int *argc,char ***argv);
 extern int myproc, nproc;
 
+int debug = 0;
+
 static __inline__ ticks getticks(void)
 {
      unsigned int tbl, tbu0, tbu1;
@@ -49,6 +51,44 @@ mynsec(void)
 	return t;
 }
 
+ticks ring(struct AmRing *amring, int iter)
+{
+	ticks start = 0ULL;
+	/* send the message around the ring */
+	Tpkt *p = (void *)mallocz(1024, 1);
+	int rx, ry, rz;
+	int rrank;
+	unsigned char data[240];
+
+	/* the usual 'kick it off cause we're special */
+	/* and we send a different message type for the initial case */
+	if (! myproc) {
+		start = getticks();
+		data[0] = 'p';
+		amrsend(amring, data, 240, 1);
+	} 
+	int i;
+	for(i = 0; i < iter; i++) {
+		waitamrpacket(amring, 'p', p, &rx, &ry, &rz, 0);
+		if (! start)
+			start = getticks();
+		if (debug) {
+		    rrank = xyztorank(rx, ry, rz);
+		    print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+		}
+		data[0] = 'p';
+		amrsend(amring, data, 240, (myproc+1)%nproc);
+		if (debug)
+			print("Done %d/%d iterations\n", i, iter);
+	}
+	if (! myproc) {
+		waitamrpacket(amring, 'p', p, &rx, &ry, &rz, 0);
+		rrank = xyztorank(rx, ry, rz);
+		if (debug) print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+	}
+	
+	return start;
+}
 int
 main (int argc, char **argv)
 {
@@ -56,7 +96,10 @@ main (int argc, char **argv)
 	
 	struct AmRing *amring;
 	extern int amrdebug;
-	amrdebug = 5;
+	amrdebug = 0;
+	int iter = 1;
+	if (argc > 1)
+		iter = strtol(argv[1], 0, 0);
 
 	print("Call amrstartup, myproc %d nproc %d\n", myproc, nproc);
 	if (myproc < nproc){
@@ -67,30 +110,9 @@ main (int argc, char **argv)
 	} else
 		while(1);
 	print("amrstartup returns\n");
-	/* send the message around the ring */
-	Tpkt *p = (void *)mallocz(1024, 1);
-	int rx, ry, rz;
-	int num, rrank;
-	unsigned char data[240];
-	/* the usual 'kick it off cause we're special */
-	/* and we send a different message type for the initial case */
-	if (! myproc) {
-		data[0] = 'p';
-		amrsend(amring, data, 240, 1);
-	} else {
-		/* wait for junior -- message type 'p'*/
-		waitamrpacket(amring, 'p', p, &rx, &ry, &rz);
-		rrank = xyztorank(rx, ry, rz);
-		print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
-		data[0] = 'p';
-		amrsend(amring, data, 240, (myproc+1)%nproc);
-	}
-
-	if (! myproc) {
-		waitamrpacket(amring, 'p', p, &rx, &ry, &rz);
-		rrank = xyztorank(rx, ry, rz);
-		print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
-	}
-	
+	ticks start, end;
+	start = ring(amring, iter);
+	end  = getticks();
+	print("%lld %lld - %d / p\n", end, start, iter);
 	return 0;
 }
