@@ -41,19 +41,6 @@ They include:
 
 We have implemented and measured these changes using the IBM Blue Gene supercomputers, running under the Plan~9 research operating system. 
 In this paper we describe the implementations and the results, and how they compare with current state of the art programming models on these machines. 
-%We have ported the Plan~9 research operating system to the IBM Blue Gene/L and /P series machines, which have up to 65536 PPC 450 CPUs and several dedicated custom interconnect networks. In contrast 
-%to 20 years of tradition in High Performance Computing (HPC), we require that programs access these networks via
-%the kernel, rather than the more traditional (for HPC) OS bypass. Put another way, we are moving the device driver from the 
-%programs back into the OS. 
-%
-%The drivers were moved into the programs in the first place, decades ago, because the OS took to long to move data to the network. Having programs use the kernel for I/O will only be effective if the kernel I/O path can be greatly improved. An essential improvement is reducing the time overhead for getting data from the program to the network. 
-%
-%In this paper we discuss our modifications to  Plan~9 to support sub-microsecond "bits to the wire" (BTW) 
-%performance. Rather than taking the traditional approach of radical optimization of the operating system at 
-%every level, we apply a mathematical technique known as Currying, or pre-evaluation of functions with constant 
-%parameters; and add a new capability to Plan~9, namely, process-private system calls. Currying provides 
-%a technique for creating new functions in the kernel; process-private system calls allow us to link 
-%those new functions to individual processes. With these two techniques we can allow kernel drivers to provide a fast path to user programs. We replace whole-kernel optimization, which has proven ineffective, with single-driver optimizaiton which has proven to work quite well. 
 
 \section{Introduction}
 Communications performance may be the single most critical determinant of overall performance on High Performance Computing (HPC) systems. Of the top 10 systems on the Top 500 list, 70\% use a proprietary interconnect. Proprietary interconnects compose 5.8\% of the Top 500, but the machines they are used in comprise over 30\% of the total compute power on that list. 
@@ -74,7 +61,7 @@ Infiniband interfaces, for example, run at about 15 watts, or 50\% more power th
 
 HPC designers are thus left with two unpalatable choices: design HPC systems as single-user devices, because the network is single-user; or, create virtualizing network interfaces, increasing power, heat dissipation, complexity, and cost. 
 
-This paper describes our research in taking a third path: the creation of  a minimal set of modifications to a general purpose operating system to allow high performance network performance for applications that need it, while at the same time preserving the availability of the network for multiple applications to use at a time. The modifications affect a very small number of lines of code in the kernel, and require very little 
+This paper describes our research in taking a third path: the creation of  a minimal set of modifications to a general purpose operating system for applications that need it, while at the same time preserving the availability of the network for multiple applications to use at a time. The modifications affect a very small number of lines of code in the kernel, and require very little 
 effort to use from the programmer's point of view, but have a dramatic 
 performance impact. The modifications are enabled at boot time, and the kernel is the same code base and in fact an identical binary to the unmodified kernel. 
 
@@ -90,13 +77,13 @@ The IBM Blue Gene\cite{DBLP:journals/ibmrd/GaraBCCCGHHHKLOSTV05} series of super
 \end{figure}
 
 The system we are currently using, the Blue Gene/P system at Argonne National Labs, has 40,000 Power PC 450 CPUs, 
-with four coresand 2 Gbytes of memory each (for a total of 80 TB of memory). The memory is not globally addressable; communications are entirely via message passing. 
+with four cores and 2 Gbytes of memory each (for a total of 80 TB of memory). The memory is not globally addressable; communications are entirely via message passing. 
 There are two CPU classes, I/O and Compute. What distinguishes the two types is their network connectivity. I/O nodes connect
 to three networks: a 10 Gbit/second Ethernet, a 2.4 Gbit/second collective network which has a tree-like topology, and
-a JTAG network for control and booting. The Compute nodes are attached to a 3D toroidal mesh network with six links per compute node and 500 MBytes/second bandwidth on each link.  The compute nodes are also connected to the collective, or "tree",network, and the JTAG network. The only connection between CPU nodes and I/O nodes is the tree network. The tree network is used for both computation support (CPU nodes only) and I/O (CPU node to I/O node communications). The I/O nodes, as the name implies, perform file system I/O as proxies for the 
+a JTAG network for control and booting. The Compute nodes are attached to a 3D toroidal mesh network with six links per compute node and 500 MBytes/second bandwidth on each link.  The compute nodes are also connected to the collective, or {\em tree}, network, and the JTAG network. The only connection between CPU nodes and I/O nodes is the tree network. The tree network is used for both computation support (CPU nodes only) and I/O (CPU node to I/O node communications). The I/O nodes, as the name implies, perform file system I/O as proxies for the 
 compute nodes. For further detail the reader is referred to \cite{plan9bgp}. 
 
-Currently, Blue Gene systems run two different kernels. The I/O nodes run Linux. The compute nodes run a lightweight kernel, the Compute Node Kernel or CNK.The CNK does not support file I/O directly; instead, system calls are packaged and forwarded to the I/O node. Experimentation with running Linux on the compute nodes is ongoing. 
+Currently, Blue Gene systems run two different kernels. The I/O nodes run Linux. The compute nodes run a lightweight kernel, the Compute Node Kernel or CNK. The CNK does not support file I/O directly; instead, system calls are packaged and forwarded to the I/O node. Experimentation with running Linux on the compute nodes is ongoing. 
 
 \subsection{Plan~9}
 Plan~9\cite{Plan9} is a distributed operating system developed at Bell Labs. In Plan~9, the only components hardwired into the kernel are those which are absolutely necessary for basic operations (drivers); other components, which can be on the same or other computer, are run outside the kernel (servers). Drivers include hardware controllers, process management, and network protocol stacks. Servers include traditional functions such as file systems and nontraditional functions such as window managers and Grid management tools. Drivers and servers can be transparently intermixed and their location is irrelevant; a server can be reimplemented as a driver with little if any code changing (the TCP/IP stack was originally a server but was moved into the kernel as a driver). For the purposes of this paper, one can consider Plan~9 to be a Unix-like operating 
@@ -127,9 +114,9 @@ achieve the needed performance if the operating system is involved in data movem
 OS Bypass is the network equivalent of what systems such as X Windows do for graphics. 
 As the name implies, the OS is completely bypassed; packets move only at the 
 direction of the application. OS Bypass involves the application (or libraries) in the
-lowest possible level of hardware manipulation, and even requires
+lowest possible level of hardware manipulation, requiring
 application libraries to replicate much of the operating systems
-capabilities in networking, but the gains are seen as worth the cost.
+capabilities in networking. 
 
 HPC network software performance is frequently characterized in terms of "bits to the wire" (BTW) and "ping-pong latency". 
 Bits to The Wire is a measure of how long it takes, 
@@ -358,16 +345,16 @@ The data structure for holding pre-validated arguments is shown in Figure \ref{s
 \begin{figure}
 \begin{verbatim}
 struct Fastcall {
-	/* System call number */
-	int	scnum;
-	/* File */
-	Chan*	c;
-	/* Function */
-	void	(*fun)(Ar0*, Fastcall *);
-	/* Pre-validated arguments */
-	void*	buf;
-	int	n;
-	vlong	offset;
+        /* System call number */
+        int	scnum;
+        /* File */
+        Chan*	c;
+        /* Function */
+        void	(*fun)(Ar0*, Fastcall *);
+        /* Pre-validated arguments */
+        void*	buf;
+        int	n;
+        vlong	offset;
 };
 \end{verbatim}
 \caption{\label{scstruct}Fast system call struct}
@@ -405,52 +392,45 @@ TEXT docall(SB), 1, $0
 
 When a system call interrupt is generated, the kernel typically checks if the system call number matches one of the standard calls; if there is a match, it calls the appropriate handler, otherwise it gives an error. However, the kernel now also checks the user process's private system call set and calls the fast path function call if a matching private call exists. In the case of the barrier device, it calls {\tt gibfastwrite}, which writes '1' to the Device Control Register. The fastcall avoids several layers of generic code and argument checking, allowing for a far faster write.
 
-\section{Results for two networks}
-\subsection{Global Barrier Network}
-We achieved our goal of sub-microsecond bits to the wire. With the traditional write path, it took approximately 3,000 cycles per write. Since the BG/P uses 850 MHz PowerPC processors, this means a normal write takes approximately 3.529 microseconds. However, when using the private system calls, it only takes around 620 cycles to do a write, or 0.729 microseconds. The overall speedup is 4.83. 
-The result is a potential ping-pong performance of slightly under 3 microseconds, which is competitive wth the best OS bypass performance. 
-
-\subsection{Torus Network}
-The Torus network consists of a 3D toroidal mesh with 6 500 Mbyte/second links. Packets consist of one or more 
-256-byte fragments, of which 240 bytes are available for user data. The MPI latency for sending 240  bytes to a remote 
-proc is approximately 12.5 microseconds (round trip time is 25 microseconds). The Plan 9 performance was not nearly as good -- the one way time was 25 microseconds. 
-
-We should keep this 25 microseconds in perspective. These are 850 Mhz Power PC RISC CPUs -- translation, they're slow.
-In fact, their instruction performance is about that of a high end network card CPU. The send involves several interrupts and scheduling operations, as we are counting remote receive overhead too. The increased time for Plan 9 
-to get perform this operation is due to the fact that a lot more instructions have to run. 
-
-That said, it is still too slow -- we're willing to take some hit from the use of a kernel instead of user-level device drivers, but intuitively, this penalty is too large. We decided to see how much we could improve performance. 
-
-A set of simple changes to the injection (i.e. transmit) side of the driver shaved 8 microseconds from the total time, 
-reducing send overhead from 11 microseconds to 2.8. We did not break the one microsecond barrier in this case, although work continues, but we did get the one way latency to a much more competitive value. 
-
-\section{Further extensions}
+\subsection{A non-general-purpose specialization}
 The modifications described in the previous section can be considered as general purpose, in the sense 
 that any device can be extended to take advantage of them. We have even created Curried pipes. 
 
 In this section we consider specializations that are very specific to the Blue Gene Torus. These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. The extensions are inspired on Active Messages,  and tailored to the needs of a graph application. 
 
-\subsection{The Graph Application}
+\subsubsection{The Graph Application: motivating intrusive changes}
 
-Discussions with the programmer revealed that due to MPI overheads, the programmer was creating a 
-queue that ran on top of the MPI queue and all the underlying abstraction layers that supported MPI. 
-What the program needed was a very fast send for short messages, and a shared-memory ring for received
-messages. 
+Graph search on a massive scale (trillions of nodes)
+is an important problem in computing. It places difficult requirements on HPC systems, such that in many cases
+programmers are reluctant to run it on anything but a shared-memory machine. 
+From the point of view of these applications, even the overhead of an MPI send is so high that the programmers write complex 
+queue software that batches small messages into larger ones: the programmers implement queues to reduce the overhead of the many
+queues hidden in the stacked layers  of communications libraries and hardware. There is a performance cost to stacked abstractions. 
+Discussions with the researcher indicated that the program needed a very fast send for short messages, and a shared-memory ring for received
+messages. In all cases, the messages are less than 100 bytes. 
 
-We implemented a fast send via a "system call bypass" mechanism, in which the system call trap code
+We implemented a fast short-packet send via a "system call bypass" mechanism, in which the system call trap code
 checks the system call number, and bypasses almost all the system call code to call a low latency 
-Torus injection function. Using this fast send, we achieved Torus injection rates of 862 thousand packets/second, or four times the rate of MPI as measured by injection test from the Sandia Messaging Benchmarks\cite{barrett2009application}. 
+Torus injection function. We
+extended the highly generalized system call code with a very specific bypass for a piece of hardware that only exists on 
+one machine. Such an intrusive change makes sense when the stringent requirements of short message 
+performance must be accomodated. 
 
 The receive side data management is more complex. Data transfer is performed in an interrupt 
 handler in the kernel, requiring a mapping between user space memory ring and kernel interrupt address space. 
 The traditional Linux approach to sharing buffers between kernel and user space is via pinning. Pinning is a complicated 
 operation which consumes a great deal of code -- there are almost as many lines of code to support 
-pinning in Linux as there are in our entire kernel. In our  non-traditional approach the physical and virtual addresses are the same, and are in addition backed by a 256 Mbyte page table entry (TLB in PowerPC terms). We call this address area the "P==V" space. In our kernel, it is used to back the so-called "BSS", or heap, area. 
+pinning in Linux as there are in our entire kernel. 
+In our  non-traditional approach, the physical and virtual addresses are the same, and are in addition backed by a 
+256 Mbyte page table entry (TLB in PowerPC terms). 
+We call this address area the "P==V" space. In our kernel, it is used to back the so-called "BSS", or heap, area, of a program. It is implicitly
+shared: any references to memory in this part of the virtual address space are backed by the same memory. 
 
-Only a few processes, and usually only one, need to use the P==V space. Our kernel limits the use of the P==V space to application processes which are compiled for the
+Only a few processes, and usually only one, need to use the P==V space. 
+Our kernel limits the use of the P==V space to application processes which are compiled for the
 IBM Blue Gene "compute node kernel". These
 processes are run using an emulation environment\cite{plan9bgp}, and are set up with the P=V 
-space as their heap segment. The runtime software such as malloc runs quite normally with this 
+space as their heap segment. Standard runtime software such as malloc runs quite normally with this 
 special heap, albeit much more quickly due to BSS being backed by 256 MB TLBs. All other programs,
 compiled with a standard toolchain, run with non-shared heaps.
 
@@ -478,7 +458,27 @@ chance of false sharing between cores. Both the base and the AmRing struct itsel
 address space. Hence, user mode, kernel mode, and interrupt handlers can manipulate these structures
 with no address translation needed. 
 
-With these changes we measured a packet reception rate, using the same benchmarks, 
+
+\section{Results for two networks}
+\subsection{Global Barrier Network}
+We achieved our goal of sub-microsecond bits to the wire. With the traditional write path, it took approximately 3,000 cycles per write. Since the BG/P uses 850 MHz PowerPC processors, this means a normal write takes approximately 3.529 microseconds. However, when using the private system calls, it only takes around 620 cycles to do a write, or 0.729 microseconds. The overall speedup is 4.83. 
+The result is a potential ping-pong performance of slightly under 3 microseconds, which is competitive wth the best OS bypass performance. 
+
+\subsection{Torus Network}
+The Torus network consists of a 3D toroidal mesh with 6 500 Mbyte/second links. Packets consist of one or more 
+256-byte fragments, of which 240 bytes are available for user data. The MPI latency for sending 240  bytes to a remote 
+proc is approximately 12.5 microseconds (round trip time is 25 microseconds). The Plan 9 performance was not nearly as good -- the one way time was 25 microseconds. 
+
+We should keep this 25 microseconds in perspective. These are 850 Mhz Power PC RISC CPUs: 
+their instruction performance is about that of a high end network card CPU. The send involves several interrupts and scheduling operations, as we are counting remote receive overhead too. The increased time for Plan 9 
+to perform this operation is due to the fact that a lot more instructions have to run. 
+
+A set of simple changes to the injection (i.e. transmit) side of the driver shaved 8 microseconds from the total time, 
+reducing send overhead from 11 microseconds to 2.8. We did not break the one microsecond barrier in this case, although work continues, but we did get the one way latency to a much more competitive value.
+
+\subsection{Fast system call bypass results on the Torus}
+Using the "System call bypass"  fast send, we achieved Torus injection rates of 862 thousand packets/second, or four times the rate of MPI as measured by injection test from the Sandia Messaging Benchmarks\cite{barrett2009application}. 
+We measured a packet reception rate, using the same benchmarks, of 
 606 thousand packets
 per second. 
 %\begin{figure}[htbp]
@@ -489,20 +489,22 @@ per second.
 %\end{center}
 %\end{figure}
 
+As of this writing we are still working on the graph benchmark. Indications are that it will perform well, but we are exercising a hardware issue which we will have resolved by time of publication. 
 
 \section{Conclusions and Future Work}
-Runtime systems for supercomputers have been stuck in a box for 20 years. The penalty for using the operating system was so high that programmers developed OS bypass software to get around the OS. The result was the re-creation of OS software above the operating system boundary, including support for device drivers, cache management, memory management, file system protocols, file servers, and many other functions we normally associate with an operating system. Only programs written to use the HPC libraries (which include a user-level device driver) could use the HPC networks, and only one program at a time could use them. Operating systems have been recreated as user libraries and, worse, they're single-user: we're back to DOS. Frequently, the performance of OS bypass is cited without taking into account the high overhead of these user-level operating systems, and the problems inherent in creating layers of redundant functions between the operating system and programs. 
+The primary function of an operating system is to provide a virtualized set of resources such 
+as processors, memory, and the network so that they can be safely shared. 
+HPC systems have removed the network responsibility from the operating system for the 
+last 20 years. A result has been  the re-creation of OS software above the operating system boundary, including support for device drivers, cache management, memory management, file system protocols, file servers, and many other functions we normally associate with an operating system. 
+Only programs written to use the HPC libraries (which include a user-level device driver) 
+can make full use of the HPC networks performance\cite{zhang2008design}. 
+Still worse, to make the network a multiuser device, operating systems 
+functionality is moved into the network interface itself, as in Infiniband interfaces, which provide virtualization at the interface level. 
+Frequently, the performance of OS bypass is cited without taking into account the high overhead of these user-level operating systems, and the problems inherent in creating layers of redundant functions between the operating system and programs. 
 
 This paper shows an alternative to the false choice of slow operating systems paths or fast user-level operating systems paths. It is possible to use a general-purpose operating system for I/O and still achieve high performance. While we are not yet equalling the user-level MPI libraries, we are coming from behind, as the user-level libraries and associated network hardware have benefited from 20 years of co-design. 
+We wonder what would be possible were the operating system and the hardware designed together, with high performance IO in mind. 
 
-We have managed the write side of the fastcall path. What remains is to improve the read side. The read side may include an interrupt, which complicates the issue a bit. We are going to need to provide a similar reduction in overhead for interrupts. 
-
-We have started to look at curried pipes. Initial performance is not very good, because the overhead of 
-the Plan 9 kernel queues is so high. It is probably time to re-examine the structure of that code in the kernel, and provide 
-a faster path for short blocks of data. 
-
-Our goal, in the end, is to show that IPC from a program to a user level file server can be competitive 
-with in-kernel file servers. Achieving this goal would help improve the performance of file servers on Plan~9. 
 \section{Acknowledgements}
 This work is support by the DOE Office of Advanced Scientific Computing Research. IBM has provided support from 2006 to the present. This research used resources of the Argonne Leadership Computing Facility
  at Argonne National Laboratory, which is supported by the Office of Science
