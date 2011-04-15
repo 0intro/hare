@@ -13,15 +13,18 @@
 \thanks{\protect\includegraphics[height=0.3in]{thunderchicken}%
 }%
 \thanks{Sandia is a multiprogram laboratory operated by Sandia Corporation, a Lockheed Martin Company, for the United States Department of Energy’s National Nuclear Security Administration under contract DE­AC04­94AL85000. SAND- 2009-5156C.}  
-and John Floren\thanks{Sandia National Labs} and 
-and Eric Van Hensberge\thanks{IBM} and Jim Mckie
+and John Floren\thanks{Sandia National Labs} 
+and Eric Van Hensbergen\thanks{IBM} 
+\\ 
+and Jim McKie
 \thanks{Bell Laboratories, Murray Hill, NJ, USA }
- and Charles Forsyth
+and Charles Forsyth
 \thanks{Vita Nuova, Ldt.} and Roger Pearce\thanks{Lawrence Livermore National Laboratory}
 }
 %\institute{Ronald G. Minnich \at Sandia National Labs, Livermore, CA, 94550,
 %    USA\\Tel.: 925-294-4713 %
 %\email{rminnich@sandia.gov}  }
+
 \title{\Large \bf Operating systems specializations: a technique to improve network  throughput for high performance computing}
 \maketitle
 \thispagestyle{empty}
@@ -398,29 +401,92 @@ In this section we consider specializations that are very specific to the Blue G
 \subsubsection{The Graph Application: motivating intrusive changes}
 
 Graph search on a massive scale (trillions of nodes)
-is an important problem in computing. It places difficult requirements on HPC systems, such that in many cases
+is an important problem in computing. 
+Processing   large  graphs   is  becoming   increasingly  important
+for  many domains such as social networks and bioinformatics. 
+In a graph data structure,
+relationships are stored using vertices and edges; a vertex
+may represent an object or concept, and the relationships between them
+are represented by edges.  The power of graph data structures lies in
+the ability to encode complex relationships between data and provide a
+framework to analyze the impact of the relationships.
+
+Unfortunately, many algorithms and implementations do not
+scale with increasing  graph sizes.  Graph search  places difficult requirements on HPC systems, such that in many cases
 programmers are reluctant to run it on anything but a shared-memory machine. 
 From the point of view of these applications, even the overhead of an MPI send is so high that the programmers write complex 
 queue software that batches small messages into larger ones: the programmers implement queues to reduce the overhead of the many
 queues hidden in the stacked layers  of communications libraries and hardware. There is a performance cost to stacked abstractions. 
-Discussions with the researcher indicated that the program needed a very fast send for short messages, and a shared-memory ring for received
-messages. In all cases, the messages are less than 100 bytes. 
 
-We implemented a fast short-packet send via a "system call bypass" mechanism, in which the system call trap code
+In contrast to using a  more globally synchronous MPI-based
+approach to this problem, we advocate an asynchronous approach for graph analysis\cite{Pearce2010}
+and are building messaging infrastructure to accommodate the needs
+of applications requiring lightweight asynchronous messaging.
+Recently, a challenging graph processing benchmark has been released,
+The Graph500 \cite{Graph500}, which involves computing a Breadth-First
+Search on massive scale-free graphs.
+
+Two useful programming constructs for this applications are a very fast send for short messages, and a shared-memory ring for received
+messages. In all cases, the messages are less than 100 bytes. 
+Because the hardware implements a shared-memory ring, it is not necessary to implement the rings 3 times at 3 levels in software for the send side. On the receive side, the hardware also 
+implements a shared-memory ring, but it is important to dequeue messages from this ring as quickly as possible; the delivery rate of messages might not match well to the consumption rate of the 
+algorithm, and a receive-side overrun is not easy to recover from on the Torus. The interface we present to the user is a function which transmits one short message at a time; and which 
+provides the programmer with a function that dequeues messages from a shared-memory ring into an array of messages. The library is called amring, for Active Message Rings. 
+
+In Figure \ref{amringexample} we show a usage of the interface for the common ``MPI Ring'' benchmark. The library provides {\tt myrank} and {\tt nrank}, indicating a processes
+rank and the total number of ranks respectively. For local setup, the  {\tt amrsetup} functions is used 
+in this example  to set up a 1 Mbyte ring.  The amring structure returned by amrsetup is used in all subsequent operations. 
+For global setup, the {\tt amrstartup} function performs a global reduction to make sure all 
+programs are running and the Torus is configured for amrings. The {\tt amrsend} and {\tt amrrecv} runctions send and receive, 
+respectively. 
+
+In this example, a packet is relayed from node to node, starting at rank 0 and wrapping back to rank
+0. 
+Rank 0 starts the rounds with a send, then receives; all other ranks do a 
+receive, then send. The program specifies the number of Torus packets to be received in the reference variable {\tt num}; the number
+actually received is returned in the reference variable.
+
+\begin{figure*}
+\begin{verbatim}
+        extern int myrank, nranks;
+        int rx[1], ry[1], rz[1];
+        int num = 1;
+        char data[256];
+        AmRing *amring;
+        amring = amrsetup(1048576);
+        amrstartup(amring);
+        if (! myrank) {
+                amrsend(amring, data, 240, 1);
+                amrrecv(amring, &num, data, rx, ry, rz);
+        }  else {
+                amrrecv(amring, &num, data, rx, ry, rz);
+                amrsend(amring, data, 240, (myring+1)%nranks);
+        }
+\end{verbatim}
+\caption{\label{amringexample}Using Active Messsages Rings for ``MPI Ring'' example}
+\end{figure*}
+
+\subsubsection{Amring implementation}
+The setup function {\tt amrsetup} is little more than a malloc followed by a 
+control operation on the Torus driver switching it amring mode. The {\tt amrstartup} 
+function is a global reduce, to make sure all participants have made the switch. The real 
+core of the amring library is in the send and receive functions. 
+
+{\tt Amrsend} is implemented via a "system call bypass" mechanism, in which the system call trap code
 checks the system call number, and bypasses almost all the system call code to call a low latency 
 Torus injection function. We
-extended the highly generalized system call code with a very specific bypass for a piece of hardware that only exists on 
+extended the highly generalized kernel system call code with a very specific bypass for a piece of hardware that only exists on 
 one machine. Such an intrusive change makes sense when the stringent requirements of short message 
-performance must be accomodated. 
+performance must be accomodated. At the same time, it was fairly easy to implement, requiring changes to only two places in the kernel. 
 
-The receive side data management is more complex. Data transfer is performed in an interrupt 
+The receive side data management is more complex and much more far-reaching. Data transfer is performed in an interrupt 
 handler in the kernel, requiring a mapping between the user space memory ring and kernel interrupt address space. 
-The traditional Linux approach to sharing buffers between kernel and user space is via pinning. Pinning is a complicated 
+The traditional kernel approach to sharing buffers between kernel and user space is via pinning. Pinning is a complicated 
 operation which consumes a great deal of code -- there are almost as many lines of code to support 
 pinning in Linux as there are in our entire kernel. 
 In our  non-traditional approach, the physical and virtual addresses are the same, and are in addition backed by a 
 256 Mbyte page table entry (TLB in PowerPC terms). 
-We call this address area the "P=V" space. In our kernel, it is used to back the so-called "BSS", or heap, area, of a program. It is implicitly
+We call this address area the "P=V" space. In our kernel, it is used to back the so-called "BSS", or heap, area of a program. It is implicitly
 shared: any references to memory in this part of the virtual address space are backed by the same memory. 
 
 Only a few processes, and usually only one, need to use the P=V space. 
@@ -431,15 +497,25 @@ space as their heap segment. Standard runtime software such as malloc runs quite
 special heap, albeit much more quickly due to BSS being backed by 256 MB TLBs. All other programs,
 compiled with a standard toolchain, run with non-shared heaps.
 
-The shared memory ring struct is shown in Figure \ref{ring}. 
+The amring ring struct is shown in Figure \ref{ring}. 
 \begin{figure}
 \begin{verbatim}
 struct AmRing {
+        /* definitions of sizes
+         * These are constant
+         */
         unsigned char *base;
         unsigned long size;
-        unsigned long prod;
         unsigned long logN;
+        /* kernel writes,
+         * user reads
+         */
+        unsigned long prod;
+        /* pad to cache align */
         unsigned char _116[128-16];
+        /* kernel ignores, 
+         * user reads/writes
+         */
         unsigned long con;
         unsigned char _124[128-4];
 };
@@ -453,7 +529,6 @@ is the record of bytes produced; con the record of bytes consumed. The padding i
 chance of false sharing between cores. Both the base and the AmRing struct itself are kept in the P=V 
 address space. Hence, user mode, kernel mode, and interrupt handlers can manipulate these structures
 with no address translation needed. 
-
 
 \section{Results for two networks}
 \subsection{Global Barrier Network}

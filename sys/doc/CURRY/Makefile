@@ -47,4 +47,4 @@ iwp9slides.pdf: iwp9slides.tex
 	pdflatex iwp9slides.tex
 
 clean: 
-	rm -f paper.dvi paper.pdf paper.log paper.bbl paper.aux paper.blg iwp9slides.pdf
+	rm -f sc11.dvi sc11.pdf sc11.log sc11.bbl sc11.aux sc11.blg iwp9slides.pdf
