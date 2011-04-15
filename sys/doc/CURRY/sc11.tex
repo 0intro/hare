@@ -9,17 +9,18 @@
 \usepackage{graphicx}
 \date{}
 \begin{document}
-\author{Ronald G. Minnich%
+\author{Ronald G. Minnich, %
 \thanks{\protect\includegraphics[height=0.3in]{thunderchicken}%
 }%
 \thanks{Sandia is a multiprogram laboratory operated by Sandia Corporation, a Lockheed Martin Company, for the United States Department of Energy’s National Nuclear Security Administration under contract DE­AC04­94AL85000. SAND- 2009-5156C.}  
-and John Floren\thanks{Sandia National Labs} 
-and Eric Van Hensbergen\thanks{IBM} 
+John Floren, \thanks{Sandia National Labs} 
+Eric Van Hensbergen \thanks{IBM} 
 \\ 
-and Jim McKie
+Jim McKie, 
 \thanks{Bell Laboratories, Murray Hill, NJ, USA }
-and Charles Forsyth
-\thanks{Vita Nuova, Ldt.} and Roger Pearce\thanks{Lawrence Livermore National Laboratory}
+Charles Forsyth, 
+\thanks{Vita Nuova, Ldt.} 
+Roger Pearce\thanks{Lawrence Livermore National Laboratory}
 }
 %\institute{Ronald G. Minnich \at Sandia National Labs, Livermore, CA, 94550,
 %    USA\\Tel.: 925-294-4713 %
@@ -235,13 +236,13 @@ Before we explain our approach we will first give a quick overview of file I/O i
 but at the same time there are enough differences to make an outline useful. 
 
 Processes perform I/O with only two system calls, read and write, as compared to the plethora used on Unix. As on all Unixes, I/O is initiated by a system call trap. 
-The kernel then takes the folowing steps:
+The kernel then takes the following steps:
 
 \begin{itemize}
 \item Validate the system call number.
 \item Call the system call function. From this point on we will discuss the write function. 
 \item Assemble arguments. Arguments are pulled from the stack, which involves a copyin. Register parameters are used in only a limited way in Plan~9. 
-\item validate the fd, convert it into an internal pointer to a channel (i.e. file) struct and increment the usage lock to ensure the channel is not closed while in use. 
+\item validate the file descriptor, convert it into an internal pointer to a channel (i.e. file) struct and increment the usage lock to ensure the channel is not closed while in use. 
 \item The virtual address and length are validated. The semantics of write require that the process block 
 until the data is completely used, or that the process not be able to change the data once the write call returns (i.e. 
 the semantics do not allow asynchrony). Some Unix systems support asynchrony by fiddling with the 
@@ -260,7 +261,8 @@ As can be seen above, there is a lot of repeated work for each system call. It i
 We instrumented the Plan~9 kernel and monitored 
 applications using  a trace device\cite{iwp9:tracedevice}. We measured all the I/O performed by all processes over 
 a 30 minute interval. We learned that, in general, programs read and write a small 
-set of files over and over, from a very small set of virtual addresses, with a very limited and small range of sizes. This result makes intuitive sense: consider programs on Unix which use stdio, for example: file I/O is performed 
+set of files over and over, from a very small set of virtual addresses, with a very limited and small range of sizes. This result makes intuitive sense: consider programs on Unix which use stdio, 
+for example: I/O is performed 
 to an internal buffer which does not change, and the buffer size is usually limited to a page size or smaller. Other I/O addresses are almost always from the stack (i.e. an auto variable). Our measurements confirm this intuition, at least for Plan~9. 
 
 We learned that the bulk of the time for basic device I/O with very small write sizes -- the type of operation common to collective operations -- was taken up in two functions: the one that validated an open file descriptor, and the one that validated an I/O address. 
@@ -396,9 +398,12 @@ When a system call interrupt is generated, the kernel typically checks if the sy
 The modifications described in the previous section can be considered as general purpose, in the sense 
 that any device can be extended to take advantage of them. We have even created Curried pipes. 
 
-In this section we consider specializations that are very specific to the Blue Gene Torus. These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. The extensions are inspired by Active Messages\cite{von1992active},  and tailored to the needs of a graph application. 
+In this section we consider specializations that are very specific to the Blue Gene Torus, and motivated
+by an important application, graph search, that is not adequately supported on that platform today. 
+These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. 
+The extensions are inspired by Active Messages\cite{von1992active},  and tailored to the needs of the graph application. 
 
-\subsubsection{The Graph Application: motivating intrusive changes}
+\subsubsection{The graph search problem: motivating intrusive changes}
 
 Graph search on a massive scale (trillions of nodes)
 is an important problem in computing. 
@@ -426,7 +431,7 @@ Recently, a challenging graph processing benchmark has been released,
 The Graph500 \cite{Graph500}, which involves computing a Breadth-First
 Search on massive scale-free graphs.
 
-Two useful programming constructs for this applications are a very fast send for short messages, and a shared-memory ring for received
+Two useful programming constructs for this application are a very fast send for short messages, and a shared-memory ring for received
 messages. In all cases, the messages are less than 100 bytes. 
 Because the hardware implements a shared-memory ring, it is not necessary to implement the rings 3 times at 3 levels in software for the send side. On the receive side, the hardware also 
 implements a shared-memory ring, but it is important to dequeue messages from this ring as quickly as possible; the delivery rate of messages might not match well to the consumption rate of the 
@@ -437,7 +442,7 @@ In Figure \ref{amringexample} we show a usage of the interface for the common ``
 rank and the total number of ranks respectively. For local setup, the  {\tt amrsetup} functions is used 
 in this example  to set up a 1 Mbyte ring.  The amring structure returned by amrsetup is used in all subsequent operations. 
 For global setup, the {\tt amrstartup} function performs a global reduction to make sure all 
-programs are running and the Torus is configured for amrings. The {\tt amrsend} and {\tt amrrecv} runctions send and receive, 
+programs are running and the Torus is configured for amrings. The {\tt amrsend} and {\tt amrrecv} functions send and receive, 
 respectively. 
 
 In this example, a packet is relayed from node to node, starting at rank 0 and wrapping back to rank
@@ -449,18 +454,17 @@ actually received is returned in the reference variable.
 \begin{figure*}
 \begin{verbatim}
         extern int myrank, nranks;
-        int rx[1], ry[1], rz[1];
-        int num = 1;
-        char data[256];
+        int rx[1], ry[1], rz[1], num = 1;
+        char data[240]; /* 256 bytes minus 16 byte header */
         AmRing *amring;
         amring = amrsetup(1048576);
         amrstartup(amring);
         if (! myrank) {
-                amrsend(amring, data, 240, 1);
+                amrsend(amring, data, sizeof(data), 1);
                 amrrecv(amring, &num, data, rx, ry, rz);
         }  else {
                 amrrecv(amring, &num, data, rx, ry, rz);
-                amrsend(amring, data, 240, (myring+1)%nranks);
+                amrsend(amring, data, sizeof(data), (myring+1)%nranks);
         }
 \end{verbatim}
 \caption{\label{amringexample}Using Active Messsages Rings for ``MPI Ring'' example}
@@ -468,7 +472,7 @@ actually received is returned in the reference variable.
 
 \subsubsection{Amring implementation}
 The setup function {\tt amrsetup} is little more than a malloc followed by a 
-control operation on the Torus driver switching it amring mode. The {\tt amrstartup} 
+control operation on the Torus driver switching it to amring mode. The {\tt amrstartup} 
 function is a global reduce, to make sure all participants have made the switch. The real 
 core of the amring library is in the send and receive functions. 
 
