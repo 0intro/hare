@@ -12,7 +12,9 @@
 \author{Ronald G. Minnich%
 \thanks{\protect\includegraphics[height=0.3in]{thunderchicken}%
 }%
-\thanks{Sandia is a multiprogram laboratory operated by Sandia Corporation, a Lockheed Martin Company, for the United States Department of Energy’s National Nuclear Security Administration under contract DE­AC04­94AL85000. SAND- 2009-5156C.}  and John Floren and Jim Mckie
+\thanks{Sandia is a multiprogram laboratory operated by Sandia Corporation, a Lockheed Martin Company, for the United States Department of Energy’s National Nuclear Security Administration under contract DE­AC04­94AL85000. SAND- 2009-5156C.}  
+and John Floren\thanks{Sandia National Labs} and 
+and Eric Van Hensberge\thanks{IBM} and Jim Mckie
 \thanks{Bell Laboratories, Murray Hill, NJ, USA }
  and Charles Forsyth
 \thanks{Vita Nuova, Ldt.} and Roger Pearce\thanks{Lawrence Livermore National Laboratory}
@@ -27,7 +29,7 @@
 \subsection*{Abstract}
 This paper explores the use of operating systems modifications, which we call {\em specializations}, as a technique for improving IO throughput in High Performance Computing (HPC) systems. 
 These specializations are the software analog of the specializations implemented in chips such as the Power PC 4xx series used in the Blue Gene supercomputer. A 
-specialization adds functionality that is not needed in a general purpose product, and that yet is essential to the correct operation of a special purpose product. It has  little use 
+specialization adds functionality that is not needed in a general purpose product, yet is essential to the correct operation of a special purpose product. It has  little use 
 outside the HPC domain; its presence is the difference between success and failure in the HPC domain. 
 
 In the Blue Gene hardware, a significant fraction of the floor plan is dedicated to special purpose subsystems. Conversely, our specializations are very small and simple, but have a dramatic impact on performance. 
@@ -36,15 +38,15 @@ They include:
 \item Support for process-private system calls and currying for devices that require it
 \item A bypass path in the system call that implements low latency access to a network driver
 \item A hybrid process model in which certain distinguished processes share the heap (bss) segment with virtual-equal-physical addressing, allowing common memory addresses in programs, the kernel, and interrupt handlers
-\item Support for {\em active messages} and {\em one sided messaging} in the interrupt handler of a network driver
+\item Support for {\em active messages} and {\em one-sided messaging} in the interrupt handler of a network driver
 \end{itemize}
 
-We have implemented and measured these changes using the IBM Blue Gene supercomputers, running under the Plan~9 research operating system. 
+We have implemented and measured these changes using IBM Blue Gene supercomputers running under the Plan~9 research operating system. 
 In this paper we describe the implementations and the results, and how they compare with current state of the art programming models on these machines. 
 
 \section{Introduction}
 Communications performance may be the single most critical determinant of overall performance on High Performance Computing (HPC) systems. Of the top 10 systems on the Top 500 list, 70\% use a proprietary interconnect. Proprietary interconnects compose 5.8\% of the Top 500, but the machines they are used in comprise over 30\% of the total compute power on that list. 
-As the Blue Gene/P shows, a supercomputer with a low-performance 850 Mhz. CPUs can thrive if given a high performance network. The reverse is not true: very high performance processors on a low-performance network will not do very well at all on traditional HPC tasks. On the Top 500, the first 
+As the Blue Gene/P shows, a supercomputer with  low performance 850 Mhz. CPUs can thrive if given a high performance network. The reverse is not true: very high performance processors on a low performance network will not do very well at all on traditional HPC tasks. On the Top 500, the first 
 mention of Ethernet occurs at slot 155, with a large but not very high performance Ethernet-connect cluster. 
 
 Even the most cursory cost estimates show that on the Top 10 systems, the cost of the interconnect consumes a large fraction of total; 50\% is not unusual. The networks are carefully engineered to support applications at minimal overhead, at a scale of 10s of thousands of processors. 
@@ -54,9 +56,9 @@ drops by a factor of 3 at least. The latency of the Torus network on the Blue Ge
 If Linux is used, we quickly find that it is possible to convert a sixty million dollar, special-purpose Blue Gene network to little better than an Ethernet. 
 
 General purpose operating systems have too much overhead attached to the movement of data, even those as efficient as Linux. 
-For this reason, for the past two decades, HPC systems have used a technique known as "OS bypass", which in the simplest terms means the device driver is part of the application, not the OS. 
+For this reason, for the past two decades, HPC systems have used a technique known as ``OS bypass'', which in the simplest terms means the device driver is part of the application, not the OS. 
 The use of "OS Bypass" is not without problems. If the network interface does not support virtualization, i.e. if a single network interface can only be used as a single network interface, OS Bypass essentially turns
-the HPC system into single-user machine. Multiple processes on a single node can not even share the interface. If, on the other hand, the network interface does support virtual instances, the cost can be very high: 
+the HPC system into a single-user machine. Multiple processes on a single node can not even share the interface. If, on the other hand, the network interface does support virtual instances, the cost can be very high: 
 Infiniband interfaces, for example, run at about 15 watts, or 50\% more power than the full Blue Gene/P node chip. 
 
 HPC designers are thus left with two unpalatable choices: design HPC systems as single-user devices, because the network is single-user; or, create virtualizing network interfaces, increasing power, heat dissipation, complexity, and cost. 
@@ -72,7 +74,9 @@ Finally, we discuss performance and future work.
 \subsection{Blue Gene and its operating systems}
 The IBM Blue Gene\cite{DBLP:journals/ibmrd/GaraBCCCGHHHKLOSTV05} series of supercomputers, among the fastest in the world, are also unique in that they are purpose built from the chip to the system level. In contrast to other systems which use a standard off-the-shelf CPU placed on a motherboard and connected to network chips, IBM has embedded network functionality on the CPU as shown in Figure \ref{bglchip}. These CPUs are then packaged into boards which consist of little more than DRAM and a connector, and from there to full systems.The result is a greatly simplified system which, in turn, is extremely reliable; the BG/L system at Lawrence Livermore National Lab, with 128,000 CPUs, has an average uptime of 10 days. The term uptime in this case means that after 10 days, {\em everything} is still working; any failure of any subsystem, down to a single DRAM cell, counts as an interrupt.
 \begin{figure}
+\center{
 \includegraphics[width=.3\textwidth]{bglchip.eps} 
+}
 \caption{\label{bglchip}Blue Gene/L CPU showing dedicated network hardware (Torus, Tree, Eth, and JTAG). Note that on most CPUs the Eth block is not connected.}
 \end{figure}
 
@@ -86,7 +90,8 @@ compute nodes. For further detail the reader is referred to \cite{plan9bgp}.
 Currently, Blue Gene systems run two different kernels. The I/O nodes run Linux. The compute nodes run a lightweight kernel, the Compute Node Kernel or CNK. The CNK does not support file I/O directly; instead, system calls are packaged and forwarded to the I/O node. Experimentation with running Linux on the compute nodes is ongoing. 
 
 \subsection{Plan~9}
-Plan~9\cite{Plan9} is a distributed operating system developed at Bell Labs. In Plan~9, the only components hardwired into the kernel are those which are absolutely necessary for basic operations (drivers); other components, which can be on the same or other computer, are run outside the kernel (servers). Drivers include hardware controllers, process management, and network protocol stacks. Servers include traditional functions such as file systems and nontraditional functions such as window managers and Grid management tools. Drivers and servers can be transparently intermixed and their location is irrelevant; a server can be reimplemented as a driver with little if any code changing (the TCP/IP stack was originally a server but was moved into the kernel as a driver). For the purposes of this paper, one can consider Plan~9 to be a Unix-like operating 
+Plan~9\cite{Plan9} is a distributed operating system developed at Bell Labs. In Plan~9, the only components hardwired into the kernel are those which are absolutely necessary for basic operations (drivers); other components, which can be on the same or other computer, are run outside the kernel (servers). Drivers include hardware controllers, process management, and network protocol stacks. Servers include traditional functions such as file systems and nontraditional functions such as window managers and Grid management tools. Drivers and servers can be transparently intermixed and their locations are 
+irrelevant; a server can be reimplemented as a driver with little if any code modification (the TCP/IP stack was originally a server but was moved into the kernel as a driver). For the purposes of this paper, one can consider Plan~9 to be a Unix-like operating 
 system with a more compact code base than Unix systems, since a great deal of functionality is provided by user-level services, not kernel services. As mentioned, all file servers are external to the kernel; even the 
 RAMdisk 
 device is implemented with a user-level process. 
@@ -108,7 +113,7 @@ We show a simplified version of the normal path in Figure \ref{ospath}, and an O
 \end{figure}
 The kernel driver is disabled, or, in some cases, removed; the functions of the driver are replaced by 
 an application or library. 
-All HPC systems in the "Top 50"\cite{top500}, and in fact most HPC systems in the Top 500, use OS bypass. Applications can not 
+All HPC systems in the ``Top 50'', and in fact most HPC systems in the Top 500, use OS bypass. Applications can not 
 achieve the needed performance if the operating system is involved in data movement for networking. 
 
 OS Bypass is the network equivalent of what systems such as X Windows do for graphics. 
@@ -118,10 +123,10 @@ lowest possible level of hardware manipulation, requiring
 application libraries to replicate much of the operating systems
 capabilities in networking. 
 
-HPC network software performance is frequently characterized in terms of "bits to the wire" (BTW) and "ping-pong latency". 
-Bits to The Wire is a measure of how long it takes, 
+HPC network software performance is frequently characterized in terms of ``bits to the wire'' (BTW) and ``ping-pong latency''. 
+Bits to the wire is a measure of how long it takes
 from the time an application initiates
-network I/O, for the bits to appear on the physical wire. Ping-pong latency 
+network I/O for the bits to appear on the physical wire. Ping-pong latency 
 is time it take a program to send a very small packet (ideally, one bit) from 
 one node to another, and get a response (usually also a bit). 
 These numbers are important as they greatly impact the performance of collectives (such as a global sum), 
@@ -137,10 +142,10 @@ A problem with OS bypass is that the HPC network becomes a single-user device. B
 owns the network, that network becomes unusable to any other program or to the kernel. This exclusivity requires, in turn, that all
 HPC systems be provisioned with several networks, increasing cost and decreasing reliability. While the reduction in reliability is not obvious, one must consider 
 that the two networks are not redundant; they are both needed for the application
-to run. A failure in either network aborts the application. Additional hardware can make the system less reliable. 
+to run. A failure in either network aborts the application.
 
 Our work on Plan~9 for HPC has been to move the communications back into the kernel. The motivation 
-for this work follows on measurements of the amount of  code that has been written over the years for OS Bypass layers that recreates the functions of an operating system; 
+for this work follows on measurements of the amount of  code that has been written over the years for OS Bypass layers that recreates the functions of an operating system 
 and the difficulty the systems have in making correct decisions about concurrrency, allocation, physical to virtual mappings, and other 
 areas that are easy to do in a kernel and very hard to do in a library. As a result the libraries tend to be large and complex: the IBM Deep Computing Messaging Facility for Blue Gene, which is used to support
 higher-level libraries such as MPI, is 81,000 lines, as compared to 64,000 lines for the entire Plan~9 kernel  for BG/P (as measured by David Wheeler's sloccount). 
@@ -152,18 +157,10 @@ MPI libraries\footnote{MPI libraries are typically much larger than the Plan~9 k
 link in the DCMF. Any program which wishes to use the HPC network must be written as an MPI 
 application. Not all applications can be written as MPI applications. Applications writers must recast their 
 programs as MPI programs, even when that is not appropriate, because it is not practical 
-to reimplement the entire user-mode driver stack 
+to reimplement the entire user-mode driver stack. 
 Shells are not MPI applications; it makes
 no sense whatsoever to turn the shell into an MPI application, as it has uses outside of MPI, such 
 as starting MPI applications! As we showed above, making the networks available as real devices can be very useful. 
-
-%Making network resources available as kernel-based files
-%makes them more accessible to all programs. Seperating the 
-%implementation from the usage reduces the chance that simple application bugs will lock up the network. 
-%Interrupts, errors, resources conflicts, and sharing can be managed by the kernel. That is why it 
-%is there in the first place. But if these benefits come at too high a cost in performance, then we will have to give up 
-%on using the kernel devices and forfeit this elegant model. The reason to use OS bypass is the cost of asking the kernel to 
-%perform network I/O. 
 
 One might think that the  drivers, in order to equal the performance of OS bypass, need to impose a very 
 low overhead -- in fact, no overhead at all: how can a code path that goes through the kernel possibly equal an
@@ -204,7 +201,7 @@ used in the context of virtual machines. Device virtualization  requires hardwar
 the addition of a so-called iommu\cite{iommu}. 
 
 An older idea is to dynamically generate code as it is needed. For example, the code to read a certain file can 
-be generated on the fly, bypassing the layers of software stack. One implementaiton of this idea 
+be generated on the fly, bypassing the layers of software stack. One implementation of this idea 
 is found in   Synthesis\cite{synthesis}. While the approach is intriguing, 
 it has not proven to be practical, and the system itself was not widely used. 
 
@@ -227,7 +224,7 @@ adds a great deal of complexity, which results in bugs and security holes that a
 devices have taken on many of the attributes of an operating system, with threading, cache- and page-aligned resource allocation, 
 and failure and interrupt management. Multiple applications using multiple virtual network interfaces end up doing the same work, with the same
 libraries, resulting in increased memory cost, higher power consumption, and a general waste of resources all around. In the end, the applications 
-can not do as good a job as the kernel, as they are not running in priveleged mode. Applications and libraries do not have access to
+can not do as good a job as the kernel, as they are not running in privileged mode. Applications and libraries do not have access to
 virtual to physical page mappings, for example, and as a result they can not optimize memory layout as the kernel code. 
 
 \section{Our Approach}
@@ -256,12 +253,12 @@ In most cases, the steps outside the actual I/O itself are not expensive relativ
 sending packets over an Ethernet, or writing a disk, the fd and address validation are insignificant, a few microseconds at most. The picture changes completely with a slow processor (as the PowerPC 450 is) and a fast network, as we have on Blue Gene. Then, the overhead of setting up the arguments alone can dominate the overall time. A global barrier operaion across 65536 nodes can be done in 125 nanoseconds 
 on Blue Gene; that is 106 instructions. On these measurements, the cost of I/O is made in 1.2-nanosecond increments, and every one counts. 
 
-As can be seen above, there is a lot of repeated work for each system call. It is reasonable to ask just how much the arguments vary for each write system call. How much of this work is unnecesary because we are validating the same parameters, over and over? 
+As can be seen above, there is a lot of repeated work for each system call. It is reasonable to ask just how much the arguments vary for each write system call. How much of this work is unnecesary because we are validating the same parameters over and over? 
 We instrumented the Plan~9 kernel and monitored 
 applications using  a trace device\cite{iwp9:tracedevice}. We measured all the I/O performed by all processes over 
 a 30 minute interval. We learned that, in general, programs read and write a small 
 set of files over and over, from a very small set of virtual addresses, with a very limited and small range of sizes. This result makes intuitive sense: consider programs on Unix which use stdio, for example: file I/O is performed 
-to an internal buffer which does not change, and the buffer size is usually limited to a page size or smaller. Other I/O addresses are almost always from the stack (i.e. an auto variable). Our measurements confirmat this intuition, at least for Plan~9. 
+to an internal buffer which does not change, and the buffer size is usually limited to a page size or smaller. Other I/O addresses are almost always from the stack (i.e. an auto variable). Our measurements confirm this intuition, at least for Plan~9. 
 
 We learned that the bulk of the time for basic device I/O with very small write sizes -- the type of operation common to collective operations -- was taken up in two functions: the one that validated an open file descriptor, and the one that validated an I/O address. 
 The measurements indicate that we could benefit from caching active file descriptors and virtual address ranges in each process structure. Caching virtual to real translation information for just 32 address ranges would eliminate all page table walks for almost all process I/O. Caching just 8 file descriptors would eliminate almost all file descriptor validation operations. Of course, this caching would not cover some extreme cases (Apache), but it would cover the most common. 
@@ -301,7 +298,7 @@ We will first digress into the nature of Curry functions, describe our changes t
 performance improvements we have seen. 
 
 \subsection{Currying}
-The technique we are using is well known in mathematical circles, and is called currying. 
+The technique we are using, Currying, is well known in mathematical circles. 
 We will illustrate it by an example. 
 
 Given a function of two variables, $ f\left( x, y\right) = y/x$, 
@@ -309,7 +306,7 @@ one may create a new function, $g\left( x\right)$,
 if $y$ is known,  such that $g\left( x\right) = f\left( x, y\right)$. 
 For example, if y is known to be 2, the function g might be $g\left( x\right) = f\left( x, 2\right)$. 
 
-We are interested in applying this idea to two key system calls: read and write. Each takes a 
+We were interested in applying this idea to two key system calls: read and write. Each takes a 
 file descriptor, a pointer, a length, and an offset. 
 
 The application of currying was obvious: given a program which is calling a kernel function read or write function: $ f\left( fd, address, size\right) $, with 
@@ -396,7 +393,7 @@ When a system call interrupt is generated, the kernel typically checks if the sy
 The modifications described in the previous section can be considered as general purpose, in the sense 
 that any device can be extended to take advantage of them. We have even created Curried pipes. 
 
-In this section we consider specializations that are very specific to the Blue Gene Torus. These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. The extensions are inspired on Active Messages,  and tailored to the needs of a graph application. 
+In this section we consider specializations that are very specific to the Blue Gene Torus. These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. The extensions are inspired by Active Messages\cite{von1992active},  and tailored to the needs of a graph application. 
 
 \subsubsection{The Graph Application: motivating intrusive changes}
 
@@ -417,17 +414,17 @@ one machine. Such an intrusive change makes sense when the stringent requirement
 performance must be accomodated. 
 
 The receive side data management is more complex. Data transfer is performed in an interrupt 
-handler in the kernel, requiring a mapping between user space memory ring and kernel interrupt address space. 
+handler in the kernel, requiring a mapping between the user space memory ring and kernel interrupt address space. 
 The traditional Linux approach to sharing buffers between kernel and user space is via pinning. Pinning is a complicated 
 operation which consumes a great deal of code -- there are almost as many lines of code to support 
 pinning in Linux as there are in our entire kernel. 
 In our  non-traditional approach, the physical and virtual addresses are the same, and are in addition backed by a 
 256 Mbyte page table entry (TLB in PowerPC terms). 
-We call this address area the "P==V" space. In our kernel, it is used to back the so-called "BSS", or heap, area, of a program. It is implicitly
+We call this address area the "P=V" space. In our kernel, it is used to back the so-called "BSS", or heap, area, of a program. It is implicitly
 shared: any references to memory in this part of the virtual address space are backed by the same memory. 
 
-Only a few processes, and usually only one, need to use the P==V space. 
-Our kernel limits the use of the P==V space to application processes which are compiled for the
+Only a few processes, and usually only one, need to use the P=V space. 
+Our kernel limits the use of the P=V space to application processes which are compiled for the
 IBM Blue Gene "compute node kernel". These
 processes are run using an emulation environment\cite{plan9bgp}, and are set up with the P=V 
 space as their heap segment. Standard runtime software such as malloc runs quite normally with this 
@@ -449,7 +446,6 @@ struct AmRing {
 \end{verbatim}
 \caption{\label{ring}Shared memory ring for receive packets.}
 \end{figure}
-
 The base is simply a pointer to the base of memory, which consists of a block of 256-byte Torus packets. 
 The size and logN are different descriptions of the size, provided in each form for convenience;
  the size must be 256 bytes or more, and always a power of 2. Prod
@@ -503,7 +499,7 @@ functionality is moved into the network interface itself, as in Infiniband inter
 Frequently, the performance of OS bypass is cited without taking into account the high overhead of these user-level operating systems, and the problems inherent in creating layers of redundant functions between the operating system and programs. 
 
 This paper shows an alternative to the false choice of slow operating systems paths or fast user-level operating systems paths. It is possible to use a general-purpose operating system for I/O and still achieve high performance. While we are not yet equalling the user-level MPI libraries, we are coming from behind, as the user-level libraries and associated network hardware have benefited from 20 years of co-design. 
-We wonder what would be possible were the operating system and the hardware designed together, with high performance IO in mind. 
+We wonder what would be possible were the operating system and the hardware designed together, with high performance I/O in mind. 
 
 \section{Acknowledgements}
 This work is support by the DOE Office of Advanced Scientific Computing Research. IBM has provided support from 2006 to the present. This research used resources of the Argonne Leadership Computing Facility
