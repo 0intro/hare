@@ -783,7 +783,7 @@ spliceto(void *arg) {
 		/* block on incoming */
 		tr = recvp(aux->chan);
 		if(tr == nil) {
-			DPRINT(DSPF, "[%s](%p) spliceto: mpipe %p (%s) hungup aux.chan\n", mp->name, mp);
+			DPRINT(DSPF, "[%s](%p) spliceto: mpipehungup aux.chan\n", mp->name, mp);
 			goto exit;
 		}
 
@@ -1011,7 +1011,7 @@ splicefrom(void *arg) {
 	}
 
 exit:
-	DPRINT(DSPF, "[%s](%p) SPLICEFROM (mp %p) (fid %d) (aux %p) EXITING\n", 
+	DPRINT(DSPF, "[%s](%p) SPLICEFROM (fid %d) (aux %p) EXITING\n", 
 			mp->name, mp, sa->fd, dummy->aux);
 	fsclunk(dummy);
 	free(sa);
