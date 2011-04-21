@@ -23,6 +23,7 @@
 		fashion.
 
 	Todo:
+		* explicit hangup modes
 		* buffered mpipes
 		* internal splice optimization
 		* reads of ~(0) yielding ctl blocks
@@ -96,8 +97,8 @@ enum {	/* DEBUG LEVELS */
  * 
  */
 enum {
-	MPTnormal = 1,	/* strictly a normal pipe */
-	MPTbcast=2,		/* enumerated pipe */
+	MPTnormal 	= 1,	/* strictly a normal pipe */
+	MPTbcast	= 2,	/* broadcast pipe */
 };
 
 /*
@@ -596,6 +597,7 @@ fsopen(Req *r)
 	fid->aux = aux;
 
 	if((r->ifcall.mode&OMASK) == OWRITE) {
+		/* TODO: grab the lock naybe */
 		mp->writers++;
 		DPRINT(DWRT, "[%s](%p) fsopen: add new writer (writers=%d)\n", mp->name, mp, mp->writers);	
 	}
@@ -1094,7 +1096,7 @@ fswrite(void *arg)
 			respond(r, err);
 		}
 		goto out;
-	} else {
+	} else { /* MAYBE: this doesn't need to be an else */
 		if(!aux->remain)
 			aux->remain = r->ifcall.count;
 		mp->len += r->ifcall.count;
