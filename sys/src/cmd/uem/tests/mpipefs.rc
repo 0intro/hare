@@ -10,13 +10,14 @@ echo '== Multipipe Regression =='
 #
 MPIPELOG=mpipefs.log
 TESTDIR=.test
+DEBUG_LEVEL=0
 
 #
 # Cleanup Previous Instances
 #
 fn cleanup {
 	echo Cleaning up previous runs...
-	unmount /n/test > /dev/null >[2] /dev/null
+	unmount /n/mpipetest > /dev/null >[2] /dev/null
 	rm -f /srv/mpipe
 	#kill mpipefs | rc
 }
@@ -31,6 +32,7 @@ fn startup {
 	}
 	if not {
 		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		DEBUG_LEVEL=$1
 	}
 }
 
@@ -42,21 +44,91 @@ fn testdir {
 }
 
 #
+# The test number names are generated and cached for later use.
+#
+TESTNUM=( 1 )
+
+#
+# Create a number of tests
+#
+fn create_tests {
+	# 
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+
+	#`# create empty test files 
+	for(i in $TESTNUM) {
+	    echo > $TESTDIR/test$i
+	}
+}
+
+#
+# Compare the output
+#
+fn cmp_tests {
+	# 
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+
+	#`# verify results
+	for(i in $TESTNUM) {
+	    if(! cmp -s $TESTDIR/test $TESTDIR/test$i) {
+	        echo
+		echo '	'FAILED: test$i not equal to test
+		exit 'cmp_tests: test$i failed for: ' $2
+	    }
+	}
+}
+
+#
+# Check to make sure that the files are ready to read and not just
+# opened or hung.
+#
+APID=() # keep a list of child PID's
+fn check_ready {
+	if(! ~ $DEBUG_LEVEL 0) {
+		echo
+		echo '    Checking readyness'
+	}
+
+	# FIXME: should we terminate after some number of tries, or
+	# just keep spinning...
+	DONE=0
+	while (~ $DONE 0) {
+		DONE=1
+		for(i in $APID) {
+	    		STATE=`{cat /proc/$i/status | sed 's%cat[ ]*[^ ]*[ ]*%%
+				s%  *.* (.*)%%'}
+	    		#` turn off the code coloring snafu
+
+	    		# check if it is not ready to read
+			if(! ~ $STATE 'Pread') {
+				if(! ~ $DEBUG_LEVEL 0) 
+	    				echo '        ' $i $STATE
+				DONE=0
+			}
+		}
+       	}
+}
+
+#
 # Naming pipe test
 #
 
 fn named {
 	echo -n Testing name parameter...
 
-	mount /srv/mpipe /n/test test
-	if(! test -e /n/test/test) {
+	mount /srv/mpipe /n/mpipetest test
+	if(! test -e /n/mpipetest/test) {
 		echo FAILED!
 		exit 'named: test failed'
 	}
 
 	echo Success!	
 	# cleanup
-	unmount /n/test
+	unmount /n/mpipetest
 }
 
 
@@ -69,17 +141,14 @@ fn simplepipe {
 
 	# initialize files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
+	create_tests 1
 
-	mount /srv/mpipe /n/test
-	cat $TESTDIR/test > /n/test/data &
-	cat /n/test/data > $TESTDIR/test1
+	mount /srv/mpipe /n/mpipetest
+	cat $TESTDIR/test > /n/mpipetest/data &
+	cat /n/mpipetest/data > $TESTDIR/test1
 
 	# verify results
-	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
-		echo FAILED!
-		exit 'simplepipe: test failed'
-	}
+	cmp_tests 1 'simplepipe'
 
 	echo Success!
 	# cleanup
@@ -91,13 +160,15 @@ fn multipipe {
 	echo -n Testing multipipe messages...
 
 	# initialize files
-	mount /srv/mpipe /n/test
-	cat /n/test/data > $TESTDIR/test1 &
-	cat /n/test/data > $TESTDIR/test2 &
+	mount /srv/mpipe /n/mpipetest
+	# FIXME: abstract?
+	cat /n/mpipetest/data > $TESTDIR/test1 &
+	cat /n/mpipetest/data > $TESTDIR/test2 &
 	#sleep 10 # poor man's synchornization
-	mp-writer -n 2 -s 8192 /n/test/data	
+	mp-writer -n 2 -s 8192 /n/mpipetest/data	
 
 	# verify results
+	# FIXME: abstract?
 	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
 		echo FAILED: test2 not equal to test1
 		exit 'multipipe: test1 failed'
@@ -113,11 +184,11 @@ fn enum {
 
 	# initialize files
 
-	mount /srv/mpipe /n/test '-e 2'
-	cat /n/test/data > $TESTDIR/test1 &
-	cat /n/test/data > $TESTDIR/test2 &
+	mount /srv/mpipe /n/mpipetest '-e 2'
+	cat /n/mpipetest/data > $TESTDIR/test1 &
+	cat /n/mpipetest/data > $TESTDIR/test2 &
 	#sleep 5 # poor man's synchornization
-	mp-writer -e 1 -n 5 -s 8192 /n/test/data	
+	mp-writer -e 1 -n 5 -s 8192 /n/mpipetest/data	
 
 	#sleep 5 # poor man's synchornization
 	if(test -s $TESTDIR/test1) {
@@ -139,12 +210,14 @@ fn longmsg {
 	# initialize files
 	rm -rf $TESTDIR/*
 
-	mount /srv/mpipe /n/test
-	cat /n/test/data > $TESTDIR/test1 &
-	cat /n/test/data > $TESTDIR/test2 &
+	mount /srv/mpipe /n/mpipetest
+	# FIXME: abstract?
+	cat /n/mpipetest/data > $TESTDIR/test1 &
+	cat /n/mpipetest/data > $TESTDIR/test2 &
 	#sleep 5 # poor man's synchornization
-	mp-writer -e 1 -n 1 -s 131072 /n/test/data	
+	mp-writer -e 1 -n 1 -s 131072 /n/mpipetest/data	
 
+	# FIXME: abstract?
 	if(test -s $TESTDIR/test1) {
 		if(test -s $TESTDIR/test2) {
 			echo FAILED: both files have data
@@ -164,27 +237,19 @@ fn bcast {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
-	echo > $TESTDIR/test2
+	create_tests 2
 
 	# accomplish the test
-	mount /srv/mpipe /n/test -b
-	cat /n/test/data > $TESTDIR/test1 &
-	cat /n/test/data > $TESTDIR/test2 &	
+	mount /srv/mpipe /n/mpipetest -b
+	# FIXME: abstract?
+	cat /n/mpipetest/data > $TESTDIR/test1 &
+	cat /n/mpipetest/data > $TESTDIR/test2 &	
 	#sleep 5	# poor mans synchronization
-	cat $TESTDIR/test > /n/test/data
-	unmount /n/test
+	cat $TESTDIR/test > /n/mpipetest/data
+	unmount /n/mpipetest
 	
 	# verify results
-	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
-		echo FAILED: test1 not equal to test
-		exit 'bcast: test1 failed'
-	}
-	
-	if(! cmp -s $TESTDIR/test $TESTDIR/test2) {
-		echo FAILED: test2 not equal to test
-		exit 'bcast: test2 failed'
-	}
+	cmp_tests 2 'bcast'
 
 	echo Success!
 
@@ -200,22 +265,19 @@ fn splicefrom {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
+	create_tests 1
 
 	# accomplish the test
-	mount /srv/mpipe /n/test
-	cat /n/test/data > $TESTDIR/test1 &
-	mp-writer -i $TESTDIR/test /n/test/data
+	mount /srv/mpipe /n/mpipetest
+	cat /n/mpipetest/data > $TESTDIR/test1 &
+	mp-writer -i $TESTDIR/test /n/mpipetest/data
 	
-	unmount /n/test
+	unmount /n/mpipetest
 
 	#sleep 5
 	
 	# verify results
-	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
-		echo FAILED: test1 not equal to test
-		exit 'splicefrom: test1 failed'
-	}
+	cmp_tests 1
 	
 	echo Success!
 
@@ -231,33 +293,35 @@ fn splicefrombcast {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
-	echo > $TESTDIR/test2
+
+	# create empty test files
+	create_tests 20
 
 
 	# accomplish the test
-	mount /srv/mpipe /n/test -b
-	cat /n/test/data > $TESTDIR/test1 &
-	cat /n/test/data > $TESTDIR/test2 &
-	sleep 5	# poor mans synchronization
-	mp-writer -i $TESTDIR/test /n/test/data
+	mount /srv/mpipe /n/mpipetest -b
+
+	# spawn a number of threads which copy the mpipe data the
+	# tests.  It waits for stuff to be written to
+	# /n/mpipetest/data
+	for(i in $TESTNUM) {
+	    cat /n/mpipetest/data > $TESTDIR/test$i &
+	    APID=( $APID $apid )
+	}
+
+	# make sure that everything is ready
+	check_ready # poor mans synchronization
+
+	mp-writer -i $TESTDIR/test /n/mpipetest/data
 	
-	#sleep 5
+	# FIXME: check_ready # verify that the state of the write is done
 	wait
 
 	# verify results
-	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
-		echo FAILED: test1 not equal to test
-		exit 'splicefrombcast: test1 failed'
-	}
+	cmp_tests 20
 
-	if(! cmp -s $TESTDIR/test $TESTDIR/test2) {
-		echo FAILED: test2 not equal to test
-		exit 'splicefrombcast: test2 failed'
-	}
-	
 	echo Success!
-	unmount /n/test
+	unmount /n/mpipetest
 
 	# cleanup
 	rm -rf $TESTDIR/*
@@ -271,20 +335,19 @@ fn spliceto {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
+	create_tests 1
 
 	# accomplish the test
-	mount /srv/mpipe /n/test
-	mp-writer -o $TESTDIR/test1 /n/test/data
-	cat $TESTDIR/test > /n/test/data
-	unmount /n/test
+	mount /srv/mpipe /n/mpipetest
+	mp-writer -o $TESTDIR/test1 /n/mpipetest/data
+
+	cat $TESTDIR/test > /n/mpipetest/data
+
+	unmount /n/mpipetest
 	
 	# verify results
-	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
-		echo FAILED: test1 not equal to test
-		exit 'spliceto: test1 failed'
-	}
-	
+	cmp_tests 1
+
 	echo Success!
 
 	# cleanup
@@ -301,7 +364,7 @@ fn splicetochain {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
+	create_tests 1
 
 	# accomplish the test
 	# stage0 and stage1 feeds stage2 which feeds stage3
@@ -345,27 +408,18 @@ fn splicetobcast {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
-	echo > $TESTDIR/test2
+	create_tests 2
 
 	# accomplish the test
-	mount /srv/mpipe /n/test -b
-	mp-writer -o $TESTDIR/test1 /n/test/data
-	mp-writer -o $TESTDIR/test2 /n/test/data
+	mount /srv/mpipe /n/mpipetest -b
+	mp-writer -o $TESTDIR/test1 /n/mpipetest/data
+	mp-writer -o $TESTDIR/test2 /n/mpipetest/data
 	#sleep 5	# poor mans synchronization
-	cat $TESTDIR/test > /n/test/data
-	unmount /n/test
+	cat $TESTDIR/test > /n/mpipetest/data
+	unmount /n/mpipetest
 	
 	# verify results
-	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
-		echo FAILED: test1 not equal to test
-		exit 'splicetobcast: test1 failed'
-	}
-	
-	if(! cmp -s $TESTDIR/test $TESTDIR/test2) {
-		echo FAILED: test2 not equal to test
-		exit 'splicetobcast: test2 failed'
-	}
+	cmp_tests 2
 
 	echo Success!
 
