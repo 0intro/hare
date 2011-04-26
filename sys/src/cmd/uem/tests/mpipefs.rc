@@ -94,7 +94,7 @@ fn multipipe {
 	mount /srv/mpipe /n/test
 	cat /n/test/data > $TESTDIR/test1 &
 	cat /n/test/data > $TESTDIR/test2 &
-	sleep 10 # poor man's synchornization
+	#sleep 10 # poor man's synchornization
 	mp-writer -n 2 -s 8192 /n/test/data	
 
 	# verify results
@@ -116,10 +116,10 @@ fn enum {
 	mount /srv/mpipe /n/test '-e 2'
 	cat /n/test/data > $TESTDIR/test1 &
 	cat /n/test/data > $TESTDIR/test2 &
-	sleep 5 # poor man's synchornization
+	#sleep 5 # poor man's synchornization
 	mp-writer -e 1 -n 5 -s 8192 /n/test/data	
 
-	sleep 5 # poor man's synchornization
+	#sleep 5 # poor man's synchornization
 	if(test -s $TESTDIR/test1) {
 		if(test -s $TESTDIR/test2) {
 			echo FAILED: both files have data
@@ -142,7 +142,7 @@ fn longmsg {
 	mount /srv/mpipe /n/test
 	cat /n/test/data > $TESTDIR/test1 &
 	cat /n/test/data > $TESTDIR/test2 &
-	sleep 5 # poor man's synchornization
+	#sleep 5 # poor man's synchornization
 	mp-writer -e 1 -n 1 -s 131072 /n/test/data	
 
 	if(test -s $TESTDIR/test1) {
@@ -171,7 +171,7 @@ fn bcast {
 	mount /srv/mpipe /n/test -b
 	cat /n/test/data > $TESTDIR/test1 &
 	cat /n/test/data > $TESTDIR/test2 &	
-	sleep 5	# poor mans synchronization
+	#sleep 5	# poor mans synchronization
 	cat $TESTDIR/test > /n/test/data
 	unmount /n/test
 	
@@ -209,7 +209,7 @@ fn splicefrom {
 	
 	unmount /n/test
 
-	sleep 5
+	#sleep 5
 	
 	# verify results
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
@@ -242,7 +242,8 @@ fn splicefrombcast {
 	sleep 5	# poor mans synchronization
 	mp-writer -i $TESTDIR/test /n/test/data
 	
-	sleep 5
+	#sleep 5
+	wait
 
 	# verify results
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
@@ -315,7 +316,7 @@ fn splicetochain {
 	echo one > /n/stage0/s0 &
 	echo two > /n/stage1/s1 &
 	
-	sleep 1
+	#sleep 1
 	
 	unmount /n/stage0
 	unmount /n/stage1
@@ -351,7 +352,7 @@ fn splicetobcast {
 	mount /srv/mpipe /n/test -b
 	mp-writer -o $TESTDIR/test1 /n/test/data
 	mp-writer -o $TESTDIR/test2 /n/test/data
-	sleep 5	# poor mans synchronization
+	#sleep 5	# poor mans synchronization
 	cat $TESTDIR/test > /n/test/data
 	unmount /n/test
 	
