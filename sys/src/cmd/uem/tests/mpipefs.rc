@@ -49,15 +49,22 @@ fn testdir {
 TESTNUM=( 1 )
 
 #
-# Create a number of tests
+# Enumerate the test numbers
 #
-fn create_tests {
-	# 
+fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
                for (i = 1; i <= '$1'; i++) printf "%d ", i
                exit }'}
+	#`# shut up the code coloring bug...
+}
 
-	#`# create empty test files 
+#
+# Create a number of tests
+#
+fn create_tests {
+	enum_tests $1
+
+	# create empty test files 
 	for(i in $TESTNUM) {
 	    echo > $TESTDIR/test$i
 	}
@@ -67,12 +74,9 @@ fn create_tests {
 # Compare the output
 #
 fn cmp_tests {
-	# 
-	TESTNUM=`{awk 'BEGIN     {
-               for (i = 1; i <= '$1'; i++) printf "%d ", i
-               exit }'}
+	enum_tests $1
 
-	#`# verify results
+	# verify results
 	for(i in $TESTNUM) {
 	    if(! cmp -s $TESTDIR/test $TESTDIR/test$i) {
 	        echo
@@ -100,8 +104,12 @@ fn check_ready {
 		DONE=1
 		for(i in $APID) {
 	    		STATE=`{cat /proc/$i/status | sed 's%cat[ ]*[^ ]*[ ]*%%
-				s%  *.* (.*)%%'}
-	    		#` turn off the code coloring snafu
+				s%  *.* (.*)%%'} #` turn off code coloring snafu
+
+			# sanity check
+			if(! ~ $status '') {
+				exit $status 
+			}
 
 	    		# check if it is not ready to read
 			if(! ~ $STATE 'Pread') {
@@ -155,26 +163,52 @@ fn simplepipe {
 	rm -rf $TESTDIR/*
 }
 
-# TODO: will this really happen deterministicly?
+#
+# Multi Pipe test
+#
+
 fn multipipe {
 	echo -n Testing multipipe messages...
 
+	# initialize test files
+	create_tests 20
+
 	# initialize files
 	mount /srv/mpipe /n/mpipetest
-	# FIXME: abstract?
-	cat /n/mpipetest/data > $TESTDIR/test1 &
-	cat /n/mpipetest/data > $TESTDIR/test2 &
-	#sleep 10 # poor man's synchornization
-	mp-writer -n 2 -s 8192 /n/mpipetest/data	
 
-	# verify results
-	# FIXME: abstract?
-	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
-		echo FAILED: test2 not equal to test1
-		exit 'multipipe: test1 failed'
+	# spawn a number of threads which copy the mpipe data the
+	# tests.  It waits for stuff to be written to
+	# /n/mpipetest/data
+	APID=()
+	for(i in $TESTNUM) {
+	    cat /n/mpipetest/data > $TESTDIR/test$i &
+	    APID=( $APID $apid )
+	}
+
+	# check to make sure all the readers are ready.
+	check_ready 
+
+	#sleep 10 # poor man's synchornization
+	mp-writer -n 2 -s 8192 /n/mpipetest/data
+
+	# wait for children to finish
+	wait
+
+	# two, and only two, files should have any data in it
+	FILLED=0
+	for(i in $TESTNUM) {
+	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
+	    if(! ~ $LST 0) {
+		if(! ~ $FILLED 0 && ! ~ $FILLED 1 ) {
+		    echo 'FAILED: more than one file has data in longmsg'
+		    exit 'longmsg'
+		}
+		FILLED=1
+	    }
 	}
 
 	echo Success!
+
 	# cleanup
 	rm -rf $TESTDIR/*
 }
@@ -183,22 +217,41 @@ fn enum {
 	echo -n Testing enumerated messages...
 
 	# initialize files
+	create_tests 2
 
 	mount /srv/mpipe /n/mpipetest '-e 2'
-	cat /n/mpipetest/data > $TESTDIR/test1 &
-	cat /n/mpipetest/data > $TESTDIR/test2 &
-	#sleep 5 # poor man's synchornization
+
+	# spawn a number of threads.  One of them will get data from
+	# mp-writer.
+ 	APID=()
+	for(i in $TESTNUM) {
+	    cat /n/mpipetest/data > $TESTDIR/test$i &
+	    APID=( $APID $apid )
+	}
+
+	# wait for test files to become ready
+	check_ready
+
+	# write some data to one, and only one, of them
 	mp-writer -e 1 -n 5 -s 8192 /n/mpipetest/data	
 
-	#sleep 5 # poor man's synchornization
-	if(test -s $TESTDIR/test1) {
-		if(test -s $TESTDIR/test2) {
-			echo FAILED: both files have data
-			exit 'enum: both files have data'
+	# wait for children to be done...
+	wait
+
+	# only one of the files should have any data in it
+	FILLED=0
+	for(i in $TESTNUM) {
+	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
+	    if(! ~ $LST 0) {
+		if(! ~ $FILLED 0) {
+		    echo 'FAILED: more than one file has data in enum'
+		    exit 'enum'
 		}
+	    }
 	}
 
 	echo Success!
+
 	# cleanup
 	rm -rf $TESTDIR/*
 }
@@ -208,21 +261,37 @@ fn longmsg {
 	echo -n Testing long messages...
 
 	# initialize files
-	rm -rf $TESTDIR/*
+	create_tests 2
 
 	mount /srv/mpipe /n/mpipetest
-	# FIXME: abstract?
-	cat /n/mpipetest/data > $TESTDIR/test1 &
-	cat /n/mpipetest/data > $TESTDIR/test2 &
-	#sleep 5 # poor man's synchornization
+
+	# spawn a number of threads.  One of them will get data from
+	# mp-writer.
+ 	APID=()
+	for(i in $TESTNUM) {
+	    cat /n/mpipetest/data > $TESTDIR/test$i &
+	    APID=( $APID $apid )
+	}
+
+	# wait for test files to become ready
+	check_ready
+
+	# write a data block that is WAY TO big...
 	mp-writer -e 1 -n 1 -s 131072 /n/mpipetest/data	
 
-	# FIXME: abstract?
-	if(test -s $TESTDIR/test1) {
-		if(test -s $TESTDIR/test2) {
-			echo FAILED: both files have data
-			exit 'longmsg: both files have data'
+	# wait for children to be done...
+	wait
+
+	# only one of the files should have any data in it
+	FILLED=0
+	for(i in $TESTNUM) {
+	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
+	    if(! ~ $LST 0) {
+		if(! ~ $FILLED 0) {
+		    echo 'FAILED: more than one file has data in longmsg'
+		    exit 'longmsg'
 		}
+	    }
 	}
 
 	echo Success!
@@ -237,19 +306,41 @@ fn bcast {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	create_tests 2
+	create_tests 20
 
 	# accomplish the test
 	mount /srv/mpipe /n/mpipetest -b
-	# FIXME: abstract?
-	cat /n/mpipetest/data > $TESTDIR/test1 &
-	cat /n/mpipetest/data > $TESTDIR/test2 &	
-	#sleep 5	# poor mans synchronization
+
+	# spawn a number of threads which copy the mpipe data the
+	# tests.  It waits for stuff to be written to
+	# /n/mpipetest/data
+	APID=()
+	for(i in $TESTNUM) {
+	    cat /n/mpipetest/data > $TESTDIR/test$i &
+	    APID=( $APID $apid )
+	}
+
+	# check to make sure all the readers are ready.  I am not sure
+	# this is strictly necessary
+	check_ready 
+
 	cat $TESTDIR/test > /n/mpipetest/data
+
+	# we have to wait for all the children to finish their reads.
+
+	# FIXME: look at checking the status of the read device again.
+	# Supposedly it terminates immediately, but the children are
+	# not finished.
+	wait
+
+	# FIXME: Umount of the multipipe does ***not*** flush readers.
+	# Should it? -- no, but think about erroring to the writer
 	unmount /n/mpipetest
-	
+
+	# FIXME: do not hangup until unmount (a mode for mpipefs)
+
 	# verify results
-	cmp_tests 2 'bcast'
+	cmp_tests 20 'bcast'
 
 	echo Success!
 
@@ -269,17 +360,23 @@ fn splicefrom {
 
 	# accomplish the test
 	mount /srv/mpipe /n/mpipetest
+
+
 	cat /n/mpipetest/data > $TESTDIR/test1 &
+	APID=( $apid )
+
+	# wait for test files to become ready
+	check_ready
+
 	mp-writer -i $TESTDIR/test /n/mpipetest/data
 	
-	unmount /n/mpipetest
+	wait 
 
-	#sleep 5
-	
 	# verify results
 	cmp_tests 1
 	
 	echo Success!
+	unmount /n/mpipetest
 
 	# cleanup
 	rm -rf $TESTDIR/*
@@ -297,13 +394,13 @@ fn splicefrombcast {
 	# create empty test files
 	create_tests 20
 
-
 	# accomplish the test
 	mount /srv/mpipe /n/mpipetest -b
 
 	# spawn a number of threads which copy the mpipe data the
 	# tests.  It waits for stuff to be written to
 	# /n/mpipetest/data
+	APID=()
 	for(i in $TESTNUM) {
 	    cat /n/mpipetest/data > $TESTDIR/test$i &
 	    APID=( $APID $apid )
@@ -408,18 +505,32 @@ fn splicetobcast {
 
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	create_tests 2
+	create_tests 20
 
 	# accomplish the test
 	mount /srv/mpipe /n/mpipetest -b
-	mp-writer -o $TESTDIR/test1 /n/mpipetest/data
-	mp-writer -o $TESTDIR/test2 /n/mpipetest/data
-	#sleep 5	# poor mans synchronization
+
+	# create a batch of writers dumping from the multipipe to an
+	# output stream.  Note: mp-writer sends a control message to
+	# mpipefs which spawns another version of itself, however,
+	# when mp-writer returns it is ready so there is no reason to
+	# wait or check its ready status.
+	enum_tests 20
+	for(i in $TESTNUM) {
+	    mp-writer -o $TESTDIR/test$i /n/mpipetest/data 
+	}
+
+	# broadcast the message.
 	cat $TESTDIR/test > /n/mpipetest/data
+
+	# FIXME: try another check for all writers?
+	wait # needs to happen before the unmount because it does not flush 
+
+	# FIXE: does not flush?
 	unmount /n/mpipetest
 	
 	# verify results
-	cmp_tests 2
+	cmp_tests 20
 
 	echo Success!
 
@@ -435,8 +546,8 @@ testdir
 # Tests
 named
 simplepipe
-#multipipe #<--- FAILS sometimes due to non-determinsm
 longmsg
+multipipe
 enum 
 bcast
 splicefrom
