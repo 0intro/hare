@@ -7,7 +7,7 @@ char *mppath;
 static void
 usage(void)
 {
-	fprint(2, "mp-writer [-D] [-e] [-n num-times] [-s testsize] <mpipe-data-path>\n");
+	fprint(2, "mp-writer [-D] [-e] [-n num-times] [-s testsize] [-i streamin] [-o streamout] <mpipe-data-path>\n");
 	exits("usage");
 }
 
