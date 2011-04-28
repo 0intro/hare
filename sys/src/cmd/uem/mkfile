@@ -25,7 +25,7 @@ dirs:V:
 	}
 	cd $p
 
-dirsinstall:V:
+dirsinstall:V: install
 	p=`{pwd}
 	for(i in $DIRS) @{
 		cd $i
@@ -33,7 +33,7 @@ dirsinstall:V:
 	}
 	cd $p
 
-dirsclean:V:
+dirsclean:V: clean
 	p=`{pwd}
 	for(i in $DIRS) @{
 		cd $i
@@ -41,7 +41,7 @@ dirsclean:V:
 	}
 	cd $p
 
-dirsnuke:V:
+dirsnuke:V: nuke
 	p=`{pwd}
 	for(i in $DIRS) @{
 		cd $i
