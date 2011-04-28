@@ -547,7 +547,8 @@ testdir
 named
 simplepipe
 longmsg
-multipipe
+#  TODO: will this really happen deterministicly?
+multipipe  #<--- FAILS sometimes due to non-determinsm
 enum 
 bcast
 splicefrom
