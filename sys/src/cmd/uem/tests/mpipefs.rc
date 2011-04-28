@@ -183,12 +183,18 @@ fn multipipe {
 	for(i in $TESTNUM) {
 	    cat /n/mpipetest/data > $TESTDIR/test$i &
 	    APID=( $APID $apid )
+
+	    # wait for each reader to become ready before creating the
+	    # next.  Note: this is not the most efficient way of doing
+	    # this as it checks all of them, but the check is already
+	    # written...
+	    check_ready 
 	}
 
-	# check to make sure all the readers are ready.
-	check_ready 
+	# No need to check to make sure all the readers are ready,
+	# because we did it in the loop.
 
-	#sleep 10 # poor man's synchornization
+	# write to two and only two readers
 	mp-writer -n 2 -s 8192 /n/mpipetest/data
 
 	# wait for children to finish
@@ -199,13 +205,26 @@ fn multipipe {
 	for(i in $TESTNUM) {
 	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
 	    if(! ~ $LST 0) {
+		 echo '   Test'$i' has data'
 		if(! ~ $FILLED 0 && ! ~ $FILLED 1 ) {
 		    echo 'FAILED: more than one file has data in longmsg'
-		    exit 'longmsg'
+		    exit 'multipipe'
 		}
 		FILLED=1
 	    }
 	}
+
+	# FIXME: the determinish test fails.  If you want to determine
+	# which of the pipes get written to we will have to
+	# investigate this seperately.
+
+	# now check to make sure that the writing was
+	# deterministically set
+	#if(~ `{ls -s $TESTDIR/test1 | sed 's% .*%%'} 0 
+	#  || `{ls -s $TESTDIR/test2 | sed 's% .*%%'} 0 ) {
+	#    echo 'FAILED: the multipipe write was not deterministic'
+	#    exit 'multipipe'
+	#}
 
 	echo Success!
 
