@@ -14,6 +14,8 @@ typedef uvlong ticks;
 struct AmRing * amringsetup(int logN, int core);
 void amrstartup(struct AmRing *amr);
 int amrsend(struct AmRing *amr, void *data, int size, int rank);
+volatile Tpkt *amrrecv(struct AmRing *amr, int *num, volatile Tpkt *p, int *x, int *y, int *z);
+
 unsigned char *amrrecvbuf(struct AmRing *amr, unsigned char *p, int *rank);
 double MPI_Wtime(void);
 int MPI_Init(int *argc,char ***argv);
@@ -51,42 +53,57 @@ mynsec(void)
 	return t;
 }
 
-ticks ring(struct AmRing *amring, int iter)
+ticks graph(struct AmRing *amring, unsigned long long num_msgs_global)
 {
 	ticks start = 0ULL;
 	/* send the message around the ring */
 	Tpkt *p = (void *)mallocz(1024, 1);
-	int rx, ry, rz;
-	int rrank;
-	unsigned char data[240];
+	unsigned char *buf;
 
-	/* the usual 'kick it off cause we're special */
-	/* and we send a different message type for the initial case */
-	if (! myproc) {
-		start = getticks();
-		data[0] = 'p';
-		amrsend(amring, data, 240, 1);
-	} 
-	int i;
-	for(i = 0; i < iter; i++) {
-		waitamrpacket(amring, 'p', p, &rx, &ry, &rz, 0);
-		if (! start)
-			start = getticks();
-		if (debug) {
-		    rrank = xyztorank(rx, ry, rz);
-		    print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
+	unsigned long long num_msgs_local = (num_msgs_global / nproc), count_msgs_local_sent = 0, 
+		count_msgs_local_recv = 0,
+		send_checksum_local = 0, recv_checksum_local = 0; 
+	if(num_msgs_global % nproc < myproc)
+		++num_msgs_local;
+	print("===> num_msgs_global %lld num_msgs_local %lld\n", num_msgs_global, num_msgs_local);
+	int test_for_termination = 0;
+	buf = mallocz(1024, 1);
+	do {
+		if(count_msgs_local_sent < num_msgs_local) {
+			++count_msgs_local_sent;
+			//generate random destination rank
+			int rank = random() % nproc;
+			if (rank == myproc)
+			    rank = (rank + 1) % nproc;
+
+			int payload = random();
+			if (debug > 2)
+				print("--> send to %d cmls %d nml %d\n", rank, count_msgs_local_sent, num_msgs_local);
+			buf[0] = 'm';
+			memcpy(&buf[4], &payload, sizeof(payload));
+			amrsend(amring, buf, 240, rank);
+			send_checksum_local += payload;
+			if (debug > 2)
+				print("Sent\n");
 		}
-		data[0] = 'p';
-		amrsend(amring, data, 240, (myproc+1)%nproc);
-		if (debug)
-			print("Done %d/%d iterations\n", i, iter);
-	}
-	if (! myproc) {
-		waitamrpacket(amring, 'p', p, &rx, &ry, &rz, 0);
-		rrank = xyztorank(rx, ry, rz);
-		if (debug) print("Got 'p' from %d(%d,%d,%d)\n", rrank, rx, ry, rz);
-	}
-	
+		/* we only get one at a time for now */
+		/* this will probably overrun */
+		int rank, num = 0, rx, ry, rz;
+		amrrecv(amring, &num, p, &rx, &ry, &rz);
+		if (num) {
+		    rank = xyztorank(rx, ry, rz);
+		    if (debug > 4)
+			    print("amrrecv gets %d packets from %d\n", num, rank);
+		    if (num && p->payload[0] == 'm') {
+			if (debug > 2)
+				printf("Got something! from %d\n", rank);
+			recv_checksum_local += *(unsigned long long *)&p->payload[4];
+			count_msgs_local_recv++;
+		    }
+		}
+		test_for_termination = (count_msgs_local_recv + count_msgs_local_sent) > num_msgs_global;
+			
+	} while(!test_for_termination);
 	return start;
 }
 int
@@ -96,10 +113,11 @@ main (int argc, char **argv)
 	
 	struct AmRing *amring;
 	extern int amrdebug;
-	amrdebug = 0;
+	unsigned long long num_msgs_global = 1024;
+	amrdebug = 4;
 	int iter = 1;
 	if (argc > 1)
-		iter = strtol(argv[1], 0, 0);
+		num_msgs_global = strtol(argv[1], 0, 0);
 
 	print("Call amrstartup, myproc %d nproc %d\n", myproc, nproc);
 	if (myproc < nproc){
@@ -111,7 +129,7 @@ main (int argc, char **argv)
 		while(1);
 	print("amrstartup returns\n");
 	ticks start, end;
-	start = ring(amring, iter);
+	start = graph(amring, num_msgs_global);
 	end  = getticks();
 	print("%lld %lld - %d / p\n", end, start, iter);
 	return 0;

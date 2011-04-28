@@ -1,7 +1,7 @@
 CC=/bgsys/drivers/ppcfloor/gnu-linux/bin/powerpc-bgp-linux-gcc
 LIB=rompi.o torus.o amring.o linux.o
 CFLAGS=-Dcnk -Wall -O0
-ALL=testamlib testamring mpiring rompihello stupidreduce testmalloc reduce dumppv testpv testring timesyscall testfastinject hello
+ALL=graph testamlib testamring mpiring rompihello stupidreduce testmalloc reduce dumppv testpv testring timesyscall testfastinject hello
 all: $(ALL)
 
 reduce: reduce.o rompilib.a
@@ -27,6 +27,11 @@ testamring: testamring.o rompilib.a
 testamlib: testamlib.o rompilib.a
 	$(CC) -I . -o testamlib testamlib.o rompilib.a
 	cp testamlib ~/rompi
+
+
+graph: graph.o rompilib.a
+	$(CC) -I . -o graph graph.o rompilib.a
+	cp graph ~/rompi
 
 testfastinject: testfastinject.o rompilib.a
 	$(CC) -I . -o testfastinject testfastinject.o rompilib.a

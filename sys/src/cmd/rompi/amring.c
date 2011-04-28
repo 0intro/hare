@@ -236,8 +236,33 @@ void waitamrpacket(struct AmRing *amr, u8int type, volatile Tpkt *pkt,
 		print("waitamrpacket: returing for %d from (%d, %d, %d)\n", type, x,y,z);
 }
 
+
 int
-beacon(struct AmRing *amr, int *nodestatus, int numnodes)
+sendonebeacon(struct AmRing *amr, int numnodes, u8int bdata)
+{
+	u8int *data;
+	int i;
+
+
+	data = mallocz(256, 1);
+	for(i = 0; i < 256; i++)
+		data[i] = 'a' + i;
+	data[0] = bdata;
+
+	if (amrdebug > 2)
+		print("0: beacon. numnodes %d\n", numnodes);
+	for(i = 1; i < numnodes; i++) {
+		amrsend(amr, data, 240, i);
+		if (amrdebug > 3)
+			print("0: send %d\n", i);
+	}
+	if (amrdebug > 2)
+		print("all beacons sent\n");
+	return numnodes;
+}
+
+int
+beacon(struct AmRing *amr, int *nodestatus, int numnodes, u8int bdata)
 {
 	u8int *data;
 	Tpkt *pkt;
@@ -251,7 +276,7 @@ beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 	data = mallocz(256, 1);
 	for(i = 0; i < 256; i++)
 		data[i] = 'a' + i;
-	data[0] = 'B';
+	data[0] = bdata;
 	/* go ahead and send the beacon. */
 	if (amrdebug > 2)
 		print("0: beacon. numnodes %d\n", numnodes);
@@ -267,14 +292,14 @@ beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 	if (amrdebug > 2)
 		print("all beacons sent\n");
 	/* gather any responses */
-	while (amrrecv(amr, &dontcare, pkt, &x, &y, &z)) {
-	    int xyztorank(int x, int y, int z);
+	while (amrrecv(amr, &dontcare, pkt, &x, &y, &z) && (num < numnodes)) {
+		int xyztorank(int x, int y, int z);
 		rank = xyztorank(x, y, z);
 		if (amrdebug > 3)
 			printf("beacon: one from %d(%d,%d,%d) status %d\n", rank, x,y,z, nodestatus[rank]);
 		if (nodestatus[rank] == 0) {
 			num++;
-			if (amrdebug > 3) print("num %d\n", num);
+			if (amrdebug > 3) print("num %d of %d\n", num, numnodes);
 		}
 		nodestatus[rank]++;
 	}
@@ -286,23 +311,23 @@ beacon(struct AmRing *amr, int *nodestatus, int numnodes)
 }
 
 void
-waitbeacon(struct AmRing *amr)
+waitbeacon(struct AmRing *amr, u8int bdata)
 {
 	int x, y, z;
 	static Tpkt *pkt = NULL;
 	if (! pkt)
 		pkt = mallocz(1024, 1);
-	waitamrpacket(amr, 'B', pkt, &x, &y, &z, 5);
+	waitamrpacket(amr, bdata, pkt, &x, &y, &z, 0);
 	if (amrdebug > 2)
 		printf("Waitbeacon gets it from (%d,%d,%d)\n", x, y, z);
 }
 
 void
-respondbeacon(struct AmRing *amr)
+respondbeacon(struct AmRing *amr, u8int response)
 {
 	unsigned char *data;
 	data = mallocz(256, 1);
-	data[0] = 'b';
+	data[0] = response;
 	if (amrdebug > 2)
 		printf("Respondbeacon to 0\n");
 	/* send a response to a packet -- first char is 'b' */
@@ -326,6 +351,7 @@ intreduce(struct AmRing *amr)
 void
 amrstartup(struct AmRing *amr)
 {
+	/* step 1: everyone checks in */
 	if (! myproc) {
 		/* node 0 beacons once per second. It collects responses. 
 		 * once all nodes have checked in it sends a start message. 
@@ -335,7 +361,7 @@ amrstartup(struct AmRing *amr)
 		if (amrdebug > 2)
 			printf("amrstartup: time for node 0 to tell %d nodes\n", nproc);
 		while (numresponded < nproc) {
-			numresponded = beacon(amr, nodes, nproc);
+			numresponded = beacon(amr, nodes, nproc, 'B');
 			if (amrdebug > 3)
 				printf("amrstartup: %d to date\n", numresponded);
 			sleep(5);
@@ -345,13 +371,20 @@ amrstartup(struct AmRing *amr)
 		}
 	} else {
 		/* wait for the beacon */
-		waitbeacon(amr);
+		waitbeacon(amr, 'B');
 		/* send our response */
-		respondbeacon(amr);
+		respondbeacon(amr, 'b');
 		if (amrdebug > 2)
 			printf("responded\n");
 	}
 
+	/* step 2: node 0 tells everyone they can proceed */
+	if (! myproc) {
+		sendonebeacon(amr, nproc, 'D');
+	} else {
+		waitbeacon(amr, 'D');
+	}
+	
 	/* amring is now usable for normal work */
 }
 

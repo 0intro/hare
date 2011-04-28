@@ -20,7 +20,7 @@ static __inline__ ticks getticks(void)
      return (((unsigned long long)tbu0) << 32) | tbl;
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	int node, nproc;
@@ -48,5 +48,5 @@ main(int argc, char **argv)
 	printf("%lld %lld - p\n", end, start);
 	printf("%d: Finalize\n", node);
 	MPI_Finalize();
-
+	return 0;
 }
