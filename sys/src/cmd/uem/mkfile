@@ -63,6 +63,7 @@ tidy:V:
 	unmount /proc
 	bind '#p' /proc
 	rm -f /srv/mpipe
+	kill execcmd | rc
 	kill gangfs | rc
 	kill execfs | rc
 	kill mpipefs | rc
