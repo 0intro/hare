@@ -93,12 +93,16 @@ enum {	/* DEBUG LEVELS */
 /*
  * Right now there are two types of pipe:
  *	1) normal - writers match to readers
- *  2) broadcast - writers send to all readers
+ *      2) broadcast - writers send to all readers
  * 
  */
 enum {
 	MPTnormal 	= 1,	/* strictly a normal pipe */
 	MPTbcast	= 2,	/* broadcast pipe */
+
+	MPThangingup,		/* terminating */
+	MPThungup, 
+	CLEANUP,
 };
 
 /*
@@ -361,6 +365,17 @@ closebcasts(Mpipe *mp)
 	}
 }
 
+/* close everyone the mpipe has slotted */
+static void
+closempipe(Mpipe *mp)
+{
+	int count;
+	
+	for(count=0;count <  mp->slots; count++)
+		if(chanclosing(mp->rrchan[count]))
+			chanclose(mp->rrchan[count]);
+}
+
 /* process mount options */
 static char *
 parsespec(Mpipe *mp, int argc, char **argv)
@@ -509,10 +524,7 @@ fsclunk(Fid *fid)
 			qunlock(&mp->l);
 
 			if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
-				for(count=0;count <  mp->slots; count++)
-					if(chanclosing(mp->rrchan[count])) {
-						chanclose(mp->rrchan[count]);
-					}
+				closempipe(mp);
 
 				if(mp->mode == MPTbcast)
 					closebcasts(mp);
@@ -544,27 +556,20 @@ fsclunk(Fid *fid)
 			}
 			
 			if((mp->writers == 0)&&(mp->readers == 0)) {
-				for(count=0;count <  mp->slots; count++) {
-					if(chanclosing(mp->rrchan[count]))
-						chanclose(mp->rrchan[count]);
+				closempipe(mp);
+				for(count=0;count <  mp->slots; count++)
 					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
-				}
 			}
 		}
 
 		/* no more references to pipe, cleanup */
 		if(mp->ref == 0) { 
+			closempipe(mp);
+
 			free(mp->name);
 			free(mp->uid);
 			free(mp->gid);
-			if(mp->rrchan) {
-				for(count=0;count <  mp->slots; count++) {
-					if(chanclosing(mp->rrchan[count])) {
-						chanclose(mp->rrchan[count]);
-					}
-				}
-				free(mp->rrchan);
-			}
+			free(mp->rrchan);
 			free(mp);
 		}
 	}
