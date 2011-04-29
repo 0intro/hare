@@ -494,8 +494,10 @@ fsclunk(Fid *fid)
 	/* if there is an participant on this fid */
 	if(fid->aux) {
 		Fidaux *aux = setfidaux(fid);	
+		qlock(&mp->l);
 		mp->ref--;
-		
+		qunlock(&mp->l);
+
 		DPRINT(DFID, ">>>> fid %d writers: %d readers: %d\n", fid->fid, mp->writers, mp->readers);
 
 		/* writer accounting and cleanup */ 
@@ -504,17 +506,17 @@ fsclunk(Fid *fid)
 			DPRINT(DWRT, "---- fid %d writers now %d\n", fid->fid, mp->writers-1);
 			qlock(&mp->l);
 			mp->writers--;
+			qunlock(&mp->l);
 
 			if((aux->state != FID_CTLONLY) && (mp->writers == 0)) {
 				for(count=0;count <  mp->slots; count++)
-					if(mp->rrchan[count]) {
+					if(chanclosing(mp->rrchan[count])) {
 						chanclose(mp->rrchan[count]);
 					}
 
 				if(mp->mode == MPTbcast)
 					closebcasts(mp);
 			}
-			qunlock(&mp->l);
 
 			free(aux);
 			fid->aux = nil;
@@ -524,8 +526,11 @@ fsclunk(Fid *fid)
 		if(((fid->omode&OMASK) == 0)&&(fid->qid.type==QTFILE)) {
 			qlock(&mp->l);
 			mp->readers--;
+			qunlock(&mp->l);
 
 			chanclose(aux->chan);
+
+			qlock(&mp->l);
 			mp->numr[aux->which]--;
 			qunlock(&mp->l);
 
@@ -538,34 +543,29 @@ fsclunk(Fid *fid)
 				aux->r = nil;
 			}
 			
-			qlock(&mp->l);
 			if((mp->writers == 0)&&(mp->readers == 0)) {
 				for(count=0;count <  mp->slots; count++) {
-					if(mp->rrchan[count])
+					if(chanclosing(mp->rrchan[count]))
 						chanclose(mp->rrchan[count]);
 					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
 				}
 			}
-			qunlock(&mp->l);
 		}
 
 		/* no more references to pipe, cleanup */
-		qlock(&mp->l);
 		if(mp->ref == 0) { 
 			free(mp->name);
 			free(mp->uid);
 			free(mp->gid);
 			if(mp->rrchan) {
 				for(count=0;count <  mp->slots; count++) {
-					if(mp->rrchan[count]) {
+					if(chanclosing(mp->rrchan[count])) {
 						chanclose(mp->rrchan[count]);
 					}
 				}
 				free(mp->rrchan);
 			}
 			free(mp);
-		} else {
-			qunlock(&mp->l);
 		}
 	}
 

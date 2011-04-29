@@ -59,42 +59,18 @@ fn enum_tests {
 }
 
 #
-# Create a number of tests
-#
-fn create_tests {
-	enum_tests $1
-
-	# create empty test files 
-	for(i in $TESTNUM) {
-	    echo > $TESTDIR/test$i
-	}
-}
-
-#
-# Compare the output
-#
-fn cmp_tests {
-	enum_tests $1
-
-	# verify results
-	for(i in $TESTNUM) {
-	    if(! cmp -s $TESTDIR/test $TESTDIR/test$i) {
-	        echo
-		echo '	'FAILED: test$i not equal to test
-		exit 'cmp_tests: test$i failed for: ' $2
-	    }
-	}
-}
-
-#
 # Check to make sure that the files are ready to read and not just
 # opened or hung.
 #
 APID=() # keep a list of child PID's
+HEADER=0
 fn check_ready {
 	if(! ~ $DEBUG_LEVEL 0) {
-		echo
-		echo '    Checking readyness'
+		if(~ $HEADER 0) {
+			echo
+			echo '    Checking readyness'
+			HEADER=1
+		}
 	}
 
 	# FIXME: should we terminate after some number of tries, or
@@ -119,6 +95,38 @@ fn check_ready {
 			}
 		}
        	}
+}
+
+#
+# Create a number of tests
+#
+fn create_tests {
+	enum_tests $1
+
+	HEADER=0 # reset the readness header 
+
+	# create empty test files 
+	for(i in $TESTNUM) {
+	    echo > $TESTDIR/test$i
+	}
+}
+
+#
+# Compare the output
+#
+fn cmp_tests {
+	enum_tests $1
+
+	HEADER=0 # reset the readness header 
+
+	# verify results
+	for(i in $TESTNUM) {
+	    if(! cmp -s $TESTDIR/test $TESTDIR/test$i) {
+	        echo
+		echo '	'FAILED: test$i not equal to test
+		exit 'cmp_tests: test$i failed for: ' $2
+	    }
+	}
 }
 
 #
@@ -492,10 +500,8 @@ fn splicetochain {
 	mp-writer -o /n/stage2/s2 /n/stage1/s1
 	mp-writer -o /n/stage3/s3 /n/stage2/s2
 	mp-writer -o $TESTDIR/test1 /n/stage3/s3
-	echo one > /n/stage0/s0 &
-	echo two > /n/stage1/s1 &
-	
-	#sleep 1
+	echo one > /n/stage0/s0
+	echo two > /n/stage1/s1
 	
 	unmount /n/stage0
 	unmount /n/stage1
