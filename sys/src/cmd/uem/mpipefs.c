@@ -102,7 +102,7 @@ enum {
 
 	MPThangingup,		/* terminating */
 	MPThungup, 
-	CLEANUP,
+	MPTcleanup,
 };
 
 /*
@@ -312,6 +312,11 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	int min = mp->numr[0];
 	aux->chan = chancreate(sizeof(Req *), 0);
 	assert(aux->chan != nil);
+
+	if(mp->mode == MPThangingup || mp->mode == MPThungup || mp->mode == MPTcleanup) {
+		DPRINT(DBCA,"[%s](%p) WARNING: mp mode set to not running\n");
+		return;
+	}
 
 	qlock(&mp->l);
 	mp->readers++;
@@ -557,15 +562,27 @@ fsclunk(Fid *fid)
 			
 			if((mp->writers == 0)&&(mp->readers == 0)) {
 				closempipe(mp);
-				for(count=0;count <  mp->slots; count++)
-					mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
+
+				// everyone is hungup. Make sure the channels are cleared
+				for(count=0;count <  mp->slots; count++) {
+					/* make sure that all any dynamically allocated data
+					   is freed up AND that it is reinitialized */
+					if(mp->rrchan[count]->closed == 2) {
+						DPRINT(DOPS, "---- reinitialize the channel[%d]\n", count);
+						chanfree(mp->rrchan[count]);
+						mp->rrchan[count] = chancreate(sizeof(Fid *), 0);
+					} else {
+						DPRINT(DOPS, "[%s](%p) ERROR: fsclunk: channel [%d] still in use\n", 
+						       mp==nil ? "nil" : mp->name, mp, count);
+						DPRINT(DOPS, "       element size [%d] nentry [%d]\n",
+						       mp->rrchan[count]->e, mp->rrchan[count]->nentry);
+					}
+				}
 			}
 		}
 
 		/* no more references to pipe, cleanup */
 		if(mp->ref == 0) { 
-			closempipe(mp);
-
 			free(mp->name);
 			free(mp->uid);
 			free(mp->gid);
@@ -587,6 +604,12 @@ fsopen(Req *r)
 
 	if (q.type&QTDIR){
 		respond(r, nil);
+		return;
+	}
+
+	/* FIXME: make sure that all the checks are necessary, and not just hungup */
+	if(mp->mode == MPThangingup || mp->mode == MPThungup || mp->mode == MPTcleanup) {
+		respond(r, Ehangup);
 		return;
 	}
 
@@ -687,6 +710,12 @@ fsread(void *arg)
 		tr = aux->r;
 		offset = tr->ofcall.count;
 	} else {
+		/* FIXME: make sure that all the checks are necessary, and not just hungup */
+		if(mp->mode == MPThangingup || mp->mode == MPThungup || mp->mode == MPTcleanup) {
+			myrespond(r, nil);
+			threadexits(nil);
+		}
+
 		/* if pipe isn't a broadcast & we don't have a peer
 		   then put us on the recvq rrchan */
 		if((mp->mode != MPTbcast) && (aux->other == nil)) {
@@ -1087,6 +1116,12 @@ fswrite(void *arg)
 	ulong hdrtag = ~0;
 	char *err;
 	
+	/* FIXME: make sure that all the checks are necessary, and not just hungup */
+	if(mp->mode == MPThangingup || mp->mode == MPThungup || mp->mode == MPTcleanup) {
+		respond(r, Ehangup);
+		goto out;
+	}
+
 	if(r->ifcall.offset == hdrtag) {
 		if(aux->state == FID_IDLE)
 			aux->state = FID_CTLONLY;
