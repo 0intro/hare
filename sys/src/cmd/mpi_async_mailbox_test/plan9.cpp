@@ -97,8 +97,9 @@ int main(int argc, char** argv) {
 	all_sent = (unsigned int *) mallocz(nproc * sizeof(*all_sent), 0);
 
 	//Recv/send buffer
-	unsigned char *buf;
-	buf = (unsigned char *)mallocz(1024, 1);
+	unsigned char *rbuf, *xbuf;
+	rbuf = (unsigned char *)mallocz(1024, 1);
+	xbuf = (unsigned char *)mallocz(1024, 1);
 	//Seed RNG
 	boost::mt19937 rng((31415 + myproc*nproc));
 	//distribution that maps to rank size
@@ -127,9 +128,16 @@ int main(int argc, char** argv) {
 			int payload = rand_rank();
 			if (debug > 2)
 				std::cout << "--> send to " << rank << " count_msgs_local_sent " << count_msgs_local_sent << " num_msgs local " << num_msgs_local << "\n";
-			buf[0] = 'm';
-			memcpy(&buf[4], &payload, sizeof(payload));
-			amrsend(amring, buf, 240, rank);
+			xbuf[0] = 'm';
+			memcpy(&xbuf[4], &payload, sizeof(payload));
+			if (debug > 7) {
+				int i;
+				std::cout << "send ..";
+				for(i = 0; i < 256; i++) printf("%02x ", xbuf[i]);
+				std::cout << "\n";
+			}
+
+			amrsend(amring, xbuf, 240, rank);
 			send_checksum_local += payload;
 			if (debug > 2)
 				std::cout << "Sent\n";
@@ -148,21 +156,29 @@ int main(int argc, char** argv) {
 		/* this will probably overrun */
 		int rank, num = 0, rx, ry, rz;
 		amrdebug = 0; //(! myproc) ? 5 : 0;
-		amrrecv(amring, &num, buf, &rx, &ry, &rz);
+		amrrecv(amring, &num, rbuf, &rx, &ry, &rz);
 		amrdebug = 0;
+		if (debug > 7) {
+			int i;
+			std::cout << "recv ..";
+			for(i = 0; i < 256; i++) printf("%02x ", rbuf[i]);
+			std::cout << "\n";
+		}
+
+
 		if (num) {
 			int oldamrdebug;
 			if (! count_msgs_local_recv)
 				double start_time = MPI_Wtime();
 			rank = xyztorank(rx, ry, rz);
 			if (debug > 4)
-				std::cout << "amrrecv gets " << num << " packets from " << rank << " msg is " << buf[16] << "\n";
-			switch (buf[16]) {
+				std::cout << "amrrecv gets " << num << " packets from " << rank << " msg is " << rbuf[16] << "\n";
+			switch (rbuf[16]) {
 				/* data */
 			case 'm':
 				if (debug > 2)
 					std::cout << "Got 'm' from " << rank << "\n";
-				recv_checksum_local += *(uint64_t *)&buf[20];
+				recv_checksum_local += *(uint64_t *)&rbuf[20];
 				count_msgs_local_recv++;
 				all_recv[myproc]++;
 				sum_uptodate = 0;
@@ -170,39 +186,58 @@ int main(int argc, char** argv) {
 				/* reduction request from 0 */
 			case 'r':
 				if (debug > 2)
-					std::cout << "Got an 'r' message\n";
+					std::cout << "Got an 'r' message " << count_msgs_local_sent << " / " << count_msgs_local_recv << " sum_uptodate " << sum_uptodate << "\n";
 				if (sum_uptodate)
 					continue;
-				buf[0] = 'R';
-				memcpy(&buf[4], &recv_checksum_local, sizeof(recv_checksum_local));
-				memcpy(&buf[8], &count_msgs_local_sent, sizeof(count_msgs_local_sent));
-				memcpy(&buf[12],&count_msgs_local_recv, sizeof(count_msgs_local_recv));
+				xbuf[0] = 'R';
+				memcpy(&xbuf[4], &recv_checksum_local, sizeof(recv_checksum_local));
+				*((unsigned int *)(&xbuf[4])) = count_msgs_local_sent;
+				*((unsigned int *)(&xbuf[8])) = count_msgs_local_recv;
+				//memcpy(&xbuf[4], &count_msgs_local_sent, sizeof(count_msgs_local_sent));
+				//memcpy(&xbuf[8],&count_msgs_local_recv, sizeof(count_msgs_local_recv));
 				oldamrdebug = amrdebug;
+				if (debug > 7) {
+					int i;
+					std::cout << "Respond 'R': ";
+					for(i = 0; i < 256; i++) printf("%02x ", xbuf[i]);
+					std::cout << "\n";
+				}
 				amrdebug = 8;
-				amrsend(amring, buf, 240, 0);
+				amrsend(amring, xbuf, 240, 0);
 				amrdebug = oldamrdebug;
 				sum_uptodate = 1;
 				break;
 				/* reduction response from non-0 */
 			case 'R':
-				if (debug > 2) 
+				if (debug > 2) {
+					int i;
 					std::cout << "got an 'R' from " << rank << "\n";
-				recv_checksum_local += *(uint64_t *)&buf[20];
-				all_recv[rank] = *(uint64_t *)&buf[28];
-				all_sent[rank] = *(uint64_t *)&buf[24];
+					for(i = 0; i < 256; i++) printf("%02x ", rbuf[i]);
+					std::cout << "\n";
+				}
+				
+				recv_checksum_local += *(uint64_t *)(&rbuf[20]);
+				all_sent[rank] = *(uint *)(&rbuf[20]);
+				all_recv[rank] = *(uint *)(&rbuf[24]);
+				if (debug > 2) 
+					std::cout << "all_sent " << all_sent[rank] << " all_recv[rank] " << all_recv[rank] << "\n";
 				for(int i = rtot = stot = 0; i < nproc; i++){
 					rtot += all_recv[i];
 					stot += all_sent[i];
+					std::cout << i << " rtot " << rtot << " stot " << stot << "\n";
 				}
 				if (debug > 2) 
 					std::cout << " rtot " << rtot << " stot " << stot << "\n";
-				
+				if (rtot + stot > 2*num_msgs_global) {
+					sendonebeacon(amring, nproc, 'q');
+					test_for_termination = 1;
+				}
 				break;
 			case 'q': 
 				test_for_termination = 1;
 				break;
 			default: 
-				std::cout << "Unknown message type" << buf[16] << "\n";
+				std::cout << "Unknown message type" << rbuf[16] << "\n";
 				break;
 			}
 			if (debug > 2)
