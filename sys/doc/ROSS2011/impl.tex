@@ -17,14 +17,12 @@ system.
 Figure \ref{fig:xcpu3Local} gives the the high-level view of the hierarchy 
 of the Brasil namespace.
 
-\begin{figure}[h]
-  \begin{center}
-    \leavevmode
-      \includegraphics[height=0.25\textheight,width=0.4\textwidth]
-		{./img/local_session_subsessions}
-    \caption{Filesystem interface in Brasil}
-    \label{fig:xcpu3Local}
-  \end{center}
+
+\begin{figure}[htp]
+\centering
+\includegraphics[width=3in]{./img/taskfs-hierarchy.eps}
+\caption{Filesystem interface in Brasil}
+\label{fig:xcpu3Local}
 \end{figure}
 
 Each node in the system has a \emph{local} directory in the root of their
@@ -134,14 +132,11 @@ Figure \ref{fig:xcpu3FSTopo} tries to give a simple overview of how this
 synthetic filesystem view is populated based on the underlying mount
 connections between the nodes.
 
-\begin{figure}[h]
-  \begin{center}
-    \leavevmode
-      \includegraphics[height=0.3\textheight,width=0.4\textwidth]
-		{./img/xcpu3FSTopo}
-    \caption{Sample filesystem interface for sample the topology in Brasil}
-    \label{fig:xcpu3FSTopo}
-  \end{center}
+\begin{figure}[htp]
+\centering
+\includegraphics[width=3in]{./img/csrv-views.eps}
+\caption{Sample filesystem interface for sample the topology in Brasil}
+\label{fig:xcpu3FSTopo}
 \end{figure}
 
 Assuming the links between the nodes are created by the remote node mounts in
