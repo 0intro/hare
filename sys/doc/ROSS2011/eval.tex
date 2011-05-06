@@ -25,15 +25,15 @@ applicaiton.
 Each deployment involves
 session creation, reservation, execution, output aggregation and termination.
 
-\begin{figure}[h]
+\begin{figure*}
   \begin{center}
     \leavevmode
-      \includegraphics[height=0.2\textheight,width=.5\textwidth]
+      \includegraphics[height=0.4\textheight,width=.9\textwidth]
 		{./img/linear}
     \caption{Comparison if Brasil with sequential deployment}
     \label{fig:sequential}
   \end{center}
-\end{figure}
+\end{figure*}
 
 %
 % We may end up losing this graph as its kinda bogus
@@ -69,15 +69,15 @@ Every deployment starts with the creation of the session followed by the
 reservation, execution, aggregation and then ending with termination of the
 session.  We have taken the average value over multiple runs for our analysis.
 
-\begin{figure}[h]
+\begin{figure*}
   \begin{center}
     \leavevmode
-      \includegraphics[height=0.2\textheight,width=0.5\textwidth]
+      \includegraphics[height=0.4\textheight,width=0.9\textwidth]
 		{./img/date_graph}
     \caption{Deployment without input}
     \label{fig:date_graph}
   \end{center}
-\end{figure}
+\end{figure*}
 
 Figure \ref{fig:date_graph} presents the results of deployment of the date
 command in the form of graph.  This graph presents the breakup time for various
@@ -92,6 +92,16 @@ aggregation time increases rapidly while reservation time remains relatively
 constant. This shows that reservation time is not directly dependent on
 the number of deployments, whereas execution and aggregation time are directly
 proportional to the number of deployments.
+
+\begin{figure*}
+  \begin{center}
+    \leavevmode
+      \includegraphics[height=0.4\textheight,width=0.9\textwidth]
+		{./img/wc_graph}
+    \caption{Deployment with input}
+    \label{fig:wc_graph}
+  \end{center}
+\end{figure*}
 
 Now, let us try to analyze why reservation time is independent of the number of
 deployments.  The reservation process involves traversing the underlying
@@ -144,16 +154,6 @@ nodes.
 Figure \ref{fig:wc_graph} presents the results of evaluations involving the
 distribution of the input.
 
-
-\begin{figure}[h]
-  \begin{center}
-    \leavevmode
-      \includegraphics[height=0.2\textheight,width=0.5\textwidth]
-		{./img/wc_graph}
-    \caption{Deployment with input}
-    \label{fig:wc_graph}
-  \end{center}
-\end{figure}
 
 These results enforce our observations that reservation time is directly
 proportional to the the depth of the tree whereas aggregation and execution time
