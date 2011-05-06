@@ -83,8 +83,8 @@ level provide the aggregate interfaces to the sub-session directory.
 \subsection{Brasil}
 
 The core of Brasil is a self-contained daemon which is based on a fork of
-Inferno.
-Inferno\cite{inferno} is an open source distributed operating system 
+Inferno~\cite{dorward1997ios}.
+Inferno is an open source distributed operating system 
 which is a direct descendant of the Plan 9 operating system~\cite{pike1995pbl}.  
 It runs natively on
 multiple hardware platforms and can also run as a user-space application on
@@ -96,7 +96,7 @@ This protocol is used by Plan 9 and Inferno extensively to access any file.
 Recently the Linux kernel has added support for the \texttt{9P}
 protocol\cite{graverobbers}.  This allows Linux to mount filesystems
 exported over the 9P protocol.  Other Unix based operating systems can use
-FUSE\cite{FUSE} for accessing the 9P based filesystems. 
+FUSE for accessing the 9P based filesystems. 
 
 The applications interact with this mounted Brasil filesystem using the native
 filesystem interfaces (e.g. VFS for Linux). Any interaction with this Brasil
@@ -149,12 +149,7 @@ node. All other directories in the represents the Brasil filesystem of the
 children nodes.  It can be easily seen that both \textit{App-1} and
 \textit{App-2} have access to all the nodes even though they are running on
 different nodes.  In this design, every node has to worry about only its
-children and the parent, other topology falls in the place automatically.
-
-Even though the filesystem view at different nodes differ from each other, 
-all nodes have access to the full topology.  The \texttt{[/csrv/]} filesystem
-view encodes enough information within itself that any nodes can construct the
-global view and figure out their own position within the global view.
+children and the parent, other topology falls into place automatically.
 
 Just because every node can construct the global view, does not mean that it
 must use this global view for making any decision or performing a typical
