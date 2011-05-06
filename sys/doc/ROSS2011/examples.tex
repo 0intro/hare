@@ -1,0 +1,70 @@
+\subsection{Examples}
+While the PUSH shell handles much of the complexity of interacting with the
+Brasil infrastructure, it is useful to see examples of how it interacts
+with the underlying infrastructure in order to understand the various mechanisms
+better.  These examples are given from the perspective of directly interacting
+with the infrastructure file systems from a normal UNIX shell.
+
+The first example presents how the default aggregation behaviour of Brasil can
+used to deploy large number of applications.
+
+\begin{verbatim}
+$ less ./mpoint/csrv/local/clone
+0 
+\end{verbatim}
+The above command is an example of creating a new session. The contents read
+from the \texttt{[clone]} file represent the session-ID.  Now we use session 0
+for performing actual execution.
+\begin{verbatim}
+$ echo "res 4" > ./mpoint/csrv/local/0/ctl
+$ echo "exec date" > ./mpoint/csrv/local/0/ctl
+$ cat ./mpoint/csrv/local/0/stdio
+Fri May 7 13:53:58 CDT 2010
+Fri May 7 13:53:58 CDT 2010
+Fri May 7 13:53:58 CDT 2010
+Fri May 7 13:53:58 CDT 2010
+$
+\end{verbatim}
+The first echo command sends the request for reserving 4 remote resources. The
+next echo command submits the request for executing the \texttt{date} command.
+And the \texttt{cat} command on \texttt{[stdio]} returns the aggregated output
+to the user.  This example shows all the complexities about finding, connecting
+and using the remote resources is hidden behind the filesystem interface.
+This approach can be used in the \textit{trivially parallelizable applications}
+where the same application is deployed on all the nodes.
+
+When constructing more complicated dataflow pipelines, Brasil handles
+reserving the resources and setting up the pipe endpoints of the pipeline
+components.
+Instead of interacting with the aggregation points, dataflow applications (such
+as the PUSH shell) can interact directly with the subsessions responsible for 
+each pipeline component.
+
+In this example, we will try to create a small pipeline of two commands
+\texttt{date | wc}.  But we will create this pipeline across multiple nodes. 
+
+Lets assume that session 0 is created by opening \texttt{[clone]} file as shown
+in the previous example.  The following commands will create the desired
+pipeline.
+
+\begin{verbatim}
+$ echo "res 2" > ./mpoint/csrv/local/0/ctl
+$ echo "exec date" > ./mpoint/csrv/local/0/0/ctl
+$ echo "exec wc" > ./mpoint/csrv/local/0/1/ctl
+$ echo "xsplice 0 1" > ./mpoint/csrv/local/0/ctl
+$ cat ./mpoint/csrv/local/0/1/stdio
+1 6 29
+$
+\end{verbatim}
+
+The first command \texttt{[exec date]} is sent to 0'th sub-session and the
+second command \texttt{[exec wc]} is sent to the 1st sub-session.  The
+\texttt{[xsplice 0 1]} request tells the parent session to redirect the output
+of the 0'th session to the input of the 1st session.  The \textbf{xsplice}
+command can be seen as a pipe operator of the shell script for redirecting the
+output of one command to the input of other command.
+
+The above example is equivalent of executing \texttt{date | wc} on the shell,
+but with the difference that both commands are executed on a different remote
+machines while sharing the same namespace.
+
