@@ -230,10 +230,18 @@ killall(Srv*)
 	threadexitsall("killall");
 }
 
-#define MAGIC		((uvlong) 6163 << 32)
+/* FIXME: prepending/adding the PID with pipealloc's path will not fit
+ * within the lower 32 bits
+ *
+
+ * This might not scale well.  Need to reexamine how the qid's are
+ * generated and acounted for not only the local machine and the
+ * synthetic file systems, but also for its scalability.
+ */
+#define MAGIC		((uvlong) 0x6163 << 32)
 #define NETTYPE(x)	((ulong)(x)&0x1f)
 #define NETID(x)	((((ulong)(x))>>5)&0xffff)
-#define NETQID(i,t)	(MAGIC|(((i)<<5)|(t)))
+#define NETQID(i,t)	(MAGIC|((((i)&0xffff)<<5)|((getpid()&0x7ff)<<21)|(t)))
 
 enum
 {
