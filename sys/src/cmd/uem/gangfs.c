@@ -1865,7 +1865,7 @@ threadmain(int argc, char **argv)
 	case 'n':	/* name override */
 		mysysname = estrdup9p(ARGF());
 		break;
-	case 'i':	/* update interval */
+	case 'i':	/* update interval (seconds) */
 		x = ARGF();
 		if(x)
 			updateinterval = atoi(x);
