@@ -1116,7 +1116,7 @@ fsopen(Req *r)
 				respond(r, Eclosing);
 				return;
 			} else {
-				mygang->ctlref++; /* TODO: do we need to lock? */
+				mygang->ctlref++;
 			}
 			wunlock(&glock);
 		} else
