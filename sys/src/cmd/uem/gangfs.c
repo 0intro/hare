@@ -61,6 +61,9 @@ char Eclosing[] = "gang is closing or broken";
 char Estatfind[] = "could not allocate or find child";
 char Ebadstat[] = "bad status message";
 char Estatparse[] = "problem parsing status write";
+char Eattach[] = "invalid attach specifier";
+char Enotimp[] = "not implemented yet";
+char Etolong[] = "ctl message too long";
 
 
 enum {	/* DEBUG LEVELS */
@@ -888,7 +891,7 @@ static void
 fsattach(Req *r)
 {
 	if(r->ifcall.aname && r->ifcall.aname[0]){
-		respond(r, "invalid attach specifier");
+		respond(r, Eattach);
 		return;
 	}
 	r->fid->qid.path = Qroot;
@@ -1110,7 +1113,7 @@ fsopen(Req *r)
 			wlock(&glock);
 			if(mygang->status >= GANG_CLOSING) {
 				wunlock(&glock);
-				respond(r, "gang already in the process of closing");
+				respond(r, Eclosing);
 				return;
 			} else {
 				mygang->ctlref++; /* TODO: do we need to lock? */
@@ -1130,7 +1133,7 @@ fsopen(Req *r)
 	/* insert new session at the end of the list & assign index*/
 	mygang = newgang();
 	if(mygang == nil) {
-		respond(r, "out of resources");
+		respond(r, Enores);
 		return;
 	}
 	fid->aux = mygang;
@@ -1170,7 +1173,7 @@ fsread(Req *r)
 			free(statbuf);
 			return;
 		default:
-			respond(r, "not yet");
+			respond(r, Enotimp);
 	}
 }
 
@@ -1623,7 +1626,7 @@ fswrite(void *arg)
 		return;
 	case Qctl:
 		if(r->ifcall.count >= 1024) {
-			respond(r, "ctl message too long");
+			respond(r, Etolong);
 			return;
 		}
 		if(g->status > GANG_EXEC) {
