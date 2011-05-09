@@ -247,6 +247,9 @@ fswrite(Req *r)
 	}
 
 	/* not active yet: read to get response */
+
+	/* this assumes that the only thing expected to be written is
+	 * the exec cmd if the session is not yet active. */
 	ret = read(e->ctlfd, ctlbuf, STRMAX);
 	if(ret < 0) {
 		responderror(r);
