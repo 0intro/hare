@@ -156,7 +156,7 @@ fsopen(Req *r)
 	pipe(p);
 	fd = create(srvctl, OWRITE, 0666);
 	if(fd < 0) {
-		err = Esrv;
+		err = estrdup9p(Esrv);
 		goto error;
 	}
 
@@ -218,11 +218,13 @@ fsopen(Req *r)
 
 error:
 	free(fname);
-	free(ctlbuf);
+	if(err != ctlbuf)
+		free(ctlbuf);
 	/* free channel */
 	free(e);
 	f->aux = nil;
 	respond(r, err);
+	free(err);
 }
 
 static void
