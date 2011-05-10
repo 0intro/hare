@@ -360,7 +360,6 @@ iothread(void*)
 		case Tclunk:
 			fsclunk(r->fid);
 			sendp(clunkchan, r);
-			free(r);
 			break;
 		default:
 			DPRINT(DERR, "*ERROR*: unrecognized io op %d\n", r->ifcall.type);
@@ -393,6 +392,8 @@ clunkproxy(Fid *f)
 		threadexits("iochan hungup");
 	}
 	recvp(clunkchan);
+
+	free(r);
 }
 
 Srv fs=
