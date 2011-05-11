@@ -144,6 +144,8 @@ struct Gang
 RWLock glock; 
 Gang *glist;
 
+// FIXME: comment...
+
 typedef struct Dirtab Dirtab;
 struct Dirtab
 {
