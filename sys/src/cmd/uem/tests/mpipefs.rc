@@ -65,13 +65,13 @@ fn enum_tests {
 APID=() # keep a list of child PID's
 HEADER=0
 fn check_ready {
-	if(! ~ $DEBUG_LEVEL 0) {
-		if(~ $HEADER 0) {
-			echo
-			echo '    Checking readyness'
-			HEADER=1
-		}
-	}
+#	if(! ~ $DEBUG_LEVEL 0) {
+#		if(~ $HEADER 0) {
+#			echo
+#			echo '    Checking readyness'
+#			HEADER=1
+#		}
+#	}
 
 	# FIXME: should we terminate after some number of tries, or
 	# just keep spinning...
@@ -80,7 +80,8 @@ fn check_ready {
 		DONE=1
 		for(i in $APID) {
 	    		STATE=`{cat /proc/$i/status | sed 's%cat[ ]*[^ ]*[ ]*%%
-				s%  *.* (.*)%%'} #` turn off code coloring snafu
+				s%  *.* (.*)%%'}
+			#`# turn off code coloring snafu
 
 			# sanity check
 			if(! ~ $status '') {
@@ -89,8 +90,8 @@ fn check_ready {
 
 	    		# check if it is not ready to read
 			if(! ~ $STATE 'Pread') {
-				if(! ~ $DEBUG_LEVEL 0) 
-	    				echo '        ' $i $STATE
+#				if(! ~ $DEBUG_LEVEL 0) 
+#	    				echo '        ' $i $STATE
 				DONE=0
 			}
 		}
@@ -178,8 +179,11 @@ fn simplepipe {
 fn multipipe {
 	echo -n Testing multipipe messages...
 
+	NUM_TESTS=9
+	NUM_PASSED=3
+
 	# initialize test files
-	create_tests 20
+	create_tests $NUM_TESTS
 
 	# initialize files
 	mount /srv/mpipe /n/mpipetest
@@ -196,6 +200,9 @@ fn multipipe {
 	    # next.  Note: this is not the most efficient way of doing
 	    # this as it checks all of them, but the check is already
 	    # written...
+
+	    # FIXME: the above does not work to force determinis.  We
+	    # should move this outsize later
 	    check_ready 
 	}
 
@@ -203,24 +210,49 @@ fn multipipe {
 	# because we did it in the loop.
 
 	# write to two and only two readers
-	mp-writer -n 2 -s 8192 /n/mpipetest/data
+	if(~ $DEBUG_LEVEL 0) {
+		mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
+	}
+	if not {
+		mp-writer -D -n $NUM_PASSED -s 8192 /n/mpipetest/data
+	}
 
 	# wait for children to finish
 	wait
 
-	# two, and only two, files should have any data in it
-	FILLED=0
+	# make a list of all tests that meet the criteria
+	T=()
 	for(i in $TESTNUM) {
-	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
+	    LST=`{ls -l $TESTDIR/test$i | sed 's%[^ ]* [^ ]* [^ ]* [^ ]* [^ ]* %%' | sed 's% .*%%'} #`#
+	    #LST2=`{echo $LST1 | sed 's/.* \([0-9]*\).* .*/\1/'} #`#
+
 	    if(! ~ $LST 0) {
-		 echo '   Test'$i' has data'
-		if(! ~ $FILLED 0 && ! ~ $FILLED 1 ) {
-		    echo 'FAILED: more than one file has data in longmsg'
-		    exit 'multipipe'
-		}
-		FILLED=1
+		T=($T $LST)
 	    }
 	}
+
+#	if(! ~ $DEBUG_LEVEL 0)
+#		echo 'Number of tests: '$#T
+
+	# make sure the number of tests that passed was that expected
+	if(! ~ $#T $NUM_PASSED) {
+	    echo 'FAILED (multipipe): more than one file has data in longmsg'
+	    exit 'multipipe'
+	}
+
+#	# two, and only two, files should have any data in it
+#	FILLED=0
+#	for(i in $TESTNUM) {
+#	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`#
+#	    if(! ~ $LST 0) {
+#		 echo '   Test'$i' has data'
+#		if(! ~ $FILLED 0 && ! ~ $FILLED 1 ) {
+#		    echo 'FAILED: more than one file has data in longmsg'
+#		    exit 'multipipe'
+#		}
+#		FILLED=1
+#	    }
+#	}
 
 	# FIXME: the determinish test fails.  If you want to determine
 	# which of the pipes get written to we will have to
@@ -268,7 +300,7 @@ fn enum {
 	# only one of the files should have any data in it
 	FILLED=0
 	for(i in $TESTNUM) {
-	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
+	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`#
 	    if(! ~ $LST 0) {
 		if(! ~ $FILLED 0) {
 		    echo 'FAILED: more than one file has data in enum'
@@ -312,7 +344,7 @@ fn longmsg {
 	# only one of the files should have any data in it
 	FILLED=0
 	for(i in $TESTNUM) {
-	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`
+	    LST=`{ls -s $TESTDIR/test$i | sed 's% .*%%'} #`#
 	    if(! ~ $LST 0) {
 		if(! ~ $FILLED 0) {
 		    echo 'FAILED: more than one file has data in longmsg'
@@ -331,9 +363,12 @@ fn longmsg {
 fn bcast {
 	echo -n Testing with broadcast...
 
+	NUM_TESTS=9
+	NUM_PASSED=3
+
 	# initialize test files
 	echo Hello Squidboy > $TESTDIR/test
-	create_tests 20
+	create_tests $NUM_TESTS
 
 	# accomplish the test
 	mount /srv/mpipe /n/mpipetest -b
@@ -367,7 +402,7 @@ fn bcast {
 	# FIXME: do not hangup until unmount (a mode for mpipefs)
 
 	# verify results
-	cmp_tests 20 'bcast'
+	cmp_tests $NUM_TESTS 'bcast'
 
 	echo Success!
 

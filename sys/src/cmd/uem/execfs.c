@@ -156,7 +156,7 @@ fsopen(Req *r)
 	pipe(p);
 	fd = create(srvctl, OWRITE, 0666);
 	if(fd < 0) {
-		err = Esrv;
+		err = estrdup9p(Esrv);
 		goto error;
 	}
 
@@ -218,11 +218,13 @@ fsopen(Req *r)
 
 error:
 	free(fname);
-	free(ctlbuf);
+	if(err != ctlbuf)
+		free(ctlbuf);
 	/* free channel */
 	free(e);
 	f->aux = nil;
 	respond(r, err);
+	free(err);
 }
 
 static void
@@ -247,6 +249,9 @@ fswrite(Req *r)
 	}
 
 	/* not active yet: read to get response */
+
+	/* this assumes that the only thing expected to be written is
+	 * the exec cmd if the session is not yet active. */
 	ret = read(e->ctlfd, ctlbuf, STRMAX);
 	if(ret < 0) {
 		responderror(r);
@@ -355,7 +360,6 @@ iothread(void*)
 		case Tclunk:
 			fsclunk(r->fid);
 			sendp(clunkchan, r);
-			free(r);
 			break;
 		default:
 			DPRINT(DERR, "*ERROR*: unrecognized io op %d\n", r->ifcall.type);
@@ -388,6 +392,8 @@ clunkproxy(Fid *f)
 		threadexits("iochan hungup");
 	}
 	recvp(clunkchan);
+
+	free(r);
 }
 
 Srv fs=
