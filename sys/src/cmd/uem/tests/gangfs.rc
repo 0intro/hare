@@ -13,11 +13,9 @@ EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
 TESTDIR=.test
 
-M_MNTPATH=/tmp/testbed/M
 E_MNTPATH=/tmp/testbed/E
 G_MNTPATH=/tmp/testbed/G
 
-#M_MNTPATH=/proc
 E_MNTPATH=/proc
 #G_MNTPATH=/proc
 
@@ -26,13 +24,12 @@ E_MNTPATH=/proc
 #
 fn cleanup {
 	echo Cleaning up previous runs.
-	unmount /n/mpipetest > /dev/null >[2] /dev/null
-	unmount $M_MNTPATH   > /dev/null >[2] /dev/null
 	unmount $E_MNTPATH   > /dev/null >[2] /dev/null
 	unmount $G_MNTPATH   > /dev/null >[2] /dev/null
 
 	rm -rf /tmp/testbed
 	rm -f /srv/mpipe
+	rm -f /srv/execfs
 	rm -f /srv/gangfs
 
 	unmount /proc > /dev/null >[2] /dev/null
@@ -44,26 +41,24 @@ fn cleanup {
 #
 fn startup {
 
-	mkdir -p $M_MNTPATH $E_MNTPATH $G_MNTPATH
+	mkdir -p $E_MNTPATH $G_MNTPATH
 
 	echo Starting mpipefs....
 	if(~ $#* 0) {
-		mpipefs $M_MNTPATH >[2] $MPIPELOG 
+		mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $1 $M_MNTPATH >[2] $MPIPELOG 	# CHATTY
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 	}
-	bind -bc '#p' $M_MNTPATH
-	mount /srv/mpipe /n/mpipetest test
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		execfs $E_MNTPATH >[2] $EXECLOG 
+		execfs -s execfs $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $1 $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		execfs -D -v $1 -s execfs $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
-	bind -bc '#p' $E_MNTPATH
+	bind -b '#p' $E_MNTPATH
 
 	echo Starting gangfs.
 	if(~ $#* 0) {
