@@ -164,6 +164,8 @@ fn enum {
 }
 
 # Setup
+rfork
+
 cleanup
 startup $1
 testdir
