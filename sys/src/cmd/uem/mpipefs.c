@@ -227,11 +227,6 @@ usage(void)
 static void
 killall(Srv*)
 {
-	// FIXME: is it necessary to kill the iothread seperately now?
-	//int tpid = threadpid(iothread_id);
-	//DPRINT(DFID, "killing iothread's pid=(%d)\n", tpid);
-	//threadkill(iothread_id);
-
 	DPRINT(DFID, "killing iochan and all thread\n");
 	chanfree(iochan);
 	threadexitsall("killall");
