@@ -17,7 +17,7 @@ DEBUG_LEVEL=0
 #
 fn cleanup {
 	echo Cleaning up previous runs...
-	unmount /n/mpipetest > /dev/null >[2] /dev/null
+	#unmount /n/mpipetest > /dev/null >[2] /dev/null
 	rm -f /srv/mpipe
 	#kill mpipefs | rc
 }
@@ -146,6 +146,8 @@ fn named {
 	echo Success!	
 	# cleanup
 	unmount /n/mpipetest
+
+	# FIXME: check that it no longer exists after unmount
 }
 
 
@@ -168,7 +170,9 @@ fn simplepipe {
 	cmp_tests 1 'simplepipe'
 
 	echo Success!
+
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -269,6 +273,7 @@ fn multipipe {
 	echo Success!
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -312,6 +317,7 @@ fn enum {
 	echo Success!
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -355,6 +361,7 @@ fn longmsg {
 
 	echo Success!
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -397,7 +404,7 @@ fn bcast {
 
 	# FIXME: Umount of the multipipe does ***not*** flush readers.
 	# Should it? -- no, but think about erroring to the writer
-	unmount /n/mpipetest
+	# unmount /n/mpipetest
 
 	# FIXME: do not hangup until unmount (a mode for mpipefs)
 
@@ -407,6 +414,7 @@ fn bcast {
 	echo Success!
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -438,9 +446,9 @@ fn splicefrom {
 	cmp_tests 1
 	
 	echo Success!
-	unmount /n/mpipetest
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -480,9 +488,9 @@ fn splicefrombcast {
 	cmp_tests 20
 
 	echo Success!
-	unmount /n/mpipetest
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -502,14 +510,13 @@ fn spliceto {
 
 	cat $TESTDIR/test > /n/mpipetest/data
 
-	unmount /n/mpipetest
-	
 	# verify results
 	cmp_tests 1
 
 	echo Success!
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
@@ -538,11 +545,6 @@ fn splicetochain {
 	echo one > /n/stage0/s0
 	echo two > /n/stage1/s1
 	
-	unmount /n/stage0
-	unmount /n/stage1
-	unmount /n/stage2
-	unmount /n/stage3
-	
 	# verify results
 	echo one > $TESTDIR/test2
 	echo two >> $TESTDIR/test2
@@ -554,6 +556,10 @@ fn splicetochain {
 	echo Success!
 
 	# cleanup
+	unmount /n/stage0
+	unmount /n/stage1
+	unmount /n/stage2
+	unmount /n/stage3
 	rm -rf $TESTDIR/*
 }
 
@@ -587,7 +593,7 @@ fn splicetobcast {
 	wait # needs to happen before the unmount because it does not flush 
 
 	# FIXE: does not flush?
-	unmount /n/mpipetest
+	# unmount /n/mpipetest
 	
 	# verify results
 	cmp_tests 20
@@ -595,10 +601,13 @@ fn splicetobcast {
 	echo Success!
 
 	# cleanup
+	unmount /n/mpipetest
 	rm -rf $TESTDIR/*
 }
 
 # Setup
+rfork
+
 cleanup
 startup $*
 testdir

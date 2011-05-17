@@ -61,6 +61,7 @@ enum
 Channel *iochan;					/* dispatch channel */
 typedef struct Fidaux Fidaux;
 char defaultsrvpath[] = "mpipe";
+int iothread_id;
 
 char Enotdir[] = "walk in non-directory";
 char Enotfound[] = "directory entry not found";
@@ -226,6 +227,12 @@ usage(void)
 static void
 killall(Srv*)
 {
+	// FIXME: is it necessary to kill the iothread seperately now?
+	//int tpid = threadpid(iothread_id);
+	//DPRINT(DFID, "killing iothread's pid=(%d)\n", tpid);
+	//threadkill(iothread_id);
+
+	DPRINT(DFID, "killing iochan and all thread\n");
 	chanfree(iochan);
 	threadexitsall("killall");
 }
@@ -373,6 +380,7 @@ closebcasts(Mpipe *mp)
 {
 	Fidaux *c;
 	
+	DPRINT(DFID, "closebcasts: pid=(%d)\n", getpid());
 	for(c=mp->bcastr; c != nil; c=c->next) {
 		chanclose(c->chan);
 	}
@@ -384,6 +392,7 @@ closempipe(Mpipe *mp)
 {
 	int count;
 	
+	DPRINT(DFID, "closempipe: pid=(%d)\n", getpid());
 	for(count=0;count <  mp->slots; count++)
 		if(chanclosing(mp->rrchan[count]))
 			chanclose(mp->rrchan[count]);
@@ -1291,7 +1300,9 @@ threadmain(int argc, char **argv)
 
 	/* spawn off a dispatcher */
 	iochan = chancreate(sizeof(void *), 0);
-	proccreate(iothread, nil, STACK);
+	iothread_id = proccreate(iothread, nil, STACK);
+
+	DPRINT(DFID, "Main: srvpath=(%s) pid=(%d)\n", srvpath, getpid());
 
 	threadpostmountsrv(&fs, srvpath, mntpath, MBEFORE);
 

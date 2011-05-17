@@ -125,6 +125,7 @@ kickit(void)
 	Channel *pidc = chancreate(sizeof(ulong), 0);
 	ulong pid;
 
+	DPRINT(DCUR, "kickit: forking the proc: %r\n");
 	procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
 	pid = recvul(pidc);
 	if(pid==0) {
@@ -174,7 +175,7 @@ fsopen(Req *r)
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel */
-	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
+	n = snprint(fname, STRMAX, "%s/%d/ctl", procpath, e->pid);
 	assert(n > 0);
 	
 	/* grab ahold of the ctl file */
@@ -184,7 +185,7 @@ fsopen(Req *r)
 		goto error;
 	}
 
-	n = snprint(fname, STRMAX, "/proc/%d", e->pid);
+	n = snprint(fname, STRMAX, "%s/%d", procpath, e->pid);
 	assert(n > 0);
 
 	/* asserts are heavy handed, but help with debug */
@@ -304,12 +305,22 @@ cleanupsession(void *arg)
 {
 	int pid = (int) arg;
 	char *path = (char *) emalloc9p(STRMAX);
+	int ret;
 
 	/* BUG: what if we can't get to them because proc is already closed? */
-	snprint(path, STRMAX, "/proc/%d", pid);
-	unmount(0, path);
-	postnote(PNPROC, pid, "kill");
+	snprint(path, STRMAX, "%s/%d", procpath, pid);
 
+/*
+	DPRINT(DFID, "cleanupsession: unmounting and killing %s pid=(%d)\n", path, pid);
+	ret = unmount(0, path);
+	if(ret == -1) {
+		DPRINT(DFID, "  ERROR: unmounting (%d) failed\n", pid);
+	}
+	ret = postnote(PNPROC, pid, "kill");
+	if(ret == -1) {
+		DPRINT(DFID, "  ERROR: postnote (%d) failed\n", pid);
+	}
+*/
 	free(path);
 }
 
@@ -320,9 +331,13 @@ fsclunk(Fid *f)
 	if(f->aux) {
 		Exec *e = f->aux;
 
-		if(e->ctlfd)
+		DPRINT(DFID, "Should be cleaning up\n");
+		if(e->ctlfd) {
+			DPRINT(DFID, "    closing fd=(%d)\n", e->ctlfd);
 			close(e->ctlfd);
+		}
 
+		// FIXME: removed???
 		proccreate(cleanupsession, (void *)e->pid, STACK);
 
 		e->pid = -1;
@@ -336,6 +351,11 @@ fsclunk(Fid *f)
 static void
 cleanup(Srv *)
 {
+	//DPRINT(DFID, "cleanup: iothread's pid=(%d)\n", threadpid(iothread_id));
+	//threadkill(iothread_id);
+
+	DPRINT(DFID, "freeing the server, io and clunk channel\n");
+	remove(srvctl);
 	chanfree(iochan);
 	chanfree(clunkchan);
 	free(srvctl);

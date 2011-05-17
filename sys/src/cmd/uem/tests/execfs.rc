@@ -12,15 +12,25 @@ TESTDIR=.test
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
 
+M_MNTPATH=/tmp/testbed/M
+E_MNTPATH=/tmp/testbed/E
+
 #
 # Cleanup Previous Instances
 #
 fn cleanup {
 	echo Cleaning up previous runs.
-	unmount /n/test > /dev/null >[2] /dev/null
+
+	# FIXME: should there be multiple mpipes?
+	unmount /n/mpipetest > /dev/null >[2] /dev/null
+	unmount $M_MNTPATH > /dev/null >[2] /dev/null
+	unmount $E_MNTPATH > /dev/null >[2] /dev/null
+
+	rm -f $M_MNTPATH $E_MNTPATH /tmp/testbed
+	rm -f /srv/mpipe
+
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
-	rm -f /srv/mpipe
 }
 
 #
@@ -28,19 +38,27 @@ fn cleanup {
 #
 fn startup {
 	echo Starting mpipefs....
+
+	mkdir -p $M_MNTPATH $E_MNTPATH
+
 	if(~ $#* 0) {
-		mpipefs >[2] $MPIPELOG 
+		mpipefs $M_MNTPATH >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		mpipefs -D -v $1 $M_MNTPATH >[2] $MPIPELOG 	# CHATTY
 	}
+
+	bind -bc '#p' $M_MNTPATH
+	mount /srv/mpipe /n/mpipetest test
+
 	echo Starting execfs.
 	if(~ $#* 0) {
-		execfs >[2] $EXECLOG 
+		execfs $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $1 >[2] $EXECLOG  	# CHATTY
+		execfs -D -v $1 $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
+	bind -bc '#p' $E_MNTPATH
 }
 
 #
@@ -51,18 +69,18 @@ fn testdir {
 }
 
 fn myexecstdin {
-	mypid=`{cat}
+	mypid=`{cat} #`
 
 	echo -n exec /bin/cat >>[2] execfs.log >>[2] error.log
-	cat $TESTDIR/test > /proc/$mypid/stdin >>[2] error.log
-	cat /proc/$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	cat $TESTDIR/test > $E_MNTPATH/$mypid/stdin >>[2] error.log
+	cat $E_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexecstdout {
-	mypid=`{cat}
+	mypid=`{cat} #`
 
 	echo -n exec /bin/cat $TESTDIR/test >>[2] error.log
-	cat /proc/$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	cat $E_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn stdout {
@@ -73,7 +91,7 @@ fn stdout {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexecstdout <>/proc/clone >[1=0]
+	myexecstdout <>$E_MNTPATH/clone >[1=0]
 
 	# verify results
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
@@ -94,7 +112,7 @@ fn stdin {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexecstdin <>/proc/clone >[1=0]
+	myexecstdin <>$E_MNTPATH/clone >[1=0]
 
 	# verify results
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
@@ -108,13 +126,29 @@ fn stdin {
 }
 
 # Setup
+rfork
+
 cleanup
 startup $1
 testdir
 
+# Note: the current tests die on the 4'th run of either stdout or
+# stdin.  If I run cleanup**startup between each it runs fine.  For
+# now I am leaving it at two tests and will look into it later.
+
 # Tests
 stdout
 stdin	#failing
+
+# Extra Tests
+#stdout
+#stdin
+#stdout
+#stdin
+#stdout
+#stdin
+#cleanup
+#startup $1
 
 # Cleanup
 rm -rf $TESTDIR
