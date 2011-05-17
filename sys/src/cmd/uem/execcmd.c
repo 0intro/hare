@@ -44,6 +44,13 @@ enum {	/* DEBUG LEVELS (complimentary with execfs */
 	DARG = 10,	/* arguments */
 };
 
+static void
+usage(void)
+{
+	fprint(2, "execcmd [-D] [-v debuglevel] [-s srvctl]\n");
+	exits("usage");
+}
+
 void
 main(int argc, char **argv)
 {
@@ -61,21 +68,27 @@ main(int argc, char **argv)
 	
 	int pid = getpid();
 
-	switch(argc){
-		case 3:
-			vflag = atoi(argv[2]);
-			if(vflag) {
-				logfile = smprint("execcmd-%d.log", getpid());
-				debugfd = create(logfile, OWRITE, 0666);
-				assert(debugfd > 2);
-			} 
-		case 2:
-			srvctl = argv[1];
-			break;
-		default:
-			/* break */
-			assert(0);
-	}
+	ARGBEGIN{
+	case 'D':
+		chatty9p++;
+		break;
+	case 'v':
+		vflag = atoi(ARGF());
+		if(vflag) {
+			logfile = smprint("execcmd-%d.log", getpid());
+			debugfd = create(logfile, OWRITE, 0666);
+			free(logfile);
+			assert(debugfd > 2);
+		} 
+		break;		
+	case 's':
+		srvctl = ARGF();
+		break;
+	default:
+		/* break */
+		usage();
+		assert(0);
+	}ARGEND
 
 	DPRINT(DEXC, "Inside execution wrapper: vflag=%d debugfd=%d\n", vflag, debugfd);
 
@@ -123,6 +136,7 @@ main(int argc, char **argv)
 		cb = parsecmd(ctlbuf, ret);
 		cmd = lookupcmd(cb, ctltab, nelem(ctltab));
 		if(cmd == nil) {
+			DPRINT(DERR, "ERROR: bad ctl\n");
 			write(ctlfd, Ebadctl, strlen(Ebadctl));
 			continue;
 		}
@@ -130,6 +144,7 @@ main(int argc, char **argv)
 		switch(cmd->index){
 		case Cexec:
 			if(cb->nf < 2) {
+				DPRINT(DERR, "ERROR: bad exec\n");
 				write(ctlfd, Ebadexec, strlen(Ebadexec));
 				continue;
 			}
@@ -147,9 +162,12 @@ main(int argc, char **argv)
 			exec(cb->f[1], &cb->f[1]);
 
 			/* something happened report it */
+			DPRINT(DERR, "ERROR:  something happened with the exec\n");
 			ctlbuf = smprint("execcmd: exec: %r");
 			write(ctlfd, ctlbuf, ret);
-			free(ctlbuf);
+
+			/* make sure that we will not try to free fname twice... */
+			fname = nil;
 			goto error;
 			break;
 		/* room for more commands later */

@@ -108,7 +108,11 @@ cloneproc(void *arg)
 
 	threadsetname("execfs-cloneproc");
 
-	procexecl(pidc, "/bin/execcmd", "execcmd", srvctl, smprint("%d", vflag), nil);
+	DPRINT(DFID, "cloneproc (%p) (%s) (%s) (%s) (%s) (%s) (%s): %r\n",
+		pidc, "/bin/execcmd", "execcmd", "-s", srvctl,
+		  "-v", smprint("%d", vflag));
+	procexecl(pidc, "/bin/execcmd", "execcmd", "-s", srvctl, "-v", 
+		  smprint("%d", vflag), nil);
 	
 	sendul(pidc, 0); /* failure */
 	threadexits(nil);
