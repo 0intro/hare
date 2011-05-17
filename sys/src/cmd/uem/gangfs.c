@@ -34,7 +34,10 @@
 #include "debug.h"
 
 static char defaultpath[] =	"/proc";
-static char *procpath;
+static char defaultsrvpath[] =	"gangfs";
+static char *procpath, *srvpath;
+int iothread_id;
+
 static char *gangpath;	/* our view of the gang path */
 static char *xgangpath; /* external view of the gang path */
 static char *mysysname;
@@ -538,6 +541,7 @@ updatestatus(void *arg)
 	char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
 	int parentfd = open(parentpath, OWRITE);
 			
+	DPRINT(DCUR, "updatestatus: parent=(%s) parentpath=(s)\n", parent, parentpath);
 	if(parentfd < 0) {
 		DPRINT(DERR, "*ERROR*: couldn't open parent %s on path %s\n", parent, parentpath);
 		return;
@@ -882,7 +886,13 @@ releasegang(Gang *g)
 static void
 cleanup(Srv *)
 {
+	DPRINT(DCUR, "cleanup: pid=(%d)\n", getpid());
 	nbsendp(iochan, 0); /* flush any blocked readers */
+
+	// FIXME: is this necessary?  the iothread is being held open...
+	DPRINT(DFID, "cleanup: iothread's pid=(%d)\n", threadpid(iothread_id));
+	threadkill(iothread_id);
+
 	chanclose(iochan);
 	closestatus(&mystats);
 	sleep(5);
@@ -1322,7 +1332,9 @@ setupsess(Gang *g, Session *s, char *path, int r)
 	if(path)
 		s->path = smprint("/n/%s/proc", path);
 	else
-		s->path = smprint("/proc");
+		s->path = smprint(defaultpath);
+	DPRINT(DEXE, "setupsess: path=(%s)\n", s->path);
+
 	s->r = nil;
 	s->chan = chancreate(sizeof(char *), 0);
 	s->g = g; /* back pointer */
@@ -1336,7 +1348,7 @@ reslocal(Gang *g)
 	int count;
 	char *err = nil;
 
-	DPRINT(DEXE, "reslocal %d\n", g->size);
+	DPRINT(DEXE, "reslocal: size=(%d)\n", g->size);
 
 	if(mystats.next == nil)
 		mystats.njobs += g->size;
@@ -1852,6 +1864,8 @@ threadmain(int argc, char **argv)
 	updateinterval = 5;	/* 5 second default update interval */
 	mysysname = getenv("sysname");
 
+	srvpath = defaultsrvpath;
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
@@ -1863,6 +1877,9 @@ threadmain(int argc, char **argv)
 		break;
 	case 'p':	/* specify parent */
 		parent = ARGF();
+		break;
+	case 's':	/* specify server name */
+		srvpath = ARGF();
 		break;
 	case 'n':	/* name override */
 		mysysname = estrdup9p(ARGF());
@@ -1898,13 +1915,17 @@ threadmain(int argc, char **argv)
 		proccreate(updatestatus, (void *)parent, STACK);
 	}
 
+	DPRINT(DFID, "Main: procpath=(%s) pid=(%d)\n", procpath, getpid());
+
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
 	clunkchan = chancreate(sizeof(void *), 0);
-	proccreate(iothread, nil, STACK);
+	iothread_id = proccreate(iothread, nil, STACK);
 	recvp(iochan);
 
-	threadpostmountsrv(&fs, nil, procpath, MAFTER);
+	DPRINT(DFID, "Main: iothread_id=(%d)\n", threadpid(iothread_id));
 
-	threadexits(0);
+	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
+
+	threadexits(nil);
 }

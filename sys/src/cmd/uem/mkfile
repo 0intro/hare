@@ -55,8 +55,8 @@ regress:V: install dirsinstall
 	tests/gangfs.rc
 
 debug:V: install dirsinstall
-	tests/mpipefs.rc 9
-	tests/execfs.rc 9
+	#tests/mpipefs.rc 9
+	#tests/execfs.rc 9
 	tests/gangfs.rc 9
 
 tidy:V:

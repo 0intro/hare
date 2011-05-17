@@ -13,45 +13,66 @@ EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
 TESTDIR=.test
 
+M_MNTPATH=/tmp/testbed/M
+E_MNTPATH=/tmp/testbed/E
+G_MNTPATH=/tmp/testbed/G
+
+#M_MNTPATH=/proc
+E_MNTPATH=/proc
+#G_MNTPATH=/proc
+
 #
 # Cleanup Previous Instances
 #
 fn cleanup {
 	echo Cleaning up previous runs.
+	unmount /n/mpipetest > /dev/null >[2] /dev/null
+	unmount $M_MNTPATH   > /dev/null >[2] /dev/null
+	unmount $E_MNTPATH   > /dev/null >[2] /dev/null
+	unmount $G_MNTPATH   > /dev/null >[2] /dev/null
+
+	rm -rf /tmp/testbed
 	rm -f /srv/mpipe
-	unmount /n/test > /dev/null >[2] /dev/null
+	rm -f /srv/gangfs
+
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
-	kill mpipfs | rc
-	kill execfs | rc
-	kill gangfs | rc
 }
 
 #
 # Startup execfs 
 #
 fn startup {
-	echo Starting execfs.
-	if(~ $#* 0) {
-		execfs >[2] $EXECLOG 
-	}
-	if not {
-		execfs -D -v $1 >[2] $EXECLOG  	# CHATTY
-	}
-	echo Starting gangfs.
-	if(~ $#* 0) {
-		gangfs >[2] $GANGLOG 
-	}
-	if not {
-		gangfs -D -v $1 >[2] $GANGLOG  	# CHATTY
-	}
+
+	mkdir -p $M_MNTPATH $E_MNTPATH $G_MNTPATH
+
 	echo Starting mpipefs....
 	if(~ $#* 0) {
-		mpipefs >[2] $MPIPELOG 
+		mpipefs $M_MNTPATH >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		mpipefs -D -v $1 $M_MNTPATH >[2] $MPIPELOG 	# CHATTY
 	}
+	bind -bc '#p' $M_MNTPATH
+	mount /srv/mpipe /n/mpipetest test
+
+	echo Starting execfs.
+	if(~ $#* 0) {
+		execfs $E_MNTPATH >[2] $EXECLOG 
+	}
+	if not {
+		execfs -D -v $1 $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+	}
+	bind -bc '#p' $E_MNTPATH
+
+	echo Starting gangfs.
+	if(~ $#* 0) {
+		gangfs $G_MNTPATH >[2] $GANGLOG 
+	}
+	if not {
+		gangfs -D -v $1 $G_MNTPATH >[2] $GANGLOG  	# CHATTY
+	}
+	mount /srv/gangfs $G_MNTPATH
 }
 
 #
@@ -62,27 +83,27 @@ fn testdir {
 }
 
 fn myexec {
-	mypid=`{cat}
+	mypid=`{cat} #`
 	echo res 5 >>[2] error.log
 	echo exec /bin/cat $TESTDIR/test >>[2] error.log
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexec2 {
-	mypid=`{cat}
+	mypid=`{cat} #`
 	echo res 5 >>[2] error.log
 	echo exec /bin/cat >>[2] error.log
-	cat $TESTDIR/test > /proc/g$mypid/stdin >>[2] error.log
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	cat $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] error.log
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexec3 {
-	mypid=`{cat}
+	mypid=`{cat} #`
 	echo enum >>[2] error.log
 	echo res 5 >>[2] error.log
 	echo exec /bin/cat >>[2] error.log
-	read -n 5 $TESTDIR/test > /proc/g$mypid/stdin >>[2] error.log &
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	read -n 5 $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] error.log &
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn basic {
@@ -93,10 +114,10 @@ fn basic {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec <>/proc/gclone >[1=0]
+	myexec <>$G_MNTPATH/gclone >[1=0]
 
 	# verify results (yes, I'm lazy)
-	cat $TESTDIR/test > $TESTDIR/test2
+	cat $TESTDIR/test >  $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
@@ -119,10 +140,10 @@ fn stdin {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec2 <>/proc/gclone >[1=0]
+	myexec2 <>$G_MNTPATH/gclone >[1=0]
 
 	# verify results (yes, I'm lazy)
-	cat $TESTDIR/test > $TESTDIR/test2
+	cat $TESTDIR/test >  $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
@@ -141,16 +162,16 @@ fn enum {
 	echo -n Enumerated STDIN Test....
 
 	# initialize files
-	echo one > $TESTDIR/test
-	echo two >> $TESTDIR/test
+	echo one   >  $TESTDIR/test
+	echo two   >> $TESTDIR/test
 	echo three >> $TESTDIR/test
-	echo four >> $TESTDIR/test
-	echo five >> $TESTDIR/test
+	echo four  >> $TESTDIR/test
+	echo five  >> $TESTDIR/test
 
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec3 <>/proc/gclone >[1=0]
+	myexec3 <>$G_MNTPATH/gclone >[1=0]
 
 	# verify results 
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
@@ -167,8 +188,8 @@ fn enum {
 rfork
 
 cleanup
-startup $1
 testdir
+startup $1
 
 # Tests
 basic

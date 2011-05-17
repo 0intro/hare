@@ -48,7 +48,8 @@ enum {	/* DEBUG LEVELS */
 };
 
 static char defaultpath[] =	"/proc";
-static char *procpath;
+static char defaultsrvpath[] =	"execfs";
+static char *procpath, *srvpath;
 static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
@@ -434,6 +435,9 @@ threadmain(int argc, char **argv)
 {
 	char *x;
 
+	srvpath = defaultsrvpath;
+	srvpath = nil;
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
@@ -443,6 +447,9 @@ threadmain(int argc, char **argv)
 		if(x)
 			vflag = atoi(x);
 		break;		
+	case 's':	/* specify server name */
+		srvpath = ARGF();
+		break;
 	default:
 		usage();
 	}ARGEND
@@ -465,6 +472,6 @@ threadmain(int argc, char **argv)
 	clunkchan = chancreate(sizeof(void *), 0);
 	proccreate(iothread, nil, STACK);
 
-	threadpostmountsrv(&fs, nil, procpath, MAFTER);
+	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
 	threadexits(0);
 }

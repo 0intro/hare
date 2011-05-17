@@ -58,6 +58,7 @@ fn startup {
 	if not {
 		execfs -D -v $1 $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
+	#bind -bc '#p' $E_MNTPATH
 	bind -bc '#p' $E_MNTPATH
 }
 
