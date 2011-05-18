@@ -712,7 +712,10 @@ flushmp(char *src)
 		return fd;
 	}
 
-	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, "");
+	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n",
+		    pkttype, (ulong)0, (ulong)0, "");
+	DPRINT(DCUR, "flushmp: src=(%s) pid=(%d)\n", src, getpid());
+
 	n = pwrite(fd, hdr, n, tag);
 	close(fd);
 	return n;

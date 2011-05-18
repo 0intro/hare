@@ -12,7 +12,6 @@ TESTDIR=.test
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
 
-M_MNTPATH=/tmp/testbed/M
 E_MNTPATH=/tmp/testbed/E
 
 #
@@ -23,11 +22,11 @@ fn cleanup {
 
 	# FIXME: should there be multiple mpipes?
 	unmount /n/mpipetest > /dev/null >[2] /dev/null
-	unmount $M_MNTPATH > /dev/null >[2] /dev/null
 	unmount $E_MNTPATH > /dev/null >[2] /dev/null
 
-	rm -f $M_MNTPATH $E_MNTPATH /tmp/testbed
+	rm -f $E_MNTPATH /tmp/testbed
 	rm -f /srv/mpipe
+	rm -f /srv/execfs
 
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
@@ -39,26 +38,24 @@ fn cleanup {
 fn startup {
 	echo Starting mpipefs....
 
-	mkdir -p $M_MNTPATH $E_MNTPATH
+	mkdir -p $E_MNTPATH
 
 	if(~ $#* 0) {
-		mpipefs $M_MNTPATH >[2] $MPIPELOG 
+		mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $1 $M_MNTPATH >[2] $MPIPELOG 	# CHATTY
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 	}
 
-	bind -bc '#p' $M_MNTPATH
 	mount /srv/mpipe /n/mpipetest test
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		execfs -m $E_MNTPATH >[2] $EXECLOG 
+		execfs -s execfs -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $1 -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		execfs -D -v $1 -s execfs -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
-	#bind -bc '#p' $E_MNTPATH
 	bind -bc '#p' $E_MNTPATH
 }
 

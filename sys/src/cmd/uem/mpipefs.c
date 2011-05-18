@@ -1260,7 +1260,7 @@ Srv fs=
 	.read=			ioproxy,
 	.write=			ioproxy,
 	.stat=			fsstat,
-	.destroyfid=	fsclunk,
+	.destroyfid=		fsclunk,
 	.end=			killall,
 };
 
@@ -1297,7 +1297,10 @@ threadmain(int argc, char **argv)
 	iochan = chancreate(sizeof(void *), 0);
 	iothread_id = proccreate(iothread, nil, STACK);
 
-	DPRINT(DFID, "Main: srvpath=(%s) pid=(%d)\n", srvpath, getpid());
+	DPRINT(DFID, "Main: srvpath=(%s) mntpath=(%s)\n",
+	       srvpath, (mntpath==nil)?"nil":mntpath);
+	DPRINT(DFID, "Main: pid=(%d) iothread_id=(%d)\n",
+	       getpid(), threadpid(iothread_id));
 
 	threadpostmountsrv(&fs, srvpath, mntpath, MBEFORE);
 

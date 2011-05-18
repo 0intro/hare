@@ -47,6 +47,11 @@ enum {	/* DEBUG LEVELS */
 	DARG = 10,	/* arguments */
 };
 
+QLock lck;
+int num_mnts = 0;
+int *mnts = nil;
+int iothread_id;
+
 static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"execfs";
 static char *procpath, *srvpath;
@@ -96,9 +101,30 @@ mpipe(char *path, char *name)
 		return -1;
 	}
 	
+	DPRINT(DFID, "mpipe: mounting (%s) on (%s) pid=(%d)\n",
+	       name, path, getpid());
 	ret = mount(fd, -1, path, MAFTER, name);
+	if(ret<0)
+		DPRINT(DERR, "*ERROR*: mpipe mount failed: %r\n");
+
 	close(fd);
 	return ret;
+}
+
+/* FIXME: debugging... */
+static void
+lsproc(void *arg)
+{
+	Channel *pidc = arg;
+
+	threadsetname("execfs-lsproc");
+	DPRINT(DFID, "lsproc (%p) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
+	       pidc, "/bin/ls", "ls", "-l", procpath, getpid());
+	procexecl(pidc, "/bin/ls", "ls", procpath, nil);
+
+	sendul(pidc, 0);
+	threadexits(nil);
+
 }
 
 /* call the execution wrapper */
@@ -109,12 +135,12 @@ cloneproc(void *arg)
 
 	threadsetname("execfs-cloneproc");
 
-	DPRINT(DFID, "cloneproc (%p) (%s) (%s) (%s) (%s) (%s) (%s): %r\n",
-		pidc, "/bin/execcmd", "execcmd", "-s", srvctl,
-		  "-v", smprint("%d", vflag));
+	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
+	       pidc, "/bin/execcmd", "execcmd", "-s", srvctl,
+	       "-v", smprint("%d", vflag), getpid());
 	procexecl(pidc, "/bin/execcmd", "execcmd", "-s", srvctl, "-v", 
 		  smprint("%d", vflag), nil);
-	
+
 	sendul(pidc, 0); /* failure */
 	threadexits(nil);
 }
@@ -126,12 +152,20 @@ kickit(void)
 	Channel *pidc = chancreate(sizeof(ulong), 0);
 	ulong pid;
 
-	DPRINT(DCUR, "kickit: forking the proc: %r\n");
-	procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
+	DPRINT(DCUR, "kickit: forking the proc\n");
+	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
+	DPRINT(DCUR, "\tnpid=(%d)\n", npid);
 	pid = recvul(pidc);
 	if(pid==0) {
 		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
 	}
+/* FIXME: debuging... the proc still is there...
+procrfork(lsproc, (void *) pidc, STACK, RFFDG);
+ulong lspid = recvul(pidc);
+if(lspid==0) {
+	DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
+}
+*/
 
 	chanfree(pidc);
 
@@ -159,9 +193,14 @@ fsopen(Req *r)
 	memset(e, 0, sizeof(Exec));
 
 	/* setup bootstrap ctlfd */
+	DPRINT(DFID, "fsopen srvctl=(%s) pid=(%d)\n", srvctl, getpid());
+
 	pipe(p);
+	qlock(&lck);
 	fd = create(srvctl, OWRITE, 0666);
+	qunlock(&lck);
 	if(fd < 0) {
+		DPRINT(DFID, "fsopen failed for srvctl=(%s): %r\n", srvctl);
 		err = estrdup9p(Esrv);
 		goto error;
 	}
@@ -173,6 +212,11 @@ fsopen(Req *r)
      
 	/* ask for a new child process */
 	e->pid = (int) kickit();
+
+	/* cloneproc generates stdin, stdout, and stderr for the ctl
+	 * channel.  If any of these fail, then e->pid will be < 2, and
+	 * this is a hard failure, so crash instead of dieing
+	 * gracefully */
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel */
@@ -197,6 +241,13 @@ fsopen(Req *r)
 	n = mpipe(fname, "stderr");
 	assert(n > 0);
 
+	// FIXME: hack to keep track of mnts
+	qlock(&lck);
+	mnts = erealloc9p(mnts, (num_mnts+1)*sizeof(int));
+	mnts[num_mnts++] = e->pid;
+	qunlock(&lck);
+	DPRINT(DCUR, "fsopen: mounted new pipe num_mnts=(%d)\n", num_mnts);
+
 	/* handshake to execcmd */
 	n = write(e->ctlfd, "1", 1);
 	if(n < 0) {
@@ -212,7 +263,7 @@ fsopen(Req *r)
 	}
 	if(n != 1) {
 		ctlbuf[n] = 0;
-		err = ctlbuf;
+		err = estrdup9p(ctlbuf);
 		goto error;
 	}
 
@@ -224,8 +275,7 @@ fsopen(Req *r)
 
 error:
 	free(fname);
-	if(err != ctlbuf)
-		free(ctlbuf);
+	free(ctlbuf);
 	/* free channel */
 	free(e);
 	f->aux = nil;
@@ -246,8 +296,12 @@ fswrite(Req *r)
 	}
 	assert(e->ctlfd != -1);
 
+	DPRINT(DFID, "fswrite: ctlfd=(%d) count=(%d) pid=(%d)\n",
+	       e->ctlfd, r->ifcall.count, getpid());
+
 	ret = write(e->ctlfd, r->ifcall.data, r->ifcall.count);
 	if(ret < 0) {
+		DPRINT(DFID, "*ERROR*(fswrite): write pid=(%d): %r\n", getpid());
 		responderror(r);
 		return;
 	} else if(e->active) {	/* program already executing */
@@ -260,6 +314,7 @@ fswrite(Req *r)
 	 * the exec cmd if the session is not yet active. */
 	ret = read(e->ctlfd, ctlbuf, STRMAX);
 	if(ret < 0) {
+		DPRINT(DFID, "*ERROR*(fswrite): read pid=(%d): %r\n", getpid());
 		responderror(r);
 		return;
 	}
@@ -269,17 +324,20 @@ fswrite(Req *r)
 		/* replace our channel with the real control channel */
 		e->ctlfd = e->rctlfd;
 		e->active++;
+		DPRINT(DFID, "fswrite: go active=(%d)\n", e->active);
 
 		goto success;
 	}
 
 	/* convention: a single byte is sucess, multibyte is an error message */
 	if(ret != 1) {
+		DPRINT(DFID, "fswrite: single byte success\n");
 		ctlbuf[ret] = 0;
 		respond(r, ctlbuf);
 		return;
 	}
 success:
+	DPRINT(DFID, "fswrite: generall success\n");
 	r->ofcall.count = r->ifcall.count;
 	respond(r, nil);
 	return;
@@ -291,9 +349,14 @@ fsread(Req *r)
 	Fid *f = r->fid;
 	Exec *e = f->aux;
 
-	if(e->pid == 0)
+	DPRINT(DFID, "fsread: ctlfd=(%d) count=(%d) pid=(%d)\n",
+	       e->ctlfd, r->ifcall.count, getpid());
+
+	if(e->pid == 0) {
+		DPRINT(DERR, "*ERROR*(fsread): no pid\n");
 		respond(r, Enopid);
-	else {
+	} else {
+		DPRINT(DFID, "fsread: reading...\n");
 		char buf[16];
 		snprint(buf, 16, "%d", e->pid);
 		readstr(r, buf);
@@ -301,14 +364,39 @@ fsread(Req *r)
 	}	
 }
 
+static int
+flushmp(char *src)
+{
+	int fd = open(src, OWRITE);
+	int n; 
+	char hdr[255];
+	ulong tag = ~0; /* header byte is at offset ~0 */
+	char pkttype='.';
+
+	if(fd < 0) {
+		DPRINT(DERR, "flushmp: open failed: %r\n");
+		return fd;
+	}
+
+	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n",
+		    pkttype, (ulong)0, (ulong)0, "");
+	DPRINT(DCUR, "flushmp: src=(%s) pid=(%d)\n", src, getpid());
+
+	n = pwrite(fd, hdr, n, tag);
+	close(fd);
+	return n;
+}
+
 static void
 cleanupsession(void *arg)
 {
 	int pid = (int) arg;
 	char *path = (char *) emalloc9p(STRMAX);
-	int ret;
 
-	/* BUG: what if we can't get to them because proc is already closed? */
+	DPRINT(DFID, "cleanupsession: pid=(%d)\n", getpid());
+
+	/* BUG: what if we can't get to them because proc is already
+	 * closed? */
 	snprint(path, STRMAX, "%s/%d", procpath, pid);
 
 /*
@@ -338,7 +426,6 @@ fsclunk(Fid *f)
 			close(e->ctlfd);
 		}
 
-		// FIXME: removed???
 		proccreate(cleanupsession, (void *)e->pid, STACK);
 
 		e->pid = -1;
@@ -352,14 +439,40 @@ fsclunk(Fid *f)
 static void
 cleanup(Srv *)
 {
-	//DPRINT(DFID, "cleanup: iothread's pid=(%d)\n", threadpid(iothread_id));
-	//threadkill(iothread_id);
+	DPRINT(DCUR, "cleanup: pid=(%d)\n", getpid());
+	nbsendp(iochan, 0); /* flush any blocked readers */
+
+	DPRINT(DCUR, "cleanup: (%d) mounted. unmounting...\n", num_mnts);
+	char *fname = (char *) emalloc9p(STRMAX);
+	flushmp("/n/mpipetest"); /* flush pipe to be sure */
+
+/*** FIXME: already removed when the execcmd dies
+	int i, ret;
+	for(i=num_mnts-1; i>=0; i--) {
+		snprint(fname, STRMAX, "%s/%d", procpath, mnts[i]);
+		DPRINT(DFID, "\tfname=(%s)\n", fname);
+		
+		flushmp(fname); 
+
+		ret = unmount(fname, "stdin");
+		if(ret)
+			DPRINT(DFID, "\tFAILED unmounting fname=(%s)\n", fname);
+		unmount(fname, "stout");
+		unmount(fname, "sterr");
+	}
+***/
+	free(fname);
+
 
 	DPRINT(DFID, "freeing the server, io and clunk channel\n");
 	remove(srvctl);
 	chanfree(iochan);
 	chanfree(clunkchan);
 	free(srvctl);
+
+	//DPRINT(DFID, "cleanup: iothread's pid=(%d)\n", threadpid(iothread_id));
+	//threadkill(iothread_id);
+
 	threadexitsall("done");
 }
 
@@ -396,7 +509,10 @@ iothread(void*)
 static void
 ioproxy(Req *r)
 {
+	DPRINT(DFID, "ioproxy...\n");
+
 	if(sendp(iochan, r) != 1) {
+		DPRINT(DFID, "ioproxy: iochan hungup...\n");
 		fprint(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
@@ -426,7 +542,7 @@ Srv fs=
 	.open=		ioproxy,
 	.write=		ioproxy,
 	.read=		fsread,
-	.destroyfid=clunkproxy,
+	.destroyfid=	clunkproxy,
 	.end=		cleanup,
 };
 
@@ -435,7 +551,7 @@ threadmain(int argc, char **argv)
 {
 	char *x;
 
-	srvpath = defaultsrvpath;
+	//srvpath = defaultsrvpath;
 	srvpath = nil;
 
 	procpath = defaultpath;
@@ -470,7 +586,12 @@ threadmain(int argc, char **argv)
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
 	clunkchan = chancreate(sizeof(void *), 0);
-	proccreate(iothread, nil, STACK);
+
+	iothread_id = proccreate(iothread, nil, STACK);
+	DPRINT(DFID, "Main: srvpath=(%s) procpath=(%s)\n",
+	       srvpath, procpath);
+	DPRINT(DFID, "Main: main pid=(%d) iothread=(%d)\n",
+	       getpid(), threadpid(iothread_id));
 
 	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
 	threadexits(0);
