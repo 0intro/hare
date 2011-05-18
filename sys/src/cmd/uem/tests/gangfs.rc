@@ -16,9 +16,6 @@ TESTDIR=.test
 E_MNTPATH=/tmp/testbed/E
 G_MNTPATH=/tmp/testbed/G
 
-E_MNTPATH=/proc
-#G_MNTPATH=/proc
-
 #
 # Cleanup Previous Instances
 #
@@ -53,19 +50,19 @@ fn startup {
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		execfs -s execfs $E_MNTPATH >[2] $EXECLOG 
+		execfs -s execfs -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $1 -s execfs $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		execfs -D -v $1 -s execfs -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	bind -b '#p' $E_MNTPATH
 
 	echo Starting gangfs.
 	if(~ $#* 0) {
-		gangfs $G_MNTPATH >[2] $GANGLOG 
+		gangfs -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
 	}
 	if not {
-		gangfs -D -v $1 $G_MNTPATH >[2] $GANGLOG  	# CHATTY
+		gangfs -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
 	}
 	mount /srv/gangfs $G_MNTPATH
 }

@@ -35,7 +35,7 @@
 
 static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"gangfs";
-static char *procpath, *srvpath;
+static char *procpath, *execfspath, *srvpath;
 int iothread_id;
 
 static char *gangpath;	/* our view of the gang path */
@@ -660,7 +660,8 @@ out:
 static void
 usage(void)
 {
-	fprint(2, "gangfs [-D] [mtpt]\n");
+	fprint(2, "gangfs [-D] [-v debug_level] [-p parent] [-s server_name] [-m mtpt] [-E execfs_mtpt] [-n mysysname] [-i interval]\n");
+
 	exits("usage");
 }
 
@@ -1332,7 +1333,8 @@ setupsess(Gang *g, Session *s, char *path, int r)
 	if(path)
 		s->path = smprint("/n/%s/proc", path);
 	else
-		s->path = smprint(defaultpath);
+		//s->path = smprint(procpath);
+		s->path = smprint("/tmp/testbed/E");
 	DPRINT(DEXE, "setupsess: path=(%s)\n", s->path);
 
 	s->r = nil;
@@ -1864,7 +1866,9 @@ threadmain(int argc, char **argv)
 	updateinterval = 5;	/* 5 second default update interval */
 	mysysname = getenv("sysname");
 
-	srvpath = defaultsrvpath;
+	srvpath    = defaultsrvpath;
+	procpath   = defaultpath;
+	execfspath = defaultpath;
 
 	ARGBEGIN{
 	case 'D':
@@ -1884,6 +1888,12 @@ threadmain(int argc, char **argv)
 	case 'n':	/* name override */
 		mysysname = estrdup9p(ARGF());
 		break;
+	case 'm':	/* mntpt override */
+		procpath = ARGF();
+		break;
+	case 'E':	/* mntpt override */
+		execfspath = ARGF();
+		break;
 	case 'i':	/* update interval (seconds) */
 		x = ARGF();
 		if(x)
@@ -1893,13 +1903,8 @@ threadmain(int argc, char **argv)
 		usage();
 	}ARGEND
 
-	if(argc > 1)
+	if(argc > 0)
 		usage();
-
-	if(argc)
-		procpath = argv[0];
-	else
-		procpath = defaultpath;
 
 	gangpath = procpath;
 	xgangpath = procpath; /* until we get a statuswrite */

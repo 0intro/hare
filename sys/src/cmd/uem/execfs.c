@@ -57,7 +57,7 @@ static Channel *clunkchan;
 static void
 usage(void)
 {
-	fprint(2, "execfs [-D] [-v debuglevel] [mtpt]\n");
+	fprint(2, "execfs [-D] [-v debuglevel] [-m mtpt]\n");
 	exits("usage");
 }
 
@@ -438,9 +438,14 @@ threadmain(int argc, char **argv)
 	srvpath = defaultsrvpath;
 	srvpath = nil;
 
+	procpath = defaultpath;
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
+		break;
+	case 'm':	/* mntpt override */
+		procpath = ARGF();
 		break;
 	case 'v':
 		x = ARGF();
@@ -454,13 +459,8 @@ threadmain(int argc, char **argv)
 		usage();
 	}ARGEND
 
-	if(argc > 1)
+	if(argc > 0)
 		usage();
-
-	if(argc)
-		procpath = argv[0];
-	else
-		procpath = defaultpath;
 
 	srvctl = smprint("/srv/execfs-%d", getpid());
 
