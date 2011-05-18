@@ -688,7 +688,8 @@ mpipe(char *path, char *name)
 		DPRINT(DERR, "couldn't open /srv/mpipe: %r\n");
 		return -1;
 	}
-	
+
+	DPRINT(DCUR, "mounting (%s) on (%s)\n", name, path);
 	ret = mount(fd, -1, path, MBEFORE, name);
 	if(ret < 0) {
 		DPRINT(DERR, "mount of multipipe failed: %r\n");
@@ -1263,7 +1264,7 @@ cloneproc(void *arg)
 		sess->fd = open(buf, ORDWR);
 		if(sess->fd > 0)
 			break;
-		DPRINT(DERR, "*ERROR*: retry: %d opening execfs returned %d: %r -- retrying\n", 
+		DPRINT(DERR, "WARNING: retry: %d opening execfs returned %d: %r -- retrying\n", 
 				retries, sess->fd);
 		if(retries++ > 10) {
 			DPRINT(DERR, "*ERROR* giving up\n");

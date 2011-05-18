@@ -55,13 +55,11 @@ regress:V: install dirsinstall
 	tests/gangfs.rc
 
 debug:V: install dirsinstall
-	#tests/mpipefs.rc 9
-	#tests/execfs.rc 9
+	tests/mpipefs.rc 9
+	tests/execfs.rc 9
 	tests/gangfs.rc 9
 
 tidy:V:
-	unmount /proc
-	bind '#p' /proc
 	rm -f /srv/mpipe
 	kill execcmd | rc
 	kill gangfs | rc
@@ -70,5 +68,8 @@ tidy:V:
 	broke | rc
 	rm -f *.log
 	rm -f *.acid
+	
+	unmount /proc
+	bind '#p' /proc
 
 acid:V: execfs.acid execcmd.acid mpipefs.acid gangfs.acid

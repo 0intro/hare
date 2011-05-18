@@ -53,10 +53,10 @@ fn startup {
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		execfs $E_MNTPATH >[2] $EXECLOG 
+		execfs -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $1 $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		execfs -D -v $1 -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	#bind -bc '#p' $E_MNTPATH
 	bind -bc '#p' $E_MNTPATH
