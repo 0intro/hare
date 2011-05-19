@@ -28,10 +28,10 @@ fn cleanup {
 fn startup {
 	echo Starting mpipefs....
 	if(~ $#* 0) {
-		./8.mpipefs >[2] $MPIPELOG 
+		../8.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		./8.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		../8.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 		DEBUG_LEVEL=$1
 	}
 }
