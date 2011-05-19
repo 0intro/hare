@@ -217,6 +217,7 @@ fsopen(Req *r)
 	 * channel.  If any of these fail, then e->pid will be < 2, and
 	 * this is a hard failure, so crash instead of dieing
 	 * gracefully */
+	DPRINT(DFID, "number of new pids=(%d): %r\n", e->pid);
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel */

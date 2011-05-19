@@ -9,14 +9,14 @@ BIN = /$objtype/bin
 
 
 regress:V: all
-	mpipefs.rc
-	execfs.rc
-	gangfs.rc
+	rc mpipefs.rc
+	rc execfs.rc
+	rc gangfs.rc
 
 debug:V: all
-	mpipefs.rc 9
-	execfs.rc 9
-	gangfs.rc 9
+	rc mpipefs.rc 9
+	rc execfs.rc 9
+	rc gangfs.rc 9
 
 tidy:VE:
 	rm -f /srv/mpipe

@@ -58,6 +58,12 @@ debug regress:VE: all dirs #install dirsinstall
 	cd $p
 
 tidy:VE:
+	p=`{pwd}
+	for(i in $DIRS) @{
+		cd $i
+		mk $MKFLAGS $target
+	}
+	cd $p
 	rm -f /srv/mpipe
 	kill execcmd | rc
 	kill gangfs | rc
