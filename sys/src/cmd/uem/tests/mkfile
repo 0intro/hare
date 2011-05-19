@@ -14,9 +14,9 @@ regress:V: all
 	rc gangfs.rc
 
 debug:V: all
-	rc mpipefs.rc 9
+	#rc mpipefs.rc 9
 	rc execfs.rc 9
-	rc gangfs.rc 9
+	#rc gangfs.rc 9
 
 tidy:VE:
 	rm -f /srv/mpipe

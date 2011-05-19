@@ -57,6 +57,9 @@ fn startup {
 		../8.execfs -D -v $1 -s execfs -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	bind -bc '#p' $E_MNTPATH
+
+	bind -bc .  /$objtype/bin
+	bind -bc .. /$objtype/bin
 }
 
 #
@@ -139,8 +142,8 @@ stdout
 stdin	#failing
 
 # Extra Tests
-#stdout
-#stdin
+stdout
+stdin
 #stdout
 #stdin
 #stdout

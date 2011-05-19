@@ -138,6 +138,8 @@ cloneproc(void *arg)
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
 	       pidc, "/bin/execcmd", "execcmd", "-s", srvctl,
 	       "-v", smprint("%d", vflag), getpid());
+	// FIXME: error -- should not call path or just do a bind to
+	// find the programs...
 	procexecl(pidc, "/bin/execcmd", "execcmd", "-s", srvctl, "-v", 
 		  smprint("%d", vflag), nil);
 
@@ -155,6 +157,7 @@ kickit(void)
 	DPRINT(DCUR, "kickit: forking the proc\n");
 	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
 	DPRINT(DCUR, "\tnpid=(%d)\n", npid);
+	// FIXME: 9vx/native problem...
 	pid = recvul(pidc);
 	if(pid==0) {
 		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
@@ -220,8 +223,13 @@ fsopen(Req *r)
 	DPRINT(DFID, "number of new pids=(%d): %r\n", e->pid);
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
-	/* grab actual reference to real control channel */
-	n = snprint(fname, STRMAX, "%s/%d/ctl", procpath, e->pid);
+	/* grab actual reference to real control channel -- which
+	 * should be on the actual /proc so we can isolate real
+	 * proc/mount/name-space issues */
+	// FIXME: test hack.  Fix later, and possibly give a cmdl
+	//   option
+	// n = snprint(fname, STRMAX, "%s/%d/ctl", procpath, e->pid);
+	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
 	assert(n > 0);
 	
 	/* grab ahold of the ctl file */
