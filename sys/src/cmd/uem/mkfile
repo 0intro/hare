@@ -54,7 +54,7 @@ regress:V: install dirsinstall
 	tests/execfs.rc
 	tests/gangfs.rc
 
-debug:V: install dirsinstall
+debug:V: all dirs #install dirsinstall
 	tests/mpipefs.rc 9
 	tests/execfs.rc 9
 	tests/gangfs.rc 9
@@ -65,6 +65,10 @@ tidy:V:
 	kill gangfs | rc
 	kill execfs | rc
 	kill mpipefs | rc
+	kill 8.execcmd | rc
+	kill 8.gangfs | rc
+	kill 8.execfs | rc
+	kill 8.mpipefs | rc
 	broke | rc
 	rm -f *.log
 	rm -f *.acid

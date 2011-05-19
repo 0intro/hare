@@ -641,7 +641,6 @@ checkmount(char *addr)
 
 	/* we need to wait for this to be done */
 	while( (tmp = dirstat(mtpt)) == nil) {
-		sleep(100);
 		if(retries++ > 100) {
 			DPRINT(DERR, "*ERROR*: checkmount: import not complete after 10 seconds, giving up\n");
 
