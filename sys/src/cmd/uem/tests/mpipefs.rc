@@ -215,7 +215,7 @@ fn multipipe {
 
 	# write to two and only two readers
 	if(~ $DEBUG_LEVEL 0) {
-		mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
+		./8.mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
 	}
 	if not {
 		./8.mp-writer -D -n $NUM_PASSED -s 8192 /n/mpipetest/data

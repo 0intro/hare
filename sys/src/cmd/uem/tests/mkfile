@@ -6,3 +6,34 @@ TARG = \
 BIN = /$objtype/bin
 
 </sys/src/cmd/mkmany
+
+
+regress:V: all
+	mpipefs.rc
+	execfs.rc
+	gangfs.rc
+
+debug:V: all
+	mpipefs.rc 9
+	execfs.rc 9
+	gangfs.rc 9
+
+tidy:VE:
+	rm -f /srv/mpipe
+	kill execcmd | rc
+	kill gangfs | rc
+	kill execfs | rc
+	kill mpipefs | rc
+	kill 8.execcmd | rc
+	kill 8.gangfs | rc
+	kill 8.execfs | rc
+	kill 8.mpipefs | rc
+	broke | rc
+	rm -f *.log
+	rm -f *.acid
+   	rm -rf .test
+	
+	unmount /proc
+	bind '#p' /proc
+
+acid:V: execfs.acid execcmd.acid mpipefs.acid gangfs.acid

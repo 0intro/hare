@@ -49,17 +49,15 @@ dirsnuke:V: nuke
 	}
 	cd $p
 
-regress:V: install dirsinstall
-	tests/mpipefs.rc
-	tests/execfs.rc
-	tests/gangfs.rc
+debug regress:VE: all dirs #install dirsinstall
+	p=`{pwd}
+	for(i in $DIRS) @{
+		cd $i
+		mk $MKFLAGS $target
+	}
+	cd $p
 
-debug:V: all dirs #install dirsinstall
-	tests/mpipefs.rc 9
-	tests/execfs.rc 9
-	tests/gangfs.rc 9
-
-tidy:V:
+tidy:VE:
 	rm -f /srv/mpipe
 	kill execcmd | rc
 	kill gangfs | rc
@@ -72,6 +70,7 @@ tidy:V:
 	broke | rc
 	rm -f *.log
 	rm -f *.acid
+   	rm -rf .test
 	
 	unmount /proc
 	bind '#p' /proc

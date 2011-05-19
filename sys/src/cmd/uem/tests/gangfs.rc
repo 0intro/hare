@@ -42,27 +42,27 @@ fn startup {
 
 	echo Starting mpipefs....
 	if(~ $#* 0) {
-		./8.mpipefs >[2] $MPIPELOG 
+		../8.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		./8.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		../8.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 	}
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		./8.execfs -s execfs -m $E_MNTPATH >[2] $EXECLOG 
+		../8.execfs -s execfs -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		./8.execfs -D -v $1 -s execfs -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		../8.execfs -D -v $1 -s execfs -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	bind -b '#p' $E_MNTPATH
 
 	echo Starting gangfs.
 	if(~ $#* 0) {
-		./8.gangfs -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
+		../8.gangfs -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
 	}
 	if not {
-		./8.gangfs -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
+		../8.gangfs -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
 	}
 	mount /srv/gangfs $G_MNTPATH
 }
