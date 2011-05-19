@@ -8,7 +8,8 @@ TARG = \
 	gangfs\
 
 HFILES = debug.h
-BIN = /$objtype/bin
+#BIN = /$objtype/bin
+BIN = /usr/$user/bin/$objtype
 
 DIRS = tests
 
@@ -49,7 +50,7 @@ dirsnuke:V: nuke
 	}
 	cd $p
 
-debug regress:VE: all dirs #install dirsinstall
+debug regress:VE: install dirsinstall
 	p=`{pwd}
 	for(i in $DIRS) @{
 		cd $i
@@ -69,10 +70,6 @@ tidy:VE:
 	kill gangfs | rc
 	kill execfs | rc
 	kill mpipefs | rc
-	kill 8.execcmd | rc
-	kill 8.gangfs | rc
-	kill 8.execfs | rc
-	kill 8.mpipefs | rc
 	broke | rc
 	rm -f *.log
 	rm -f *.acid

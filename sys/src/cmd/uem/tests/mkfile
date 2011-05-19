@@ -4,19 +4,20 @@ TARG = \
 	mp-writer\
 
 BIN = /$objtype/bin
+BIN = /usr/$user/bin/$objtype
 
 </sys/src/cmd/mkmany
 
 
-regress:V: all
+regress:V: install
 	rc mpipefs.rc
 	rc execfs.rc
 	rc gangfs.rc
 
-debug:V: all
-	#rc mpipefs.rc 9
+debug:V: install
+	rc mpipefs.rc 9
 	rc execfs.rc 9
-	#rc gangfs.rc 9
+	rc gangfs.rc 9
 
 tidy:VE:
 	rm -f /srv/mpipe
@@ -24,10 +25,6 @@ tidy:VE:
 	kill gangfs | rc
 	kill execfs | rc
 	kill mpipefs | rc
-	kill 8.execcmd | rc
-	kill 8.gangfs | rc
-	kill 8.execfs | rc
-	kill 8.mpipefs | rc
 	broke | rc
 	rm -f *.log
 	rm -f *.acid
