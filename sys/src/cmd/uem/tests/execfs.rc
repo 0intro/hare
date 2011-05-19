@@ -141,15 +141,16 @@ testdir
 stdout
 stdin	#failing
 
-# Extra Tests
-stdout
-stdin
-#stdout
-#stdin
-#stdout
-#stdin
-#cleanup
-#startup $1
+# FIXME: running dubug with more than 3 stdin/stdout tests or regress
+# with more than 1, causes the clone to fail while opening
+# /proc/#/ctl.  Ex:
+#
+# can't open: '/tmp/testbed/E/clone' execfs: fsopen: opening
+# [/proc/220943/ctl] failed: '/proc/220943/ctl' process exited mk: rc
+# mpipefs.rc rc ...  : exit status=rc 220177: rc 220903: error
+#
+
+# you can run cleanup/startup between each one to force it to work...
 
 # Cleanup
 rm -rf $TESTDIR
