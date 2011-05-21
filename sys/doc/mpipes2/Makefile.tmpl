@@ -1,0 +1,446 @@
+#                           -*- mode: makefile -*-
+
+##################################################
+#
+# This is the general Makefile for GTD-LaTeX
+#
+#                 (c) John (EBo) David 2004 - 2011
+#                           version 0.1.0 - 040723
+#                              		0.1.1 - 050319
+#                              		0.1.2 - 050328
+#                              		0.1.3 - 051019
+#                              		0.1.4 - 060121
+#                              		0.1.5 - 060419
+#                              		0.1.6 - 060918
+#                              		0.1.7 - 070205
+#                              		0.1.8 - 070804
+#                              		0.1.9 - 080911
+#                             1.0.0_pre14 - 081007
+#                             1.0.0_pre18 - 090106
+#                             1.0.0_pre19 - 090417
+#                             2.0.0_pre1  - 090519
+#                             2.0.0_pre4  - 110130
+#                             2.0.0_pre5  - 110206
+#
+# (CC) Creative Commons: Attribution-NonCommercial-NoDerivs 3.0
+#
+# please contact ebo@users.sourceforge.net for more information
+#
+##################################################
+
+DIRS = `find . -mindepth 1 -maxdepth 1 -type d -print`
+
+#################### projects #####################
+
+GTD_VERSION=2.0.0_pre5
+
+# set up verbose dubuggin option for build
+ifndef (GTD_DEBUG)
+	GTD_DEBUG := 1 # debug
+else
+	GTD_DEBUG := 0 # no debug
+endif
+ifneq ($(GTD_DEBUG), 1)
+	GTD_DIAG_START := >& ${HOME}/gtd/logs/pdflatex.log
+	GTD_DIAG_OUT := >& ${HOME}/gtd/logs/pdflatex.log
+else
+	GTD_DIAG_START := 
+	GTD_DIAG_OUT := 
+endif
+
+all::
+
+#.PHONY: dvi ps pdf clean
+
+%.gtd: %.pdf
+%.ps: %.pdf
+	pdf2ps $<
+#	  (if [ -e $*.glo ]; then makeindex -t $*.glg -o $*.gls -s $*.ist $*.glo \
+#			${GTD_DIAG_OUT}; fi);\
+
+# set the default, overridable, latex program
+ifndef (GTD_LATEX)
+  GTD_LATEX=pdflatex # defalut latex program
+endif
+
+LATEX_FLAGS = ${EXTRA_LATEX_FLAGS} --shell-escape
+
+# initial hack to typset Sanskrit Devanagari
+%.tex:: %.dn
+	devnag $< $@
+
+# default pdf/tex dependency and build
+%.pdf: %.tex 
+	-@( \
+	  (echo "#####################################################");\
+	  (echo "    making $*");\
+	  (echo "Making $< in ${PWD}" ${GTD_DIAG_START});\
+	  (echo ""      ${GTD_DIAG_OUT});\
+	  (pdflatex ${LATEX_FLAGS} $< ${GTD_DIAG_OUT});\
+	  (makeglossaries $* ${GTD_DIAG_OUT});\
+	  (bibtex    $* ${GTD_DIAG_OUT});\
+	  (pdflatex ${LATEX_FLAGS} $< ${GTD_DIAG_OUT});\
+	  (pdflatex ${LATEX_FLAGS} $< ${GTD_DIAG_OUT});\
+	)
+# FIXME: the gossaries are made with the below
+#	  (makeglossaries $* $< ${GTD_DIAG_OUT});\
+
+
+proj:: 
+ifneq ($(TYPE),s)
+	-@echo "DIR=$(PWD)"
+	-@for p in ${PROJ}; do\
+		${MAKE} -s $$p.pdf;\
+	done
+	${MAKE} -s clean
+endif
+
+################ GTD support files ################
+
+gtd:: proj
+
+dir-gtd:: gtd
+ifneq ($(TYPE),s)
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    (cd $$d && $(MAKE) -s dir-gtd);\
+	  fi;\
+	done
+endif
+
+gtc:: 
+ifeq ($(TYPE),c)
+	-@echo "  Making GTC"
+	$(MAKE) -s dir-gtd
+	@gtdcollect -o auto.gtc . 2> /dev/null
+endif
+
+dir-gtc:: gtc
+ifneq ($(TYPE),s)
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    (cd $$d && $(MAKE) -s dir-gtc);\
+	  fi;\
+	done
+endif
+
+################### overviews #####################
+
+overview:: 
+ifeq ($(TYPE),c)
+	$(MAKE) -s gtc
+	-@echo "OVERVIEW=$(PWD)"
+	-@for o in ${PROJ} ${OVERVIEW}; do\
+		${RM}   -f $$o.pdf;\
+		${MAKE} -s $$o.pdf;\
+	done
+	${MAKE} -s clean
+endif
+
+dir-overview:: 
+ifneq ($(TYPE),s)
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-OVERVIEW=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-overview);\
+	  fi;\
+	done
+ifeq ($(TYPE),c)
+#	  if ! [ "`basename $$d`" = ".hg" ] ; then
+	 ${MAKE} -s overview
+else
+	 ${MAKE} -s gtd
+endif
+endif
+
+#################### cleaning #####################
+
+clean::
+	-rm -f *~ core
+ifneq ($(TYPE),s)
+ifneq ($(SILENT),)
+	-@#echo "  Cleaning..."
+endif
+	-rm -f *.aux *.log *.tmp *.dvi *.bbl *.blg *.srt
+	-rm -f *.glo *.glg *.gls *.ist *.out *.toc *.idx
+	-rm -f *.acn *.acr *.alg *.not *.nlg *.nlt *.ntn
+	-rm -f $(CLEANFILES)
+endif
+
+pdf-clean:: clean
+ifneq ($(TYPE),s)
+ifneq ($(SILENT),)
+	-@echo "  Cleaning PDF and PS's..."
+endif
+	-rm -f *.ps *.pdf 
+endif
+
+realclean:: pdf-clean clean
+ifneq ($(TYPE),s)
+ifneq ($(SILENT),)
+	-@echo "  Cleaning everything..."
+endif
+	-rm -f *.gtd *.gtc
+	-rm -f $(REALCLEANFILES)
+endif
+
+dir-clean::
+ifneq ($(TYPE),s)
+	-@$(MAKE) -s clean
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-CLEAN=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-clean);\
+	  fi;\
+	done
+endif
+
+
+dir-realclean:: 
+ifneq ($(TYPE),s)
+	-@$(MAKE) -s realclean
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-REALCLEAN=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-realclean);\
+	  fi;\
+	done
+endif
+
+gtd-clean::
+	-@echo "  Cleaning all gtd's..."
+	-@find . -name \*.gtd -exec rm {} \; -print
+
+gtc-clean::
+	echo "  Cleaning all gtc's..."
+	-find . -name \*.gtc -exec rm {} \; -print
+
+tilde-clean::
+	-@echo "  Cleaning all *~..."
+	-@find . -name \*~ -exec rm {} \; -print
+
+#################### Makefile #####################
+
+#sync:: 
+#	-@echo "Syncing ($(TYPE)) DIR-SYNC=$(PWD)"
+#	-@gtdinit -m$(TYPE)
+#
+#dir-sync:: sync
+#ifneq ($(TYPE),s)
+#	-@for d in ${DIRS}; do\
+#	  (cd $$d && $(MAKE) -s dir-sync);\
+#	done
+#endif
+
+#################### Git #####################
+# FIXME: the automated git repository is not fully functional and
+# testing.  Use at your own risk.
+#
+#git-commit:: 
+#ifeq ($(TYPE),p)
+#	-@echo "  Commiting changes..."
+#	-@git commit -a
+#endif
+#ifeq ($(TYPE),d)
+#	-@echo "  Commiting changes..."
+#	-@git commit -a
+#endif
+#ifeq ($(TYPE),c)
+#	-@echo "  Commiting changes..."
+#	-@git submodule commit -a
+#endif
+#
+#dir-git-commit:: commit
+#ifneq ($(TYPE),s)
+#	-@$(MAKE) -s git-commit
+#	-@for d in ${DIRS}; do\
+#	  echo "DIR-COMMIT=$(PWD)/$$d";\
+#	  (cd $$d && $(MAKE) -s dir-git-commit);\
+#	done
+#endif
+#
+#git-update:: 
+#ifeq ($(TYPE),p)
+#	-@echo "  Adding new changes..."
+#	-@git add .
+#	-@git commit -a
+#	#-@git update
+#endif
+#ifeq ($(TYPE),d)
+#	-@echo "  Adding new changes..."
+#	-@git add .
+#	-@git commit -a
+#	#-@git update
+#endif
+#ifeq ($(TYPE),c)
+#	-@echo "  Adding new submodules..."
+#	-@git submodule add .
+#	-@git submodule commit -a
+#	#-@git submodule update
+#endif
+#
+#dir-git-update:: 
+#ifneq ($(TYPE),s)
+#	-@$(MAKE) -s git-update
+#	-@for d in ${DIRS}; do\
+#	  echo "DIR-UPDATE=$(PWD)/$$d";\
+#	  (cd $$d && $(MAKE) -s dir-git-update);\
+#	done
+#endif
+#
+#git-init::
+#ifeq ($(TYPE),p)
+#	-@echo "  Initializing Project..."
+#	-@git init
+#	-@(cd .git; gtdinit -S)
+#	-@$(MAKE) -s git-update
+#endif
+#ifeq ($(TYPE),d)
+#	-@echo "  Initializing Directory..."
+#	-@git init
+#	-@(cd .git; gtdinit -S)
+#	-@$(MAKE) -s git-update
+#endif
+#ifeq ($(TYPE),c)
+#	-@echo "  Initializing Category..."
+#	-@git init 
+#	-@(cd .git; gtdinit -S)
+##	-@git submodule init 
+##	-@for d in ${DIRS}; do\
+#	  echo "  SUBMODULE==$$d";\
+#	ifeq ("$$d",".git"); git submodule add "$$d";endif;\
+#	done
+#endif
+#
+##git submodule [--quiet] add [-b branch] [--] <repository> <path> 
+##git submodule [--quiet] status [--cached] [--] [<path>…] 
+##git submodule [--quiet] init [--] [<path>…] 
+##git submodule [--quiet] update [--init] [--] [<path>…] 
+##git submodule [--quiet] summary [--summary-limit <n>] [commit] [--] [<path>…]
+#
+#dir-git-init:: 
+#ifneq ($(TYPE),s)
+#	-@$(MAKE) -s git-init
+#	-@for d in ${DIRS}; do\
+#	  echo "DIR-UPDATE=$(PWD)/$$d";\
+#	  (cd $$d && $(MAKE) -s dir-git-init);\
+#	done
+#endif
+
+##############################################
+# FIXME: to make this worl you need the following defined (default:
+#  place in ~/.gtdrc and add "[ -f ${HOME}/.gtdrc ] && source
+#  ${HOME}/.gtdrc" to your .bashrc or similar shell startup script
+#
+#    GTDHOME = ${HOME}/gtd/ 
+#    GTDHGRepository = HG_USER@URL
+
+ifeq ($(shell test -e ${HOME}/.gtdrc && echo "1" || echo "0"),1)
+include ${HOME}/.gtdrc
+endif
+
+ifndef (GTDHOME)
+GTDHOME=${HOME}/gtd
+GTDHGRepository=hg@localhost
+endif
+RELNAME=$(shell pwd | sed -e "s%${GTDHOME}%${USER}/gtd%" | sed -e "s%^/%%")
+
+hg-commit:
+	@hg commit -u ${USER}
+hg-status:
+	@hg status
+hg-clone:
+	@hg clone ssh://${GTDHGRepository}/${RELNAME}
+hg-pull hg-update:
+	@hg pull -u ssh://${GTDHGRepository}/${RELNAME}
+
+hg-push:
+	@if ! [ -n "$(shell ssh ${GTDHGRepository} test -e ${RELNAME} && echo 1)" ] ; then\
+	    echo "***** Warning: ${GTDHGRepository}/${RELNAME} Not found:";\
+	    echo "    initializing...";\
+	    $(MAKE) -s hg-init;\
+	else\
+	    hg --quiet push ssh://${GTDHGRepository}/${RELNAME};\
+	fi
+
+hg-init:
+# FIXME: could run intp problems commiting to non empty directory
+	@ssh ${GTDHGRepository} mkdir -p ${RELNAME}
+	@scp -rpq .hg ${GTDHGRepository}:${RELNAME}/.hg
+#	@if ! [ -n "$(shell ssh ${GTDHGRepository} test -e ${RELNAME} && echo 1)" ] ; then\
+#	    ssh ${GTDHGRepository} mkdir -p ${RELNAME};\
+#	    scp -rpq .hg ${GTDHGRepository}:${RELNAME}/.hg;\
+#	fi
+
+hg-delete:
+	@ssh ${GTDHGRepository} rm -rf ${RELNAME}/.hg
+
+
+dir-hg-update::
+	-@$(MAKE) -s hg-update
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-HG-UPDATE=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-hg-update);\
+	  fi;\
+	done
+
+dir-hg-autocommit::
+	-@hg commit -m "automated commit `date`" -u ${USER}
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-HG-COMMIT=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-hg-commit);\
+	  fi;\
+	done
+
+dir-hg-commit::
+	-@$(MAKE) -s hg-commit
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-HG-COMMIT=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-hg-commit);\
+	  fi;\
+	done
+
+dir-hg-push::
+	-@$(MAKE) -s hg-push
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-HG-PUSH=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-hg-push);\
+	  fi;\
+	done;\
+
+dir-hg-pull::
+	-@$(MAKE) -s hg-pull
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-HG-PUSH=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-hg-pull);\
+	  fi;\
+	done
+
+dir-hg-delete::
+	-@$(MAKE) -s hg-delete
+	-@for d in ${DIRS}; do\
+	  if ! [ "`basename $$d`" = ".hg" ] ; then\
+	    echo "DIR-HG-PUSH=$(PWD)/$$d";\
+	    (cd $$d && $(MAKE) -s dir-hg-delete);\
+	  fi;\
+	done
+
+####### FIXME: this is cruddy, but works ######
+# need to fire out how to get the dirname 
+dir-hg-clone::
+	@for d in $(shell ssh ${GTDHGRepository} find ${RELNAME}/* -name .hg -print); do\
+	  echo DIR-HG-CLONE=`dirname $$d | sed -e "s%${RELNAME}/%%"`;\
+	  (\
+		rm -rf /tmp/gtd_hg;\
+		mkdir -p `dirname $$d | sed -e "s%${RELNAME}/%%"`;\
+		hg clone ssh://${GTDHGRepository}/${RELNAME}/`dirname $$d | sed -e "s%${RELNAME}/%%"` /tmp/gtd_hg 1> /dev/null;\
+		cp -a /tmp/gtd_hg/* /tmp/gtd_hg/.??* `dirname $$d | sed -e "s%${RELNAME}/%%"`;\
+		rm -rf /tmp/gtd_hg;\
+);\
+	done
+

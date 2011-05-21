@@ -1,0 +1,408 @@
+%%
+%% This is file `gtd.sty',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% gtd.dtx  (with options: `package')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from gtd.sty.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file gtd.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{gtd}[2005/02/04 v0.5
+                      Track GTD items in your documents]
+
+%\RequirePackage{keyval}
+%\RequirePackage{textcomp}
+%\RequirePackage{ifthen}
+%\RequirePackage{calc}
+
+%\def\GTDUserHome{$HOME/gtd}% $ the second dollar sign shuts up the highlighting
+%\def\GTDSystemHome{/usr/share/gtd-2}
+\def\GTDUserHome{$HOME/gtd}% $ the second dollar sign shuts up the highlighting
+\def\GTDSystemHome{}
+
+\newcommand*\gtdlogo{\textsf{GTD}}
+
+\newcommand{\GTDProject}[2][]{\title{#2}}
+
+
+\newcommand{\@ResetKeys}[1]{}%
+
+\newcommand{\@SetCache}[2]{}%
+
+%%% take a look at: http://docs.miktex.org/manual/texfeatures.html
+%%%  for Piped Input and Output and more on write18
+\newcommand{\osExecuteCommand}[1]{}
+
+\newcommand{\osRemove}[2][-f]{}
+
+%\newread\@execfile%
+\newcommand{\osExecuteAndSet}[3][\jobname.exec]{}
+
+\newcommand{\osReadAndSet}[2]{}
+
+\newcommand{\osReadItems}[1]{}
+
+
+%\edef\@MaxNext{99999}
+%\edef\@GTDProject@abriv{DEF}
+%\edef\@GTDProject@abriv@def{DEF}
+%\edef\@GTDProject@parent{}%
+%\edef\@GTDProject@subparent{}%
+
+\newcommand{\@SetKeys}[2]{}%
+
+\newcommand{\GTDDefineGroup}[2][]{}%
+
+\newcommand{\@DefineKeys}[1]{}%
+
+\newcommand{\GTDsilent}{}%
+\newcommand{\GTDnosilent}{}%
+
+\newcommand{\GTDreread}{}%
+\newcommand{\GTDnoreread}{}%
+%\@namedef{@GTDProject@reread}{}
+
+\newcommand{\GTDcitation}{}%
+\newcommand{\GTDnocitation}{}%
+
+%\@namedef{@GTDProject@defaultCitation}{} % let the command line decide
+
+%\@namedef{@GTDSubProject@abriv}{DEF}%
+%\@namedef{@GTDSubProject@abriv@def}{DEF}%
+\newcommand{\GTDSubProject}[2][]{}%
+
+%\edef\@GTDSubSubProject@abriv{DEF}%
+%\edef\@GTDSubSubProject@abriv@def{DEF}%
+\newcommand{\GTDSubSubProject}[2][]{}%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\def\makebib #1{\checkbib #1.bib\\}
+\def\checkbib #1.bib#2\\{#1.bib}
+
+
+\def\GTDUserBib{}%
+\def\GTDSystemBib{\GTDSystemHome/reference/gtd}%
+\def\GTDOtherBib{}%
+\newcommand{\GTDUseBib}[1]{%
+  %  \edef\tmpa{\makebib{#1}}
+  %  \def\tmpb{#1}
+  %  \ifx\tmpa\tmpb\then% <extension was already .bib>
+  %
+  \IfFileExists{#1}
+    {\ifx\@empty\GTDOtherBib\else\g@addto@macro\GTDOtherBib{,}\fi%
+      \g@addto@macro\GTDOtherBib{#1}}%
+    {\IfFileExists{#1.bib}
+       { \ifx\@empty\GTDOtherBib\else\g@addto@macro\GTDOtherBib{,}\fi%
+         \g@addto@macro\GTDOtherBib{#1}}%
+       {\message{****************************************}%
+        \message{WARNING: missing Bib file: "#1" skipping}%
+        \message{****************************************}%
+       }%
+    }%
+}
+
+\newcommand{\GTDBib}[1][plain]{%
+  \bibliographystyle{#1}%
+  %
+  \@namedef{@biblist}{}%
+  %
+  \IfFileExists{\GTDUserBib.bib}%
+               {\ifx\@empty\GTDUserBib\else%
+                 \g@addto@macro\@biblist{\GTDUserBib}\fi}%
+               {}%
+  \IfFileExists{\GTDSystemBib.bib}%
+               {\ifx\@empty\@biblist\else\g@addto@macro\@biblist{,}\fi%
+                 \g@addto@macro\@biblist{\GTDSystemBib}}%
+               {}%
+  %
+  \ifx\@empty\GTDOtherBib\else%
+    \ifx\@empty\@biblist\else\g@addto@macro\@biblist{,}\fi%
+    \g@addto@macro\@biblist{\GTDOtherBib}%
+  \fi%
+  %
+  \bibliography{\@biblist}%
+}%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\listGTDFile}[4][Default:]{}%
+
+%\newcount\@numfilter@cnt%
+%\newcount\@numfilter@first%
+%\newcount\@numfilter@last% FIXME: duplicate -- remove
+%\@numfilter@cnt\number0\relax%
+%\@numfilter@first\number0\relax%
+%\@numfilter@last\number\@MaxNext\relax%
+
+%\@namedef{@output@type}{}%
+
+%\newcount\@tmp@v%
+\newcommand{\listGTDItems}[3][Default:]{}%
+
+
+\newcommand{\GTDItem}[3][]{}%
+
+%\def\@makecitemark{\hbox{\@textsuperscript{\normalfont\@thecitemark~}}}%
+%\def\makecitemark{\@makecitemark}%
+%\def\thecitemark{\@thecitemark}%
+%\def\@thecitemark{}%
+
+%\def\@preItemFMT{}
+\newcommand{\GTDFormatPreItem}[1]{}
+
+%\def\@statusFMT{}
+\newcommand{\GTDFormatStatus}[1]{}
+
+%\def\@nextFMT{}
+\newcommand{\GTDFormatNext}[1]{}
+
+%\def\@dueFMT{}
+\newcommand{\GTDFormatDue}[1]{}
+
+%\def\@startFMT{}
+\newcommand{\GTDFormatStart}[1]{}
+
+%\def\@endFMT{}
+\newcommand{\GTDFormatEnd}[1]{}
+
+%\def\@timeFMT{}
+\newcommand{\GTDFormatTime}[1]{}
+
+%\def\@durationFMT{}
+\newcommand{\GTDFormatDuration}[1]{}
+
+%\def\@followupFMT{}
+\newcommand{\GTDFormatFollowup}[1]{}
+
+%\def\@delegatedFMT{}
+\newcommand{\GTDFormatDelegated}[1]{}
+
+%\def\@waitingFMT{}
+\newcommand{\GTDFormatWaiting}[1]{}
+
+%\def\@refFMT{}
+\newcommand{\GTDFormatRef}[1]{}
+
+%\def\@whoFMT{}
+\newcommand{\GTDFormatWho}[1]{}
+
+%\def\@whereFMT{}
+\newcommand{\GTDFormatWhere}[1]{}
+
+%\def\@costFMT{}
+\newcommand{\GTDFormatCost}[1]{}
+
+%\def\@locationFMT{}
+\newcommand{\GTDFormatLocation}[1]{}
+
+%\def\@bodyFMT#1{#1\\}
+\newcommand{\GTDFormatBody}[1]{}
+
+%\def\CitemarkFormat#1{}%
+%\def\HeaderFormat#1{#1}%
+%\def\ItemFormat#1#2{}%
+
+%%%%%%%%%%%%%%%%%%%%%%%%% GTD Specialization %%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\listProjects}[1][Projects:]{}
+
+\newcommand{\Action}[2][]{}%
+
+
+\newcommand{\listActions}[1][Actions:]{}%
+
+\newcommand{\listNextActions}[1][Next Actions:]{}%
+
+\newcommand{\listSortedNextActions}[1][Sorted Next Actions:]{}%
+
+\newcommand{\listOpenActions}[1][Open Actions:]{}%
+
+\newcommand{\listDelegatedActions}[1][Delegated To:]{}%
+
+\newcommand{\listWaintingForActions}[1][Waiting For:]{}%
+
+\newcommand{\listFollowupActions}[1][Followup:]{}%
+
+\newcommand{\listFirstNextActions}[2][First Next Actions:]{}%
+
+\newcommand{\listFirstNextProjects}[2][First Next Projects:]{}%
+
+\newcommand{\Purchase}[2][]{}%
+\newcommand{\listPurchases}[1][Purchases:]{}%
+
+\newcommand{\Refrence}[2][]{}%
+\newcommand{\listRefrences}[1][Refrences:]{}%
+
+\newcommand{\Contact}[2][]{}%
+\newcommand{\listContacts}[1][Contacts:]{}%
+
+\newcommand{\Note}[2][]{}%
+\newcommand{\listNotes}[1][Notes:]{}%
+
+\newcommand{\listNested}[1][Nested:]{}%
+
+\newcommand{\listNestedNotCompleted}[1][Nested Not Completed:]{}%
+
+\newcommand{\listSortedNestedNotCompleted}%
+           [1][Sorted Nested NextNot Completed:]{}%
+
+\GTDDefineGroup[]{GTDItem}%
+\GTDDefineGroup[]{GTDProject}%
+\GTDDefineGroup[]{GTDSubProject}%
+\GTDDefineGroup[]{GTDSubSubProject}%
+\GTDDefineGroup[postcite=A]{GTDActions}%
+\GTDDefineGroup[postcite=P]{GTDPurchases}%
+\GTDDefineGroup[postcite=R]{GTDRefrences}%
+\GTDDefineGroup[postcite=C]{GTDContacts}%
+\GTDDefineGroup[postcite=N]{GTDNotes}%
+
+\def\cmpeqval#1#2#3#4{% if ref(#1)==val(#2) then #3 else #4)%
+%  \edef\@tmpa{\@nameuse{#1}}%
+%  \edef\@tmpb{#2}%
+%  \ifx\@tmpa\@tmpb #3\else #4\fi%
+  }%
+\def\cmpneqval#1#2#3#4{% if ref(#1)!=val(#2) then #3 else #4)%
+%  \edef\@tmpa{\@nameuse{#1}}%
+%  \edef\@tmpb{#2}%
+%  \ifx\@tmpa\@tmpb #4\else #3\fi%
+  }%
+
+%\@namedef{GroupOnlyItemFilter}{}%
+
+%\@namedef{StatusCItemFilter}{}%
+%\@namedef{StatusNotCItemFilter}{}%
+
+%\@namedef{StatusTItemFilter}{}%
+%\@namedef{StatusNotTItemFilter}{}%
+
+%\@namedef{StatusWItemFilter}{}%
+%\@namedef{StatusNotWItemFilter}{}%
+
+%\@namedef{StatusOItemFilter}{}%
+%\@namedef{StatusNotOItemFilter}{}%
+
+%\@namedef{ProjectFilter}{}%
+
+%\@namedef{ActionFilter}{}%
+
+\newcommand{\NextFilter}{}%
+
+%\@definecounter{@num@action@cnt}
+%\setcounter{@num@action@cnt}{0}
+\newcommand{\NumActionFilter}[1][\@num@actions]{}
+
+%\@definecounter{@num@purchase@cnt}
+%\setcounter{@num@purchase@cnt}{0}
+\newcommand{\NumPurchaseFilter}[1][\@num@purchases]{}
+
+%\@definecounter{@num@note@cnt}
+%\setcounter{@num@note@cnt}{0}
+\newcommand{\NumNoteFilter}[1][\@num@notes]{}
+
+%\@definecounter{@num@contact@cnt}
+%\setcounter{@num@contact@cnt}{0}
+\newcommand{\NumContactFilter}[1][\@num@contacts]{}
+
+%\@definecounter{@num@project@cnt}
+%\setcounter{@num@project@cnt}{0}
+\newcommand{\NumProjectFilter}[1][\expandafter\number\@num@projects]{}
+
+%\newcounter{@numfilter@last}%
+%\setcounter{@numfilter@last}{1}%
+\newcommand{\NFilter}[3]{}%
+
+%\@namedef{WaitingForFilter}{}%
+
+%\@namedef{NotWaitingForFilter}{}%
+
+%\@namedef{DelegatedToFilter}{}%
+
+%\@namedef{FollowupFilter}{}%
+
+%\newcount\@tmp@scil\relax%
+%\newcount\@tmp@scol\relax%
+%\newcount\@tmp@scolZ\relax%
+%\@namedef{@GTDoutput@ourdered@cached}{}%
+\newcommand{\GTDoutput}[1][\jobname.gtd]{}%
+
+%\newwrite\@GTD@out%
+\newcommand{\GTDfoutput}[2][\jobname.gtd]{}%
+
+%\begingroup
+%\catcode`_=\active
+%\gdef\MakeUnderscoreOther{}
+%\endgroup
+
+\newcommand{\GTDfoutputNEW}[5][\jobname.gtd]{}%
+
+
+%\def\@nameaddto#1#2{}%
+%\def\@nameaddto@x#1#2{}%
+%\def\@nameaddto@e#1#2{}%
+
+%\@namedef{@GTDoutput@cachedP}{}%
+%\def\@SAVdoItemP[#1]#2#3#4#5{}%
+%
+%\@namedef{@GTDoutput@cachedNN}{}%
+%\def\@SAVdoItemNN[#1]#2#3#4#5{}%
+%
+%\@namedef{@GTDoutput@cachedN}{}%
+%\def\@SAVdoItemN[#1]#2#3#4#5{}%
+%
+%\@namedef{@GTDoutput@cachedA}{}%
+%\def\@SAVdoItemA[#1]#2#3#4#5{}%
+%
+%\newcount\@ordered@item@cnt%
+%\@ordered@item@cnt\number0\relax%
+%\def\@SAVdoItem[#1]#2#3#4#5{}%
+%
+%\@namedef{@GTDoutput@cached}{}%
+%\@definecounter{@GTDItems@cnt}
+%\setcounter{@GTDItems@cnt}{0}%
+
+\def\GTDdoItem[#1]#2#3#4#5{}%
+
+
+\newcommand{\GTDSort}[1][\jobname.srt]{}
+
+\newcommand{\GTDSortAndRead}[1][\jobname.srt]{}
+
+\newcommand{\numProjects}[1]{}
+\newcommand{\numActions}[1]{}
+\newcommand{\numContacts}[1]{}
+\newcommand{\numNotes}[1]{}
+\newcommand{\numPurchases}[1]{}
+%\edef\@num@projects{}
+%\edef\@num@actions{}
+%\edef\@num@contacts{}
+%\edef\@num@notes{}
+%\edef\@num@purchases{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%% old implementation... rework %%%%%%%%%%%%%%%%%%%%%%
+
+%\def\@theItems[#1]#2#3{}%
+
+%\def\gtdheading#1{}%
+
+
+\endinput
+%%
+%% End of file `gtd.sty'.
