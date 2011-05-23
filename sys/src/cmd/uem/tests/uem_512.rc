@@ -16,8 +16,8 @@ TESTDIR=.test
 E_MNTPATH=/tmp/testbed/E # execfs mount point
 G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
-CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
-#CMD='/bin/date'
+#CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
+CMD='/bin/date'
 NUM=32 # much bigger and it consistantly dies...
 
 fn enum_tests {
@@ -121,16 +121,6 @@ fn basic {
 
 
 # Setup
-#{/bin/date | sed 's/:[0-9]*:[0-9]*/hr/'}
-
-
-
-#CMD='/bin/date|sed 's%[a-zA-Z]* [a-zA-Z]* %\1 %''
-
-$CMD
-exit 0
-
-
 rfork
 
 cleanup
