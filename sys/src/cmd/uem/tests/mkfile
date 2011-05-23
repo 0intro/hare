@@ -32,8 +32,8 @@ debug:V: all
 	#rc mpipefs.rc 9
 	#rc execfs.rc 9
 	#rc gangfs.rc 9
-	#rc uem_hier.rc 9
-	rc uem_512.rc 9
+	rc uem_hier.rc 9
+	#rc uem_512.rc 9
 
 tidy:VE: 
 	rm -f /srv/mpipe

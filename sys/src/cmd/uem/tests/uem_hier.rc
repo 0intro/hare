@@ -52,10 +52,10 @@ fn startup {
 
 	echo Starting execfs.
 	if(~ $#* 1) {
-		../$O.execfs -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
+		../../../$O.execfs -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		../$O.execfs -D -v $2 -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
+		../../../$O.execfs -D -v $2 -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
 	}
 	bind -b '#p' $E_MNTPATH
 
@@ -64,11 +64,11 @@ fn startup {
 	        echo 'starting gangfs (n='$1') without debug'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			../$O.gangfs -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			../../../$O.gangfs -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			../$O.gangfs -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			../../../$O.gangfs -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
 	if not {
@@ -76,17 +76,16 @@ fn startup {
 		if (~ $PARENT 0) {
 			echo '	master mode'
 			echo '		O='$O'  G_MNTPATH='$G_MNTPATH'  E_MNTPATH='$E_MNTPATH
-			echo '../'$O'.gangfs -D -v '$2' -n '$1' -m '$G_MNTPATH' -E '$E_MNTPATH' >[2] '$GANGLOG
-			../$O.gangfs -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
-#			../8.gangfs -D -v 9 -n master -m /tmp/testbed/G -E /tmp/testbed/E  >[2] gangfs.log
+			echo '../../../'$O'.gangfs -D -v '$2' -n '$1' -m '$G_MNTPATH' -E '$E_MNTPATH' >[2] '$GANGLOG
+			../../../$O.gangfs -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+#			../../../8.gangfs -D -v 9 -n master -m /tmp/testbed/G -E /tmp/testbed/E  >[2] gangfs.log
 		}
 		if not {
 			echo '	child mode'
-			../$O.gangfs -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
-#			../8.gangfs -D -v 9 -n master -p 0 -m /tmp/testbed/G -E /tmp/testbed/E  >[2] gangfs.log
+			../../../$O.gangfs -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+#			../../../8.gangfs -D -v 9 -n master -p 0 -m /tmp/testbed/G -E /tmp/testbed/E  >[2] gangfs.log
 		}
 	}
-ls -l  /srv/gangfs
 	mount /srv/gangfs $G_MNTPATH
 }
 
@@ -118,8 +117,6 @@ fn metanode {
 	cd $METADIR/$1
 	startup $1 $2
 	srvfs $1 /
-	ls -l $G_MNTPATH 
-	#ls -l $E_MNTPATH
 }
 
 fn myexec {
@@ -130,10 +127,7 @@ fn myexec {
 }
 
 fn basic {
-	echo -n Basic Test....
-echo 'G='$G_MNTPATH
-ls -l $G_MNTPATH
-exit 0
+	echo -n 'Basic Test.... '
 
 	# initialize files
 	echo Hello Squidboy > $TESTDIR/test
@@ -159,27 +153,18 @@ exit 0
 cleanup
 testdir
 
-# startup master node
-
-#startmp 9 9
-
+# startup child node
 PARENT=0
-
-#startup master $1
-
-
 @{metanode master $1}
-#metanode master $1
-exit 0
-
 mount /srv/master /n/master
-PARENT=master
 
-#@{metanode child $1 9}
-metanode child $1 9
+# startup master node
+PARENT=master
+@{metanode child $1 9}
 mount /srv/child /n/child
 bind /n/master/proc /proc
 
+# tests
 basic
 
 # Cleanup
