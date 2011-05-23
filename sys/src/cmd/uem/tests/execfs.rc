@@ -41,20 +41,20 @@ fn startup {
 	mkdir -p $E_MNTPATH
 
 	if(~ $#* 0) {
-		mpipefs >[2] $MPIPELOG 
+		../$O.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 	}
 
 	mount /srv/mpipe /n/mpipetest test
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		execfs -s execfs -m $E_MNTPATH >[2] $EXECLOG 
+		../$O.execfs -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		execfs -D -v $1 -s execfs -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		../$O.execfs -D -v $1 -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	bind -bc '#p' $E_MNTPATH
 

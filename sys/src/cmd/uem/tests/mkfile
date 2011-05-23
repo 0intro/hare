@@ -1,30 +1,44 @@
 </$objtype/mkfile
 
+DIRS = \
+
 TARG = \
 	mp-writer\
 
-BIN = /$objtype/bin
-BIN = /usr/$user/bin/$objtype
-
 </sys/src/cmd/mkmany
 
+dirsclean:V: clean
+	p=`{pwd}
+	for(i in $DIRS) @{
+		cd $i
+		mk $MKFLAGS $target
+	}
+	cd $p
 
-regress:V: install
+dirsnuke:V: nuke
+	p=`{pwd}
+	for(i in $DIRS) @{
+		cd $i
+		mk $MKFLAGS $target
+	}
+	cd $p
+
+regress:V: all
 	rc mpipefs.rc
 	rc execfs.rc
 	rc gangfs.rc
 
-debug:V: install
+debug:V: all
 	rc mpipefs.rc 9
 	rc execfs.rc 9
 	rc gangfs.rc 9
 
-tidy:VE:
+tidy:VE: 
 	rm -f /srv/mpipe
-	kill execcmd | rc
-	kill gangfs | rc
-	kill execfs | rc
-	kill mpipefs | rc
+	kill $O.execcmd | rc
+	kill $O.gangfs | rc
+	kill $O.execfs | rc
+	kill $O.mpipefs | rc
 	broke | rc
 	rm -f *.log
 	rm -f *.acid
@@ -34,3 +48,11 @@ tidy:VE:
 	bind '#p' /proc
 
 acid:V: execfs.acid execcmd.acid mpipefs.acid gangfs.acid
+
+clean:
+	rm -f *.[$OS] *.a[$OS] y.tab.? lex.yy.c y.debug y.output [$OS].??* $TARG $CLEANFILES
+	rm -f *.log
+
+nuke:V:
+	rm -f *.[$OS] y.tab.? lex.yy.c y.debug y.output [$OS].??* *.acid $TARG
+	rm -f *.log

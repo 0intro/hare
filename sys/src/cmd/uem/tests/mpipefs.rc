@@ -28,10 +28,10 @@ fn cleanup {
 fn startup {
 	echo Starting mpipefs....
 	if(~ $#* 0) {
-		mpipefs >[2] $MPIPELOG 
+		../$O.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 		DEBUG_LEVEL=$1
 	}
 }
@@ -215,10 +215,10 @@ fn multipipe {
 
 	# write to two and only two readers
 	if(~ $DEBUG_LEVEL 0) {
-		mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
+		./$O.mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
 	}
 	if not {
-		mp-writer -D -n $NUM_PASSED -s 8192 /n/mpipetest/data
+		./$O.mp-writer -D -n $NUM_PASSED -s 8192 /n/mpipetest/data
 	}
 
 	# wait for children to finish
@@ -297,7 +297,7 @@ fn enum {
 	check_ready
 
 	# write some data to one, and only one, of them
-	mp-writer -e 1 -n 5 -s 8192 /n/mpipetest/data	
+	./$O.mp-writer -e 1 -n 5 -s 8192 /n/mpipetest/data	
 
 	# wait for children to be done...
 	wait
@@ -342,7 +342,7 @@ fn longmsg {
 	check_ready
 
 	# write a data block that is WAY TO big...
-	mp-writer -e 1 -n 1 -s 131072 /n/mpipetest/data	
+	./$O.mp-writer -e 1 -n 1 -s 131072 /n/mpipetest/data	
 
 	# wait for children to be done...
 	wait
@@ -438,7 +438,7 @@ fn splicefrom {
 	# wait for test files to become ready
 	check_ready
 
-	mp-writer -i $TESTDIR/test /n/mpipetest/data
+	./$O.mp-writer -i $TESTDIR/test /n/mpipetest/data
 	
 	wait 
 
@@ -479,7 +479,7 @@ fn splicefrombcast {
 	# make sure that everything is ready
 	check_ready # poor mans synchronization
 
-	mp-writer -i $TESTDIR/test /n/mpipetest/data
+	./$O.mp-writer -i $TESTDIR/test /n/mpipetest/data
 	
 	# FIXME: check_ready # verify that the state of the write is done
 	wait
@@ -506,7 +506,7 @@ fn spliceto {
 
 	# accomplish the test
 	mount /srv/mpipe /n/mpipetest
-	mp-writer -o $TESTDIR/test1 /n/mpipetest/data
+	./$O.mp-writer -o $TESTDIR/test1 /n/mpipetest/data
 
 	cat $TESTDIR/test > /n/mpipetest/data
 
@@ -538,10 +538,10 @@ fn splicetochain {
 	mount /srv/mpipe /n/stage1 s1
 	mount /srv/mpipe /n/stage2 s2
 	mount /srv/mpipe /n/stage3 s3
-	mp-writer -o /n/stage2/s2 /n/stage0/s0
-	mp-writer -o /n/stage2/s2 /n/stage1/s1
-	mp-writer -o /n/stage3/s3 /n/stage2/s2
-	mp-writer -o $TESTDIR/test1 /n/stage3/s3
+	./$O.mp-writer -o /n/stage2/s2 /n/stage0/s0
+	./$O.mp-writer -o /n/stage2/s2 /n/stage1/s1
+	./$O.mp-writer -o /n/stage3/s3 /n/stage2/s2
+	./$O.mp-writer -o $TESTDIR/test1 /n/stage3/s3
 	echo one > /n/stage0/s0
 	echo two > /n/stage1/s1
 	
@@ -583,7 +583,7 @@ fn splicetobcast {
 	# wait or check its ready status.
 	enum_tests 20
 	for(i in $TESTNUM) {
-	    mp-writer -o $TESTDIR/test$i /n/mpipetest/data 
+	    ./$O.mp-writer -o $TESTDIR/test$i /n/mpipetest/data 
 	}
 
 	# broadcast the message.

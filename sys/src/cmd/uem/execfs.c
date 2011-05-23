@@ -54,7 +54,8 @@ int iothread_id;
 
 static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"execfs";
-static char *procpath, *srvpath;
+static char defaultcmdpath[] =	"/bin/execcmd";
+static char *procpath, *srvpath, *cmdpath;
 static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
@@ -136,11 +137,11 @@ cloneproc(void *arg)
 	threadsetname("execfs-cloneproc");
 
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
-	       pidc, "/bin/execcmd", "execcmd", "-s", srvctl,
+	       pidc, cmdpath, "execcmd", "-s", srvctl,
 	       "-v", smprint("%d", vflag), getpid());
 	// FIXME: error -- should not call path or just do a bind to
 	// find the programs...
-	procexecl(pidc, "/bin/execcmd", "execcmd", "-s", srvctl, "-v", 
+	procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
 		  smprint("%d", vflag), nil);
 
 	sendul(pidc, 0); /* failure */
@@ -564,6 +565,7 @@ threadmain(int argc, char **argv)
 	srvpath = nil;
 
 	procpath = defaultpath;
+	cmdpath = defaultcmdpath;
 
 	ARGBEGIN{
 	case 'D':
@@ -571,6 +573,9 @@ threadmain(int argc, char **argv)
 		break;
 	case 'm':	/* mntpt override */
 		procpath = ARGF();
+		break;
+	case 'E':	/* mntpt override */
+		cmdpath = ARGF();
 		break;
 	case 'v':
 		x = ARGF();
