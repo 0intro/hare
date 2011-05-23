@@ -13,8 +13,8 @@ EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
 TESTDIR=.test
 
-E_MNTPATH=/tmp/testbed/E
-G_MNTPATH=/tmp/testbed/G
+E_MNTPATH=/tmp/testbed/E # execfs mount point
+G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
 #
 # Cleanup Previous Instances
@@ -186,6 +186,7 @@ startup $1
 # Tests
 basic
 stdin
+
 enum
 
 # Cleanup

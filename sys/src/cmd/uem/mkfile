@@ -68,10 +68,12 @@ tidy:VE:
 	kill gangfs | rc
 	kill execfs | rc
 	kill mpipefs | rc
+	kill exportfs | rc
+	
 	broke | rc
 	rm -f *.log
 	rm -f *.acid
-   	rm -rf .test
+	rm -rf .test
 	
 	unmount /proc
 	bind '#p' /proc

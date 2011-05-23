@@ -1,0 +1,145 @@
+#!/bin/rc
+# 
+# Large scale (512) fanout with gangfs
+#
+
+echo '== Large scale fanout =='
+
+#
+# Parameters
+#
+GANGLOG=gangfs.log
+EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
+TESTDIR=.test
+
+E_MNTPATH=/tmp/testbed/E # execfs mount point
+G_MNTPATH=/tmp/testbed/G # gangfs mount point
+
+CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
+#CMD='/bin/date'
+NUM=32 # much bigger and it consistantly dies...
+
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+#
+# Cleanup Previous Instances
+#
+fn cleanup {
+	echo Cleaning up previous runs.
+	unmount $E_MNTPATH   > /dev/null >[2] /dev/null
+	unmount $G_MNTPATH   > /dev/null >[2] /dev/null
+
+	rm -rf /tmp/testbed
+	rm -f /srv/mpipe
+	rm -f /srv/execfs
+	rm -f /srv/gangfs
+
+	unmount /proc > /dev/null >[2] /dev/null
+	bind '#p' /proc
+}
+
+#
+# Startup execfs 
+#
+fn startup {
+
+	mkdir -p $E_MNTPATH $G_MNTPATH
+
+	echo Starting mpipefs....
+	if(~ $#* 0) {
+		../$O.mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
+
+	echo Starting execfs.
+	if(~ $#* 0) {
+		../$O.execfs -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
+	}
+	if not {
+		../$O.execfs -D -v $1 -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+	}
+	bind -b '#p' $E_MNTPATH
+
+	echo Starting gangfs.
+	if(~ $#* 0) {
+		../$O.gangfs -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
+	}
+	if not {
+		../$O.gangfs -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
+	}
+	mount /srv/gangfs $G_MNTPATH
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	mkdir -p $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat} #`
+	echo res $NUM >>[2] error.log
+	echo exec $CMD >>[2] error.log
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+}
+
+fn basic {
+	echo -n Basic Test....
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- create a test output with NUM results
+	enum_tests $NUM
+	echo -n > $TESTDIR/test2
+	for(i in $TESTNUM) {
+	    /bin/date >> $TESTDIR/test2
+	}
+
+	#`# shut up the code coloring bug...
+	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
+
+# Setup
+#{/bin/date | sed 's/:[0-9]*:[0-9]*/hr/'}
+
+
+
+#CMD='/bin/date|sed 's%[a-zA-Z]* [a-zA-Z]* %\1 %''
+
+$CMD
+exit 0
+
+
+rfork
+
+cleanup
+testdir
+startup $1
+
+# Tests
+basic
+
+# Cleanup
+rm -rf $TESTDIR
+cleanup
