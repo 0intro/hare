@@ -18,7 +18,8 @@ G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
 #CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
 CMD='/bin/date'
-NUM=32 # much bigger and it consistantly dies...
+#NUM=32 # much bigger and it consistantly dies...
+NUM=512 # ...
 
 fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
