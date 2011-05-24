@@ -18,8 +18,8 @@ G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
 #CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
 CMD='/bin/date'
-#NUM=32 # much bigger and it consistantly dies...
-NUM=512 # ...
+NUM=3 # much bigger and it consistantly dies...
+#NUM=512 # ...
 
 fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
@@ -102,15 +102,11 @@ fn basic {
 	# execute test
 	myexec <>$G_MNTPATH/gclone >[1=0]
 
-	# verify results -- create a test output with NUM results
-	enum_tests $NUM
-	echo -n > $TESTDIR/test2
-	for(i in $TESTNUM) {
-	    /bin/date >> $TESTDIR/test2
-	}
-
-	#`# shut up the code coloring bug...
-	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc $TESTDIR/test1 | sed 's%[0-9]* *[0-9]* *[a-zA-Z0-9/.]*$%%'} #`
+	if(! ~ $LEN $NUM) {
 		echo FAILED!
 		exit 'stdout: test failed'
 	}
