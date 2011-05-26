@@ -18,11 +18,17 @@ G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
 #CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
 CMD='/bin/date'
+
+# kvm -- 512 now works
+#
 #NUM=64 # much bigger than 32 and it consistantly crashes 9vx and hangs native
-NUM=256 # good with -m 2000
-NUM=384 # good with config.nproc hacked (3000 procs)
-NUM=448 # good with config.nproc hacked (3000 procs)
+#NUM=256 # good with -m 2000
+#NUM=384 # good with config.nproc hacked (3000 procs)
+#NUM=448 # good with config.nproc hacked (3000 procs)
 NUM=512 # good with config.nproc hacked (3250 procs - 3500 crashes out of memory)
+
+# 9vx -- hands much past 64.  Try Ron's version
+#NUM=
 
 fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
