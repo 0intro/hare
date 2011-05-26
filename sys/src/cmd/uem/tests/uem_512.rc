@@ -18,8 +18,11 @@ G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
 #CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
 CMD='/bin/date'
-NUM=3 # much bigger and it consistantly dies...
-#NUM=512 # ...
+#NUM=64 # much bigger than 32 and it consistantly crashes 9vx and hangs native
+NUM=256 # good with -m 2000
+NUM=384 # good with config.nproc hacked (3000 procs)
+NUM=448 # good with config.nproc hacked (3000 procs)
+NUM=512 # good with config.nproc hacked (3250 procs - 3500 crashes out of memory)
 
 fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
@@ -94,7 +97,7 @@ fn myexec {
 }
 
 fn basic {
-	echo -n Basic Test....
+	echo -n 'Basic Test for NUM='$NUM' procs....'
 
 	# initialize files
 	echo > $TESTDIR/test1
@@ -105,7 +108,9 @@ fn basic {
 	# verify results -- date returns time time in seconds, so
 	# simply varify that the number of procs returned are the same
 	# as those requested.
-	LEN=`{wc $TESTDIR/test1 | sed 's%[0-9]* *[0-9]* *[a-zA-Z0-9/.]*$%%'} #`
+	#LEN=`{wc -l $TESTDIR/test1 | sed 's%[0-9]* *[0-9]* *[a-zA-Z0-9/.]*$%%'} #`
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
 	if(! ~ $LEN $NUM) {
 		echo FAILED!
 		exit 'stdout: test failed'
@@ -119,6 +124,8 @@ fn basic {
 
 # Setup
 rfork
+
+#echo 'NPROC='$NPROC
 
 cleanup
 testdir

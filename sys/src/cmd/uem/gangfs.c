@@ -111,6 +111,7 @@ struct Session
 	int pid;		/* Session's actual pid */
 	int index;		/* session index in gang */
 	int remote;		/* flag marking whether session is local or remote */
+	int subindex;		/* sub index into session  */
 };
 
 enum {
@@ -1275,7 +1276,7 @@ cloneproc(void *arg)
 		}
 		/* retry on failure */
 	}
-	DPRINT(DEXE, "\t control channel on fd %d\n", sess->fd);
+	DPRINT(DEXE, "\t control channel on fd %d for subsession %d\n", sess->fd, sess->subindex);
 
 	n = pread(sess->fd, buf, 255, 0);
 	if(n < 0) {
@@ -1318,11 +1319,11 @@ cloneproc(void *arg)
 
 	/* finish by setting up stdio */
 	if(err = setupstdio(sess)) {
-		DPRINT(DEXE, "reporting failure from stdio setup session %d: %s\n", 
-				sess->index, err);
+		DPRINT(DEXE, "reporting failure from stdio setup session %d:%d: %s\n", 
+				sess->index, sess->subindex, err);
 		sendp(sess->chan, err);
 	} else {
-		DPRINT(DEXE, "reporting success from session %d\n", sess->index);
+		DPRINT(DEXE, "reporting success from session %d:%d\n", sess->index, sess->subindex);
 		sendp(sess->chan, nil);
 	}
 
@@ -1331,7 +1332,7 @@ error:
 }
 
 static void
-setupsess(Gang *g, Session *s, char *path, int r)
+setupsess(Gang *g, Session *s, char *path, int r, int sub)
 {
 	if(path)
 		s->path = smprint("/n/%s/proc", path);
@@ -1344,6 +1345,7 @@ setupsess(Gang *g, Session *s, char *path, int r)
 	s->chan = chancreate(sizeof(char *), 0);
 	s->g = g; /* back pointer */
 	s->remote = r;
+	s->subindex = sub; /* keep the subsession index to help with debugging */
 }
 
 /* local reservation */
@@ -1362,7 +1364,7 @@ reslocal(Gang *g)
 	
 	for(count = 0; count < g->size; count++) {
 		DPRINT(DEXE, "\t reservation: count: %d\n", count);
-		setupsess(g, &g->sess[count], nil, 0);
+		setupsess(g, &g->sess[count], nil, 0, count);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	}
 
@@ -1434,7 +1436,7 @@ resgang(Gang *g)
 		checkmount(current->name);
 		assert(njobs[count] != 0);
 		DPRINT(DEXE, "Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
-		setupsess(g, &g->sess[count], current->name, njobs[count]);
+		setupsess(g, &g->sess[count], current->name, njobs[count], count);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	/* BUG: NEED current = current->next */
 	}
@@ -1737,8 +1739,10 @@ cleanupgang(void *arg)
 	flushmp(fname); /* flush pipe to be sure */
 	unmount(0, fname);
 	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
+	flushmp(fname);
 	unmount(0, fname);
 	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
+	flushmp(fname);
 	unmount(0, fname);
 
 	/* TODO: Clean up subsessions? */
