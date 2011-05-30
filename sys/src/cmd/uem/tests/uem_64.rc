@@ -19,9 +19,9 @@ G_MNTPATH=/tmp/testbed/G # gangfs mount point
 #CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
 CMD='/bin/date'
 
-# kvm -- 512 now works, but 9vx will only do about 80 if we push it
+# kvm -- 512 now works, but 9vx will only do about 80 if we push it.
 #
-NUM=512
+NUM=64
 
 fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
