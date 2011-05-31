@@ -1119,16 +1119,19 @@ fsopen(Req *r)
 	Gang *mygang;
 
 	if(TYPE(fid->qid) >= Qsubses) {
+		DPRINT(DERR, "fsopen: ERROR: TYPE(fid->qid) >= Qsubses: %r\n");
 		respond(r, Eperm);
 		return;
 	}
 	if (q->type&QTDIR){
+		DPRINT(DERR, "fsopen: ERROR: q->type&QTDIR: %r\n");
 		respond(r, nil);
 		return;
 	}
 	
 	if(TYPE(fid->qid) == Qctl) {
 		mygang = fid->aux;
+		DPRINT(DFID, "fsopen: mygang=(%p)\n", mygang);
 		
 		if(mygang) {
 			wlock(&glock);
