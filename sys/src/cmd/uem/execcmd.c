@@ -133,6 +133,8 @@ main(int argc, char **argv)
 
 	DPRINT(DEXC, "waiting for cmds\n");
 	while((ret = read(ctlfd, ctlbuf, 255)) > 0) {
+		DPRINT(DEXC, "received cmd \"%s\"\n", ctlbuf);
+
 		cb = parsecmd(ctlbuf, ret);
 		cmd = lookupcmd(cb, ctltab, nelem(ctltab));
 		if(cmd == nil) {
