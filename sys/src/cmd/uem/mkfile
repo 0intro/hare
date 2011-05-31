@@ -73,7 +73,13 @@ tidy:VE:
 	broke | rc
 	rm -f *.log
 	rm -f *.acid
-	rm -rf .test
+	rm -rf .test .meta
+	
+	rm -f /srv/mpipe*
+	rm -f /srv/execfs*
+	rm -f /srv/gangfs*
+	rm -f /srv/master
+	rm -f /srv/child
 	
 	unmount /proc
 	bind '#p' /proc
