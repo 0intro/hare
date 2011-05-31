@@ -8,19 +8,37 @@ echo '== UEM Regression =='
 #
 # Parameters
 #
+PWD=`{pwd}#`
+CMDPATH=$PWD'/..'
+
 GANGLOG=gangfs.log
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
-TESTDIR=.test
+TESTDIR=$PWD/.test
 # metadir is the subdir in which instances will store their logs and .tests
 METADIR=.meta
 
 E_MNTPATH=/tmp/testbed/E # execfs mount point
 G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
-NUM=2
-#CMD=/bin/cat $TESTDIR/test
-CMD='/bin/date'
+
+NUM=5
+CMD='/bin/cat '$TESTDIR'/test'
+
+#
+# The test number names are generated and cached for later use.
+#
+TESTNUM=( 1 )
+
+#
+# Enumerate the test numbers
+#
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
 
 #
 # Cleanup Previous Instances
@@ -41,13 +59,20 @@ fn cleanup {
 
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
+
+	kill $O.execcmd | rc
+	kill $O.gangfs | rc
+	kill $O.execfs | rc
+	kill $O.mpipefs | rc
+#	kill exportfs | rc
+#	broke | rc
 }
 
 #
 # Cleanup the previous runs logs
 #
 fn cleanlogs {
-	rm $GANGLOG $EXECLOG $MPIPELOG
+	rm -f $GANGLOG $EXECLOG $MPIPELOG
 }
 
 #
@@ -66,11 +91,11 @@ fn startup {
 
 	echo Starting execfs.
 	if(~ $#* 1) {
-		../../../$O.execfs -s execfs$GHEAD -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
+		$CMDPATH/$O.execfs -s execfs$GHEAD -E $CMDPATH/$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		echo '  ../../../'$O'.execfs -D -v '$2' -s execfs -E ../'$O'.execcmd -m '$E_MNTPATH' >[2] '$EXECLOG
-		../../../$O.execfs -D -v $2 -s execfs$GHEAD -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
+		echo '  '$CMDPATH/$O'.execfs -D -v '$2' -s execfs -E '$CMDPATH/$O'.execcmd -m '$E_MNTPATH' >[2] '$EXECLOG
+		$CMDPATH/$O.execfs -D -v $2 -s execfs$GHEAD -E $CMDPATH/$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
 	}
 	bind -b '#p' $E_MNTPATH
 
@@ -79,24 +104,23 @@ fn startup {
 	        echo 'starting gangfs (n='$1') without debug'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			../../../$O.gangfs -s gangfs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -s gangfs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			../../../$O.gangfs -s gangfs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -s gangfs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
 	if not {
 	        echo 'starting gangfs (n='$1') with debug (v='$2')'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			echo '		O='$O'  G_MNTPATH='$G_MNTPATH'  E_MNTPATH='$E_MNTPATH
-			echo '../../../'$O'.gangfs -D -v '$2' -n '$1' -m '$G_MNTPATH' -E '$E_MNTPATH' >[2] '$GANGLOG
-			../../../$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			echo '$CMDPATH/'$O'.gangfs -D -v '$2' -n '$1' -m '$G_MNTPATH' -E '$E_MNTPATH' >[2] '$GANGLOG
+			$CMDPATH/$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			../../../$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
 	mount /srv/gangfs$GHEAD $G_MNTPATH
@@ -105,10 +129,10 @@ fn startup {
 fn startmp {
 	echo Starting mpipefs....
 	if(~ $#* 1) {
-		../$O.mpipefs >[2] $MPIPELOG 
+		$CMDPATH/$O.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		../$O.mpipefs -D -v $2 >[2] $MPIPELOG
+		$CMDPATH/$O.mpipefs -D -v $2 >[2] $MPIPELOG
 	}
 }
 
@@ -125,8 +149,7 @@ fn testdir {
 #
 fn metanode {
 	echo 'Starting metanode'
-# FIXME	
-#	rfork n
+	rfork n
 	mkdir -p $METADIR/$1
 	cd $METADIR/$1
 	startup $1 $2
@@ -145,14 +168,17 @@ fn basic {
 
 	# initialize files
 	echo Hello Squidboy > $TESTDIR/test
-	echo > $TESTDIR/test1
+	echo -n > $TESTDIR/test1
 
 	# execute test
 	myexec <>$G_MNTPATH/gclone >[1=0]
 
-	# verify results (yes, I'm lazy)
-	cat $TESTDIR/test > $TESTDIR/test2
-	cat $TESTDIR/test >> $TESTDIR/test2
+	# verify results
+	echo -n > $TESTDIR/test2
+	for(i in $TESTNUM) {
+	    cat $TESTDIR/test >> $TESTDIR/test2
+	}
+
 	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
 		echo FAILED!
 
@@ -162,49 +188,37 @@ fn basic {
 	}
 
 	echo Success!
-	# cleanup
-	rm -rf $TESTDIR/*
 }
 
 # Setup
+rfork
+
 cleanup
 cleanlogs
 testdir
 
 startmp $1
 
+enum_tests $NUM
+
 # startup child node
 PARENT=0
 @{metanode master $1}
 mount /srv/master /n/master
-# FIXME: /n/master now has /usr/9vx 
 
 # startup master node
 PARENT=master
 @{metanode child $1 9}
-# FIXME: /n/master still has /usr/9vx 
 mount /srv/child /n/child
-# FIXME: /n/child has /usr/9vx 
 
 #FIXME: bind /n/master/proc /proc
-# FIXME: /n/master now hangs
-
-ls -l /tmp/testbed
-ls -l /tmp/testbed/G
+bind /n/master /
 
 # tests
 basic
-exit 0
 
 # Cleanup
 rm -rf $METADIR
 rm -rf $TESTDIR
 cleanup
 
-exit 0
-# help with testing...
-
-cd $home/hare_uem
-mount /srv/gangfs_master /tmp/testbed/G
-cd /tmp/testbed/G
-bind -b '#p' /tmp/testbed/E
