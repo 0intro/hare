@@ -23,13 +23,6 @@ CMD='/bin/date'
 #
 NUM=512
 
-fn enum_tests {
-	TESTNUM=`{awk 'BEGIN     {
-               for (i = 1; i <= '$1'; i++) printf "%d ", i
-               exit }'}
-	#`# shut up the code coloring bug...
-}
-
 #
 # Cleanup Previous Instances
 #
@@ -107,7 +100,6 @@ fn basic {
 	# verify results -- date returns time time in seconds, so
 	# simply varify that the number of procs returned are the same
 	# as those requested.
-	#LEN=`{wc -l $TESTDIR/test1 | sed 's%[0-9]* *[0-9]* *[a-zA-Z0-9/.]*$%%'} #`
 	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
 	echo -n ' (LEN='$LEN') '
 	if(! ~ $LEN $NUM) {

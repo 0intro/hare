@@ -539,10 +539,11 @@ updatestatus(void *arg)
 	int n;
 	char *parent = (char *) arg;
 	char *statbuf = emalloc9p((NUMSIZE*11+1) + 1);
-	char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
+	// FIXME: char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
+	char *parentpath = smprint("%s/status", procpath);
 	int parentfd = open(parentpath, OWRITE);
 			
-	DPRINT(DCUR, "updatestatus: parent=(%s) parentpath=(s)\n", parent, parentpath);
+	DPRINT(DCUR, "updatestatus: parent=(%s) parentpath=(%s)\n", parent, parentpath);
 	if(parentfd < 0) {
 		DPRINT(DERR, "*ERROR*: couldn't open parent %s on path %s\n", parent, parentpath);
 		return;
@@ -615,11 +616,14 @@ checkmount(char *addr)
 	int retries = 0;
 	int err = 0;
 
+	DPRINT(DCUR, "checkmount: checking mount point (%s) on (%s)\n", mtpt, dest);
 	if((tmp = dirstat(mtpt)) != nil) /* dir exists, sweet */
 		goto out;
 	else {
 		char *srvpt = smprint("/srv/%s", addr);
 		char *srvtg = smprint("/n/%s", addr);
+		DPRINT(DCUR, "    srvpt=(%s)\n", srvpt);
+		DPRINT(DCUR, "    srvtg=(%s)\n", srvtg);
 		int fd;
 		DPRINT(DCUR, "attempting to mount %s on %s\n", srvpt, srvtg);
 		if(fd = open(srvpt, ORDWR)) { /* srv exists, sweet */

@@ -18,6 +18,10 @@ METADIR=.meta
 E_MNTPATH=/tmp/testbed/E # execfs mount point
 G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
+NUM=2
+#CMD=/bin/cat $TESTDIR/test
+CMD='/bin/date'
+
 #
 # Cleanup Previous Instances
 #
@@ -29,20 +33,30 @@ fn cleanup {
 	unmount /n/master > /dev/null >[2] /dev/null
 
 	rm -rf /tmp/testbed
-	rm -f /srv/mpipe
-	rm -f /srv/execfs
-	rm -f /srv/gangfs
-	rm -f /srv/master
-	rm -f /srv/child
+	rm -f /srv/mpipe*
+	rm -f /srv/execfs*
+	rm -f /srv/gangfs*
+	rm -f /srv/master*
+	rm -f /srv/child*
 
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
 }
 
 #
+# Cleanup the previous runs logs
+#
+fn cleanlogs {
+	rm $GANGLOG $EXECLOG $MPIPELOG
+}
+
+#
 # Startup execfs 
 #
 fn startup {
+
+	GHEAD='_'$PARENT
+	#GHEAD=''
 
 	if(~ $#* 0) {
 		exit usage
@@ -52,10 +66,11 @@ fn startup {
 
 	echo Starting execfs.
 	if(~ $#* 1) {
-		../../../$O.execfs -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
+		../../../$O.execfs -s execfs$GHEAD -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		../../../$O.execfs -D -v $2 -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
+		echo '  ../../../'$O'.execfs -D -v '$2' -s execfs -E ../'$O'.execcmd -m '$E_MNTPATH' >[2] '$EXECLOG
+		../../../$O.execfs -D -v $2 -s execfs$GHEAD -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
 	}
 	bind -b '#p' $E_MNTPATH
 
@@ -64,11 +79,11 @@ fn startup {
 	        echo 'starting gangfs (n='$1') without debug'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			../../../$O.gangfs -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			../../../$O.gangfs -s gangfs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			../../../$O.gangfs -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			../../../$O.gangfs -s gangfs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
 	if not {
@@ -77,16 +92,14 @@ fn startup {
 			echo '	master mode'
 			echo '		O='$O'  G_MNTPATH='$G_MNTPATH'  E_MNTPATH='$E_MNTPATH
 			echo '../../../'$O'.gangfs -D -v '$2' -n '$1' -m '$G_MNTPATH' -E '$E_MNTPATH' >[2] '$GANGLOG
-			../../../$O.gangfs -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
-#			../../../8.gangfs -D -v 9 -n master -m /tmp/testbed/G -E /tmp/testbed/E  >[2] gangfs.log
+			../../../$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			../../../$O.gangfs -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
-#			../../../8.gangfs -D -v 9 -n master -p 0 -m /tmp/testbed/G -E /tmp/testbed/E  >[2] gangfs.log
+			../../../$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
-	mount /srv/gangfs $G_MNTPATH
+	mount /srv/gangfs$GHEAD $G_MNTPATH
 }
 
 fn startmp {
@@ -111,8 +124,9 @@ fn testdir {
 # Setup metanode in its own namespace
 #
 fn metanode {
-    echo 'Starting metanode'
-	rfork n
+	echo 'Starting metanode'
+# FIXME	
+#	rfork n
 	mkdir -p $METADIR/$1
 	cd $METADIR/$1
 	startup $1 $2
@@ -121,8 +135,8 @@ fn metanode {
 
 fn myexec {
 	mypid=`{cat} #`
-	echo res 2 >>[2] error.log
-	echo exec /bin/cat $TESTDIR/test >>[2] error.log
+	echo res $NUM >>[2] error.log # appears to be hanging here
+	echo exec $CMD >>[2] error.log
 	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
@@ -141,6 +155,9 @@ fn basic {
 	cat $TESTDIR/test >> $TESTDIR/test2
 	if(! cmp -s $TESTDIR/test2 $TESTDIR/test1) {
 		echo FAILED!
+
+		cat error.log
+
 		exit 'stdout: test failed'
 	}
 
@@ -151,23 +168,43 @@ fn basic {
 
 # Setup
 cleanup
+cleanlogs
 testdir
+
+startmp $1
 
 # startup child node
 PARENT=0
 @{metanode master $1}
 mount /srv/master /n/master
+# FIXME: /n/master now has /usr/9vx 
 
 # startup master node
 PARENT=master
 @{metanode child $1 9}
+# FIXME: /n/master still has /usr/9vx 
 mount /srv/child /n/child
-bind /n/master/proc /proc
+# FIXME: /n/child has /usr/9vx 
+
+#FIXME: bind /n/master/proc /proc
+# FIXME: /n/master now hangs
+
+ls -l /tmp/testbed
+ls -l /tmp/testbed/G
 
 # tests
 basic
+exit 0
 
 # Cleanup
 rm -rf $METADIR
 rm -rf $TESTDIR
 cleanup
+
+exit 0
+# help with testing...
+
+cd $home/hare_uem
+mount /srv/gangfs_master /tmp/testbed/G
+cd /tmp/testbed/G
+bind -b '#p' /tmp/testbed/E
