@@ -144,6 +144,8 @@ cloneproc(void *arg)
 	procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
 		  smprint("%d", vflag), nil);
 
+	DPRINT(DERR, "cloneproc: execcmd failed!: %r\n");
+
 	sendul(pidc, 0); /* failure */
 	threadexits(nil);
 }
