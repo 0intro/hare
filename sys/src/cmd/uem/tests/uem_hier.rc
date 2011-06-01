@@ -50,7 +50,6 @@ fn cleanup {
 	unmount /n/child  > /dev/null >[2] /dev/null
 	unmount /n/master > /dev/null >[2] /dev/null
 
-	rm -rf /tmp/testbed
 	rm -f /srv/mpipe*
 	rm -f /srv/execfs*
 	rm -f /srv/gangfs*
@@ -64,15 +63,15 @@ fn cleanup {
 	kill $O.gangfs | rc
 	kill $O.execfs | rc
 	kill $O.mpipefs | rc
-#	kill exportfs | rc
-#	broke | rc
 }
 
 #
-# Cleanup the previous runs logs
+# Cleanup the previous runs logs and results
 #
 fn cleanlogs {
 	rm -f $GANGLOG $EXECLOG $MPIPELOG
+	rm -rf $G_MNTPATH $E_MNTPATH
+	rm -rf $TESTDIR $METADIR
 }
 
 #
@@ -211,14 +210,13 @@ PARENT=master
 @{metanode child $1 9}
 mount /srv/child /n/child
 
-#FIXME: bind /n/master/proc /proc
-bind /n/master /
+bind /n/master/proc /proc
+bind /n/master/$E_MNTPATH $E_MNTPATH
+bind /n/master/$G_MNTPATH $G_MNTPATH
 
 # tests
 basic
 
 # Cleanup
-rm -rf $METADIR
-rm -rf $TESTDIR
 cleanup
-
+cleanlogs
