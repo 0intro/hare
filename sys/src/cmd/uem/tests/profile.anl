@@ -1,0 +1,76 @@
+#!/bin/rc
+
+DEBUG='-v 9'
+
+# /n/home/lib/profile
+# TESTDIR=$home/uem_test
+TESTDIR=/tmp/uem_test
+#GANGLOG='>[2] $TESTDIR/gangfs.log'
+#EXECLOG='>[2] $TESTDIR/execfs.log'
+#MPIPELOG='>[2] $TESTDIR/mpipefs.log'
+GANGLOG=''
+EXECLOG=''
+MPIPELOG=''
+
+
+
+# E_MNTPATH=/tmp/testbed/E # execfs mount point
+# G_MNTPATH=/tmp/testbed/G # gangfs mount point
+
+#bind -c '#p' /proc
+
+if(~ $cpunode '1'){
+	i=`{cat /net/ipifc/clone}
+	echo bind torus /dev/torus > /net/ipifc/$i/ctl
+	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
+}
+
+# fire up a cache
+if(~ $cpunode '0') {
+	ramcfs -a $fsaddr -n /n/cache
+	bind /n/cache/n/local /n/frontend
+	bind -c /n/frontend^$fshome /n/home
+	bind -c /n/frontend^$plan9root /n/root
+}
+
+# bind our shit for now
+bind -a /n/root /
+bind -b /n/root/power/bin /bin
+bind -b /n/root/rc/bin /bin
+bind -a /n/root/sys /sys
+# should already be running!
+
+if(test -e '/net/cs')
+	echo cs already running
+if not 
+	ndb/cs
+
+@{
+	rfork n
+
+	mkdir -p $TESTDIR
+
+	# start up the UEM stuff
+	#execfs -m /n/io/proc
+	execfs
+
+	# if we are an ionode
+	if (~ $cpunode '0'){
+		gangfs $DEBUG -n 11.^$treeip(1)
+	}
+	if (~ $cpunode '1'){
+		gangfs $DEBUG -p io -n 11.^$treeip(1) -m /n/io/proc
+		#srvfs 11.^$treeip(1) /
+	}
+
+	#csrv
+	mpipefs
+	# adds an extra hop but allows visibility of mpipefs
+	srvfs uem /proc
+}
+
+mount -c /srv/uem /proc
+#mount -c /srv/11.^$treeip(1) /n/11.^$treeip(1)
+
+echo okay squidboy?
+

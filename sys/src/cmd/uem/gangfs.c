@@ -527,8 +527,10 @@ statuswrite(char *buf)
 	}
 
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
-	if(xgangpath == procpath)
+	if(xgangpath == procpath){
 		xgangpath = smprint("/n/%s%s", mysysname, procpath);
+		DPRINT(DEXE, "statuswrite: xgangpath=(%s)\n", xgangpath);
+	}
 
 	return nil;
 }
@@ -644,11 +646,14 @@ checkmount(char *addr)
 	/* no dir, spawn off an import */
 	proccreate(startimport, dest, STACK);
 
+	// FIXME: crapola...
 	/* we need to wait for this to be done */
 	while( (tmp = dirstat(mtpt)) == nil) {
+		// start a mount with a timeout...
+		// use wait....
 		if(retries++ > 100) {
 			DPRINT(DERR, "*ERROR*: checkmount: import not complete after 10 seconds, giving up\n");
-
+			sleep(100);
 			err = -1;
 			break;
 		}
@@ -1124,7 +1129,8 @@ fsopen(Req *r)
 		return;
 	}
 	if (q->type&QTDIR){
-		DPRINT(DERR, "fsopen: ERROR: q->type&QTDIR: %r\n");
+		// FIXME: this is probably not an error -- 
+		// DPRINT(DERR, "fsopen: ERROR: q->type&QTDIR: %r\n");
 		respond(r, nil);
 		return;
 	}
@@ -1211,6 +1217,8 @@ setupstdio(Session *s)
 	char dest[255];
 	int n;
 
+	DPRINT(DEXE, "setupstdio: path=(%s) remote=(%d)\n", s->path, s->remote);
+
 	/* BUG: won't work for gang because gang pid is not an int */
 	if(s->remote)
 		snprint(buf, 255, "%s/g%d", s->path, s->pid);
@@ -1218,6 +1226,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/%d", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/%d", gangpath, g->index, s->index);
 	n = bind(buf, dest, MREPL);
+	DPRINT(DEXE, "   bind dest=(%s) ret=%d\n", dest, n);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
 
@@ -1227,8 +1236,9 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/stdin", xgangpath, g->index);
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
+	DPRINT(DEXE, "   splicefrom buf=(%s) dest=(%s)  ret=%d\n", buf, dest, n);
 	if(n < 0)
-		return smprint("splicefrom: %r\n");
+		return smprint("setupstdio: %r\n");
 
 	if(s->remote)
 		snprint(buf, 255, "%s/g%d/stdout", s->path, s->pid);
@@ -1236,8 +1246,9 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
+	DPRINT(DEXE, "   spliceto buf=(%s) dest=(%s)  ret=%d\n", buf, dest, n);
 	if(n < 0)
-		return smprint("spliceto: %r\n");
+		return smprint("setupstdio: %r\n");
 
 	if(s->remote)
 		snprint(buf, 255, "%s/g%d/stderr", s->path, s->pid);
@@ -1245,8 +1256,9 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
+	DPRINT(DEXE, "   spliceto buf=(%s) dest=(%s)  ret=%d\n", buf, dest, n);
 	if(n < 0)
-		return smprint("spliceto: %r\n");
+		return smprint("setupstdio: %r\n");
 
 	return nil;
 }
@@ -1267,7 +1279,7 @@ cloneproc(void *arg)
 	else
 		snprint(buf, 255, "%s/clone", sess->path);
 
-	DPRINT(DEXE, "**** clone proc %s\n", buf);
+	DPRINT(DEXE, "**** clone proc %s (remote=%d)\n", buf, sess->remote);
 
 	while(1) {
 		DPRINT(DEXE, "Attempting to open child exec: %s\n", buf);
@@ -1406,7 +1418,8 @@ resgang(Gang *g)
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
 	if(size > (mystats.nproc-mystats.njobs)) {
-		DPRINT(DEXE, "insufficient resources for %d\n", size);
+		DPRINT(DEXE, "insufficient resources for %d out of %d\n", 
+		       size, mystats.nproc-mystats.njobs);
 		return estrdup9p(Enores);
 	}
 	
@@ -1443,8 +1456,11 @@ resgang(Gang *g)
 		checkmount(current->name);
 		assert(njobs[count] != 0);
 		DPRINT(DEXE, "Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
+		// EBo -- FIXME 
 		setupsess(g, &g->sess[count], current->name, njobs[count], count);
+		///// setupsess(g, &g->sess[count], current->name, 0, count);
 		proccreate(cloneproc, &g->sess[count], STACK);
+		current = current->next;
 	/* BUG: NEED current = current->next */
 	}
 

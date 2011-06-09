@@ -1,0 +1,109 @@
+#!/bin/rc
+# 
+# Large scale (256) node fanout with gangfs
+#
+
+echo '== Large scale fanout =='
+
+#
+# Parameters
+#
+GANGLOG=gangfs.log
+EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
+ERRORLOG=error.log
+TESTDIR=.test
+
+#E_MNTPATH=/tmp/testbed/E # execfs mount point
+#G_MNTPATH=/tmp/testbed/G # gangfs mount point
+
+#if(~ $#G_MNTPATH 0) {
+#  G_MNTPATH=/n/172.16.3.12/proc # gangfs mount point
+#}
+
+G_MNTPATH=/n/$IP/proc
+
+9fs $IP
+
+#CMD='/bin/date | /bin/sed s/:[0-9]*:[0-9]*/hr/'
+CMD='/bin/date'
+
+# kvm -- 512 now works, but 9vx will only do about 80 if we push it.
+#
+NUM=1
+
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	mkdir -p $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat} #`
+	echo res $NUM >>[2] $ERRORLOG
+	echo exec $CMD >>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+
+# Setup
+rfork
+
+  #mount /srv/anlgw /n/anl
+  #bind /n/anl/net /net
+
+#enum_srv
+#echo 'SRVNUM='
+#for(i in $SRVNUM) {
+#  echo '    ='$i
+#  9fs $i
+#  #bind -ac /n/$i/proc /proc
+#}
+#exit 0
+
+
+#echo 'NPROC='$NPROC
+
+
+#cleanup
+testdir
+#startup $1
+
+# Tests
+basic
+
+# Cleanup
+#rm -rf $TESTDIR
+#cleanup

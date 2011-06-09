@@ -1,0 +1,21 @@
+#!/bin/rc
+
+fn enum_srv {
+	SRVNUM=`{awk 'BEGIN     {
+               for (i=0; i<4; i++) 
+	         for (j=0; j<4; j++) 
+		   for (k=1; k<=4; k++)
+		     printf "11.%d.%d.%d ", i, j, k
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+rfork
+
+enum_srv
+echo 'Serving='
+for(i in $SRVNUM) {
+  echo '  '$i
+  9fs $i
+  bind -ac /proc /n/$i/proc 
+}

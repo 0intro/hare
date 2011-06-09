@@ -96,13 +96,23 @@ nuke:V:
 	rm -f *.[$OS] y.tab.? lex.yy.c y.debug y.output [$OS].??* *.acid $TARG
 	rm -f *.log
 
-anl: clean
+anl_mount:
 	srv tcp!9.3.45.4!1127 anlgw
 	mount /srv/anlgw /n/anl
+
+anl: clean profile
 	objtype=power mk all
 	cp q.gangfs /n/anl/n/local/home/ericvh/9/power/bin/gangfs
 	cp q.mpipefs /n/anl/n/local/home/ericvh/9/power/bin/mpipefs
 	cp q.execfs /n/anl/n/local/home/ericvh/9/power/bin/execfs
 	cp q.execcmd /n/anl/n/local/home/ericvh/9/power/bin/execcmd
 	cp q.csrv /n/anl/n/local/home/ericvh/9/power/bin/csrv
+
+profile: anl_mount
+	cp tests/profile.anl /n/anl/n/local/home/ericvh/lib/profile
+	cp tests/bg_256.rc /n/anl/n/local/home/ericvh/tmp/bg_256.rc
+	cp tests/9fsnodes /n/anl/n/local/home/ericvh/tmp/9fsnodes
+
+anl_run: anl_mount
+	start-res -p 6048
 
