@@ -1,0 +1,104 @@
+#!/bin/rc
+
+DEBUG='-v 9'
+
+# /n/home/lib/profile
+# TESTDIR=$home/uem_test
+#TESTDIR=/tmp/uem_test
+TESTDIR=.test
+GANGLOG=''
+EXECLOG=''
+MPIPELOG=''
+GANGLOG=$TESTDIR'/gangfs.log'
+EXECLOG=$TESTDIR'/execfs.log'
+MPIPELOG=$TESTDIR'/mpipefs.log'
+ERRORLOG=$TESTDIR'/error.log'
+
+O=8
+PWD=`{pwd}#`
+CMDPATH=$PWD'/..'
+
+# E_MNTPATH=/tmp/testbed/E # execfs mount point
+# G_MNTPATH=/tmp/testbed/G # gangfs mount point
+
+#bind -c '#p' /proc
+
+
+#if(~ $cpunode '1'){
+#	i=`{cat /net/ipifc/clone}
+#	echo bind torus /dev/torus > /net/ipifc/$i/ctl
+#	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
+#}
+#
+## fire up a cache
+#if(~ $cpunode '0') {
+#	ramcfs -a $fsaddr -n /n/cache
+#	bind /n/cache/n/local /n/frontend
+#	bind -c /n/frontend^$fshome /n/home
+#	bind -c /n/frontend^$plan9root /n/root
+#}
+
+## bind our shit for now
+#bind -a /n/root /
+#bind -b /n/root/power/bin /bin
+#bind -b /n/root/rc/bin /bin
+#bind -a /n/root/sys /sys
+
+# should already be running!
+if(! test -e '/net/cs'){
+	echo cs starting
+	ndb/cs
+}
+
+@{
+	rfork n
+
+	mkdir -p $TESTDIR
+
+	# start up the UEM stuff
+	if(! test -e '/srv/execfs'){
+		echo 'starting execfs'
+		rm -f $EXECLOG  
+		../$O.execfs $DEBUG -E $CMDPATH/$O.execcmd >>[2] $EXECLOG
+	}
+
+	# if we are an ionode
+	if (~ $cpunode '0'){
+	  # FIXME: this assumes that the IO node is created first...
+	  rm -f $GANGLOG $MPIPELOG $ERRORLOG
+	  if(! test -e '/srv/gangfs-11.'$treeip){
+		echo 'starting gangfs on IO node treeip='11.^$treeip
+		../$O.gangfs $DEBUG -n 11.^$treeip >>[2] $GANGLOG
+	  }
+	}
+	if (~ $cpunode '1'){
+	  if(! test -e '/srv/gangfs-11.'$treeip){
+		echo 'starting gangfs on CPU node treeip='11.^$treeip
+		../$O.gangfs $DEBUG -p io -n 11.^$treeip -m /n/io >>[2] $GANGLOG
+	  }
+	}
+
+	#csrv
+	if(! test -e '/srv/mpipe'){
+		echo 'starting mpipe'
+		../$O.mpipefs >>[2] $MPIPELOG
+	}
+
+	# adds an extra hop but allows visibility of mpipefs
+	if(! test -e '/srv/uem'){
+		echo 'exporting uem'
+		srvfs uem /proc
+	}
+
+	# 
+	if(! test -e '/srv/11.'$treeip){
+		echo 'exporting treeip='11.$treeip
+		srvfs 11.$treeip /
+	}
+}
+
+mount -cb /srv/uem /proc
+mount -cb /srv/11.$treeip /n/11.$treeip
+
+echo okay squidboy?
+

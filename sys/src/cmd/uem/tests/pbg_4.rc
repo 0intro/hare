@@ -1,0 +1,122 @@
+#!/bin/rc
+# 
+# Pretend to mimic the BG/P setup
+#
+
+echo '== Large scale fanout =='
+
+IP=127.0.0.2
+IO=11.1.1.1
+
+#
+# Parameters
+#
+GANGLOG=gangfs.log
+EXECLOG=execfs.log
+MPIPELOG=mpipefs.log
+ERRORLOG=error.log
+
+#TESTDIR=$home/tests/uem_test
+TESTDIR=.test
+
+G_MNTPATH=/n/$IO/proc
+
+#CMD='/bin/date -n'
+CMD='/bin/date'
+
+
+# setup 
+#
+NUM=4
+
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	echo 'TESTDIR='$TESTDIR
+	mkdir -p $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat} #`
+	echo res $NUM >>[2] $ERRORLOG
+	echo exec $CMD >>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+
+# Setup
+rfork
+
+echo 'testing /srv/'$IP
+if(test -e '/srv/$IP')
+  srvfs $IP /
+
+########################################
+# fake mount the IO node
+#if(! test -e '/srv/$IO'){
+#  srvfs $IO /
+#  #bind -ac /proc /n/$IO/proc
+#}
+#mount -cb /srv/$IO /n/$IO
+
+# fake the BG/P profile (1 I/O node and 4 CPU nodes)
+cpunode=0 treeip=1.1.1 profile.pbg
+
+cpunode=1 treeip=0.0.1 profile.pbg
+cpunode=1 treeip=0.0.2 profile.pbg
+cpunode=1 treeip=0.0.3 profile.pbg
+cpunode=1 treeip=0.0.4 profile.pbg
+
+# fake mount the CPU nodes
+#9fsnodes
+
+# make sure that the programs are available
+PWD=`{pwd}#`
+CMDPATH=$PWD'/..'
+bind -a .. /bin
+########################################
+
+
+#cleanup
+testdir
+
+#startup $1
+
+# Tests
+basic
+
+# Cleanup
+#rm -rf $TESTDIR
+#cleanup

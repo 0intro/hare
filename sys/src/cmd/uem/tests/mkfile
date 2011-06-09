@@ -57,6 +57,8 @@ tidy:VE:
 	rm -f /srv/gangfs*
 	rm -f /srv/master
 	rm -f /srv/child
+	rm -f /srv/uem
+	rm -f /srv/11.*
 	
 	unmount /proc
 	bind '#p' /proc

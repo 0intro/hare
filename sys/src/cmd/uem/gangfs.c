@@ -33,6 +33,10 @@
 #include <stdio.h>
 #include "debug.h"
 
+int remote_override = 0;
+int remote = 0;
+
+
 static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"gangfs";
 static char *procpath, *execfspath, *srvpath;
@@ -1353,17 +1357,26 @@ error:
 static void
 setupsess(Gang *g, Session *s, char *path, int r, int sub)
 {
-	if(path)
+	if(path){
 		s->path = smprint("/n/%s/proc", path);
-	else
-		//s->path = smprint(procpath);
-		s->path = smprint("/tmp/testbed/E");
+		DPRINT(DEXE, "setupsess: given path=(%s)\n", path);
+	} else {
+		s->path = smprint(procpath);
+		//s->path = smprint("/tmp/testbed/E");
+		//s->path = smprint("%s", gangpath);
+		DPRINT(DEXE, "setupsess: gangpath=(%s)\n", gangpath);
+	}
 	DPRINT(DEXE, "setupsess: path=(%s)\n", s->path);
 
 	s->r = nil;
 	s->chan = chancreate(sizeof(char *), 0);
 	s->g = g; /* back pointer */
-	s->remote = r;
+
+	if(remote_override)
+		s->remote = remote;
+	else
+		s->remote = r;
+
 	s->subindex = sub; /* keep the subsession index to help with debugging */
 }
 
@@ -1929,6 +1942,10 @@ threadmain(int argc, char **argv)
 		if(x)
 			updateinterval = atoi(x);
 		break;
+	case 'R':
+		remote_override = 1;
+		remote = atoi(ARGF());
+		break;
 	default:
 		usage();
 	}ARGEND
@@ -1959,6 +1976,8 @@ threadmain(int argc, char **argv)
 	recvp(iochan);
 
 	DPRINT(DFID, "Main: iothread_id=(%d)\n", threadpid(iothread_id));
+	DPRINT(DFID, "      srvpath=(%s) procpath=(%s) mysysname=(%s)\n", 
+	       srvpath, procpath, mysysname);
 
 	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
 

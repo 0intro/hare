@@ -563,8 +563,8 @@ threadmain(int argc, char **argv)
 {
 	char *x;
 
-	//srvpath = defaultsrvpath;
-	srvpath = nil;
+	//srvpath = nil;
+	srvpath = defaultsrvpath;
 
 	procpath = defaultpath;
 	cmdpath = defaultcmdpath;
@@ -588,13 +588,24 @@ threadmain(int argc, char **argv)
 		srvpath = ARGF();
 		break;
 	default:
+		DPRINT(DERR, "ERROR: bad argv (%s)\n", *argv);
+		fprint(2, "ERROR: bad argv (%s)\n", *argv);
 		usage();
 	}ARGEND
 
-	if(argc > 0)
+	if(argc > 0){
+		int i;
+		fprint(2, "*ARGV*: argc=%d\n", argc);
+		DPRINT(DERR, "*ARGV*: argc=%d\n", argc);
+		for(i=0;i<argc;i++){
+			fprint(2, "  argv[%d]: %s\n", i, argv[i]);
+			DPRINT(DERR, "  argv[%d]: %s\n", i, argv[i]);
+		}
 		usage();
+	}
 
 	srvctl = smprint("/srv/execfs-%d", getpid());
+	DPRINT(DFID, "Main: srvctl=(%s)\n", srvctl);
 
 	fs.tree = alloctree("execfs", "execfs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "execfs", 0666, (void *)Xclone));
