@@ -371,6 +371,8 @@ refreshstatus(Status *m)
 	int i;
 	uvlong a[nelem(m->devsysstat)];
 	
+	DPRINT(DCUR, "refreshstatus:\n");
+
 	rlock(&statslock);
 	if(m->next) { /* aggregation node */
 		Status *c;
@@ -416,6 +418,16 @@ refreshstatus(Status *m)
 	}
 
 	runlock(&statslock);
+
+	// what's going on...
+	DPRINT(DCUR, "   m->nproc=(%d)\n", m->nproc);
+	DPRINT(DCUR, "   m->nchild=(%d)\n", m->nchild);
+	DPRINT(DCUR, "   m->njobs=(%d)\n", m->njobs);
+	DPRINT(DCUR, "   m->devswap[Mem]=(%d)\n", m->devswap[Mem]);
+	DPRINT(DCUR, "   m->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
+	DPRINT(DCUR, "   m->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
+	DPRINT(DCUR, "   m->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
+
 	return 1;
 }
 
@@ -429,6 +441,16 @@ fillstatbuf(Status *m, char *statbuf)
 	t = time(0);
 	if(t-m->lastup > updateinterval)
 		refreshstatus(m);
+
+	// what's going on...
+	DPRINT(DCUR, "fillstatbuf:\n");
+	DPRINT(DCUR, "   m->nproc=(%d)\n", m->nproc);
+	DPRINT(DCUR, "   m->nchild=(%d)\n", m->nchild);
+	DPRINT(DCUR, "   m->njobs=(%d)\n", m->njobs);
+	DPRINT(DCUR, "   m->devswap[Mem]=(%d)\n", m->devswap[Mem]);
+	DPRINT(DCUR, "   m->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
+	DPRINT(DCUR, "   m->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
+	DPRINT(DCUR, "   m->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
 
 	bp+=snprint(bp, 17, "%-15.15s ", mystats.name);
 
@@ -501,6 +523,8 @@ statuswrite(char *buf)
 	if(bp != 0)
 		*bp = 0;
 
+	DPRINT(DEXE, "statuswrite: name=(%s)\n", name);
+
 	m = findchild(&mystats, name);
 	if(m == nil) {
 		m = emalloc9p(sizeof(Status));
@@ -533,8 +557,9 @@ statuswrite(char *buf)
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
 	if(xgangpath == procpath){
 		xgangpath = smprint("/n/%s%s", mysysname, procpath);
-		DPRINT(DEXE, "statuswrite: xgangpath=(%s)\n", xgangpath);
+		DPRINT(DEXE, "statuswrite: reseting xgangpath==procpath (%s)\n", xgangpath);
 	}
+	DPRINT(DEXE, "statuswrite: xgangpath=(%s)\n", xgangpath);
 
 	return nil;
 }
@@ -586,7 +611,7 @@ initstatus(Status *m)
 		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
 			;
 		m->nproc = n;
-	}else
+	} else
 		m->nproc = 1;
 	m->lastup = time(0);
 }
@@ -702,8 +727,11 @@ mpipe(char *path, char *name)
 		return -1;
 	}
 
-	DPRINT(DCUR, "mounting (%s) on (%s)\n", name, path);
+	//wunlock(&glock);
+	DPRINT(DCUR, "mounting (%s) on (%s) mysysname=(%s)\n", 
+	       name, path, mysysname);
 	ret = mount(fd, -1, path, MBEFORE, name);
+	//wunlock(&glock);
 	if(ret < 0) {
 		DPRINT(DERR, "mount of multipipe failed: %r\n");
 	}
@@ -1467,8 +1495,8 @@ resgang(Gang *g)
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
 		checkmount(current->name);
+		DPRINT(DEXE, "resgang: Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
 		assert(njobs[count] != 0);
-		DPRINT(DEXE, "Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
 		// EBo -- FIXME 
 		setupsess(g, &g->sess[count], current->name, njobs[count], count);
 		///// setupsess(g, &g->sess[count], current->name, 0, count);
@@ -1613,7 +1641,14 @@ cmdbcast(Req *r, Gang *g)
 	char *resp;
 	char *err = nil;
 
-	DPRINT(DBCA, "broadcasting %s to gang %d (size: %d)\n", r->ifcall.data, g->index, g->size);
+	char *cmd = estrdup9p(r->ifcall.data);
+	if(cmd[r->ifcall.count-1]=='\n')
+		cmd[r->ifcall.count-1] = 0;
+	else
+		cmd[r->ifcall.count] = 0;
+	DPRINT(DBCA, "broadcasting (%s) to gang %d (size: %d)\n", 
+	       cmd, g->index, g->size);
+	free(cmd);
 
 	/* broadcast to all subsessions */
 	for(count = 0; count < g->size; count++) {
@@ -1955,11 +1990,19 @@ threadmain(int argc, char **argv)
 
 	gangpath = procpath;
 	xgangpath = procpath; /* until we get a statuswrite */
-	
+
+//	if(remote_override)
+//		xgangpath = smprint("/n/%s%s", mysysname, procpath);
+
 	/* initialize status */
 	initstatus(&mystats);
 	
+	DPRINT(DFID, "Main: procpath=(%s) pid=(%d)\n", procpath, getpid());
+	DPRINT(DFID, "      srvpath=(%s) procpath=(%s) mysysname=(%s)\n", 
+	       srvpath, procpath, mysysname);
+
 	if(parent) {
+		DPRINT(DFID, "      has parent=(%s)\n", parent);
 		if(checkmount(parent) < 0) {
 			DPRINT(DERR, "*ERROR*: Connecting to parent failed\n");
 			threadexits("problem connecting to parent\n");
@@ -1967,7 +2010,6 @@ threadmain(int argc, char **argv)
 		proccreate(updatestatus, (void *)parent, STACK);
 	}
 
-	DPRINT(DFID, "Main: procpath=(%s) pid=(%d)\n", procpath, getpid());
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
@@ -1975,9 +2017,8 @@ threadmain(int argc, char **argv)
 	iothread_id = proccreate(iothread, nil, STACK);
 	recvp(iochan);
 
-	DPRINT(DFID, "Main: iothread_id=(%d)\n", threadpid(iothread_id));
-	DPRINT(DFID, "      srvpath=(%s) procpath=(%s) mysysname=(%s)\n", 
-	       srvpath, procpath, mysysname);
+	DPRINT(DFID, "Main: iothread_id=(%d) mysysname=(%s)\n",
+	       threadpid(iothread_id), mysysname);
 
 	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
 

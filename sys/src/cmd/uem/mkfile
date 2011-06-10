@@ -82,6 +82,8 @@ tidy:VE:
 	rm -f /srv/gangfs*
 	rm -f /srv/master
 	rm -f /srv/child
+	rm -f /srv/11.*
+	rm -f /srv/io
 	
 	unmount /proc
 	bind '#p' /proc
@@ -99,6 +101,7 @@ nuke:V:
 anl_mount:
 	srv tcp!9.3.45.4!1127 anlgw
 	mount /srv/anlgw /n/anl
+	bind /n/anl/net /net
 
 anl: clean profile
 	objtype=power mk all
@@ -111,7 +114,7 @@ anl: clean profile
 profile: anl_mount
 	cp tests/profile.anl /n/anl/n/local/home/ericvh/lib/profile
 	cp tests/bg_256.rc /n/anl/n/local/home/ericvh/tmp/bg_256.rc
-	cp tests/9fsnodes /n/anl/n/local/home/ericvh/tmp/9fsnodes
+	#cp tests/9fsnodes /n/anl/n/local/home/ericvh/tmp/9fsnodes
 
 anl_run: anl_mount
 	start-res -p 6048

@@ -1,8 +1,8 @@
 #!/bin/rc
 
-I_MAX=1
-J_MAX=1
-K_MAX=1
+I_MAX=4
+J_MAX=4
+K_MAX=4
 
 fn enum_srv {
 	SRVNUM=`{awk 'BEGIN     {
@@ -14,13 +14,13 @@ fn enum_srv {
 	#`# shut up the code coloring bug...
 }
 
-rfork
+### rfork
 
 enum_srv
 echo 'Serving CPU Nodes='
 for(i in $SRVNUM) {
   echo '  '$i
-  #9fs $i
-  #bind -ac /proc /n/$i/proc
+  9fs $i
   mount -cb /srv/$i /n/$i
+  #bind -ac /proc /n/$i/proc
 }

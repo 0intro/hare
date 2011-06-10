@@ -5,22 +5,13 @@ DEBUG='-v 9'
 # /n/home/lib/profile
 # TESTDIR=$home/uem_test
 TESTDIR=/tmp/uem_test
-#GANGLOG='>[2] $TESTDIR/gangfs.log'
-#EXECLOG='>[2] $TESTDIR/execfs.log'
-#MPIPELOG='>[2] $TESTDIR/mpipefs.log'
-GANGLOG=''
-EXECLOG=''
-MPIPELOG=''
 
-
-
-# E_MNTPATH=/tmp/testbed/E # execfs mount point
-# G_MNTPATH=/tmp/testbed/G # gangfs mount point
-
-#bind -c '#p' /proc
+GANGLOG=$TESTDIR/gangfs.log
+EXECLOG=$TESTDIR/execfs.log
+MPIPELOG=$TESTDIR/mpipefs.log
 
 if(~ $cpunode '1'){
-	i=`{cat /net/ipifc/clone}
+	i=`{cat /net/ipifc/clone} #`
 	echo bind torus /dev/torus > /net/ipifc/$i/ctl
 	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
 }
@@ -52,19 +43,20 @@ if not
 
 	# start up the UEM stuff
 	#execfs -m /n/io/proc
-	execfs
+	rm -f $EXECLOG
+	execfs >>[2] $EXECLOG
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
-		gangfs $DEBUG -n 11.^$treeip(1)
+ 		rm -f $GANGLOG $MPIPELOG $ERRORLOG
+		gangfs $DEBUG -n 11.^$treeip(1) >>[2] $GANGLOG
 	}
 	if (~ $cpunode '1'){
-		gangfs $DEBUG -p io -n 11.^$treeip(1) -m /n/io/proc
-		#srvfs 11.^$treeip(1) /
+		gangfs $DEBUG -p io -n 11.^$treeip(1) -m /n/io/proc >>[2] $GANGLOG
 	}
 
 	#csrv
-	mpipefs
+	mpipefs >>[2] $MPIPELOG
 	# adds an extra hop but allows visibility of mpipefs
 	srvfs uem /proc
 }

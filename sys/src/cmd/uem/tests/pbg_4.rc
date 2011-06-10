@@ -5,33 +5,46 @@
 
 echo '== Large scale fanout =='
 
-IP=127.0.0.2
-IO=11.1.1.1
+# fake the IO node's IP
+IO=128.0.1
+#mount -cb /srv/11.$IO /n/11.$IO
 
 #
 # Parameters
 #
-GANGLOG=gangfs.log
-EXECLOG=execfs.log
-MPIPELOG=mpipefs.log
-ERRORLOG=error.log
-
-#TESTDIR=$home/tests/uem_test
 TESTDIR=.test
 
-G_MNTPATH=/n/$IO/proc
+GANGLOG=$TESTDIR'/gangfs'-11.$IO'.log'
+EXECLOG=$TESTDIR'/execfs'-11.$IO'.log'
+MPIPELOG=$TESTDIR'/mpipefs'-11.$IO'.log'
+ERRORLOG=$TESTDIR'/error.log'
+
+G_MNTPATH=/n/11.$IO/proc
 
 #CMD='/bin/date -n'
 CMD='/bin/date'
 
-
 # setup 
 #
-NUM=4
+NUM=1
+
+I_MAX=1
+J_MAX=1
+K_MAX=$NUM
 
 fn enum_tests {
 	TESTNUM=`{awk 'BEGIN     {
                for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+fn enum_srv {
+	SRVNUM=`{awk 'BEGIN     {
+               for (i=0; i<'$I_MAX'; i++) 
+	         for (j=0; j<'$J_MAX'; j++) 
+		   for (k=1; k<='$K_MAX'; k++)
+		     printf "%d.%d.%d ", i, j, k
                exit }'}
 	#`# shut up the code coloring bug...
 }
@@ -46,8 +59,8 @@ fn testdir {
 
 fn myexec {
 	mypid=`{cat} #`
-	echo res $NUM >>[2] $ERRORLOG
-	echo exec $CMD >>[2] $ERRORLOG
+	echo res $NUM>>[2] $ERRORLOG
+	echo exec $CMD>>[2] $ERRORLOG
 	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
@@ -59,6 +72,7 @@ fn basic {
 
 	# execute test
 	myexec <>$G_MNTPATH/gclone >[1=0]
+exit 0
 
 	# verify results -- date returns time time in seconds, so
 	# simply varify that the number of procs returned are the same
@@ -77,39 +91,46 @@ fn basic {
 
 
 # Setup
-rfork
-
-echo 'testing /srv/'$IP
-if(test -e '/srv/$IP')
-  srvfs $IP /
-
-########################################
-# fake mount the IO node
-#if(! test -e '/srv/$IO'){
-#  srvfs $IO /
-#  #bind -ac /proc /n/$IO/proc
-#}
-#mount -cb /srv/$IO /n/$IO
-
-# fake the BG/P profile (1 I/O node and 4 CPU nodes)
-cpunode=0 treeip=1.1.1 profile.pbg
-
-cpunode=1 treeip=0.0.1 profile.pbg
-cpunode=1 treeip=0.0.2 profile.pbg
-cpunode=1 treeip=0.0.3 profile.pbg
-cpunode=1 treeip=0.0.4 profile.pbg
-
-# fake mount the CPU nodes
-#9fsnodes
-
-# make sure that the programs are available
-PWD=`{pwd}#`
-CMDPATH=$PWD'/..'
-bind -a .. /bin
-########################################
-
+#rfork
 
 #cleanup
+rm -f $EXECLOG  
+rm -f $GANGLOG $MPIPELOG $ERRORLOG
+
+enum_srv
+
+########################################
+
+# fake the BG/P profile (1 I/O node and 4 CPU nodes)
+cpunode=0 treeip=$IO profile.pbg
+echo '############ starting next '11.$IO' ############' >> $GANGLOG
+
+mount /srv/11.$IO /n/11.$IO
+
+srvfs io /n/11.$IO/proc
+mount /srv/io /n/io/
+
+# generate tje fake CPU nodes and moutn them
+for(i in $SRVNUM){
+  echo '############ starting next '11.$i' ############' >> $GANGLOG
+  cpunode=1 treeip=$i profile.pbg
+}
+
+########################################
+
+# 
+echo 'Serving CPU Nodes='
+for(i in $SRVNUM) {
+  echo -n ' '$i
+  if(! test -e '/srv/11.'$i)
+    9fs 11.$i
+  if(! test -e '/n/11.'$i){
+    mount -cb /srv/11.$i /n/11.$i
+    #bind -ac /proc /n/11.$i/proc
+  }
+}
+echo ''
+
 testdir
 
 #startup $1

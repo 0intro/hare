@@ -59,6 +59,7 @@ tidy:VE:
 	rm -f /srv/child
 	rm -f /srv/uem
 	rm -f /srv/11.*
+	rm -f /srv/io
 	
 	unmount /proc
 	bind '#p' /proc
