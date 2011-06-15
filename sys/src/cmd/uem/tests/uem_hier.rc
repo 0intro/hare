@@ -3,7 +3,7 @@
 # (pseudo-)Multi-Node Regression
 #
 
-echo '== UEM Regression =='
+echo '== UEM Hier Regression =='
 
 #
 # Parameters
@@ -93,36 +93,35 @@ fn startup {
 		$CMDPATH/$O.execfs -s execfs$GHEAD -E $CMDPATH/$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		echo '  '$CMDPATH/$O'.execfs -D -v '$2' -s execfs -E '$CMDPATH/$O'.execcmd -m '$E_MNTPATH' >[2] '$EXECLOG
+		#echo '  '$CMDPATH/$O'.execfs -D -v '$2' -s execfs -E '$CMDPATH/$O'.execcmd -m '$E_MNTPATH' >[2] '$EXECLOG
 		$CMDPATH/$O.execfs -D -v $2 -s execfs$GHEAD -E $CMDPATH/$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
 	}
-	bind -b '#p' $E_MNTPATH
+	bind -bc '#p' $E_MNTPATH
 
 	echo Starting gangfs parent $PARENT
 	if(~ $#* 1) {
 	        echo 'starting gangfs (n='$1') without debug'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			$CMDPATH/$O.gangfs -s gangfs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -R 0 -s gangfs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			$CMDPATH/$O.gangfs -s gangfs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -R 1 -s gangfs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
 	if not {
 	        echo 'starting gangfs (n='$1') with debug (v='$2')'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			echo '$CMDPATH/'$O'.gangfs -D -v '$2' -n '$1' -m '$G_MNTPATH' -E '$E_MNTPATH' >[2] '$GANGLOG
-			$CMDPATH/$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -R 0 -s gangfs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			$CMDPATH/$O.gangfs -s gangfs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gangfs -R 1 -s gangfs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
-	mount /srv/gangfs$GHEAD $G_MNTPATH
+	mount -ac /srv/gangfs$GHEAD $G_MNTPATH
 }
 
 fn startmp {
@@ -147,7 +146,7 @@ fn testdir {
 # Setup metanode in its own namespace
 #
 fn metanode {
-	echo 'Starting metanode'
+	echo 'Starting metanode (head='$1') (debug='$2')'
 	rfork n
 	mkdir -p $METADIR/$1
 	cd $METADIR/$1
@@ -207,16 +206,30 @@ mount /srv/master /n/master
 
 # startup master node
 PARENT=master
-@{metanode child $1 9}
+@{metanode child $1}
 mount /srv/child /n/child
 
 bind /n/master/proc /proc
 bind /n/master/$E_MNTPATH $E_MNTPATH
 bind /n/master/$G_MNTPATH $G_MNTPATH
 
+#bind $E_MNTPATH /n/child/$E_MNTPATH 
+#bind $G_MNTPATH /n/child/$G_MNTPATH
+mount -ca /srv/execfs_master /n/child/proc
+
+#  mount /srv/child /n/child
+#  mount -ca /srv/execfs_master /n/child/proc
+
+#ls /n/child/$G_MNTPATH
+#ls $G_MNTPATH
+#ls /n/master/proc
+#ls /n/child/proc
+
+ls -l /n/child/proc/clone
+
+
 # tests
 basic
 
 # Cleanup
 cleanup
-cleanlogs
