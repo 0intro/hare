@@ -26,7 +26,7 @@ CMD='/bin/date'
 
 # setup 
 #
-NUM=1
+NUM=4
 
 I_MAX=1
 J_MAX=1
@@ -72,7 +72,6 @@ fn basic {
 
 	# execute test
 	myexec <>$G_MNTPATH/gclone >[1=0]
-exit 0
 
 	# verify results -- date returns time time in seconds, so
 	# simply varify that the number of procs returned are the same
@@ -91,49 +90,31 @@ exit 0
 
 
 # Setup
-#rfork
+rfork
 
 #cleanup
-rm -f $EXECLOG  
-rm -f $GANGLOG $MPIPELOG $ERRORLOG
+rm -f $TESTDIR'/error.log'  
+rm -f $TESTDIR'/gangfs'* $MPIPELOG $TESTDIR'/mpipefs'* $TESTDIR'/execfs'*
+
+testdir
 
 enum_srv
 
 ########################################
 
 # fake the BG/P profile (1 I/O node and 4 CPU nodes)
+echo '############ starting next '11.$IO' ############' >>[2] $GANGLOG
 cpunode=0 treeip=$IO profile.pbg
-echo '############ starting next '11.$IO' ############' >> $GANGLOG
 
-mount /srv/11.$IO /n/11.$IO
-
-srvfs io /n/11.$IO/proc
-mount /srv/io /n/io/
+srvfs io /n/11.$IO
 
 # generate tje fake CPU nodes and moutn them
 for(i in $SRVNUM){
-  echo '############ starting next '11.$i' ############' >> $GANGLOG
+  echo '############ starting next '11.$i' ############' >>[2] $GANGLOG
   cpunode=1 treeip=$i profile.pbg
 }
 
 ########################################
-
-# 
-echo 'Serving CPU Nodes='
-for(i in $SRVNUM) {
-  echo -n ' '$i
-  if(! test -e '/srv/11.'$i)
-    9fs 11.$i
-  if(! test -e '/n/11.'$i){
-    mount -cb /srv/11.$i /n/11.$i
-    #bind -ac /proc /n/11.$i/proc
-  }
-}
-echo ''
-
-testdir
-
-#startup $1
 
 # Tests
 basic
