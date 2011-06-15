@@ -84,6 +84,7 @@ enum {	/* DEBUG LEVELS */
 	DFID = 8,	/* fid tracking */
 	DREF = 9,	/* ref count tracking */
 	DARG = 10,	/* arguments */
+	DSTS = 11,	/* status */
 };
 
 enum
@@ -371,11 +372,11 @@ refreshstatus(Status *m)
 	int i;
 	uvlong a[nelem(m->devsysstat)];
 	
-	DPRINT(DCUR, "refreshstatus:\n");
-
 	rlock(&statslock);
 	if(m->next) { /* aggregation node */
 		Status *c;
+		DPRINT(DSTS, "refreshstatus (aggregated):\n");
+
 		/* go through all the children and add the important bits up */
 		m->nproc = 0;
 		m->nchild = 0;
@@ -386,6 +387,14 @@ refreshstatus(Status *m)
 		m->devsysstat[Idle] = 0;
 		c = m->next;
 		while(c != nil) {
+			DPRINT(DSTS, "\tc->nproc=(%d)\n", c->nproc);
+			DPRINT(DSTS, "\tc->nchild=(%d)\n", c->nchild);
+			DPRINT(DSTS, "\tc->njobs=(%d)\n", c->njobs);
+			DPRINT(DSTS, "\tc->devswap[Mem]=(%d)\n", c->devswap[Mem]);
+			DPRINT(DSTS, "\tc->devswap[Maxmem]=(%d)\n", c->devswap[Maxmem]);
+			DPRINT(DSTS, "\tc->devsysstat[Load]=(%d)\n", c->devsysstat[Load]);
+			DPRINT(DSTS, "\tc->devsysstat[Idle]=(%d)\n", c->devsysstat[Idle]);
+
 			m->nproc += c->nproc;
 			/* if child is an aggregation node only count its children */
 			if(c->nchild) { 
@@ -404,6 +413,7 @@ refreshstatus(Status *m)
 
 		/* MAYBE: average load and idle when done? */
 	} else { /* child node */
+		DPRINT(DSTS, "refreshstatus (child):\n");
 		if(loadbuf(m, &m->swapfd) && readswap(m, a))
 			memmove(m->devswap, a, sizeof m->devswap);
 
@@ -420,13 +430,13 @@ refreshstatus(Status *m)
 	runlock(&statslock);
 
 	// what's going on...
-	DPRINT(DCUR, "   m->nproc=(%d)\n", m->nproc);
-	DPRINT(DCUR, "   m->nchild=(%d)\n", m->nchild);
-	DPRINT(DCUR, "   m->njobs=(%d)\n", m->njobs);
-	DPRINT(DCUR, "   m->devswap[Mem]=(%d)\n", m->devswap[Mem]);
-	DPRINT(DCUR, "   m->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
-	DPRINT(DCUR, "   m->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
-	DPRINT(DCUR, "   m->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
+	DPRINT(DSTS, "\tm->nproc=(%d)\n", m->nproc);
+	DPRINT(DSTS, "\tm->nchild=(%d)\n", m->nchild);
+	DPRINT(DSTS, "\tm->njobs=(%d)\n", m->njobs);
+	DPRINT(DSTS, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
+	DPRINT(DSTS, "\tm->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
+	DPRINT(DSTS, "\tm->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
+	DPRINT(DSTS, "\tm->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
 
 	return 1;
 }
@@ -443,14 +453,14 @@ fillstatbuf(Status *m, char *statbuf)
 		refreshstatus(m);
 
 	// what's going on...
-	DPRINT(DCUR, "fillstatbuf:\n");
-	DPRINT(DCUR, "   m->nproc=(%d)\n", m->nproc);
-	DPRINT(DCUR, "   m->nchild=(%d)\n", m->nchild);
-	DPRINT(DCUR, "   m->njobs=(%d)\n", m->njobs);
-	DPRINT(DCUR, "   m->devswap[Mem]=(%d)\n", m->devswap[Mem]);
-	DPRINT(DCUR, "   m->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
-	DPRINT(DCUR, "   m->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
-	DPRINT(DCUR, "   m->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
+	DPRINT(DSTS, "fillstatbuf:\n");
+	DPRINT(DSTS, "\tm->nproc=(%d)\n", m->nproc);
+	DPRINT(DSTS, "\tm->nchild=(%d)\n", m->nchild);
+	DPRINT(DSTS, "\tm->njobs=(%d)\n", m->njobs);
+	DPRINT(DSTS, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
+	DPRINT(DSTS, "\tm->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
+	DPRINT(DSTS, "\tm->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
+	DPRINT(DSTS, "\tm->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
 
 	bp+=snprint(bp, 17, "%-15.15s ", mystats.name);
 
@@ -523,8 +533,8 @@ statuswrite(char *buf)
 	if(bp != 0)
 		*bp = 0;
 
-	DPRINT(DEXE, "statuswrite: name=(%s)\n", name);
-
+	DPRINT(DSTS, "statuswrite: name=(%s)\n", name);
+ 
 	m = findchild(&mystats, name);
 	if(m == nil) {
 		m = emalloc9p(sizeof(Status));
@@ -542,7 +552,7 @@ statuswrite(char *buf)
 
 	ret = readints(buf+16, 7, a);
 	if(ret == 0) {
-		DPRINT(DERR, "readints returned %d\n", ret);
+		DPRINT(DERR, "statuswrite: readints returned %d\n", ret);
 		return Estatparse;
 	} else {
 		m->nproc = a[0];
@@ -556,10 +566,10 @@ statuswrite(char *buf)
 
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
 	if(xgangpath == procpath){
-		xgangpath = smprint("/n/%s%s", mysysname, procpath);
-		DPRINT(DEXE, "statuswrite: reseting xgangpath==procpath (%s)\n", xgangpath);
+		xgangpath = smprint("%s/%s%s", amprefix, mysysname, procpath);
+		DPRINT(DEXE, "statuswrite: reseting xgangpath=(%s)\n", xgangpath);
 	}
-	DPRINT(DEXE, "statuswrite: xgangpath=(%s)\n", xgangpath);
+	DPRINT(DSTS, "statuswrite: xgangpath=(%s)\n", xgangpath);
 
 	return nil;
 }
@@ -570,8 +580,8 @@ updatestatus(void *arg)
 	int n;
 	char *parent = (char *) arg;
 	char *statbuf = emalloc9p((NUMSIZE*11+1) + 1);
-	// FIXME: char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
-	char *parentpath = smprint("%s/status", procpath);
+	char *parentpath = smprint("%s/%s/proc/status", amprefix, parent);
+
 	int parentfd = open(parentpath, OWRITE);
 			
 	DPRINT(DCUR, "updatestatus: parent=(%s) parentpath=(%s)\n", parent, parentpath);
@@ -614,6 +624,16 @@ initstatus(Status *m)
 	} else
 		m->nproc = 1;
 	m->lastup = time(0);
+
+	DPRINT(DEXE, "initstatus:\n");
+	DPRINT(DEXE, "\tm->name=(%s)\n", m->name);
+	DPRINT(DEXE, "\tm->nproc=(%d)\n", m->nproc);
+	DPRINT(DEXE, "\tm->nchild=(%d)\n", m->nchild);
+	DPRINT(DEXE, "\tm->njobs=(%d)\n", m->njobs);
+	//DPRINT(DEXE, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
+	//DPRINT(DEXE, "\tm->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
+	//DPRINT(DEXE, "\tm->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
+	//DPRINT(DEXE, "\tm->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
 }
 
 static void
@@ -631,7 +651,8 @@ startimport(void *arg)
 
 	threadsetname("gangfs-startimport");
 	
-	procexecl(nil, "/bin/import", "import", "-A", arg, "/", smprint("/n/%s", addr), nil);
+	procexecl(nil, "/bin/import", "import", "-A", arg, "/",
+		  smprint("%s/%s", amprefix, addr), nil);
 
 	DPRINT(DERR, "*ERROR*: startimport: procexecl returned %r\n");
 	threadexits(nil);
@@ -642,35 +663,33 @@ static int
 checkmount(char *addr)
 {
 	char *dest = estrdup9p(addr);
-	char *mtpt = smprint("/n/%s/proc", addr);
-	Dir *tmp;
+	char *srvpt = smprint("/srv/%s", addr);
+	char *srvtg = smprint("%s/%s", amprefix, addr);
+	char *mtpt = smprint("%s/%s/proc", amprefix, addr);
+	Dir *tmp = dirstat(mtpt);
 	int retries = 0;
 	int err = 0;
+	int fd;
 
-	DPRINT(DCUR, "checkmount: checking mount point (%s) on (%s)\n", mtpt, dest);
-	if((tmp = dirstat(mtpt)) != nil) /* dir exists, sweet */
-		goto out;
-	else {
-		char *srvpt = smprint("/srv/%s", addr);
-		char *srvtg = smprint("/n/%s", addr);
-		DPRINT(DCUR, "    srvpt=(%s)\n", srvpt);
-		DPRINT(DCUR, "    srvtg=(%s)\n", srvtg);
-		int fd;
-		DPRINT(DCUR, "attempting to mount %s on %s\n", srvpt, srvtg);
-		if(fd = open(srvpt, ORDWR)) { /* srv exists, sweet */
-			free(srvpt);
-			if(mount(fd, -1, srvtg, MREPL, "") < 0) {
-				free(srvtg);
-				close(fd);
-				DPRINT(DERR, "srv mount failed: %r\n");
-			} else {
-				free(srvtg);
-				close(fd);
-				DPRINT(DERR, "srv mount succeeded\n");
-				goto out;
-			}
-		}
+	DPRINT(DCUR, "checkmount: checking mount point (%s)\n", srvtg);
+
+	if(tmp != nil) {
+		DPRINT(DEXE, "\tsrv already mounted on (%s)\n", mtpt);
+ 		goto out;
 	}
+
+	DPRINT(DFID, "\tmount point (%s) does not exist... mounting\n", srvtg);
+	DPRINT(DCUR, "\tattempting to mount %s on %s\n", srvpt, srvtg);
+	if(fd = open(srvpt, ORDWR)) { /* srv exists, sweet */
+		if(mount(fd, -1, srvtg, MREPL, "") < 0) {
+			close(fd);
+			DPRINT(DERR, "\t*ERROR*: srv mount failed: %r\n");
+		} else {
+			close(fd);
+			DPRINT(DFID, "\tsrv mount succeeded\n");
+			goto out;
+ 		}
+ 	}
 
 	/* no dir, spawn off an import */
 	proccreate(startimport, dest, STACK);
@@ -689,7 +708,12 @@ checkmount(char *addr)
 	}
 
 out:
-	free(tmp);
+	if(srvpt)
+		free(srvpt);
+	if(srvtg)
+		free(srvtg);
+	if(tmp)
+		free(tmp);
 	free(dest);
 	free(mtpt);
 	return err;
@@ -891,13 +915,18 @@ releasesessions(Gang *g)
 {
 	int count;
 	
+	DPRINT(DEXE, "releasesessions:\n");
 	for(count = 0; count < g->size; count++) {
+		DPRINT(DEXE, "\tsess[%d].path=(%s)\n", count, g->sess[count].path);
+		DPRINT(DEXE, "\tsess[%d].chan=(%d)\n", count, g->sess[count].chan);
+		DPRINT(DEXE, "\tsess[%d].fd=(%d)\n", count, g->sess[count].fd);
 		free(g->sess[count].path);
 		chanfree(g->sess[count].chan);
 		close(g->sess[count].fd);
 	}
 
 	free(g->sess);
+	g->sess = nil;
 }
 
 static void
@@ -1126,6 +1155,7 @@ fsclone(Fid *oldfid, Fid *newfid)
 {
 	Gang *g;
 
+	DPRINT(DEXE, "fsclone: mysysname=(%s) \n", mysysname);
 	if((oldfid == nil)||(newfid==nil)) {
 		fprint(2, "fsclone: bad fids\n");
 		return nil;
@@ -1182,7 +1212,9 @@ fsopen(Req *r)
 			}
 			wunlock(&glock);
 		} else
-			DPRINT(DERR, "*ERROR*: fsopen: ctl fid %d without aux\n", fid->fid);
+			// it is only an error when we are not cloning
+			if(TYPE(fid->qid) != Qclone)
+				DPRINT(DERR, "*ERROR*: fsopen: ctl fid %d without aux\n", fid->fid);
 	}
 
 	if(TYPE(fid->qid) != Qclone) {
@@ -1250,6 +1282,7 @@ setupstdio(Session *s)
 	int n;
 
 	DPRINT(DEXE, "setupstdio: path=(%s) remote=(%d)\n", s->path, s->remote);
+	DPRINT(DEXE, "\tgangpath=(%s) xgangpath=(%s)\n", gangpath, xgangpath);
 
 	/* BUG: won't work for gang because gang pid is not an int */
 	if(s->remote)
@@ -1258,7 +1291,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/%d", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/%d", gangpath, g->index, s->index);
 	n = bind(buf, dest, MREPL);
-	DPRINT(DEXE, "   bind dest=(%s) ret=%d\n", dest, n);
+	DPRINT(DEXE, "\tbind buf=(%s) dest=(%s) ret=%d\n", buf, dest, n);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
 
@@ -1267,8 +1300,9 @@ setupstdio(Session *s)
 	else
 		snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/stdin", xgangpath, g->index);
+	DPRINT(DEXE, "\tsplicefrom buf=(%s) dest=(%s)\n", buf, dest);
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
-	DPRINT(DEXE, "   splicefrom buf=(%s) dest=(%s)  ret=%d\n", buf, dest, n);
+	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
 
@@ -1277,8 +1311,9 @@ setupstdio(Session *s)
 	else
 		snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
+	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
-	DPRINT(DEXE, "   spliceto buf=(%s) dest=(%s)  ret=%d\n", buf, dest, n);
+	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
 
@@ -1287,8 +1322,9 @@ setupstdio(Session *s)
 	else
 		snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
 	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
+	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
-	DPRINT(DEXE, "   spliceto buf=(%s) dest=(%s)  ret=%d\n", buf, dest, n);
+	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
 
@@ -1301,7 +1337,7 @@ static void
 cloneproc(void *arg)
 {
 	Session *sess = (Session *) arg;
-	char buf[255];
+	char buf[256];
 	int retries = 0;
 	int n;
 	char *err;
@@ -1327,7 +1363,7 @@ cloneproc(void *arg)
 		}
 		/* retry on failure */
 	}
-	DPRINT(DEXE, "\t control channel on fd %d for subsession %d\n", sess->fd, sess->subindex);
+	DPRINT(DEXE, "\tcontrol channel on fd %d for subsession %d\n", sess->fd, sess->subindex);
 
 	n = pread(sess->fd, buf, 255, 0);
 	if(n < 0) {
@@ -1336,14 +1372,19 @@ cloneproc(void *arg)
 					sess->path));
 		threadexits(Ebadctl);
 	}
+	buf[n] = 0; // FIXME: need to terminate the buffer or we get junk...
+
 	if(sess->remote)
 		sess->pid = atoi(buf+1); /* skip the g */
 	else 
 		sess->pid = atoi(buf); /* convert to local execs session number */
-	
+
+	DPRINT(DEXE, "cloneproc: sess->pid=%ld buf=(%s)\n", sess->pid, buf);
+
 	/* if we are a remote session, setup backmount */
 	if(sess->remote) {
-		DPRINT(DEXE, "Attempting to remote checkmount %s\n", xgangpath);
+		DPRINT(DEXE, "Attempting to remote checkmount %s on %s\n", 
+		       mysysname, sess->path);
 		n = fprint(sess->fd, "checkmount %s", mysysname);
 		if(n < 0) {
 			DPRINT(DEXE, "setting up backmount failed: %r\n");
@@ -1386,15 +1427,13 @@ static void
 setupsess(Gang *g, Session *s, char *path, int r, int sub)
 {
 	if(path){
-		s->path = smprint("/n/%s/proc", path);
-		DPRINT(DEXE, "setupsess: given path=(%s)\n", path);
+		s->path = smprint("%s/%s/proc", amprefix, path);
 	} else {
-		s->path = smprint(procpath);
-		//s->path = smprint("/tmp/testbed/E");
-		//s->path = smprint("%s", gangpath);
-		DPRINT(DEXE, "setupsess: gangpath=(%s)\n", gangpath);
+		s->path = smprint(execfspath);
 	}
-	DPRINT(DEXE, "setupsess: path=(%s)\n", s->path);
+	DPRINT(DEXE, "setupsess: path=(%s) gangpath=(%s) execfspath=(%s) \n",
+	       path, gangpath, execfspath);
+	DPRINT(DEXE, "\tresult session path=(%s)\n", s->path);
 
 	s->r = nil;
 	s->chan = chancreate(sizeof(char *), 0);
@@ -1420,17 +1459,22 @@ reslocal(Gang *g)
 	if(mystats.next == nil)
 		mystats.njobs += g->size;
 
+	DPRINT(DEXE, "reslocal: name=(%s)\n", mystats.name);
+	DPRINT(DEXE, "\tnproc=(%d)\n",  mystats.nproc);
+	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
+	DPRINT(DEXE, "\tnjobs=(%d)\n",  mystats.njobs);
+
 	g->sess = emalloc9p(sizeof(Session)*g->size);
 	
 	for(count = 0; count < g->size; count++) {
-		DPRINT(DEXE, "\t reservation: count: %d\n", count);
+		DPRINT(DEXE, "\t reservation: count=%d out of %d\n", count+1, g->size);
 		setupsess(g, &g->sess[count], nil, 0, count);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	}
 
 	for(count = 0; count < g->size; count++) {
 		char *myerr;
-		DPRINT(DEXE, "\t waiting on reservation: count: %d\n", count); 
+		DPRINT(DEXE, "\twaiting on reservation: count=%d out of %d\n", count+1, g->size);
 		myerr = recvp(g->sess[count].chan);
 		if(myerr != nil) 
 			err = myerr;
@@ -1454,10 +1498,10 @@ resgang(Gang *g)
 
 	g->size=0;
 
-	DPRINT(DEXE, "resgang %d\n", size);
-
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
+	DPRINT(DEXE, "resgang: requesting size=%d out of %d=(mystats.nproc=%d) - (mystats.njobs=%d)\n", 
+	       size, mystats.nproc-mystats.njobs, mystats.nproc, mystats.njobs);
 	if(size > (mystats.nproc-mystats.njobs)) {
 		DPRINT(DEXE, "insufficient resources for %d out of %d\n", 
 		       size, mystats.nproc-mystats.njobs);
@@ -1470,6 +1514,11 @@ resgang(Gang *g)
 	/* walk children tree, allocating cores and incrementing stats.njobs
 		counting sessions and keeping children per subsession in an array? */
 	for(current=mystats.next; current !=nil; current = current->next) {
+		DPRINT(DEXE, "resgang (child stats): name=(%s)\n", current->name);
+		DPRINT(DEXE, "\tnproc=(%d)\n", current->nproc);
+		DPRINT(DEXE, "\tnchild=(%d)\n", current->nchild);
+		DPRINT(DEXE, "\tnjobs=(%d)\n", current->njobs);
+
 		int avail = current->nproc - current->njobs;
 		if(avail > remaining) {
 			njobs[scount] = remaining;
@@ -1482,7 +1531,11 @@ resgang(Gang *g)
 		current->njobs += njobs[scount];
 		scount++;
 	}
-
+	DPRINT(DEXE, "resgang (my stats): name=(%s)\n", mystats.name);
+	DPRINT(DEXE, "\tnproc=(%d)\n", mystats.nproc);
+	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
+	DPRINT(DEXE, "\tnjobs=(%d)\n", mystats.njobs);
+ 
 	scount++; /* count instead of index now */
 	
 	/* allocate subsessions */
@@ -1495,9 +1548,10 @@ resgang(Gang *g)
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
 		checkmount(current->name);
-		DPRINT(DEXE, "resgang: Session %d Target %s Njobs: %d\n", count, current->name, njobs[count]);
+		DPRINT(DEXE, "resgang: Session %d Target %s Njobs: %d From %s\n",
+		       count, current->name, njobs[count], mysysname);
 		assert(njobs[count] != 0);
-		// EBo -- FIXME 
+		// EBo -- FIXME -- needs to chec for children or (or leaf)
 		setupsess(g, &g->sess[count], current->name, njobs[count], count);
 		///// setupsess(g, &g->sess[count], current->name, 0, count);
 		proccreate(cloneproc, &g->sess[count], STACK);
@@ -1509,7 +1563,7 @@ resgang(Gang *g)
 
 	for(count = 0; count < scount; count++) {
 		char *myerr;
-		DPRINT(DEXE, "\t waiting on reservation: count: %d\n", count); 
+		DPRINT(DEXE, "\twaiting on reservation: count=%d out of %d\n", count+1, scount);
 		myerr = recvp(g->sess[count].chan);
 		if(myerr != nil) {
 			DPRINT(DERR, "*ERROR*: session %d broke\n", count);
@@ -1549,7 +1603,7 @@ cmdres(Req *r, int num)
 
 	switch(g->imode) {
 		case CMbcast:
-			DPRINT(DGAN, "broadcast mode\n");
+			DPRINT(DGAN, "cmdres: broadcast mode\n");
 			if (mpipe(dest, "-b stdin") < 0) {
 				DPRINT(DGAN, "setting up stdin pipe failed\n");
 				respond(r, Estdin);
@@ -1557,7 +1611,7 @@ cmdres(Req *r, int num)
 			}
 			break;
 		case CMenum:
-			DPRINT(DGAN, "enumerated mode\n");
+			DPRINT(DGAN, "cmdres: enumerated mode\n");
 			mntargs = smprint("-e %d stdin", num);
 			if (mpipe(dest, mntargs)< 0) {
 				free(mntargs);
@@ -1625,10 +1679,11 @@ relaycmd(void *arg)
 	Session *s = arg;
 	int n;
 
-	DPRINT(DEXE, "writing %d count of data to %d\n", s->r->ifcall.count, s->fd);
+	DPRINT(DEXE, "\trelaycmd: writing %d count of data to %d\n",
+	       s->r->ifcall.count, s->fd);
 	n = pwrite(s->fd, s->r->ifcall.data, s->r->ifcall.count, 0);
 	if(n < 0) {
-		sendp(s->chan, smprint("relay write cmd failed: %r\n"));
+		sendp(s->chan, smprint("*ERROR*: relaycmd: write cmd failed: %r\n"));
 	} else {
 		sendp(s->chan, nil);
 	}
@@ -1646,8 +1701,9 @@ cmdbcast(Req *r, Gang *g)
 		cmd[r->ifcall.count-1] = 0;
 	else
 		cmd[r->ifcall.count] = 0;
-	DPRINT(DBCA, "broadcasting (%s) to gang %d (size: %d)\n", 
-	       cmd, g->index, g->size);
+
+	DPRINT(DBCA, "cmdbcast: broadcasting (%s) to gang %d (size: %d)\n", 
+ 	       cmd, g->index, g->size);
 	free(cmd);
 
 	/* broadcast to all subsessions */
@@ -1661,6 +1717,9 @@ cmdbcast(Req *r, Gang *g)
 	for(count = 0; count < g->size; count++) {
 		/* wait for response */
 		resp = recvp(g->sess[count].chan);
+		// FIXME: do we need to free anything up?
+		DPRINT(DCUR, "**** cmdbcast: returning err=(%s) for %d\n", 
+		       resp, count);
 		g->sess[count].r = nil;
 		if(resp)
 			err = resp;
@@ -1673,6 +1732,29 @@ cmdbcast(Req *r, Gang *g)
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
 	}
+}
+
+static void
+cleanupgang(void *arg)
+{
+	Gang *g = arg;
+	char fname[255];
+
+	DPRINT(DCLN, "cleanupgang: flushing and unmounting stdin, stdout, and stderr\n");
+	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
+	flushmp(fname); /* flush pipe to be sure */
+	unmount(0, fname);
+	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
+	flushmp(fname);
+	unmount(0, fname);
+	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
+	flushmp(fname);
+	unmount(0, fname);
+
+	/* TODO: Clean up subsessions? */
+
+	/* close it out */
+	g->status=GANG_CLOSED;
 }
 
 static void
@@ -1735,6 +1817,11 @@ fswrite(void *arg)
 			} else {
 				DPRINT(DEXE, "Unknown command, broadcasting to children\n");
 				cmdbcast(r, g);
+
+				// FIXME: I am not sure this is the
+				// most appropriate place to put this...
+				releasegang(g);
+				cleanupgang(g);
 			}
 		} else {
 			switch(cmd->index) {
@@ -1800,42 +1887,18 @@ fsstat(Req* r)
 }
 
 static void
-cleanupgang(void *arg)
-{
-	Gang *g = arg;
-	char fname[255];
-
-	DPRINT(DCLN, "cleaning up gang, entering umount\n");
-	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
-	flushmp(fname); /* flush pipe to be sure */
-	unmount(0, fname);
-	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
-	flushmp(fname);
-	unmount(0, fname);
-	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
-	flushmp(fname);
-	unmount(0, fname);
-
-	/* TODO: Clean up subsessions? */
-
-	/* close it out */
-	g->status=GANG_CLOSED;
-}
-
-
-static void
 fsclunk(Fid *fid)
 {
 	Gang *g;
 
 	DPRINT(DFID, "fsclunk: %d\n", fid->fid);
 	if(TYPE(fid->qid) == Qctl) {
-		DPRINT(DFID, "and its a ctl\n");
+		DPRINT(DFID, "\tand its a ctl\n");
 		g = fid->aux;
 		if(g) {
 			wlock(&glock);
 			g->ctlref--;	
-			DPRINT(DREF, "ctlref=%d\n", g->ctlref);
+			DPRINT(DREF, "\tctlref=%d\n", g->ctlref);
 			if(g->ctlref == 0) {
 				if(mystats.next == nil)
 					mystats.njobs -= g->size;
@@ -1846,7 +1909,8 @@ fsclunk(Fid *fid)
 				wunlock(&glock);
 			}
 		} else
-			DPRINT(DERR, "*ERROR*: fsclunk: ctl fid without aux\n");
+			// FIXME: check on this...  The first time through g is nil
+			DPRINT(DERR, "*WARNING*: fsclunk: ctl fid %d without aux\n", fid->fid);
 	} else {
 		if(fid->aux != nil) {
 			g = fid->aux;
@@ -1909,7 +1973,8 @@ clunkproxy(Fid *f)
 	/* really freaking clunky, but not sure what else to do */
 	Req *r = emalloc9p(sizeof(Req));
 
-	DPRINT(DFID, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
+	DPRINT(DFID, "clunkproxy: %p fidnum=%d aux=%p pid=%d\n", 
+	       f, f->fid, f->aux, getpid());
 
 	r->ifcall.type = Tclunk;
 	r->fid = f;
@@ -1991,8 +2056,12 @@ threadmain(int argc, char **argv)
 	gangpath = procpath;
 	xgangpath = procpath; /* until we get a statuswrite */
 
-//	if(remote_override)
-//		xgangpath = smprint("/n/%s%s", mysysname, procpath);
+	if(remote_override) {
+		// FIXME: extra proc?  from procpath, and added in by had...
+		//xgangpath = smprint("/n/%s%s", mysysname, procpath);
+//		xgangpath = smprint("/n/%s", mysysname);
+//		DPRINT(DFID, "Main: xgangpath overide = (%s)\n", xgangpath);
+	}
 
 	/* initialize status */
 	initstatus(&mystats);
@@ -2009,7 +2078,6 @@ threadmain(int argc, char **argv)
 		}
 		proccreate(updatestatus, (void *)parent, STACK);
 	}
-
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
