@@ -534,7 +534,7 @@ statuswrite(char *buf)
 		*bp = 0;
 
 	DPRINT(DSTS, "statuswrite: name=(%s)\n", name);
- 
+
 	m = findchild(&mystats, name);
 	if(m == nil) {
 		m = emalloc9p(sizeof(Status));
@@ -663,20 +663,20 @@ static int
 checkmount(char *addr)
 {
 	char *dest = estrdup9p(addr);
-	char *srvpt = smprint("/srv/%s", addr);
-	char *srvtg = smprint("%s/%s", amprefix, addr);
-	char *mtpt = smprint("%s/%s/proc", amprefix, addr);
-	Dir *tmp = dirstat(mtpt);
 	int retries = 0;
 	int err = 0;
 	int fd;
+	char *srvpt = smprint("/srv/%s", addr);
+	char *srvtg = smprint("%s/%s", amprefix, addr);
+	char *mtpt = smprint("%s/proc", srvtg);
+	Dir *tmp = dirstat(mtpt);
 
 	DPRINT(DCUR, "checkmount: checking mount point (%s)\n", srvtg);
 
 	if(tmp != nil) {
 		DPRINT(DEXE, "\tsrv already mounted on (%s)\n", mtpt);
- 		goto out;
-	}
+		goto out;
+	} else 
 
 	DPRINT(DFID, "\tmount point (%s) does not exist... mounting\n", srvtg);
 	DPRINT(DCUR, "\tattempting to mount %s on %s\n", srvpt, srvtg);
@@ -688,15 +688,15 @@ checkmount(char *addr)
 			close(fd);
 			DPRINT(DFID, "\tsrv mount succeeded\n");
 			goto out;
- 		}
- 	}
+		}
+	}
 
 	/* no dir, spawn off an import */
 	proccreate(startimport, dest, STACK);
 
 	// FIXME: crapola...
 	/* we need to wait for this to be done */
-	while( (tmp = dirstat(mtpt)) == nil) {
+	while((tmp = dirstat(mtpt)) == nil) {
 		// start a mount with a timeout...
 		// use wait....
 		if(retries++ > 100) {
@@ -928,6 +928,30 @@ releasesessions(Gang *g)
 	free(g->sess);
 	g->sess = nil;
 }
+
+static void
+cleanupgang(void *arg)
+{
+	Gang *g = arg;
+	char fname[255];
+
+	DPRINT(DCLN, "cleanupgang: flushing and unmounting stdin, stdout, and stderr\n");
+	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
+	flushmp(fname); /* flush pipe to be sure */
+	unmount(0, fname);
+	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
+	flushmp(fname);
+	unmount(0, fname);
+	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
+	flushmp(fname);
+	unmount(0, fname);
+
+	/* TODO: Clean up subsessions? */
+	
+	/* close it out */
+	g->status=GANG_CLOSED;
+}
+
 
 static void
 releasegang(Gang *g)
@@ -1289,17 +1313,19 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/g%d", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d", s->path, s->pid);
+
 	snprint(dest, 255, "%s/g%d/%d", gangpath, g->index, s->index);
 	n = bind(buf, dest, MREPL);
 	DPRINT(DEXE, "\tbind buf=(%s) dest=(%s) ret=%d\n", buf, dest, n);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
 
+// FIXME: the rest of the gangs are actually xgangs...
 	if(s->remote)
 		snprint(buf, 255, "%s/g%d/stdin", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdin", xgangpath, g->index);
+	snprint(dest, 255, "%s/g%d/stdin", gangpath, g->index);
 	DPRINT(DEXE, "\tsplicefrom buf=(%s) dest=(%s)\n", buf, dest);
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
 	DPRINT(DEXE, "\t\tret=%d\n", n);
@@ -1310,7 +1336,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/g%d/stdout", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
+	snprint(dest, 255, "%s/g%d/stdout", gangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
 	DPRINT(DEXE, "\t\tret=%d\n", n);
@@ -1321,7 +1347,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/g%d/stderr", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
+	snprint(dest, 255, "%s/g%d/stderr", gangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
 	DPRINT(DEXE, "\t\tret=%d\n", n);
@@ -1535,7 +1561,7 @@ resgang(Gang *g)
 	DPRINT(DEXE, "\tnproc=(%d)\n", mystats.nproc);
 	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
 	DPRINT(DEXE, "\tnjobs=(%d)\n", mystats.njobs);
- 
+
 	scount++; /* count instead of index now */
 	
 	/* allocate subsessions */
@@ -1679,8 +1705,7 @@ relaycmd(void *arg)
 	Session *s = arg;
 	int n;
 
-	DPRINT(DEXE, "\trelaycmd: writing %d count of data to %d\n",
-	       s->r->ifcall.count, s->fd);
+	DPRINT(DEXE, "\trelaycmd: writing %d count of data to %d\n", s->r->ifcall.count, s->fd);
 	n = pwrite(s->fd, s->r->ifcall.data, s->r->ifcall.count, 0);
 	if(n < 0) {
 		sendp(s->chan, smprint("*ERROR*: relaycmd: write cmd failed: %r\n"));
@@ -1702,8 +1727,7 @@ cmdbcast(Req *r, Gang *g)
 	else
 		cmd[r->ifcall.count] = 0;
 
-	DPRINT(DBCA, "cmdbcast: broadcasting (%s) to gang %d (size: %d)\n", 
- 	       cmd, g->index, g->size);
+	DPRINT(DBCA, "cmdbcast: broadcasting (%s) to gang %d (size: %d)\n", cmd, g->index, g->size);
 	free(cmd);
 
 	/* broadcast to all subsessions */
@@ -1732,29 +1756,6 @@ cmdbcast(Req *r, Gang *g)
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
 	}
-}
-
-static void
-cleanupgang(void *arg)
-{
-	Gang *g = arg;
-	char fname[255];
-
-	DPRINT(DCLN, "cleanupgang: flushing and unmounting stdin, stdout, and stderr\n");
-	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
-	flushmp(fname); /* flush pipe to be sure */
-	unmount(0, fname);
-	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
-	flushmp(fname);
-	unmount(0, fname);
-	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
-	flushmp(fname);
-	unmount(0, fname);
-
-	/* TODO: Clean up subsessions? */
-
-	/* close it out */
-	g->status=GANG_CLOSED;
 }
 
 static void
