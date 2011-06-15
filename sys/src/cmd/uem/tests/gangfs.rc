@@ -8,9 +8,13 @@ echo '== Gangfs Regression =='
 #
 # Parameters
 #
+O=8.
+CMD=../$O
+
 GANGLOG=gangfs.log
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
+ERRORLOG=error.log
 TESTDIR=.test
 
 E_MNTPATH=/tmp/testbed/E # execfs mount point
@@ -31,6 +35,8 @@ fn cleanup {
 
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
+
+	rm -f $GANGLOG $EXECLOG $MPIPELOG $ERRORLOG
 }
 
 #
@@ -42,27 +48,27 @@ fn startup {
 
 	echo Starting mpipefs....
 	if(~ $#* 0) {
-		../$O.mpipefs >[2] $MPIPELOG 
+		$CMD^mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		$CMD^mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
 	}
 
 	echo Starting execfs.
 	if(~ $#* 0) {
-		../$O.execfs -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
+		$CMD^execfs -s execfs -E $CMD^execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		../$O.execfs -D -v $1 -s execfs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		$CMD^execfs -D -v $1 -s execfs -E $CMD^execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	bind -b '#p' $E_MNTPATH
 
 	echo Starting gangfs.
 	if(~ $#* 0) {
-		../$O.gangfs -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
+		$CMD^gangfs -R 0 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
 	}
 	if not {
-		../$O.gangfs -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
+		$CMD^gangfs -R 0 -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
 	}
 	mount /srv/gangfs $G_MNTPATH
 }
@@ -76,26 +82,26 @@ fn testdir {
 
 fn myexec {
 	mypid=`{cat} #`
-	echo res 5 >>[2] error.log
-	echo exec /bin/cat $TESTDIR/test >>[2] error.log
-	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	echo res 5 >>[2] $ERRORLOG
+	echo exec /bin/cat $TESTDIR/test >>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn myexec2 {
 	mypid=`{cat} #`
-	echo res 5 >>[2] error.log
-	echo exec /bin/cat >>[2] error.log
-	cat $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] error.log
-	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	echo res 5 >>[2] $ERRORLOG
+	echo exec /bin/cat >>[2] $ERRORLOG
+	cat $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn myexec3 {
 	mypid=`{cat} #`
-	echo enum >>[2] error.log
-	echo res 5 >>[2] error.log
-	echo exec /bin/cat >>[2] error.log
-	read -n 5 $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] error.log &
-	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
+	echo enum >>[2] $ERRORLOG
+	echo res 5 >>[2] $ERRORLOG
+	echo exec /bin/cat >>[2] $ERRORLOG
+	read -n 5 $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] $ERRORLOG &
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn basic {
