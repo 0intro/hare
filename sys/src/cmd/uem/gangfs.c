@@ -240,9 +240,10 @@ struct Status
 	char	name[16];
 	long	lastup;	/* last time this was updated */
 
-	int		nproc;
-	int		nchild;
-	int		njobs;
+	int		ntask;  /* the number of tasks (on a remote
+				   gange, it is the sum of all its children) */
+	int nchild; /* number of children */
+	int njobs; /* numer of tasks being run */
 
 	int		statsfd;
 	int		swapfd;
@@ -251,7 +252,7 @@ struct Status
 	uvlong	devsysstat[10];
 
 	/* big enough to hold /dev/sysstat even with many processors */
-	char	buf[8*1024];
+	char	buf[8*1024]; // FIXME: check to make sure this is still true */
 	char	*bufp;
 	char	*ebufp;
 
@@ -378,7 +379,7 @@ refreshstatus(Status *m)
 		DPRINT(DSTS, "refreshstatus (aggregated):\n");
 
 		/* go through all the children and add the important bits up */
-		m->nproc = 0;
+		m->ntask = 0;
 		m->nchild = 0;
 		m->njobs = 0; /* MAYBE: do we really want to do this? */
 		m->devswap[Mem] = 0;
@@ -387,7 +388,7 @@ refreshstatus(Status *m)
 		m->devsysstat[Idle] = 0;
 		c = m->next;
 		while(c != nil) {
-			DPRINT(DSTS, "\tc->nproc=(%d)\n", c->nproc);
+			DPRINT(DSTS, "\tc->ntask=(%d)\n", c->ntask);
 			DPRINT(DSTS, "\tc->nchild=(%d)\n", c->nchild);
 			DPRINT(DSTS, "\tc->njobs=(%d)\n", c->njobs);
 			DPRINT(DSTS, "\tc->devswap[Mem]=(%d)\n", c->devswap[Mem]);
@@ -395,7 +396,7 @@ refreshstatus(Status *m)
 			DPRINT(DSTS, "\tc->devsysstat[Load]=(%d)\n", c->devsysstat[Load]);
 			DPRINT(DSTS, "\tc->devsysstat[Idle]=(%d)\n", c->devsysstat[Idle]);
 
-			m->nproc += c->nproc;
+			m->ntask += c->ntask;
 			/* if child is an aggregation node only count its children */
 			if(c->nchild) { 
 				m->nchild += c->nchild;
@@ -419,7 +420,7 @@ refreshstatus(Status *m)
 
 		if(loadbuf(m, &m->statsfd)){
 			memset(m->devsysstat, 0, sizeof m->devsysstat);
-			for(n=0; n<m->nproc && readnums(m, nelem(m->devsysstat), a, 0); n++)
+			for(n=0; n<m->ntask && readnums(m, nelem(m->devsysstat), a, 0); n++)
 				for(i=0; i<nelem(m->devsysstat); i++)
 					m->devsysstat[i] += a[i];
 		}
@@ -430,7 +431,7 @@ refreshstatus(Status *m)
 	runlock(&statslock);
 
 	// what's going on...
-	DPRINT(DSTS, "\tm->nproc=(%d)\n", m->nproc);
+	DPRINT(DSTS, "\tm->ntask=(%d)\n", m->ntask);
 	DPRINT(DSTS, "\tm->nchild=(%d)\n", m->nchild);
 	DPRINT(DSTS, "\tm->njobs=(%d)\n", m->njobs);
 	DPRINT(DSTS, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
@@ -454,7 +455,7 @@ fillstatbuf(Status *m, char *statbuf)
 
 	// what's going on...
 	DPRINT(DSTS, "fillstatbuf:\n");
-	DPRINT(DSTS, "\tm->nproc=(%d)\n", m->nproc);
+	DPRINT(DSTS, "\tm->ntask=(%d)\n", m->ntask);
 	DPRINT(DSTS, "\tm->nchild=(%d)\n", m->nchild);
 	DPRINT(DSTS, "\tm->njobs=(%d)\n", m->njobs);
 	DPRINT(DSTS, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
@@ -464,7 +465,7 @@ fillstatbuf(Status *m, char *statbuf)
 
 	bp+=snprint(bp, 17, "%-15.15s ", mystats.name);
 
-	readnum(0, bp, NUMSIZE, m->nproc, NUMSIZE);
+	readnum(0, bp, NUMSIZE, m->ntask, NUMSIZE);
 	bp+=NUMSIZE;
 	readnum(0, bp, NUMSIZE, m->nchild, NUMSIZE);
 	bp+=NUMSIZE;
@@ -555,7 +556,7 @@ statuswrite(char *buf)
 		DPRINT(DERR, "statuswrite: readints returned %d\n", ret);
 		return Estatparse;
 	} else {
-		m->nproc = a[0];
+		m->ntask = a[0];
 		m->nchild = a[1];
 		m->njobs = a[2];
 		m->devsysstat[Load] = a[3];
@@ -620,14 +621,14 @@ initstatus(Status *m)
 	if(loadbuf(m, &m->statsfd)){
 		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
 			;
-		m->nproc = n;
+		m->ntask = n;
 	} else
-		m->nproc = 1;
+		m->ntask = 1;
 	m->lastup = time(0);
 
 	DPRINT(DEXE, "initstatus:\n");
 	DPRINT(DEXE, "\tm->name=(%s)\n", m->name);
-	DPRINT(DEXE, "\tm->nproc=(%d)\n", m->nproc);
+	DPRINT(DEXE, "\tm->ntask=(%d)\n", m->ntask);
 	DPRINT(DEXE, "\tm->nchild=(%d)\n", m->nchild);
 	DPRINT(DEXE, "\tm->njobs=(%d)\n", m->njobs);
 	//DPRINT(DEXE, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
@@ -1486,7 +1487,7 @@ reslocal(Gang *g)
 		mystats.njobs += g->size;
 
 	DPRINT(DEXE, "reslocal: name=(%s)\n", mystats.name);
-	DPRINT(DEXE, "\tnproc=(%d)\n",  mystats.nproc);
+	DPRINT(DEXE, "\tntask=(%d)\n",  mystats.ntask);
 	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
 	DPRINT(DEXE, "\tnjobs=(%d)\n",  mystats.njobs);
 
@@ -1526,11 +1527,11 @@ resgang(Gang *g)
 
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
-	DPRINT(DEXE, "resgang: requesting size=%d out of %d=(mystats.nproc=%d) - (mystats.njobs=%d)\n", 
-	       size, mystats.nproc-mystats.njobs, mystats.nproc, mystats.njobs);
-	if(size > (mystats.nproc-mystats.njobs)) {
+	DPRINT(DEXE, "resgang: requesting size=%d out of %d=(mystats.ntask=%d) - (mystats.njobs=%d)\n", 
+	       size, mystats.ntask-mystats.njobs, mystats.ntask, mystats.njobs);
+	if(size > (mystats.ntask-mystats.njobs)) {
 		DPRINT(DEXE, "insufficient resources for %d out of %d\n", 
-		       size, mystats.nproc-mystats.njobs);
+		       size, mystats.ntask-mystats.njobs);
 		return estrdup9p(Enores);
 	}
 	
@@ -1541,24 +1542,24 @@ resgang(Gang *g)
 		counting sessions and keeping children per subsession in an array? */
 	for(current=mystats.next; current !=nil; current = current->next) {
 		DPRINT(DEXE, "resgang (child stats): name=(%s)\n", current->name);
-		DPRINT(DEXE, "\tnproc=(%d)\n", current->nproc);
+		DPRINT(DEXE, "\tntask=(%d)\n", current->ntask);
 		DPRINT(DEXE, "\tnchild=(%d)\n", current->nchild);
 		DPRINT(DEXE, "\tnjobs=(%d)\n", current->njobs);
 
-		int avail = current->nproc - current->njobs;
+		int avail = current->ntask - current->njobs;
 		if(avail > remaining) {
 			njobs[scount] = remaining;
 			current->njobs += njobs[scount];
 			break;
 		} else {
-			njobs[scount] = current->nproc - current->njobs;
+			njobs[scount] = current->ntask - current->njobs;
 			remaining -= njobs[scount];
 		}
 		current->njobs += njobs[scount];
 		scount++;
 	}
 	DPRINT(DEXE, "resgang (my stats): name=(%s)\n", mystats.name);
-	DPRINT(DEXE, "\tnproc=(%d)\n", mystats.nproc);
+	DPRINT(DEXE, "\tntask=(%d)\n", mystats.ntask);
 	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
 	DPRINT(DEXE, "\tnjobs=(%d)\n", mystats.njobs);
 
