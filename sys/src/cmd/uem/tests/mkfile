@@ -38,7 +38,7 @@ debug:V: all
 	#rc uem_512.rc 9
 	#rc bg_256.rc 9
 	#rc uem_hier.rc 9
-	rc pbg_4.rc 9
+	rc pbg_4.rc 11
 
 tidy:VE: 
 	rm -f /srv/mpipe

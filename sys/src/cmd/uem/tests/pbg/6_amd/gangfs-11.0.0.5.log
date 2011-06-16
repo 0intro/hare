@@ -1,0 +1,18 @@
+	[19961793021374][00000281]	 initstatus: 
+	[19961793021382][00000281]	 	m->name=(11.0.0.5) 
+	[19961793021385][00000281]	 	m->nproc=(6) 
+	[19961793021386][00000281]	 	m->nchild=(0) 
+	[19961793021387][00000281]	 	m->njobs=(0) 
+	[19961793021388][00000281]	 Main: procpath=(/proc) pid=(281) 
+	[19961793021389][00000281]	       srvpath=(gangfs-11.0.0.5) procpath=(/proc) mysysname=(11.0.0.5) 
+	[19961793021390][00000281]	       has parent=(11.128.0.1) 
+	[19961793021413][00000281]	 checkmount: checking mount point (/n/11.128.0.1) 
+	[19961793021415][00000281]	 	srv already mounted on (/n/11.128.0.1/proc) 
+	[19961793021479][00000281]	 Main: iothread_id=(283) mysysname=(11.0.0.5) 
+	[19961793021556][00000284]	 clunkproxy: 46a98 fidnum=873 aux=0 pid=284 
+	[19961793021576][00000284]	 clunkproxy: waiting on response 
+	[19961793021580][00000283]	 fsclunk: 873 
+	[19961793021759][00000282]	 updatestatus: parent=(11.128.0.1) parentpath=(/n/11.128.0.1/proc/status) 
+	[19961793021822][00000284]	 clunkproxy: 46758 fidnum=876 aux=0 pid=284 
+	[19961793021830][00000284]	 clunkproxy: waiting on response 
+	[19961793021833][00000283]	 fsclunk: 876 

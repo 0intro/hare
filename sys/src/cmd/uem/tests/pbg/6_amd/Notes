@@ -1,0 +1,17 @@
+There appears to be several problems with the reservation mechanism.
+
+First, nprocs is improperly calculated.  For the base node it should
+be ncores or 1.  The top level gangfs should report the sum of all
+below.  I probably need DSTS (-v 11) to see the stats change as
+children register.
+
+On the children, reslocal makes a reservation, and each subsequent
+cloneproc makes one.  This ends up using the number of requested
+reservations+1.  This is what is causing one of the segfault problems.
+
+All the reservations are being sent to a single child (on the AMD
+machine).  This needs to be confirmed on Intel and the BG.
+
+
+On the master gang, the reservation request is setting up 2 gangs and
+not4.

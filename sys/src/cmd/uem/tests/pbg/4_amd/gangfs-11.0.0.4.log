@@ -1,0 +1,285 @@
+	[19961794470685][00000253]	 initstatus: 
+	[19961794470694][00000253]	 	m->name=(11.0.0.4) 
+	[19961794470696][00000253]	 	m->nproc=(6) 
+	[19961794470697][00000253]	 	m->nchild=(0) 
+	[19961794470698][00000253]	 	m->njobs=(0) 
+	[19961794470699][00000253]	 Main: procpath=(/proc) pid=(253) 
+	[19961794470700][00000253]	       srvpath=(gangfs-11.0.0.4) procpath=(/proc) mysysname=(11.0.0.4) 
+	[19961794470701][00000253]	       has parent=(11.128.0.1) 
+	[19961794470724][00000253]	 checkmount: checking mount point (/n/11.128.0.1) 
+	[19961794470726][00000253]	 	srv already mounted on (/n/11.128.0.1/proc) 
+	[19961794470789][00000253]	 Main: iothread_id=(255) mysysname=(11.0.0.4) 
+	[19961794470866][00000256]	 clunkproxy: 46a98 fidnum=815 aux=0 pid=256 
+	[19961794470885][00000256]	 clunkproxy: waiting on response 
+	[19961794470889][00000255]	 fsclunk: 815 
+	[19961794471029][00000254]	 updatestatus: parent=(11.128.0.1) parentpath=(/n/11.128.0.1/proc/status) 
+	[19961794471091][00000256]	 clunkproxy: 46758 fidnum=818 aux=0 pid=256 
+	[19961794471098][00000256]	 clunkproxy: waiting on response 
+	[19961794471101][00000255]	 fsclunk: 818 
+	[19961794472104][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794472124][00000256]	 clunkproxy: 467d8 fidnum=869 aux=0 pid=256 
+	[19961794472155][00000256]	 clunkproxy: waiting on response 
+	[19961794472158][00000255]	 fsclunk: 869 
+	[19961794472175][00000255]	 	and its a ctl 
+	[19961794472186][00000255]	 *WARNING*: fsclunk: ctl fid 869 without aux 
+	[19961794472199][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794472213][00000255]	 fsopen: mygang=(0) 
+	[19961794472220][00000255]	 	 newgang 46e18 
+	[19961794472295][00000273]	 check mount 11.128.0.1 (2) 
+	[19961794472329][00000273]	 checkmount: checking mount point (/n/11.128.0.1) 
+	[19961794472331][00000273]	 	srv already mounted on (/n/11.128.0.1/proc) 
+	[19961794472360][00000274]	 cmdres: broadcast mode 
+	[19961794472370][00000274]	 mounting (-b stdin) on (/proc/g0) mysysname=(11.0.0.4) 
+	[19961794472402][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794472410][00000256]	 		Gang(46898).refcount++ = 2 [findgang] 
+	[19961794472420][00000274]	 mounting (stdout) on (/proc/g0) mysysname=(11.0.0.4) 
+	[19961794472450][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794472457][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794472468][00000256]	 clunkproxy: 46d18 fidnum=887 aux=46898 pid=256 
+	[19961794472470][00000274]	 mounting (stderr) on (/proc/g0) mysysname=(11.0.0.4) 
+	[19961794472474][00000256]	 clunkproxy: waiting on response 
+	[19961794472479][00000255]	 fsclunk: 887 
+	[19961794472504][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794472529][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794472536][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794472546][00000256]	 clunkproxy: 46d18 fidnum=894 aux=46898 pid=256 
+	[19961794472549][00000274]	 reslocal: size=(4) 
+	[19961794472553][00000256]	 clunkproxy: waiting on response 
+	[19961794472556][00000255]	 fsclunk: 894 
+	[19961794472559][00000274]	 reslocal: name=(11.0.0.4) 
+	[19961794472563][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794472566][00000274]	 	nproc=(6) 
+	[19961794472574][00000274]	 	nchild=(0) 
+	[19961794472575][00000274]	 	njobs=(4) 
+	[19961794472576][00000274]	 	 reservation: count=1 out of 4 
+	[19961794472578][00000274]	 setupsess: path=(<nil>) gangpath=(/proc) execfspath=(/proc)  
+	[19961794472578][00000274]	 	result session path=(/proc) 
+	[19961794472604][00000275]	 **** clone proc /proc/clone (remote=0) 
+	[19961794472612][00000274]	 	 reservation: count=2 out of 4 
+	[19961794472620][00000275]	 Attempting to open child exec: /proc/clone 
+	[19961794472624][00000274]	 setupsess: path=(<nil>) gangpath=(/proc) execfspath=(/proc)  
+	[19961794472636][00000274]	 	result session path=(/proc) 
+	[19961794472669][00000276]	 **** clone proc /proc/clone (remote=0) 
+	[19961794472683][00000274]	 	 reservation: count=3 out of 4 
+	[19961794472690][00000276]	 Attempting to open child exec: /proc/clone 
+	[19961794472724][00000274]	 setupsess: path=(<nil>) gangpath=(/proc) execfspath=(/proc)  
+	[19961794472746][00000274]	 	result session path=(/proc) 
+	[19961794472780][00000278]	 **** clone proc /proc/clone (remote=0) 
+	[19961794472791][00000274]	 	 reservation: count=4 out of 4 
+	[19961794472800][00000278]	 Attempting to open child exec: /proc/clone 
+	[19961794472808][00000274]	 setupsess: path=(<nil>) gangpath=(/proc) execfspath=(/proc)  
+	[19961794472812][00000274]	 	result session path=(/proc) 
+	[19961794472853][00000280]	 **** clone proc /proc/clone (remote=0) 
+	[19961794472866][00000274]	 	waiting on reservation: count=1 out of 4 
+	[19961794472874][00000280]	 Attempting to open child exec: /proc/clone 
+	[19961794473038][00000275]	 	control channel on fd 9 for subsession 0 
+	[19961794473265][00000276]	 	control channel on fd 10 for subsession 1 
+	[19961794473493][00000280]	 	control channel on fd 11 for subsession 3 
+	[19961794473544][00000275]	 cloneproc: sess->pid=279 buf=(279) 
+	[19961794473563][00000275]	 setupstdio: path=(/proc) remote=(0) 
+	[19961794473576][00000276]	 cloneproc: sess->pid=282 buf=(282) 
+	[19961794473580][00000275]	 	gangpath=(/proc) xgangpath=(/proc) 
+	[19961794473587][00000276]	 setupstdio: path=(/proc) remote=(0) 
+	[19961794473598][00000280]	 cloneproc: sess->pid=284 buf=(284) 
+	[19961794473601][00000276]	 	gangpath=(/proc) xgangpath=(/proc) 
+	[19961794473607][00000280]	 setupstdio: path=(/proc) remote=(0) 
+	[19961794473630][00000280]	 	gangpath=(/proc) xgangpath=(/proc) 
+	[19961794473778][00000278]	 	control channel on fd 12 for subsession 2 
+	[19961794473790][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794473799][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794473812][00000256]	 clunkproxy: 538f0 fidnum=1010 aux=46898 pid=256 
+	[19961794473828][00000256]	 clunkproxy: waiting on response 
+	[19961794473831][00000255]	 fsclunk: 1010 
+	[19961794473842][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794473853][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794473862][00000256]	 		Gang(46898).refcount++ = 3 [fsclone] 
+	[19961794473870][00000275]	 	bind buf=(/proc/279) dest=(/proc/g0/0) ret=1404 
+	[19961794473877][00000278]	 cloneproc: sess->pid=286 buf=(286) 
+	[19961794473881][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794473884][00000275]	 	splicefrom buf=(/proc/279/stdin) dest=(/proc/g0/stdin) 
+	[19961794473891][00000278]	 setupstdio: path=(/proc) remote=(0) 
+	[19961794473894][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794473903][00000275]	 just so we know where we are splicing: [/proc/g0/stdin] 
+	[19961794473912][00000278]	 	gangpath=(/proc) xgangpath=(/proc) 
+	[19961794473917][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794473931][00000256]	 		Gang(46898).refcount++ = 5 [findgang] 
+	[19961794473982][00000256]	 clunkproxy: 539d0 fidnum=1015 aux=46898 pid=256 
+	[19961794474008][00000256]	 clunkproxy: waiting on response 
+	[19961794474011][00000255]	 fsclunk: 1015 
+	[19961794474048][00000255]	 		Gang(46898).refcount-- = 4 [releasegang] 
+	[19961794474069][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794474109][00000256]	 		Gang(46898).refcount++ = 5 [fsclone] 
+	[19961794474126][00000256]	 clunkproxy: 53ad0 fidnum=1019 aux=46898 pid=256 
+	[19961794474155][00000275]	 		ret=21 
+	[19961794474160][00000256]	 clunkproxy: waiting on response 
+	[19961794474163][00000255]	 fsclunk: 1019 
+	[19961794474172][00000275]	 	spliceto buf=(/proc/279/stdout) dest=(/proc/g0/stdout) 
+	[19961794474176][00000255]	 		Gang(46898).refcount-- = 4 [releasegang] 
+	[19961794474229][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794474243][00000256]	 		Gang(46898).refcount++ = 5 [findgang] 
+	[19961794474256][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794474267][00000256]	 		Gang(46898).refcount++ = 6 [fsclone] 
+	[19961794474303][00000275]	 		ret=22 
+	[19961794474309][00000256]	 clunkproxy: 53a10 fidnum=1027 aux=46898 pid=256 
+	[19961794474311][00000276]	 	bind buf=(/proc/282) dest=(/proc/g0/0) ret=1408 
+	[19961794474322][00000275]	 	spliceto buf=(/proc/279/stderr) dest=(/proc/g0/stderr) 
+	[19961794474326][00000256]	 clunkproxy: waiting on response 
+	[19961794474329][00000255]	 fsclunk: 1027 
+	[19961794474347][00000276]	 	splicefrom buf=(/proc/282/stdin) dest=(/proc/g0/stdin) 
+	[19961794474404][00000255]	 		Gang(46898).refcount-- = 5 [releasegang] 
+	[19961794474413][00000276]	 just so we know where we are splicing: [/proc/g0/stdin] 
+	[19961794474438][00000256]	 clunkproxy: 53ad0 fidnum=1028 aux=46898 pid=256 
+	[19961794474492][00000256]	 clunkproxy: waiting on response 
+	[19961794474495][00000255]	 fsclunk: 1028 
+	[19961794474512][00000255]	 		Gang(46898).refcount-- = 4 [releasegang] 
+	[19961794474551][00000275]	 		ret=22 
+	[19961794474559][00000256]	 clunkproxy: 53b90 fidnum=1034 aux=46898 pid=256 
+	[19961794474561][00000280]	 	bind buf=(/proc/284) dest=(/proc/g0/0) ret=1412 
+	[19961794474577][00000275]	 reporting success from session 0:0 
+	[19961794474580][00000256]	 clunkproxy: waiting on response 
+	[19961794474583][00000255]	 fsclunk: 1034 
+	[19961794474601][00000280]	 	splicefrom buf=(/proc/284/stdin) dest=(/proc/g0/stdin) 
+	[19961794474623][00000274]	 	waiting on reservation: count=2 out of 4 
+	[19961794474628][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794474639][00000280]	 just so we know where we are splicing: [/proc/g0/stdin] 
+	[19961794474660][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794474691][00000256]	 		Gang(46898).refcount++ = 4 [fsclone] 
+	[19961794474737][00000256]	 clunkproxy: 539d0 fidnum=1051 aux=46898 pid=256 
+	[19961794474740][00000278]	 	bind buf=(/proc/286) dest=(/proc/g0/0) ret=1416 
+	[19961794474761][00000256]	 clunkproxy: waiting on response 
+	[19961794474764][00000255]	 fsclunk: 1051 
+	[19961794474768][00000278]	 	splicefrom buf=(/proc/286/stdin) dest=(/proc/g0/stdin) 
+	[19961794474793][00000276]	 		ret=21 
+	[19961794474798][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794474807][00000278]	 just so we know where we are splicing: [/proc/g0/stdin] 
+	[19961794474822][00000276]	 	spliceto buf=(/proc/282/stdout) dest=(/proc/g0/stdout) 
+	[19961794474976][00000280]	 		ret=21 
+	[19961794474999][00000280]	 	spliceto buf=(/proc/284/stdout) dest=(/proc/g0/stdout) 
+	[19961794475163][00000278]	 		ret=21 
+	[19961794475179][00000278]	 	spliceto buf=(/proc/286/stdout) dest=(/proc/g0/stdout) 
+	[19961794475305][00000276]	 		ret=22 
+	[19961794475318][00000276]	 	spliceto buf=(/proc/282/stderr) dest=(/proc/g0/stderr) 
+	[19961794475435][00000280]	 		ret=22 
+	[19961794475451][00000280]	 	spliceto buf=(/proc/284/stderr) dest=(/proc/g0/stderr) 
+	[19961794475581][00000278]	 		ret=22 
+	[19961794475598][00000278]	 	spliceto buf=(/proc/286/stderr) dest=(/proc/g0/stderr) 
+	[19961794475724][00000276]	 		ret=22 
+	[19961794475740][00000276]	 reporting success from session 0:1 
+	[19961794475764][00000274]	 	waiting on reservation: count=3 out of 4 
+	[19961794475805][00000280]	 		ret=22 
+	[19961794475815][00000280]	 reporting success from session 0:3 
+	[19961794475860][00000278]	 		ret=22 
+	[19961794475870][00000278]	 reporting success from session 0:2 
+	[19961794475884][00000274]	 	waiting on reservation: count=4 out of 4 
+	[19961794475894][00000274]	 	 gangs all here 
+	[19961794475947][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794475954][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794475965][00000256]	 clunkproxy: 47218 fidnum=1116 aux=46898 pid=256 
+	[19961794476000][00000256]	 clunkproxy: waiting on response 
+	[19961794476003][00000255]	 fsclunk: 1116 
+	[19961794476014][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476109][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476121][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476132][00000256]	 clunkproxy: 47218 fidnum=1131 aux=46898 pid=256 
+	[19961794476152][00000256]	 clunkproxy: waiting on response 
+	[19961794476155][00000255]	 fsclunk: 1131 
+	[19961794476164][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476177][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476184][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476193][00000256]	 clunkproxy: 47218 fidnum=1136 aux=46898 pid=256 
+	[19961794476225][00000256]	 clunkproxy: waiting on response 
+	[19961794476228][00000255]	 fsclunk: 1136 
+	[19961794476237][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476250][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476257][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476266][00000256]	 clunkproxy: 47218 fidnum=1141 aux=46898 pid=256 
+	[19961794476294][00000256]	 clunkproxy: waiting on response 
+	[19961794476298][00000255]	 fsclunk: 1141 
+	[19961794476330][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476480][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476487][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476497][00000256]	 clunkproxy: 47218 fidnum=1152 aux=46898 pid=256 
+	[19961794476516][00000256]	 clunkproxy: waiting on response 
+	[19961794476520][00000255]	 fsclunk: 1152 
+	[19961794476529][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476542][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476549][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476557][00000256]	 clunkproxy: 47218 fidnum=1157 aux=46898 pid=256 
+	[19961794476583][00000256]	 clunkproxy: waiting on response 
+	[19961794476586][00000255]	 fsclunk: 1157 
+	[19961794476595][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476608][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476615][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476623][00000256]	 clunkproxy: 47218 fidnum=1161 aux=46898 pid=256 
+	[19961794476669][00000256]	 clunkproxy: waiting on response 
+	[19961794476672][00000255]	 fsclunk: 1161 
+	[19961794476688][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476803][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476810][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476821][00000256]	 clunkproxy: 47218 fidnum=1170 aux=46898 pid=256 
+	[19961794476840][00000256]	 clunkproxy: waiting on response 
+	[19961794476843][00000255]	 fsclunk: 1170 
+	[19961794476852][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476865][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476872][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476880][00000256]	 clunkproxy: 47218 fidnum=1175 aux=46898 pid=256 
+	[19961794476903][00000256]	 clunkproxy: waiting on response 
+	[19961794476906][00000255]	 fsclunk: 1175 
+	[19961794476915][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794476928][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794476935][00000256]	 		Gang(46898).refcount++ = 4 [findgang] 
+	[19961794476943][00000256]	 clunkproxy: 47218 fidnum=1178 aux=46898 pid=256 
+	[19961794476986][00000256]	 clunkproxy: waiting on response 
+	[19961794476989][00000255]	 fsclunk: 1178 
+	[19961794477004][00000255]	 		Gang(46898).refcount-- = 3 [releasegang] 
+	[19961794477213][00000308]	 Unknown command, broadcasting to children 
+	[19961794477225][00000308]	 cmdbcast: broadcasting (exec /bin/date) to gang 0 (size: 4) 
+	[19961794477248][00000309]	 	relaycmd: writing 15 count of data to 9 
+	[19961794477276][00000310]	 	relaycmd: writing 15 count of data to 10 
+	[19961794477314][00000311]	 	relaycmd: writing 15 count of data to 12 
+	[19961794477353][00000312]	 	relaycmd: writing 15 count of data to 11 
+	[19961794477417][00000308]	 **** cmdbcast: returning err=(<nil>) for 0 
+	[19961794477537][00000308]	 **** cmdbcast: returning err=(<nil>) for 1 
+	[19961794477607][00000308]	 **** cmdbcast: returning err=(<nil>) for 2 
+	[19961794477668][00000308]	 **** cmdbcast: returning err=(<nil>) for 3 
+	[19961794477680][00000308]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794477701][00000308]	 cleanupgang: flushing and unmounting stdin, stdout, and stderr 
+	[19961794477757][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794477770][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794477789][00000256]	 clunkproxy: 46e18 fidnum=1185 aux=46898 pid=256 
+	[19961794477805][00000308]	 flushmp: src=(/proc/g0/stdin) pid=(308) 
+	[19961794477822][00000256]	 clunkproxy: waiting on response 
+	[19961794477827][00000255]	 fsclunk: 1185 
+	[19961794477882][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794477936][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794477992][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794478054][00000256]	 clunkproxy: 46e18 fidnum=1192 aux=46898 pid=256 
+	[19961794478089][00000256]	 clunkproxy: waiting on response 
+	[19961794478093][00000255]	 fsclunk: 1192 
+	[19961794478111][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794478156][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794478177][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794478197][00000256]	 clunkproxy: 46e18 fidnum=1198 aux=46898 pid=256 
+	[19961794478211][00000308]	 flushmp: src=(/proc/g0/stdout) pid=(308) 
+	[19961794478238][00000256]	 clunkproxy: waiting on response 
+	[19961794478242][00000255]	 fsclunk: 1198 
+	[19961794478278][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794478377][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794478396][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794478413][00000256]	 clunkproxy: 46e18 fidnum=1217 aux=46898 pid=256 
+	[19961794478459][00000256]	 clunkproxy: waiting on response 
+	[19961794478463][00000255]	 fsclunk: 1217 
+	[19961794478484][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794478509][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794478528][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794478546][00000256]	 clunkproxy: 46e18 fidnum=1221 aux=46898 pid=256 
+	[19961794478556][00000308]	 flushmp: src=(/proc/g0/stderr) pid=(308) 
+	[19961794478582][00000256]	 clunkproxy: waiting on response 
+	[19961794478586][00000255]	 fsclunk: 1221 
+	[19961794478625][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
+	[19961794478689][00000256]	 fsclone: mysysname=(11.0.0.4)  
+	[19961794478728][00000256]	 		Gang(46898).refcount++ = 3 [findgang] 
+	[19961794478749][00000256]	 clunkproxy: 46e18 fidnum=1233 aux=46898 pid=256 
+	[19961794478776][00000256]	 clunkproxy: waiting on response 
+	[19961794478779][00000255]	 fsclunk: 1233 
+	[19961794478795][00000255]	 		Gang(46898).refcount-- = 2 [releasegang] 
