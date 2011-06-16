@@ -1,14 +1,17 @@
 #!/bin/rc
 
-DEBUG='-v 9'
+DEBUG='-v 12'
+
+# calc IP
+IP=11.$treeip(1)
 
 # /n/home/lib/profile
 # TESTDIR=$home/uem_test
 TESTDIR=/tmp/uem_test
 
-GANGLOG=$TESTDIR/gangfs.log
-EXECLOG=$TESTDIR/execfs.log
-MPIPELOG=$TESTDIR/mpipefs.log
+GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
+EXECLOG=$TESTDIR'/execfs-'$IP'.log'
+MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
 
 if(~ $cpunode '1'){
 	i=`{cat /net/ipifc/clone} #`
@@ -45,24 +48,33 @@ if not
 	#execfs -m /n/io/proc
 	rm -f $EXECLOG
 	execfs >>[2] $EXECLOG
+	# FIXME: do I need to mount?  IP named in pbg
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
- 		rm -f $GANGLOG $MPIPELOG $ERRORLOG
-		gangfs $DEBUG -n 11.^$treeip(1) >>[2] $GANGLOG
+ 		rm -f $GANGLOG $MPIPELOG
+		echo '***** starting gangfs (master='$IP') *****'
+		#gangfs $DEBUG -n $IP >>[2] $GANGLOG
+		gangfs $DEBUG -s gangfs-$IP -n $IP >>[2] $GANGLOG
+		mount -ca /srv/gangfs-$IP /proc
 	}
 	if (~ $cpunode '1'){
-		gangfs $DEBUG -p io -n 11.^$treeip(1) -m /n/io/proc >>[2] $GANGLOG
+		echo '***** starting gangfs (child='$IP') *****'
+		#gangfs $DEBUG -p io -n $IP >>[2] $GANGLOG
+		gangfs $DEBUG -p io -s gangfs-$IP -n $IP >>[2] $GANGLOG
+		mount -ca /srv/gangfs-$IP /proc
 	}
 
 	#csrv
+	echo '***** starting mpipefs (on '$IP') *****'
 	mpipefs >>[2] $MPIPELOG
+	#mount -ca /srv/mpipe /proc
+
 	# adds an extra hop but allows visibility of mpipefs
 	srvfs uem /proc
 }
 
 mount -c /srv/uem /proc
-#mount -c /srv/11.^$treeip(1) /n/11.^$treeip(1)
 
 echo okay squidboy?
 

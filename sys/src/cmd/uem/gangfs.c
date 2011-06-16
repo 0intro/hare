@@ -264,6 +264,22 @@ static char *canonpath; /* canonical path */
 static Status mystats;	/* my statistics */
 RWLock statslock; /* protect stat updates and additions */ 
 
+static void
+dprint_status(Status *s, char *who, int dev)
+{
+	DPRINT(DSTS, "%s: name=(%s)\n", who, s->name);
+	DPRINT(DSTS, "\tntask=(%d)\n", s->ntask);
+	DPRINT(DSTS, "\tnchild=(%d)\n", s->nchild);
+	DPRINT(DSTS, "\tnjobs=(%d)\n", s->njobs);
+
+	if(dev){
+		DPRINT(DSTS, "\tdevswap[Mem]=(%d)\n", s->devswap[Mem]);
+		DPRINT(DSTS, "\tdevswap[Maxmem]=(%d)\n", s->devswap[Maxmem]);
+		DPRINT(DSTS, "\tdevsysstat[Load]=(%d)\n", s->devsysstat[Load]);
+		DPRINT(DSTS, "\tdevsysstat[Idle]=(%d)\n", s->devsysstat[Idle]);
+	}
+}
+
 static int
 loadbuf(Status *m, int *fd)
 {
@@ -376,7 +392,6 @@ refreshstatus(Status *m)
 	rlock(&statslock);
 	if(m->next) { /* aggregation node */
 		Status *c;
-		DPRINT(DSTS, "refreshstatus (aggregated):\n");
 
 		/* go through all the children and add the important bits up */
 		m->ntask = 0;
@@ -388,13 +403,7 @@ refreshstatus(Status *m)
 		m->devsysstat[Idle] = 0;
 		c = m->next;
 		while(c != nil) {
-			DPRINT(DSTS, "\tc->ntask=(%d)\n", c->ntask);
-			DPRINT(DSTS, "\tc->nchild=(%d)\n", c->nchild);
-			DPRINT(DSTS, "\tc->njobs=(%d)\n", c->njobs);
-			DPRINT(DSTS, "\tc->devswap[Mem]=(%d)\n", c->devswap[Mem]);
-			DPRINT(DSTS, "\tc->devswap[Maxmem]=(%d)\n", c->devswap[Maxmem]);
-			DPRINT(DSTS, "\tc->devsysstat[Load]=(%d)\n", c->devsysstat[Load]);
-			DPRINT(DSTS, "\tc->devsysstat[Idle]=(%d)\n", c->devsysstat[Idle]);
+			dprint_status(c, "refreshstatus (child)", 0);
 
 			m->ntask += c->ntask;
 			/* if child is an aggregation node only count its children */
@@ -414,7 +423,6 @@ refreshstatus(Status *m)
 
 		/* MAYBE: average load and idle when done? */
 	} else { /* child node */
-		DPRINT(DSTS, "refreshstatus (child):\n");
 		if(loadbuf(m, &m->swapfd) && readswap(m, a))
 			memmove(m->devswap, a, sizeof m->devswap);
 
@@ -431,13 +439,7 @@ refreshstatus(Status *m)
 	runlock(&statslock);
 
 	// what's going on...
-	DPRINT(DSTS, "\tm->ntask=(%d)\n", m->ntask);
-	DPRINT(DSTS, "\tm->nchild=(%d)\n", m->nchild);
-	DPRINT(DSTS, "\tm->njobs=(%d)\n", m->njobs);
-	DPRINT(DSTS, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
-	DPRINT(DSTS, "\tm->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
-	DPRINT(DSTS, "\tm->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
-	DPRINT(DSTS, "\tm->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
+	dprint_status(m, "refreshstatus (master after agregarion)", 1);
 
 	return 1;
 }
@@ -448,20 +450,14 @@ fillstatbuf(Status *m, char *statbuf)
 	char *bp;
 	ulong t;
 
+	DPRINT(DSTS, "fillstatbuf:\n");
 	bp = statbuf;
 	t = time(0);
 	if(t-m->lastup > updateinterval)
 		refreshstatus(m);
 
 	// what's going on...
-	DPRINT(DSTS, "fillstatbuf:\n");
-	DPRINT(DSTS, "\tm->ntask=(%d)\n", m->ntask);
-	DPRINT(DSTS, "\tm->nchild=(%d)\n", m->nchild);
-	DPRINT(DSTS, "\tm->njobs=(%d)\n", m->njobs);
-	DPRINT(DSTS, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
-	DPRINT(DSTS, "\tm->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
-	DPRINT(DSTS, "\tm->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
-	DPRINT(DSTS, "\tm->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
+	dprint_status(m, "fillstatbuf (after refres)", 1);
 
 	bp+=snprint(bp, 17, "%-15.15s ", mystats.name);
 
@@ -538,7 +534,11 @@ statuswrite(char *buf)
 
 	m = findchild(&mystats, name);
 	if(m == nil) {
+		DPRINT(DSTS, "\tcreating new status for (%s)\n", name);
 		m = emalloc9p(sizeof(Status));
+		// FIXME: this was moved from below to make more sense.  Probably not the correct error...
+		if(m == nil)
+			return Estatfind;
 		memset(m, 0, sizeof(Status));
 		strncpy(m->name, name, 16);
 		wlock(&statslock);
@@ -548,8 +548,6 @@ statuswrite(char *buf)
 		wunlock(&statslock);
 	}
 
-	if(m == nil)
-		return Estatfind;
 
 	ret = readints(buf+16, 7, a);
 	if(ret == 0) {
@@ -1486,16 +1484,13 @@ reslocal(Gang *g)
 	if(mystats.next == nil)
 		mystats.njobs += g->size;
 
-	DPRINT(DEXE, "reslocal: name=(%s)\n", mystats.name);
-	DPRINT(DEXE, "\tntask=(%d)\n",  mystats.ntask);
-	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
-	DPRINT(DEXE, "\tnjobs=(%d)\n",  mystats.njobs);
+	dprint_status(&mystats, "reslocal", 0);
 
 	g->sess = emalloc9p(sizeof(Session)*g->size);
 	
 	for(count = 0; count < g->size; count++) {
-		DPRINT(DEXE, "\t reservation: count=%d out of %d\n", count+1, g->size);
 		setupsess(g, &g->sess[count], nil, 0, count);
+		DPRINT(DEXE, "reslocal: reservation: count=%d out of %d\n", count+1, g->size);
 		proccreate(cloneproc, &g->sess[count], STACK);
 	}
 
@@ -1527,6 +1522,10 @@ resgang(Gang *g)
 
 	/* MAYBE: Lock? */
 	/* TODO: implement other modes (block, time-share) */
+	
+	/* we need to know the current status of the job market... */
+	refreshstatus(&mystats);
+
 	DPRINT(DEXE, "resgang: requesting size=%d out of %d=(mystats.ntask=%d) - (mystats.njobs=%d)\n", 
 	       size, mystats.ntask-mystats.njobs, mystats.ntask, mystats.njobs);
 	if(size > (mystats.ntask-mystats.njobs)) {
@@ -1541,13 +1540,10 @@ resgang(Gang *g)
 	/* walk children tree, allocating cores and incrementing stats.njobs
 		counting sessions and keeping children per subsession in an array? */
 	for(current=mystats.next; current !=nil; current = current->next) {
-		DPRINT(DEXE, "resgang (child stats): name=(%s)\n", current->name);
-		DPRINT(DEXE, "\tntask=(%d)\n", current->ntask);
-		DPRINT(DEXE, "\tnchild=(%d)\n", current->nchild);
-		DPRINT(DEXE, "\tnjobs=(%d)\n", current->njobs);
+		dprint_status(current, "resgang (child stats)", 0);
 
 		int avail = current->ntask - current->njobs;
-		if(avail > remaining) {
+		if(avail >= remaining) {
 			njobs[scount] = remaining;
 			current->njobs += njobs[scount];
 			break;
@@ -1558,10 +1554,7 @@ resgang(Gang *g)
 		current->njobs += njobs[scount];
 		scount++;
 	}
-	DPRINT(DEXE, "resgang (my stats): name=(%s)\n", mystats.name);
-	DPRINT(DEXE, "\tntask=(%d)\n", mystats.ntask);
-	DPRINT(DEXE, "\tnchild=(%d)\n", mystats.nchild);
-	DPRINT(DEXE, "\tnjobs=(%d)\n", mystats.njobs);
+	dprint_status(&mystats, "resgang (master stats)", 0);
 
 	scount++; /* count instead of index now */
 	
@@ -1575,9 +1568,12 @@ resgang(Gang *g)
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
 		checkmount(current->name);
+		// the child might already be busy, so just skip it for now
+		//assert(njobs[count] != 0);
+		if(njobs[count] == 0)
+			continue;
 		DPRINT(DEXE, "resgang: Session %d Target %s Njobs: %d From %s\n",
 		       count, current->name, njobs[count], mysysname);
-		assert(njobs[count] != 0);
 		// EBo -- FIXME -- needs to chec for children or (or leaf)
 		setupsess(g, &g->sess[count], current->name, njobs[count], count);
 		///// setupsess(g, &g->sess[count], current->name, 0, count);

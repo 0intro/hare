@@ -103,7 +103,7 @@ anl_mount:
 	mount /srv/anlgw /n/anl
 	bind /n/anl/net /net
 
-anl: clean profile
+anl: profile
 	objtype=power mk all
 	cp q.gangfs /n/anl/n/local/home/ericvh/9/power/bin/gangfs
 	cp q.mpipefs /n/anl/n/local/home/ericvh/9/power/bin/mpipefs
@@ -119,3 +119,5 @@ profile: anl_mount
 anl_run: anl_mount
 	start-res -p 6048
 
+anl_list: anl_mount
+	list-res

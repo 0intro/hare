@@ -3,10 +3,11 @@
 # Pretend to mimic the BG/P setup
 #
 
-echo '== Large scale fanout =='
+echo '== Test gangfs across a simulated BlueGene/P node structure =='
 
 # fake the IO node's IP
 IO=128.0.1
+IP=11.$IO
 #mount -cb /srv/11.$IO /n/11.$IO
 
 #
@@ -14,12 +15,14 @@ IO=128.0.1
 #
 TESTDIR=.test
 
-GANGLOG=$TESTDIR'/gangfs'-11.$IO'.log'
-EXECLOG=$TESTDIR'/execfs'-11.$IO'.log'
-MPIPELOG=$TESTDIR'/mpipefs'-11.$IO'.log'
+GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
+EXECLOG=$TESTDIR'/execfs'-$IP'.log'
+MPIPELOG=$TESTDIR'/mpipefs'-$IP'.log'
 ERRORLOG=$TESTDIR'/error.log'
 
-G_MNTPATH=/n/11.$IO/proc
+G_MNTPATH=/n/$IP/proc
+
+# 9fs $IP
 
 #CMD='/bin/date -n'
 CMD='/bin/date'
@@ -27,7 +30,7 @@ CMD='/bin/date'
 # setup 
 #
 NUM=4
-#NUM=6
+#NUM=32
 
 I_MAX=1
 J_MAX=1
@@ -104,10 +107,10 @@ enum_srv
 ########################################
 
 # fake the BG/P profile (1 I/O node and 4 CPU nodes)
-echo '############ starting next '11.$IO' ############' >>[2] $GANGLOG
+echo '############ starting next '$IP' ############' >>[2] $GANGLOG
 cpunode=0 treeip=$IO profile.pbg
 
-srvfs io /n/11.$IO
+srvfs io /n/$IP
 
 # generate tje fake CPU nodes and moutn them
 for(i in $SRVNUM){

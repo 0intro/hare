@@ -2,11 +2,13 @@
 
 DEBUG='-v 9'
 
+IP=11.$treeip
+
 TESTDIR=.test
 
-GANGLOG=$TESTDIR'/gangfs'-11.$treeip'.log'
-EXECLOG=$TESTDIR'/execfs'-11.$treeip'.log'
-MPIPELOG=$TESTDIR'/mpipefs'-11.$treeip'.log'
+GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
+EXECLOG=$TESTDIR'/execfs-'$IP'.log'
+MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
 
 O=8.
 PWD=`{pwd}#`
@@ -45,27 +47,27 @@ if(! test -e '/net/cs'){
 
 	# start up the UEM stuff
 	rm -f $EXECLOG
-	if(! test -e '/srv/execfs-11.'$treeip){
+	if(! test -e '/srv/execfs-'$IP){
 	    echo 'starting execfs'
-	    $CMDPATH^execfs $DEBUG -s execfs-11.^$treeip -E $CMDPATH^execcmd >>[2] $EXECLOG
+	    $CMDPATH^execfs $DEBUG -s execfs-$IP -E $CMDPATH^execcmd >>[2] $EXECLOG
 	}
-	mount -ca /srv/execfs-11.$treeip /proc
+	mount -ca /srv/execfs-$IP /proc
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
 	  # FIXME: this assumes that the IO node is created first...
-	  if(! test -e /srv/gangfs-11.$treeip){
-		echo 'starting gangfs on IO node treeip='11.^$treeip
-		$CMDPATH^gangfs $DEBUG -s gangfs-11.^$treeip -n 11.^$treeip >>[2] $GANGLOG
+	  if(! test -e /srv/gangfs-$IP){
+		echo 'starting gangfs on IO node treeip='$IP
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n $IP >>[2] $GANGLOG
 	  }
-	  mount -ca /srv/gangfs-11.$treeip /proc
+	  mount -ca /srv/gangfs-$IP /proc
 	}
 	if (~ $cpunode '1'){
-	  if(! test -e /srv/gangfs-11.$treeip){
-		echo 'starting gangfs on CPU node treeip='11.^$treeip
-		$CMDPATH^gangfs $DEBUG -s gangfs-11.^$treeip -p 11.^$IO -n 11.^$treeip >>[2] $GANGLOG
+	  if(! test -e /srv/gangfs-$IP){
+		echo 'starting gangfs on CPU node treeip='$IP
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p 11.^$IO -n $IP >>[2] $GANGLOG
 	  }
-	  mount -ca /srv/gangfs-11.$treeip /proc
+	  mount -ca /srv/gangfs-$IP /proc
 	}
 
         #csrv
@@ -76,14 +78,14 @@ if(! test -e '/net/cs'){
 	mount -ca /srv/mpipe /proc
 
 	# adds an extra hop but allows visibility of mpipefs
-	if(! test -e '/srv/uem'){
-		echo 'exporting 11.'^$treeip
+	if(! test -e /srv/$IP){
+		echo 'exporting '$IP
 		#srvfs uem /proc
-		srvfs 11.$treeip /
+		srvfs $IP /
 	}
 }
 
-mount -ca /srv/11.$treeip /n/11.$treeip
+mount -ca /srv/$IP /n/$IP
 
 #echo okay squidboy?
 

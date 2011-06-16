@@ -3,7 +3,7 @@
 # Large scale (256) node fanout with gangfs
 #
 
-echo '== Large scale fanout =='
+echo '== Test gangfs across a BlueGene/P node =='
 
 #
 # Parameters
@@ -12,9 +12,10 @@ ERRORLOG=error.log
 TESTDIR=.test
 
 IP=`{echo $ip | sed 's% .*%%'} #`
-echo 'The IP = '$IP
+echo '************************ The IP = '$IP
 
-G_MNTPATH=/n/$IP/proc
+#G_MNTPATH=/n/$IP/proc
+G_MNTPATH=/n/io/proc
 
 9fs $IP
 
@@ -50,6 +51,7 @@ fn enum_srv {
 # Setup a testdirp
 #
 fn testdir {
+	echo 'TESTDIR='$TESTDIR
 	mkdir -p $TESTDIR
 }
 
@@ -88,7 +90,13 @@ fn basic {
 # Setup
 rfork
 
+#cleanup
+testdir
+
 enum_srv
+
+########################################
+
 echo 'Serving CPU Nodes='
 for(i in $SRVNUM) {
   echo -n ' '$i
@@ -101,8 +109,7 @@ for(i in $SRVNUM) {
 }
 echo ''
 
-#cleanup
-testdir
+########################################
 
 # Tests
 basic
