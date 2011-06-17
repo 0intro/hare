@@ -929,6 +929,22 @@ releasesessions(Gang *g)
 }
 
 static void
+flushgang(void *arg)
+{
+	Gang *g = arg;
+	char fname[255];
+
+	DPRINT(DCLN, "cleanupgang: flushing and unmounting stdin, stdout, and stderr\n");
+	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
+	flushmp(fname); /* flush pipe to be sure */
+	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
+	flushmp(fname);
+	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
+	flushmp(fname);
+}
+
+
+static void
 cleanupgang(void *arg)
 {
 	Gang *g = arg;
@@ -1815,6 +1831,13 @@ fswrite(void *arg)
 			} else {
 				DPRINT(DEXE, "Unknown command, broadcasting to children\n");
 				cmdbcast(r, g);
+
+				// FIXME: on large numbers of tasks,
+				// some of the stdouts appear to be
+				// removed before they are fully
+				// processed.
+				flushgang(g);
+				sleep(5000);
 
 				// FIXME: I am not sure this is the
 				// most appropriate place to put this...

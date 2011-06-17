@@ -30,7 +30,8 @@ CMD='/bin/date'
 # setup 
 #
 NUM=4
-#NUM=32
+NUM=32
+NUM=64
 
 I_MAX=1
 J_MAX=1
