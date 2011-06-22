@@ -8,7 +8,6 @@ echo '== Test gangfs across a simulated BlueGene/P node structure =='
 # fake the IO node's IP
 IO=128.0.1
 IP=11.$IO
-#mount -cb /srv/11.$IO /n/11.$IO
 
 #
 # Parameters
@@ -22,16 +21,11 @@ ERRORLOG=$TESTDIR'/error.log'
 
 G_MNTPATH=/n/$IP/proc
 
-# 9fs $IP
-
-#CMD='/bin/date -n'
 CMD='/bin/date'
 
 # setup 
 #
 NUM=4
-NUM=32
-NUM=64
 
 I_MAX=1
 J_MAX=1
