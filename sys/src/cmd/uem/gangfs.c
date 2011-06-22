@@ -564,12 +564,13 @@ statuswrite(char *buf)
 	}
 
 	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
+/* FIXME: see if this causes problems with the BG runs
 	if(xgangpath == procpath){
 		xgangpath = smprint("%s/%s%s", amprefix, mysysname, procpath);
 		DPRINT(DEXE, "statuswrite: reseting xgangpath=(%s)\n", xgangpath);
 	}
 	DPRINT(DSTS, "statuswrite: xgangpath=(%s)\n", xgangpath);
-
+*/
 	return nil;
 }
 
@@ -598,6 +599,9 @@ updatestatus(void *arg)
 			break;
 		sleep(updateinterval*1000);
 	}
+
+	// FIXME: shouldn't parentfd be closed at the end?
+	close(parentfd);
 
 	free(parentpath);
 	free(statbuf);
@@ -664,7 +668,7 @@ checkmount(char *addr)
 	char *dest = estrdup9p(addr);
 	int retries = 0;
 	int err = 0;
-	int fd;
+	int fd = 0;
 	char *srvpt = smprint("/srv/%s", addr);
 	char *srvtg = smprint("%s/%s", amprefix, addr);
 	char *mtpt = smprint("%s/proc", srvtg);
@@ -679,12 +683,11 @@ checkmount(char *addr)
 
 	DPRINT(DFID, "\tmount point (%s) does not exist... mounting\n", srvtg);
 	DPRINT(DCUR, "\tattempting to mount %s on %s\n", srvpt, srvtg);
-	if(fd = open(srvpt, ORDWR)) { /* srv exists, sweet */
+	if(fd = open(srvpt, ORDWR)) {
 		if(mount(fd, -1, srvtg, MREPL, "") < 0) {
-			close(fd);
+			// FIXME: what should we do here?
 			DPRINT(DERR, "\t*ERROR*: srv mount failed: %r\n");
 		} else {
-			close(fd);
 			DPRINT(DFID, "\tsrv mount succeeded\n");
 			goto out;
 		}
@@ -693,7 +696,6 @@ checkmount(char *addr)
 	/* no dir, spawn off an import */
 	proccreate(startimport, dest, STACK);
 
-	// FIXME: crapola...
 	/* we need to wait for this to be done */
 	while((tmp = dirstat(mtpt)) == nil) {
 		// start a mount with a timeout...
@@ -707,6 +709,9 @@ checkmount(char *addr)
 	}
 
 out:
+	if(fd)
+		close(fd);
+
 	if(srvpt)
 		free(srvpt);
 	if(srvtg)
@@ -934,7 +939,7 @@ flushgang(void *arg)
 	Gang *g = arg;
 	char fname[255];
 
-	DPRINT(DCLN, "cleanupgang: flushing and unmounting stdin, stdout, and stderr\n");
+	DPRINT(DCLN, "flushgang: flushing stdin, stdout, and stderr\n");
 	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
 	flushmp(fname); /* flush pipe to be sure */
 	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
@@ -950,15 +955,16 @@ cleanupgang(void *arg)
 	Gang *g = arg;
 	char fname[255];
 
-	DPRINT(DCLN, "cleanupgang: flushing and unmounting stdin, stdout, and stderr\n");
+	flushgang(arg);
+
+	// FIXME: make sure that the std files are completely flushed */
+
+	DPRINT(DCLN, "cleanupgang: unmounting stdin, stdout, and stderr\n");
 	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
-	flushmp(fname); /* flush pipe to be sure */
 	unmount(0, fname);
 	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
-	flushmp(fname);
 	unmount(0, fname);
 	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
-	flushmp(fname);
 	unmount(0, fname);
 
 	/* TODO: Clean up subsessions? */
@@ -1010,6 +1016,7 @@ cleanup(Srv *)
 	chanclose(iochan);
 	closestatus(&mystats);
 	sleep(5);
+	DPRINT(DCUR, "cleanup: killing remaing threads\n");
 	threadexitsall("done");
 }
 
@@ -1340,7 +1347,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/g%d/stdin", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdin", gangpath, g->index);
+	snprint(dest, 255, "%s/g%d/stdin", xgangpath, g->index);
 	DPRINT(DEXE, "\tsplicefrom buf=(%s) dest=(%s)\n", buf, dest);
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
 	DPRINT(DEXE, "\t\tret=%d\n", n);
@@ -1351,7 +1358,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/g%d/stdout", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stdout", gangpath, g->index);
+	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
 	DPRINT(DEXE, "\t\tret=%d\n", n);
@@ -1362,7 +1369,7 @@ setupstdio(Session *s)
 		snprint(buf, 255, "%s/g%d/stderr", s->path, s->pid);
 	else
 		snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
-	snprint(dest, 255, "%s/g%d/stderr", gangpath, g->index);
+	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
 	DPRINT(DEXE, "\t\tret=%d\n", n);
@@ -1755,17 +1762,19 @@ cmdbcast(Req *r, Gang *g)
 		/* wait for response */
 		resp = recvp(g->sess[count].chan);
 		// FIXME: do we need to free anything up?
-		DPRINT(DCUR, "**** cmdbcast: returning err=(%s) for %d\n", 
-		       resp, count);
+		DPRINT(DEXE, "\t**** cmdbcast[%d]: returning err=(%s)\n", 
+		       count, resp);
 		g->sess[count].r = nil;
 		if(resp)
 			err = resp;
 	}
 	
 	if(err) {
+		DPRINT(DEXE, "cmdbcast: returning err=(%s)\n", err);
 		respond(r, err);
 	} else {
 		/* success */
+		DPRINT(DEXE, "cmdbcast: returning success\n");
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
 	}
@@ -2077,11 +2086,15 @@ threadmain(int argc, char **argv)
 	gangpath = procpath;
 	xgangpath = procpath; /* until we get a statuswrite */
 
+	if(parent) {
+		xgangpath = smprint("%s/%s%s", amprefix, parent, procpath);
+		DPRINT(DFID, "Main: parent setting xgangpath = (%s)\n", xgangpath);
+	}
+
 	if(remote_override) {
 		// FIXME: extra proc?  from procpath, and added in by had...
-		//xgangpath = smprint("/n/%s%s", mysysname, procpath);
-//		xgangpath = smprint("/n/%s", mysysname);
-//		DPRINT(DFID, "Main: xgangpath overide = (%s)\n", xgangpath);
+		xgangpath = smprint("%s/%s%s", amprefix, mysysname, procpath);
+		DPRINT(DFID, "Main: xgangpath overide = (%s)\n", xgangpath);
 	}
 
 	/* initialize status */
