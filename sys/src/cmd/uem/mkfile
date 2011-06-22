@@ -8,6 +8,7 @@ TARG = \
 	execfs\
 	execcmd\
 	gangfs\
+	poke\
 
 HFILES = debug.h
 
@@ -105,6 +106,7 @@ anl_mount:
 
 anl: profile
 	objtype=power mk all
+	cp q.poke /n/anl/n/local/home/ericvh/9/power/bin/poke
 	cp q.gangfs /n/anl/n/local/home/ericvh/9/power/bin/gangfs
 	cp q.mpipefs /n/anl/n/local/home/ericvh/9/power/bin/mpipefs
 	cp q.execfs /n/anl/n/local/home/ericvh/9/power/bin/execfs
@@ -114,7 +116,6 @@ anl: profile
 profile: anl_mount
 	cp tests/profile.anl /n/anl/n/local/home/ericvh/lib/profile
 	cp tests/bg_256.rc /n/anl/n/local/home/ericvh/tmp/bg_256.rc
-	#cp tests/9fsnodes /n/anl/n/local/home/ericvh/tmp/9fsnodes
 
 anl_run: anl_mount
 	start-res -p 6048
