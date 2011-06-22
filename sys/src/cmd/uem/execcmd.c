@@ -65,6 +65,7 @@ main(int argc, char **argv)
 	Cmdtab *cmd;
 	char *srvctl = nil;
 	char *logfile;
+	char *logdir = nil;
 	
 	int pid = getpid();
 
@@ -74,15 +75,13 @@ main(int argc, char **argv)
 		break;
 	case 'v':
 		vflag = atoi(ARGF());
-		if(vflag) {
-			logfile = smprint("execcmd-%d.log", getpid());
-			debugfd = create(logfile, OWRITE, 0666);
-			free(logfile);
-			assert(debugfd > 2);
-		} 
-		break;		
+		assert(vflag >= 0);
+		break;
 	case 's':
 		srvctl = ARGF();
+		break;
+	case 'T':
+		logdir = ARGF();
 		break;
 	default:
 		/* break */
@@ -90,7 +89,23 @@ main(int argc, char **argv)
 		assert(0);
 	}ARGEND
 
-	DPRINT(DEXC, "Inside execution wrapper: vflag=%d debugfd=%d\n", vflag, debugfd);
+	assert(argc == 0);
+
+	/* move the  log file generation outside the test directory */
+	if(vflag > 0) {
+		if(logdir)
+			logfile = smprint("%s/execcmd-%d.log", logdir, getpid());
+		else
+			logfile = smprint("execcmd-%d.log", getpid());
+		debugfd = create(logfile, OWRITE, 0666);
+		assert(debugfd > 2);
+
+		//sleep(100);
+		DPRINT(DEXC, "Main: logfile=%s\n", logfile);
+		free(logfile);
+	} 
+
+	DPRINT(DEXC, "Inside execution wrapper: logdir=%s vflag=%d debugfd=%d\n", logdir, vflag, debugfd);
 
 	/* open our files */
 	ctlfd = open(srvctl, ORDWR|OCEXEC);
@@ -162,6 +177,8 @@ main(int argc, char **argv)
 			
 			/* go baby go */
 			exec(cb->f[1], &cb->f[1]);
+
+// FIXME: test this fail over...
 
 			/* something happened report it */
 			DPRINT(DERR, "ERROR:  something happened with the exec\n");
