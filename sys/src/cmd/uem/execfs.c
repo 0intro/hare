@@ -56,6 +56,7 @@ static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"execfs";
 static char defaultcmdpath[] =	"/bin/execcmd";
 static char *procpath, *srvpath, *cmdpath;
+static char *logdir = nil;
 static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
@@ -136,14 +137,17 @@ cloneproc(void *arg)
 
 	threadsetname("execfs-cloneproc");
 
-	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
+	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%d", vflag), getpid());
+	       "-v", smprint("%d", vflag), "-T", logdir, getpid());
 	// FIXME: error -- should not call path or just do a bind to
 	// find the programs...
-	procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-		  smprint("%d", vflag), nil);
-
+	if(logdir)
+		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
+			  smprint("%d", vflag), "-T", logdir, nil);
+	else
+		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
+			  smprint("%d", vflag), nil);
 	DPRINT(DERR, "cloneproc: execcmd failed!: %r\n");
 
 	sendul(pidc, 0); /* failure */
@@ -587,6 +591,9 @@ threadmain(int argc, char **argv)
 	case 's':	/* specify server name */
 		srvpath = ARGF();
 		break;
+	case 'T':
+		logdir = ARGF();
+		break;
 	default:
 		DPRINT(DERR, "ERROR: bad argv (%s)\n", *argv);
 		fprint(2, "ERROR: bad argv (%s)\n", *argv);
@@ -619,6 +626,7 @@ threadmain(int argc, char **argv)
 	       srvpath, procpath);
 	DPRINT(DFID, "Main: main pid=(%d) iothread=(%d)\n",
 	       getpid(), threadpid(iothread_id));
+	DPRINT(DFID, "Main: logdir=(%s)\n", logdir);
 
 	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
 	threadexits(0);
