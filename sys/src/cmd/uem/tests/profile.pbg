@@ -49,7 +49,7 @@ if(! test -e '/net/cs'){
 	rm -f $EXECLOG
 	if(! test -e '/srv/execfs-'$IP){
 	    echo 'starting execfs'
-	    $CMDPATH^execfs $DEBUG -s execfs-$IP -E $CMDPATH^execcmd >>[2] $EXECLOG
+	    $CMDPATH^execfs $DEBUG -s execfs-$IP -E $CMDPATH^execcmd -T $TESTDIR>>[2] $EXECLOG
 	}
 	mount -ca /srv/execfs-$IP /proc
 
@@ -65,7 +65,7 @@ if(! test -e '/net/cs'){
 	if (~ $cpunode '1'){
 	  if(! test -e /srv/gangfs-$IP){
 		echo 'starting gangfs on CPU node treeip='$IP
-		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p 11.^$IO -n $IP >>[2] $GANGLOG
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p $IP -n $IP >>[2] $GANGLOG
 	  }
 	  mount -ca /srv/gangfs-$IP /proc
 	}
