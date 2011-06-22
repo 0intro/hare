@@ -1,6 +1,7 @@
 #!/bin/rc
 
-DEBUG='-v 12'
+#DEBUG='-v 9'
+DEBUG='-v 10'
 
 # calc IP
 IP=11.$treeip(1)
@@ -47,28 +48,26 @@ if not
 	# start up the UEM stuff
 	#execfs -m /n/io/proc
 	rm -f $EXECLOG
-	execfs >>[2] $EXECLOG
-	# FIXME: do I need to mount?  IP named in pbg
+	echo '***** starting execfs (on '$IP' with execcmd log on '$TESTDIR') *****'
+	execfs $DEBUG -T $TESTDIR >>[2] $EXECLOG
+
+	# FIXME: segmented names.  Will need two names for child and
+	# parent.
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
  		rm -f $GANGLOG $MPIPELOG
 		echo '***** starting gangfs (master='$IP') *****'
-		#gangfs $DEBUG -n $IP >>[2] $GANGLOG
-		gangfs $DEBUG -s gangfs-$IP -n $IP >>[2] $GANGLOG
-		mount -ca /srv/gangfs-$IP /proc
+		gangfs $DEBUG -n io >>[2] $GANGLOG
 	}
 	if (~ $cpunode '1'){
 		echo '***** starting gangfs (child='$IP') *****'
-		#gangfs $DEBUG -p io -n $IP >>[2] $GANGLOG
-		gangfs $DEBUG -p io -s gangfs-$IP -n $IP >>[2] $GANGLOG
-		mount -ca /srv/gangfs-$IP /proc
+		gangfs $DEBUG -p io -n $IP >>[2] $GANGLOG
 	}
 
 	#csrv
 	echo '***** starting mpipefs (on '$IP') *****'
-	mpipefs >>[2] $MPIPELOG
-	#mount -ca /srv/mpipe /proc
+	mpipefs $DEBUG >>[2] $MPIPELOG
 
 	# adds an extra hop but allows visibility of mpipefs
 	srvfs uem /proc
