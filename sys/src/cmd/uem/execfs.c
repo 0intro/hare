@@ -55,7 +55,8 @@ int iothread_id;
 static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"execfs";
 static char defaultcmdpath[] =	"/bin/execcmd";
-static char *procpath, *srvpath, *cmdpath;
+static char defaultsrvmpipe[] =	"mpipe";
+static char *procpath, *srvpath, *cmdpath, *srvmpipe;
 static char *logdir = nil;
 static char *srvctl;
 static Channel *iochan;
@@ -64,7 +65,7 @@ static Channel *clunkchan;
 static void
 usage(void)
 {
-	fprint(2, "execfs [-D] [-v debuglevel] [-m mtpt]\n");
+	fprint(2, "execfs [-D] [-v debuglevel] [-m mtpt] [-L logdir] [-M srvmpipe]\n");
 	exits("usage");
 }
 
@@ -97,14 +98,17 @@ static int
 mpipe(char *path, char *name)
 {
 	int fd, ret;
-	fd = open("/srv/mpipe", ORDWR);
+	char *srvpt = smprint("/srv/%s", srvmpipe);
+	fd = open(srvpt, ORDWR);
 	if(fd<0) {
-		DPRINT(DERR, "*ERROR*: couldn't open /srv/mpipe: %r\n");
+		DPRINT(DERR, "*ERROR*: couldn't open %s: %r\n", srvpt);
+		free(srvpt);
 		return -1;
 	}
-	
-	DPRINT(DFID, "mpipe: mounting (%s) on (%s) pid=(%d)\n",
-	       name, path, getpid());
+	free(srvpt);
+
+	DPRINT(DFID, "mpipe: mounting (%s) on (%s) pid=(%d) fd=%d\n",
+	       name, path, getpid(), fd);
 	ret = mount(fd, -1, path, MAFTER, name);
 	if(ret<0)
 		DPRINT(DERR, "*ERROR*: mpipe mount failed: %r\n");
@@ -139,12 +143,12 @@ cloneproc(void *arg)
 
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%d", vflag), "-T", logdir, getpid());
+	       "-v", smprint("%d", vflag), "-L", logdir, getpid());
 	// FIXME: error -- should not call path or just do a bind to
 	// find the programs...
 	if(logdir)
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%d", vflag), "-T", logdir, nil);
+			  smprint("%d", vflag), "-L", logdir, nil);
 	else
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
 			  smprint("%d", vflag), nil);
@@ -162,7 +166,7 @@ kickit(void)
 	ulong pid;
 
 	DPRINT(DCUR, "kickit: forking the proc\n");
-	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
+	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG); // RFENVG,RFNOTEG,RFNAMEG
 	DPRINT(DCUR, "\tnpid=(%d)\n", npid);
 	// FIXME: 9vx/native problem...
 	pid = recvul(pidc);
@@ -195,6 +199,7 @@ fsopen(Req *r)
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
 
 	if(f->file->aux != (void *)Xclone) {
+		DPRINT(DFID, "fsopen: f->file->aux != (void *)Xclone\n");
 		respond(r, nil);
 		return;
 	}
@@ -203,7 +208,7 @@ fsopen(Req *r)
 	memset(e, 0, sizeof(Exec));
 
 	/* setup bootstrap ctlfd */
-	DPRINT(DFID, "fsopen srvctl=(%s) pid=(%d)\n", srvctl, getpid());
+	DPRINT(DFID, "fsopen: srvctl=(%s) pid=(%d)\n", srvctl, getpid());
 
 	pipe(p);
 	qlock(&lck);
@@ -227,7 +232,7 @@ fsopen(Req *r)
 	 * channel.  If any of these fail, then e->pid will be < 2, and
 	 * this is a hard failure, so crash instead of dieing
 	 * gracefully */
-	DPRINT(DFID, "number of new pids=(%d): %r\n", e->pid);
+	DPRINT(DFID, "number of new pids=(%d)\n", e->pid);
 	assert(e->pid > 2);	/* assumption for our ctl channels */
 
 	/* grab actual reference to real control channel -- which
@@ -245,6 +250,7 @@ fsopen(Req *r)
 		err = smprint("execfs: fsopen: opening [%s] failed: %r", fname);
 		goto error;
 	}
+	DPRINT(DFID, "\tctlfd=(%d)\n", e->rctlfd);
 
 	n = snprint(fname, STRMAX, "%s/%d", procpath, e->pid);
 	assert(n > 0);
@@ -267,6 +273,7 @@ fsopen(Req *r)
 	/* handshake to execcmd */
 	n = write(e->ctlfd, "1", 1);
 	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: execcmd write failed\n");
 		err = estrdup9p(Ectlchan);
 		goto error;	
 	}
@@ -274,22 +281,26 @@ fsopen(Req *r)
 	/* check for partial success: execcmd has opened stdio */
 	n = read(e->ctlfd, ctlbuf, STRMAX);
 	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: execcmd read failed\n");
 		err = estrdup9p(Ectlchan);
 		goto error;	
 	}
 	if(n != 1) {
+		DPRINT(DERR, "fsopen: *ERROR*: execcmd n != 1\n");
 		ctlbuf[n] = 0;
 		err = estrdup9p(ctlbuf);
 		goto error;
 	}
 
 	f->aux = e;
+	DPRINT(DCUR, "fsopen: sucseeded - setting f->aux = e (%p)\n", f->aux);
 	free(fname);
 	free(ctlbuf);
 	respond(r, nil);
 	return;
 
 error:
+	DPRINT(DERR, "fsopen: *ERROR*: %s\n", err);
 	free(fname);
 	free(ctlbuf);
 	/* free channel */
@@ -396,7 +407,7 @@ flushmp(char *src)
 
 	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n",
 		    pkttype, (ulong)0, (ulong)0, "");
-	DPRINT(DCUR, "flushmp: src=(%s) pid=(%d)\n", src, getpid());
+	DPRINT(DCUR, "flushmp: src=(%s) pid=(%d) fd=%d\n", src, getpid(), fd);
 
 	n = pwrite(fd, hdr, n, tag);
 	close(fd);
@@ -433,6 +444,7 @@ static void
 fsclunk(Fid *f)
 {
 	DPRINT(DFID, "fsclunk: %p fid=%d aux=%p\n", f, f->fid, f->aux);
+	// FIXME: this section of the code appears to never be run.  Where is aus supposed to be set?
 	if(f->aux) {
 		Exec *e = f->aux;
 
@@ -569,6 +581,7 @@ threadmain(int argc, char **argv)
 
 	//srvpath = nil;
 	srvpath = defaultsrvpath;
+	srvmpipe = defaultsrvmpipe;
 
 	procpath = defaultpath;
 	cmdpath = defaultcmdpath;
@@ -591,8 +604,11 @@ threadmain(int argc, char **argv)
 	case 's':	/* specify server name */
 		srvpath = ARGF();
 		break;
-	case 'T':
+	case 'L':
 		logdir = ARGF();
+		break;
+	case 'M':
+		srvmpipe = ARGF();
 		break;
 	default:
 		DPRINT(DERR, "ERROR: bad argv (%s)\n", *argv);
@@ -627,6 +643,7 @@ threadmain(int argc, char **argv)
 	DPRINT(DFID, "Main: main pid=(%d) iothread=(%d)\n",
 	       getpid(), threadpid(iothread_id));
 	DPRINT(DFID, "Main: logdir=(%s)\n", logdir);
+	DPRINT(DFID, "\tsrvmpipe=(%s)\n", srvmpipe);
 
 	threadpostmountsrv(&fs, srvpath, procpath, MAFTER);
 	threadexits(0);
