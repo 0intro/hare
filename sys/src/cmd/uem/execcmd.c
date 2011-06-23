@@ -47,7 +47,7 @@ enum {	/* DEBUG LEVELS (complimentary with execfs */
 static void
 usage(void)
 {
-	fprint(2, "execcmd [-D] [-v debuglevel] [-s srvctl]\n");
+	fprint(2, "execcmd [-D] [-v debuglevel] [-s srvctl] [-L logdir]\n");
 	exits("usage");
 }
 
@@ -64,7 +64,7 @@ main(int argc, char **argv)
 	Cmdbuf *cb;
 	Cmdtab *cmd;
 	char *srvctl = nil;
-	char *logfile;
+	char *logfile = nil;
 	char *logdir = nil;
 	
 	int pid = getpid();
@@ -80,7 +80,7 @@ main(int argc, char **argv)
 	case 's':
 		srvctl = ARGF();
 		break;
-	case 'T':
+	case 'L':
 		logdir = ARGF();
 		break;
 	default:
