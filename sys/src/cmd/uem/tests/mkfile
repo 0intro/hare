@@ -40,18 +40,16 @@ debug:V: all
 	#rc uem_hier.rc 9
 	rc pbg_4.rc 12
 
-tidy:VE: 
+kill:VE: 
 	rm -f /srv/mpipe
 	kill $O.execcmd | rc
 	kill $O.gangfs | rc
 	kill $O.execfs | rc
 	kill $O.mpipefs | rc
 	kill exportfs | rc
+	kill import | rc
 	
 	broke | rc
-	rm -f *.log
-	rm -f *.acid
-	rm -rf .test .meta
 	
 	rm -f /srv/mpipe*
 	rm -f /srv/execfs*
@@ -64,6 +62,11 @@ tidy:VE:
 	
 	unmount /proc
 	bind '#p' /proc
+
+tidy:VE: kill
+	rm -f *.log
+	rm -f *.acid
+	rm -rf .test .meta
 
 acid:V: execfs.acid execcmd.acid mpipefs.acid gangfs.acid
 
