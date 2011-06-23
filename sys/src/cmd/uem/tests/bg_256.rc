@@ -15,27 +15,22 @@ echo '************************ IP = '$IP
 9fs $IP
 
 
-#TESTDIR=/n/$IP/
 #TESTDIR=/tmp/uem_test
 TESTDIR=/n/frontend/home/ericvh/tmp/.test
 
-#ERRORLOG=$TESTDIR'/error-'$IP'.log'
-#ERRORLOG=/n/io/$TESTDIR/error.log
 ERRORLOG=$TESTDIR'/error-'$IP'.log'
 
-#G_MNTPATH=/n/$IP/proc
 G_MNTPATH=/proc
 
-#CMD='/bin/date -n'
 #CMD='/bin/date'
-CMD='/bin/poke'
+CMD='/bin/poke -L '$TESTDIR
 
 PWD=`{pwd}#`
 echo '************************ PWD = '$PWD
 
 # setup 
 #
-NUM=16
+NUM=32
 #NUM=256
 
 I_MAX=4
