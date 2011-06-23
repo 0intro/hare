@@ -1,6 +1,6 @@
 #!/bin/rc
 
-DEBUG='-v 9'
+DEBUG='-v 11'
 
 IP=11.$treeip
 
@@ -45,44 +45,58 @@ if(! test -e '/net/cs'){
 
 	mkdir -p $TESTDIR
 
-	# start up the UEM stuff
-	rm -f $EXECLOG
-	if(! test -e '/srv/execfs-'$IP){
-	    echo 'starting execfs'
-	    $CMDPATH^execfs $DEBUG -s execfs-$IP -E $CMDPATH^execcmd -T $TESTDIR>>[2] $EXECLOG
-	}
-	mount -ca /srv/execfs-$IP /proc
-
-	# if we are an ionode
-	if (~ $cpunode '0'){
-	  # FIXME: this assumes that the IO node is created first...
-	  if(! test -e /srv/gangfs-$IP){
-		echo 'starting gangfs on IO node treeip='$IP
-		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n $IP >>[2] $GANGLOG
-	  }
-	  mount -ca /srv/gangfs-$IP /proc
-	}
-	if (~ $cpunode '1'){
-	  if(! test -e /srv/gangfs-$IP){
-		echo 'starting gangfs on CPU node treeip='$IP
-		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p $IP -n $IP >>[2] $GANGLOG
-	  }
-	  mount -ca /srv/gangfs-$IP /proc
-	}
-
-        #csrv
-	if(! test -e '/srv/mpipe'){
-	    echo 'starting mpipe'
-	    $CMDPATH^mpipefs >>[2] $MPIPELOG
-	}
-	mount -ca /srv/mpipe /proc
-
 	# adds an extra hop but allows visibility of mpipefs
+	# we need to export the file system before starting gangfs
 	if(! test -e /srv/$IP){
 		echo 'exporting '$IP
 		#srvfs uem /proc
 		srvfs $IP /
+		mount -c /srv/$IP /n/$IP
 	}
+
+	# start up the UEM stuff
+	if(! test -e '/srv/mpipe-'$IP){
+	    echo 'starting mpipe-'$IP
+	    $CMDPATH^mpipefs $DEBUG -s mpipe-$IP >>[2] $MPIPELOG
+	    mount -ca /srv/mpipe-$IP /n/$IP/proc
+	}
+
+	rm -f $EXECLOG
+	if(! test -e '/srv/execfs-'$IP){
+	    echo 'starting execfs-'$IP
+	    $CMDPATH^execfs $DEBUG -s execfs-$IP -E $CMDPATH^execcmd -L $TESTDIR -M mpipe-$IP >>[2] $EXECLOG
+	    mount -ca /srv/execfs-$IP /n/$IP/proc
+	}
+
+	# if we are an ionode
+	if (~ $cpunode '0'){
+	  # FIXME: this assumes that the IO node is created first...
+	  if(! test -e '/srv/io'){
+		echo 'starting IO server'
+		srvfs io /
+		mount -c /srv/io /n/io
+	  }
+	  if(! test -e '/srv/gangfs-'$IP){
+		echo 'starting gangfs on IO node treeip='$IP
+		#$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n $IP -M mpipe-$IP >>[2] $GANGLOG
+		#mount -ca /srv/gangfs-$IP /n/$IP/proc
+
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n io -M mpipe-$IP >>[2] $GANGLOG
+		mount -ca /srv/gangfs-$IP /n/io/proc
+ 	  }
+	}
+	if (~ $cpunode '1'){
+	  if(! test -e '/srv/gangfs-'$IP){
+		echo 'starting gangfs on CPU node treeip='$IP
+		#$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p 11.$IO -n $IP -M mpipe-$IP >>[2] $GANGLOG
+
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p io -n $IP -M mpipe-$IP >>[2] $GANGLOG
+
+		mount -ca /srv/gangfs-$IP /n/$IP/proc
+	  }
+	}
+
+        #csrv
 }
 
 mount -ca /srv/$IP /n/$IP
