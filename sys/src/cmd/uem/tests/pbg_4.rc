@@ -33,9 +33,6 @@ NUM=32
 # and sometimes
 #    exportfs: No more work buffers
 
-
-
-
 I_MAX=1
 J_MAX=4
 K_MAX=4
