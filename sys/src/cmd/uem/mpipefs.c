@@ -796,7 +796,7 @@ spliceto(void *arg) {
 	Req *tr;
 
 	sa->fd = open(sa->path, OWRITE);
-	DPRINT(DHDR, "[%s](%p) spliceto open: %s returned %d\n", 
+	DPRINT(DHDR, "[%s](%p) spliceto open: path=%s returned fd=%d\n", 
 					mp->name, mp, sa->path, sa->fd);
 	free(sa->path);
 	if(sa->fd < 0) {
@@ -840,7 +840,7 @@ spliceto(void *arg) {
 
 		while(offset < tr->ifcall.count) {
 			int n;
-			DPRINT(DSPF,"[%s](%p) spliceto: fd: %d\n",  mp->name, mp, sa->fd);
+			DPRINT(DSPF,"[%s](%p) spliceto: fd=%d\n",  mp->name, mp, sa->fd);
 			n = write(sa->fd, tr->ifcall.data+offset, tr->ifcall.count-offset);
 			if(n < 0) {
 				myresponderror(tr);
@@ -971,7 +971,7 @@ splicefrom(void *arg) {
 	Channel *reterr;
 
 	sa->fd = open(sa->path, OREAD);
-	DPRINT(DHDR, "[%s](%p) splicefrom open: %s returned %d\n", 
+	DPRINT(DHDR, "[%s](%p) splicefrom open: %s returned fd=%d\n", 
 					mp->name, mp, sa->path, sa->fd);
 	free(sa->path);
 	if(sa->fd < 0) {
@@ -1059,7 +1059,7 @@ splicefrom(void *arg) {
 	}
 
 exit:
-	DPRINT(DSPF, "[%s](%p) SPLICEFROM (fid %d) (aux %p) EXITING\n", 
+	DPRINT(DSPF, "[%s](%p) SPLICEFROM (fd=%d) (aux=%p) EXITING\n", 
 			mp->name, mp, sa->fd, dummy->aux);
 	fsclunk(dummy);
 	free(sa);
@@ -1099,9 +1099,11 @@ parseheader(Req *r, Mpipe *mp, Fidaux *aux)
 		sa->path = estrdup9p(argv[3]);
 		sa->chan = chancreate(sizeof(void *), 0);
 		if(type=='>')
-			proccreate(spliceto, sa, STACK);
+			//proccreate(spliceto, sa, STACK);
+			procrfork(spliceto, sa, STACK, RFFDG);
 		else
-			proccreate(splicefrom, sa, STACK);
+			//proccreate(splicefrom, sa, STACK);
+			procrfork(splicefrom, sa, STACK, RFFDG);
 		err = recvp(sa->chan); /* sync */
 		chanfree(sa->chan);
 		return err;
