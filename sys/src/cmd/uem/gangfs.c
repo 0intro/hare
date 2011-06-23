@@ -13,7 +13,6 @@
 	Based in part on Pravin Shinde's devtask.c
 
 	TODO:
-		* gang->gang job deployment
 		* per stdio aggregation mode
 		* non-aggregation mode for stdio(s)
 		* push helper: (launch local stage1 and stage3 with fanout stage2)
@@ -39,7 +38,8 @@ int remote = 0;
 
 static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"gangfs";
-static char *procpath, *execfspath, *srvpath;
+static char defaultsrvmpipe[] =	"mpipe";
+static char *procpath, *execfspath, *srvpath, *srvmpipe;
 int iothread_id;
 
 static char *gangpath;	/* our view of the gang path */
@@ -263,6 +263,19 @@ static Status avgstats;	/* composite statistics */
 static char *canonpath; /* canonical path */
 static Status mystats;	/* my statistics */
 RWLock statslock; /* protect stat updates and additions */ 
+
+/* FIXME: debugging... */
+static void
+lsproc(void *arg)
+{
+	threadsetname("gangfs-lsproc");
+	DPRINT(DFID, "lsproc (%s) (%s) (%s) (%s) pid=(%d)\n",
+	       "/bin/ls", "ls", "-l", arg, getpid());
+	procexecl(nil, "/bin/ls", "ls", "-l", arg, nil);
+
+	threadexits(nil);
+
+}
 
 static void
 dprint_status(Status *s, char *who, int dev)
@@ -585,6 +598,7 @@ updatestatus(void *arg)
 	int parentfd = open(parentpath, OWRITE);
 			
 	DPRINT(DCUR, "updatestatus: parent=(%s) parentpath=(%s)\n", parent, parentpath);
+	DPRINT(DCUR, "\tparentfd=(%d)\n", parentfd);
 	if(parentfd < 0) {
 		DPRINT(DERR, "*ERROR*: couldn't open parent %s on path %s\n", parent, parentpath);
 		return;
@@ -613,12 +627,15 @@ initstatus(Status *m)
 	int n;
 	uvlong a[nelem(m->devsysstat)];
 
+	DPRINT(DEXE, "initstatus:\n");
 	memset(m, 0, sizeof(Status));
 	strncpy(m->name, mysysname, 15);
 	m->name[15] = 0;
 	m->swapfd = open("/dev/swap", OREAD);
+	DPRINT(DCUR, "\tm->swapfd=(%d)\n", m->swapfd);
 	assert(m->swapfd > 0);
 	m->statsfd = open("/dev/sysstat", OREAD);
+	DPRINT(DCUR, "\tm->statsfd=(%d)\n", m->statsfd);
 	assert(m->swapfd > 0);
 	if(loadbuf(m, &m->statsfd)){
 		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
@@ -628,7 +645,6 @@ initstatus(Status *m)
 		m->ntask = 1;
 	m->lastup = time(0);
 
-	DPRINT(DEXE, "initstatus:\n");
 	DPRINT(DEXE, "\tm->name=(%s)\n", m->name);
 	DPRINT(DEXE, "\tm->ntask=(%d)\n", m->ntask);
 	DPRINT(DEXE, "\tm->nchild=(%d)\n", m->nchild);
@@ -684,6 +700,7 @@ checkmount(char *addr)
 	DPRINT(DFID, "\tmount point (%s) does not exist... mounting\n", srvtg);
 	DPRINT(DCUR, "\tattempting to mount %s on %s\n", srvpt, srvtg);
 	if(fd = open(srvpt, ORDWR)) {
+		DPRINT(DCUR, "\tfd=(%d)\n", fd);
 		if(mount(fd, -1, srvtg, MREPL, "") < 0) {
 			// FIXME: what should we do here?
 			DPRINT(DERR, "\t*ERROR*: srv mount failed: %r\n");
@@ -749,15 +766,20 @@ static int
 mpipe(char *path, char *name)
 {
 	int fd, ret;
-	fd = open("/srv/mpipe", ORDWR);
+	char *srvpt = smprint("/srv/%s", srvmpipe);
+//lsproc("/srv");
+	fd = open(srvpt, ORDWR);
 	if(fd<0) {
-		DPRINT(DERR, "couldn't open /srv/mpipe: %r\n");
+		DPRINT(DERR, "*ERROR*: couldn't open %s: %r\n", srvpt);
+		free(srvpt);
 		return -1;
 	}
+	free(srvpt);
 
 	//wunlock(&glock);
 	DPRINT(DCUR, "mounting (%s) on (%s) mysysname=(%s)\n", 
 	       name, path, mysysname);
+	DPRINT(DCUR, "\tfd=(%d)\n", fd);
 	ret = mount(fd, -1, path, MBEFORE, name);
 	//wunlock(&glock);
 	if(ret < 0) {
@@ -784,6 +806,7 @@ flushmp(char *src)
 	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n",
 		    pkttype, (ulong)0, (ulong)0, "");
 	DPRINT(DCUR, "flushmp: src=(%s) pid=(%d)\n", src, getpid());
+	DPRINT(DCUR, "\tfd=(%d)\n", fd);
 
 	n = pwrite(fd, hdr, n, tag);
 	close(fd);
@@ -804,6 +827,7 @@ spliceto(char *src, char *dest)
 		return fd;
 	}
 
+	DPRINT(DCUR, "spliceto: fd=(%d)\n", fd);
 	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, dest);
 	n = pwrite(fd, hdr, n, tag);
 	close(fd);
@@ -824,6 +848,7 @@ splicefrom(char *dest, char *src)
 		return fd;
 	}
 
+	DPRINT(DCUR, "splicefrom: fd=(%d)\n", fd);
 	DPRINT(DEXE, "just so we know where we are splicing: [%s]\n", src);
 
 	n = snprint(hdr, 255, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, (ulong)0, src);
@@ -1400,6 +1425,8 @@ cloneproc(void *arg)
 	while(1) {
 		DPRINT(DEXE, "Attempting to open child exec: %s\n", buf);
 		sess->fd = open(buf, ORDWR);
+		DPRINT(DCUR, "cloneproc: sess->fd=(%d)\n", sess->fd);
+
 		if(sess->fd > 0)
 			break;
 		DPRINT(DERR, "WARNING: retry: %d opening execfs returned %d: %r -- retrying\n", 
@@ -1487,10 +1514,8 @@ setupsess(Gang *g, Session *s, char *path, int r, int sub)
 	s->chan = chancreate(sizeof(char *), 0);
 	s->g = g; /* back pointer */
 
-	if(remote_override)
-		s->remote = remote;
-	else
-		s->remote = r;
+	// remote_override does not work here as r = the number of sessions
+	s->remote = r;
 
 	s->subindex = sub; /* keep the subsession index to help with debugging */
 }
@@ -1864,6 +1889,7 @@ fswrite(void *arg)
 					break;
 				}
 				num = atol(cb->f[1]);
+				DPRINT(DGAN, "reserve num=(%d)\n", num);
 				if(num < 0) {
 					respondcmderror(r, cb, "bad arguments: %d", num);
 				} else {
@@ -2040,6 +2066,7 @@ threadmain(int argc, char **argv)
 	mysysname = getenv("sysname");
 
 	srvpath    = defaultsrvpath;
+	srvmpipe   = defaultsrvmpipe;
 	procpath   = defaultpath;
 	execfspath = defaultpath;
 
@@ -2076,6 +2103,9 @@ threadmain(int argc, char **argv)
 		remote_override = 1;
 		remote = atoi(ARGF());
 		break;
+	case 'M':
+		srvmpipe = ARGF();
+		break;
 	default:
 		usage();
 	}ARGEND
@@ -2101,8 +2131,9 @@ threadmain(int argc, char **argv)
 	initstatus(&mystats);
 	
 	DPRINT(DFID, "Main: procpath=(%s) pid=(%d)\n", procpath, getpid());
-	DPRINT(DFID, "      srvpath=(%s) procpath=(%s) mysysname=(%s)\n", 
+	DPRINT(DFID, "\tsrvpath=(%s) procpath=(%s) mysysname=(%s)\n", 
 	       srvpath, procpath, mysysname);
+	DPRINT(DFID, "\tsrvmpipe=(%s)\n", srvmpipe);
 
 	if(parent) {
 		DPRINT(DFID, "      has parent=(%s)\n", parent);
