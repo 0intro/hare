@@ -667,13 +667,16 @@ static void
 startimport(void *arg)
 {
 	char *addr = (char *) arg;
+	char *name = smprint("%s/%s", amprefix, addr);
 
 	threadsetname("gangfs-startimport");
 	
+	// FIXME: should arg be replaced with addr
+	DPRINT(DCUR, "startimport: importing name=%s\n");
 	procexecl(nil, "/bin/import", "import", "-A", arg, "/",
-		  smprint("%s/%s", amprefix, addr), nil);
+		  name, nil);
 
-	DPRINT(DERR, "*ERROR*: startimport: procexecl returned %r\n");
+	DPRINT(DERR, "*ERROR*: startimport: procexecl returned: %r\n");
 	threadexits(nil);
 }
 
@@ -704,13 +707,17 @@ checkmount(char *addr)
 		if(mount(fd, -1, srvtg, MREPL, "") < 0) {
 			// FIXME: what should we do here?
 			DPRINT(DERR, "\t*ERROR*: srv mount failed: %r\n");
+			close(fd);
 		} else {
-			DPRINT(DFID, "\tsrv mount succeeded\n");
+			DPRINT(DFID, "\tsrv mount succeeded");
+			DPRINT(DFID, "\t\tMOUNT");
+			close(fd);
 			goto out;
 		}
 	}
 
 	/* no dir, spawn off an import */
+	DPRINT(DFID, "\tno dir, spawn off an import +++\n");
 	proccreate(startimport, dest, STACK);
 
 	/* we need to wait for this to be done */
@@ -726,9 +733,6 @@ checkmount(char *addr)
 	}
 
 out:
-	if(fd)
-		close(fd);
-
 	if(srvpt)
 		free(srvpt);
 	if(srvtg)
@@ -749,17 +753,29 @@ usage(void)
 }
 
 static void
+gangref(Gang *g, char *where)
+{
+	g->refcount++;
+	DPRINT(DREF, "\t\tGang(%p).refcount = %d [%s]\n", g, g->refcount, where);
+}
+
+static void
 gangrefinc(Gang *g, char *where)
 {
 	g->refcount++;
-	DPRINT(DREF, "\t\tGang(%p).refcount++ = %d [%s]\n", g, g->refcount, where);
+	DPRINT(DREF, "\t\tGang(%p).refcount++ = %d -> %d[%s]\n", g, g->refcount-1, g->refcount, where);
 }
 
 static void
 gangrefdec(Gang *g, char *where)
 {
 	g->refcount--;
-	DPRINT(DREF, "\t\tGang(%p).refcount-- = %d [%s]\n", g, g->refcount, where);
+	// reality check
+	if(g->refcount < 0) {
+		DPRINT(DERR, "%s: *WARNING* gangrefdec is less than 0.  Resetting to 0\n", where);
+		g->refcount = 0;	
+	}
+	DPRINT(DREF, "\t\tGang(%p).refcount-- = %d -> %d[%s]\n", g, g->refcount+1, g->refcount, where);
 }
 
 static int
@@ -767,7 +783,6 @@ mpipe(char *path, char *name)
 {
 	int fd, ret;
 	char *srvpt = smprint("/srv/%s", srvmpipe);
-//lsproc("/srv");
 	fd = open(srvpt, ORDWR);
 	if(fd<0) {
 		DPRINT(DERR, "*ERROR*: couldn't open %s: %r\n", srvpt);
@@ -777,14 +792,16 @@ mpipe(char *path, char *name)
 	free(srvpt);
 
 	//wunlock(&glock);
-	DPRINT(DCUR, "mounting (%s) on (%s) mysysname=(%s)\n", 
-	       name, path, mysysname);
-	DPRINT(DCUR, "\tfd=(%d)\n", fd);
+	DPRINT(DFID, "mpipe: mounting name=(%s) on path=(%s) pid=(%d) fd=%d\n",
+	       name, path, getpid(), fd);
+	DPRINT(DCUR, "\from mysysname=(%s)\n", mysysname);
 	ret = mount(fd, -1, path, MBEFORE, name);
 	//wunlock(&glock);
 	if(ret < 0) {
 		DPRINT(DERR, "mount of multipipe failed: %r\n");
-	}
+	} else
+		DPRINT(DFID, "\t\tMOUNT");
+
 	close(fd);
 	return ret;
 }
@@ -885,7 +902,7 @@ newgang(void)
 		mygang->index = current->index+1;
 	}
 
-	mygang->ctlref = 1;
+	mygang->ctlref = 1; 
 	mygang->refcount = 1;
 	mygang->imode = CMbcast;	/* broadcast mode default */
 	mygang->status = GANG_NEW;
@@ -973,6 +990,33 @@ flushgang(void *arg)
 	flushmp(fname);
 }
 
+static void
+printgang(Gang *g)
+{
+	wlock(&glock);
+
+	DPRINT(DCUR, "\tprintgang:\n");
+	DPRINT(DCUR, "\t\tpath=%s\n", g->path);
+	DPRINT(DCUR, "\t\trefcount=%d\n", g->refcount);
+	DPRINT(DCUR, "\t\tctlref=%d\n", g->ctlref);
+	DPRINT(DCUR, "\t\tstatus=%d\n", g->status);
+	DPRINT(DCUR, "\t\tindex=%d\n", g->index);
+	DPRINT(DCUR, "\t\tsize=%d\n", g->size);
+	DPRINT(DCUR, "\t\timode=%d\n", g->imode);
+	DPRINT(DCUR, "\t\t*** sessions not reported\n");
+
+	wunlock(&glock);
+}
+
+static void
+printganglist(void)
+{
+	Gang *g;
+	
+	DPRINT(DCUR, "printganglist:\n");
+	for(g = glist; g != nil; g = g->next)
+		printgang(g);
+}
 
 static void
 cleanupgang(void *arg)
@@ -980,30 +1024,40 @@ cleanupgang(void *arg)
 	Gang *g = arg;
 	char fname[255];
 
+	/* make sure that the std files are completely flushed */
 	flushgang(arg);
 
-	// FIXME: make sure that the std files are completely flushed */
-
+	/* unmount the std files and remove their references */
 	DPRINT(DCLN, "cleanupgang: unmounting stdin, stdout, and stderr\n");
 	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
-	unmount(0, fname);
+	if(unmount(0, fname) == -1)
+		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
+	gangrefdec(g, "cleanupgang");
+
 	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
-	unmount(0, fname);
+	if(unmount(0, fname) == -1)
+		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
+	gangrefdec(g, "cleanupgang");
+
 	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
-	unmount(0, fname);
+	if(unmount(0, fname) == -1)
+		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
+	gangrefdec(g, "cleanupgang");
 
 	/* TODO: Clean up subsessions? */
 	
 	/* close it out */
 	g->status=GANG_CLOSED;
+printgang(g);
 }
-
 
 static void
 releasegang(Gang *g)
 {
 	wlock(&glock);
-	gangrefdec(g, "releasegang");
+	DPRINT(DEXE, "releasegang:\n");
+	gangrefdec(g, "releasegang"); // new gang reserved it so we
+			//need to decrement the ref counter here
 	if(g->refcount == 0) {	/* clean up */
 		Gang *c;
 		Gang *p = glist;
@@ -1780,15 +1834,17 @@ cmdbcast(Req *r, Gang *g)
 		/* slightly slimy */
 		g->sess[count].r = r;
 		proccreate(relaycmd, &g->sess[count], STACK);
+		DPRINT(DEXE, "\t**** cmdbcast[%d]: relaycmd created\n", count);
 	}
 	
+	DPRINT(DEXE, "\twaiting for responses\n");
 	/* wait for responses, checking for errors */
 	for(count = 0; count < g->size; count++) {
+		DPRINT(DEXE, "\t\twaiting on relay[%d]\n", count);
 		/* wait for response */
 		resp = recvp(g->sess[count].chan);
 		// FIXME: do we need to free anything up?
-		DPRINT(DEXE, "\t**** cmdbcast[%d]: returning err=(%s)\n", 
-		       count, resp);
+		DPRINT(DEXE, "\t\treturning err=(%s)\n", resp);
 		g->sess[count].r = nil;
 		if(resp)
 			err = resp;
@@ -1866,17 +1922,27 @@ fswrite(void *arg)
 				DPRINT(DEXE, "Unknown command, broadcasting to children\n");
 				cmdbcast(r, g);
 
+//gangrefdec(g, "testing cmdbcast:");
 				// FIXME: on large numbers of tasks,
 				// some of the stdouts appear to be
 				// removed before they are fully
 				// processed.
-				flushgang(g);
-				sleep(5000);
+
+				//flushgang(g);
+				//sleep(5000);
 
 				// FIXME: I am not sure this is the
 				// most appropriate place to put this...
-				releasegang(g);
-				cleanupgang(g);
+				//DPRINT(DCUR, "******** releasegang\n");
+				//releasegang(g);
+//				DPRINT(DCUR, "******** cleanupgang\n");
+//				cleanupgang(g);
+//				DPRINT(DCUR, "******** done\n");
+//DPRINT(DCUR, "hacking the refcount\n");
+//gangrefdec(g, "cmdbcast");
+//gangrefdec(g, "cmdbcast");
+//gangrefdec(g, "cmdbcast");
+//printganglist();
 			}
 		} else {
 			switch(cmd->index) {
@@ -1945,12 +2011,11 @@ fsstat(Req* r)
 static void
 fsclunk(Fid *fid)
 {
-	Gang *g;
+	Gang *g = fid->aux;
 
 	DPRINT(DFID, "fsclunk: %d\n", fid->fid);
 	if(TYPE(fid->qid) == Qctl) {
 		DPRINT(DFID, "\tand its a ctl\n");
-		g = fid->aux;
 		if(g) {
 			wlock(&glock);
 			g->ctlref--;	
@@ -1960,6 +2025,7 @@ fsclunk(Fid *fid)
 					mystats.njobs -= g->size;
 				g->status=GANG_CLOSING;
 				wunlock(&glock);
+				DPRINT(DFID, "fsclunk: g->status=GANG_CLOSING for gang %p path=%s\n", g, g->path);
 				proccreate(cleanupgang, (void *)g, STACK); 
 			} else {
 				wunlock(&glock);
@@ -1968,8 +2034,8 @@ fsclunk(Fid *fid)
 			// FIXME: check on this...  The first time through g is nil
 			DPRINT(DERR, "*WARNING*: fsclunk: ctl fid %d without aux\n", fid->fid);
 	} else {
-		if(fid->aux != nil) {
-			g = fid->aux;
+		if(g) {
+			DPRINT(DFID, "fsclunk: releasing gang %p path=%s\n", g, g->path);
 			releasegang(g);
 		}
 	}
