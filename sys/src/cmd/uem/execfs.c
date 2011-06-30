@@ -107,11 +107,13 @@ mpipe(char *path, char *name)
 	}
 	free(srvpt);
 
-	DPRINT(DFID, "mpipe: mounting (%s) on (%s) pid=(%d) fd=%d\n",
+	DPRINT(DFID, "mpipe: mounting name=(%s) on path=(%s) pid=(%d) fd=%d\n",
 	       name, path, getpid(), fd);
 	ret = mount(fd, -1, path, MAFTER, name);
 	if(ret<0)
-		DPRINT(DERR, "*ERROR*: mpipe mount failed: %r\n");
+		DPRINT(DERR, "\t*ERROR*: mpipe mount failed: %r\n");
+	else
+		DPRINT(DFID, "\t\tMOUNT");
 
 	close(fd);
 	return ret;
@@ -294,6 +296,7 @@ fsopen(Req *r)
 
 	f->aux = e;
 	DPRINT(DCUR, "fsopen: sucseeded - setting f->aux = e (%p)\n", f->aux);
+	DPRINT(DCUR, "\tf->fid=%d\n", f->fid);
 	free(fname);
 	free(ctlbuf);
 	respond(r, nil);
@@ -444,6 +447,7 @@ static void
 fsclunk(Fid *f)
 {
 	DPRINT(DFID, "fsclunk: %p fid=%d aux=%p\n", f, f->fid, f->aux);
+
 	// FIXME: this section of the code appears to never be run.  Where is aus supposed to be set?
 	if(f->aux) {
 		Exec *e = f->aux;
@@ -552,7 +556,7 @@ clunkproxy(Fid *f)
 	/* really freaking clunky, but not sure what else to do */
 	Req *r = emalloc9p(sizeof(Req));
 
-	DPRINT(DFID, "clunkproxy: %p fidnum=%d aux=%p\n", f, f->fid, f->aux);
+	DPRINT(DFID, "clunkproxy: %p fid=%d aux=%p\n", f, f->fid, f->aux);
 
 	r->ifcall.type = Tclunk;
 	r->fid = f;
