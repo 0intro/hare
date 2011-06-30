@@ -30,7 +30,11 @@ echo '************************ PWD = '$PWD
 
 # setup 
 #
-NUM=32
+NUM=16
+
+# exportfs 14181: warning: process exceeds 100 file descriptors
+# exportfs: No more work buffers
+#NUM=32
 #NUM=256
 
 I_MAX=4

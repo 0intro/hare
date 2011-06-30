@@ -26,7 +26,9 @@ CMD='../8.poke -L '$TESTDIR
 
 # setup 
 #
-NUM=32
+#NUM=64 # succeds
+NUM=75 # succeds
+NUM=80 # fails
 
 #  NUM=32 # (with 1,4,4) gives
 #    exportfs 929: warning: process exceeds 100 file descriptors
