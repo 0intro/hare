@@ -16,3 +16,6 @@ UPDATE=\
 	${OFILES:%.$O=%.c}\
 
 </sys/src/cmd/mkone
+
+anl:
+	objtype=power mk all
