@@ -70,11 +70,20 @@ struct Qidtab
 
 enum
 {
+/*
 	MAXPROC		= 50,
 	FHASHSIZE	= 64,
 	Nr_workbufs 	= 50,
 	Fidchunk	= 1000,
 	Npsmpt		= 32,
+*/
+
+	MAXPROC		= 200,
+	FHASHSIZE	= 256,
+	Nr_workbufs 	= 200,
+	Fidchunk	= 1000,
+	Npsmpt		= 128,
+
 	Nqidbits		= 5,
 	Nqidtab		= (1<<Nqidbits),
 };
