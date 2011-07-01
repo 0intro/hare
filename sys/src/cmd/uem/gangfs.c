@@ -687,7 +687,7 @@ checkmount(char *addr)
 	char *dest = estrdup9p(addr);
 	int retries = 0;
 	int err = 0;
-	int fd = 0;
+	int fd;
 	char *srvpt = smprint("/srv/%s", addr);
 	char *srvtg = smprint("%s/%s", amprefix, addr);
 	char *mtpt = smprint("%s/proc", srvtg);
@@ -794,7 +794,7 @@ mpipe(char *path, char *name)
 	//wunlock(&glock);
 	DPRINT(DFID, "mpipe: mounting name=(%s) on path=(%s) pid=(%d) fd=%d\n",
 	       name, path, getpid(), fd);
-	DPRINT(DCUR, "\from mysysname=(%s)\n", mysysname);
+	DPRINT(DCUR, "\tfrom mysysname=(%s)\n", mysysname);
 	ret = mount(fd, -1, path, MBEFORE, name);
 	//wunlock(&glock);
 	if(ret < 0) {
@@ -1056,8 +1056,8 @@ releasegang(Gang *g)
 {
 	wlock(&glock);
 	DPRINT(DEXE, "releasegang:\n");
-	gangrefdec(g, "releasegang"); // new gang reserved it so we
-			//need to decrement the ref counter here
+//	gangrefdec(g, "releasegang"); // new gang reserved it so we
+//			//need to decrement the ref counter here
 	if(g->refcount == 0) {	/* clean up */
 		Gang *c;
 		Gang *p = glist;
@@ -1465,8 +1465,8 @@ cloneproc(void *arg)
 {
 	Session *sess = (Session *) arg;
 	char buf[256];
-	int retries = 0;
-	int n;
+	int retries;
+	int n = -1;
 	char *err;
 
 	if(sess->remote)
@@ -1474,31 +1474,39 @@ cloneproc(void *arg)
 	else
 		snprint(buf, 255, "%s/clone", sess->path);
 
-	DPRINT(DEXE, "**** clone proc %s (remote=%d)\n", buf, sess->remote);
-
-	while(1) {
-		DPRINT(DEXE, "Attempting to open child exec: %s\n", buf);
+	DPRINT(DEXE, "cloneproc: **** clone proc %s (remote=%d)\n",
+	       buf, sess->remote);
+	for(retries=0; retries <= 10; retries++) {
 		sess->fd = open(buf, ORDWR);
-		DPRINT(DCUR, "cloneproc: sess->fd=(%d)\n", sess->fd);
 
-		if(sess->fd > 0)
-			break;
-		DPRINT(DERR, "WARNING: retry: %d opening execfs returned %d: %r -- retrying\n", 
-				retries, sess->fd);
-		if(retries++ > 10) {
-			DPRINT(DERR, "*ERROR* giving up\n");
-			sendp(sess->chan, smprint("execfs returning %r"));
-			threadexits(Ebadpid);
+		if(sess->fd <= 0) {
+			sleep (100);
+			DPRINT(DERR, "WARNING: retry: %d opening execfs returned %d: %r -- retrying\n", 
+			       retries, sess->fd);
+			continue;
 		}
-		/* retry on failure */
-	}
-	DPRINT(DEXE, "\tcontrol channel on fd %d for subsession %d\n", sess->fd, sess->subindex);
 
-	n = pread(sess->fd, buf, 255, 0);
+		n = pread(sess->fd, buf, 255, 0);
+		if(n >= 0)
+			break;
+
+		DPRINT(DERR, "WARNING: retry: %d execfs's pread=(%d) failed for fd=(%d): %r -- retrying\n", 
+		       retries, n, sess->fd);
+		close (sess->fd);
+	}
+	DPRINT(DCUR, "\tcontrol channel on sess->fd=(%d) for subsession (%d) pread=(%d)\n",
+	       sess->fd, sess->subindex, n);
+
+	if(retries > 10) {
+		DPRINT(DERR, "*ERROR* giving up\n");
+		sendp(sess->chan, smprint("execfs returning %r"));
+		threadexits(Ebadpid);
+	}
+
 	if(n < 0) {
 		sendp(sess->chan,
-			smprint("couldn't read from session ctl %s/clone: %r\n", 
-					sess->path));
+			smprint("couldn't read from session ctl path=%s/clone fd=(%d) n=(%d): %r\n", 
+				sess->path, sess->fd, n));
 		threadexits(Ebadctl);
 	}
 	buf[n] = 0; // FIXME: need to terminate the buffer or we get junk...
@@ -1681,7 +1689,6 @@ resgang(Gang *g)
 		///// setupsess(g, &g->sess[count], current->name, 0, count);
 		proccreate(cloneproc, &g->sess[count], STACK);
 		current = current->next;
-	/* BUG: NEED current = current->next */
 	}
 
 	DPRINT(DEXE, "waiting on %d sessions\n", scount);
@@ -1691,11 +1698,34 @@ resgang(Gang *g)
 		DPRINT(DEXE, "\twaiting on reservation: count=%d out of %d\n", count+1, scount);
 		myerr = recvp(g->sess[count].chan);
 		if(myerr != nil) {
-			DPRINT(DERR, "*ERROR*: session %d broke\n", count);
+			DPRINT(DERR, "*ERROR*: session %d broke for (%s) err=(%s)\n", count, g->sess[count].path, myerr); // FIXME: g->path appears to always be nil try session info
 			err = myerr;
 			g->status = GANG_BROKE;
 		}
-			/* MAYBE: retry here? for reliability ? */
+                /* MAYBE: retry here? for reliability ? */
+
+		/* 
+		   This is extremely fragile, and should be looked at
+		   to retry, fail over to another session, and other
+		   fault tollerance behaviour.  There are a couple of
+		   possible scenerios here 1) the node is dead, 2)
+		   there is a race condition, ...
+
+		   Plan:
+		     * disable node (not gang)
+		     * keep a node fail counter
+		     * allow possible restart via the status update or
+		       retry.
+
+		   For now, just disable and move on.  
+
+		   FIXME: we need to examine/discuss what could be
+		   happening with a task whose operation changes the
+		   behaviour of the system and if it is possible that
+		   failing in the middle of an operation destabalizes
+		   the system.
+
+		 */
 	}
 
 	return err;
