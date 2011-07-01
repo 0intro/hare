@@ -112,6 +112,11 @@ anl: profile
 	cp q.execfs /n/anl/n/local/home/ericvh/9/power/bin/execfs
 	cp q.execcmd /n/anl/n/local/home/ericvh/9/power/bin/execcmd
 	cp q.csrv /n/anl/n/local/home/ericvh/9/power/bin/csrv
+	
+	cd ../exportfs
+	mk anl
+	cp q.out /n/anl/n/local/home/ericvh/9/power/bin/exportfs
+
 
 profile: anl_mount
 	cp tests/profile.anl /n/anl/n/local/home/ericvh/lib/profile
