@@ -404,6 +404,9 @@ refreshstatus(Status *m)
 	uvlong a[nelem(m->devsysstat)];
 	
 	wlock(&statslock);
+	// FIXME: this might not work when we are dealing with gangs
+	// of gangs because it is both a child and a master.
+
 	if(m->next) { /* aggregation node */
 		Status *c;
 
@@ -446,10 +449,9 @@ refreshstatus(Status *m)
 				for(i=0; i<nelem(m->devsysstat); i++)
 					m->devsysstat[i] += a[i];
 		}
-
-		m->lastup = time(0);
 	}
 
+	m->lastup = time(0);
 	wunlock(&statslock);
 
 	// what's going on...
