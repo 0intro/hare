@@ -712,7 +712,8 @@ checkmount(char *addr)
 
 	DPRINT(DFID, "\tmount point (%s) does not exist... mounting\n", srvtg);
 	DPRINT(DCUR, "\tattempting to mount %s on %s\n", srvpt, srvtg);
-	if(fd = open(srvpt, ORDWR)) {
+	fd = open(srvpt, ORDWR);
+	if(fd > 0) {
 		DPRINT(DCUR, "\tfd=(%d)\n", fd);
 		if(mount(fd, -1, srvtg, MREPL, "") < 0) {
 			// FIXME: what should we do here?
