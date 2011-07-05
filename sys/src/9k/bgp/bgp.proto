@@ -73,6 +73,7 @@ power d775 sys sys /tmp/empty
 		echo 775 sys sys
 		iostats 775 sys sys
 		miniciod 775 sys sys ../root/q.miniciod
+		mkdir 775 sys sys
 		mntgen 775 sys sys
 		ramcfs 775 sys sys ../root/fscfs/q.out
 		ramfs 775 sys sys
@@ -145,6 +146,7 @@ power d775 sys sys /tmp/empty
 	lib d775 sys sys /tmp/empty
 	mkfile 775 sys sys
 sys d775 sys sys /tmp/empty
+	log d775 sys sys /tmp/empty
 	lib d775 sys sys /tmp/empty
 		acid d775 sys sys /tmp/empty
 			power 775 sys sys

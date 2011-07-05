@@ -13,6 +13,7 @@ rootdir=/root
 rootspec=''
 rootsrv=boot
 job_home=''
+logdir=/tmp/log
 
 beetroot=bgp.rr
 #authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'	# -a ...
@@ -135,6 +136,13 @@ cd /
 
 #ramfs so we can copy binaries in & have scratch space
 ramfs /tmp
+
+#
+# setup logs to point to tmp
+#
+
+mkdir -p $logdir
+bind -c /tmp/log /sys/log
 
 #
 # Finish environment setup and start services.
