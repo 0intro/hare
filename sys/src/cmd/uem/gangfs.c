@@ -34,6 +34,7 @@
 
 int remote_override = 0;
 int remote = 0;
+int ntask_override = 0;
 
 
 static char defaultpath[] =	"/proc";
@@ -466,7 +467,8 @@ fillstatbuf(Status *m, char *statbuf)
 	DPRINT(DSTS, "fillstatbuf:\n");
 	bp = statbuf;
 	t = time(0);
-	if(t-m->lastup > updateinterval)
+	// FIXME: hack...
+	// if(t-m->lastup > updateinterval)
 		refreshstatus(m);
 
 	// what's going on...
@@ -576,7 +578,8 @@ statuswrite(char *buf)
 		m->devswap[Maxmem] = a[6];
 	}
 
-	m->lastup = time(0); /* MAYBE: pull timestamp from child and include it in data */
+	m->lastup = time(0); 
+/* MAYBE: pull timestamp from child and include it in data */
 /* FIXME: see if this causes problems with the BG runs
 	if(xgangpath == procpath){
 		xgangpath = smprint("%s/%s%s", amprefix, mysysname, procpath);
@@ -640,6 +643,13 @@ initstatus(Status *m)
 	if(loadbuf(m, &m->statsfd)){
 		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
 			;
+if(n > 4){
+  DPRINT(DCUR, "***** WARNING *****: overwriting m->ntask from %d to %d\n", n, 4);
+  n= 4;
+}
+	if(ntask_override)
+		m->ntask = ntask_override;
+	else
 		m->ntask = n;
 	} else
 		m->ntask = 1;
@@ -1923,6 +1933,7 @@ fswrite(void *arg)
 			free(buf);
 			return;	
 		}
+		DPRINT(DCUR, "fswrite(Qgstat): statuswrite buf: %s\n", buf);
 		err = statuswrite(buf);	/* TODO: add error checking & reporting */
 		free(buf);
 		if(err) {
@@ -2201,6 +2212,9 @@ threadmain(int argc, char **argv)
 		break;
 	case 'M':
 		srvmpipe = ARGF();
+		break;
+	case 'N':
+		ntask_override = atoi(ARGF());
 		break;
 	default:
 		usage();
