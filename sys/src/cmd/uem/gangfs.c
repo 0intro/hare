@@ -1603,7 +1603,7 @@ reslocal(Gang *g)
 	dprint_status(&mystats, "reslocal", 0);
 
 	g->sess = emalloc9p(sizeof(Session)*g->size);
-	
+	/* TODO: check return value? */
 	for(count = 0; count < g->size; count++) {
 		setupsess(g, &g->sess[count], nil, 0, count);
 		DPRINT(DEXE, "reslocal: reservation: count=%d out of %d\n", count+1, g->size);
@@ -1668,7 +1668,8 @@ resgang(Gang *g)
 			remaining -= njobs[scount];
 		}
 		current->njobs += njobs[scount];
-		scount++;
+		if(njobs[scount] > 0)	/* only increment when we've allocated a subnode */
+			scount++;
 	}
 	dprint_status(&mystats, "resgang (master stats)", 0);
 
@@ -1702,7 +1703,9 @@ resgang(Gang *g)
 	for(count = 0; count < scount; count++) {
 		char *myerr;
 		DPRINT(DEXE, "\twaiting on reservation: count=%d out of %d\n", count+1, scount);
+		assert(g->sess[count].chan != 0); /* or you are stupid */
 		myerr = recvp(g->sess[count].chan);
+
 		if(myerr != nil) {
 			DPRINT(DERR, "*ERROR*: session %d broke for (%s) err=(%s)\n", count, g->sess[count].path, myerr); // FIXME: g->path appears to always be nil try session info
 			err = myerr;
