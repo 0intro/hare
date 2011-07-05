@@ -403,7 +403,7 @@ refreshstatus(Status *m)
 	int i;
 	uvlong a[nelem(m->devsysstat)];
 	
-	rlock(&statslock);
+	wlock(&statslock);
 	if(m->next) { /* aggregation node */
 		Status *c;
 
@@ -450,7 +450,7 @@ refreshstatus(Status *m)
 		m->lastup = time(0);
 	}
 
-	runlock(&statslock);
+	wunlock(&statslock);
 
 	// what's going on...
 	dprint_status(m, "refreshstatus (master after agregarion)", 1);
@@ -467,8 +467,8 @@ fillstatbuf(Status *m, char *statbuf)
 	DPRINT(DSTS, "fillstatbuf:\n");
 	bp = statbuf;
 	t = time(0);
-	// FIXME: hack...
-	// if(t-m->lastup > updateinterval)
+
+	if(t-m->lastup > updateinterval)
 		refreshstatus(m);
 
 	// what's going on...
@@ -1004,7 +1004,7 @@ flushgang(void *arg)
 static void
 printgang(Gang *g)
 {
-	wlock(&glock);
+	rlock(&glock);
 
 	DPRINT(DCUR, "\tprintgang:\n");
 	DPRINT(DCUR, "\t\tpath=%s\n", g->path);
@@ -1016,7 +1016,7 @@ printgang(Gang *g)
 	DPRINT(DCUR, "\t\timode=%d\n", g->imode);
 	DPRINT(DCUR, "\t\t*** sessions not reported\n");
 
-	wunlock(&glock);
+	runlock(&glock);
 }
 
 static void
