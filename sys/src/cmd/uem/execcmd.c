@@ -64,7 +64,7 @@ main(int argc, char **argv)
 	Cmdbuf *cb;
 	Cmdtab *cmd;
 	char *srvctl = nil;
-	char *logfile = nil;
+	char *logfile;
 	char *logdir = nil;
 	
 	int pid = getpid();
