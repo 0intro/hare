@@ -425,7 +425,7 @@ enum
 	RENDHASH =	1<<RENDLOG,	/* Hash to lookup rendezvous tags */
 	MNTLOG	=	5,
 	MNTHASH =	1<<MNTLOG,	/* Hash to walk mount table */
-	NFD =		100,		/* per process file descriptors */
+	NFD =		4096,		/* per process file descriptors */
 	PGHLOG  =	9,
 	PGHSIZE	=	1<<PGHLOG,	/* Page hash for image lookup */
 };

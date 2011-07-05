@@ -313,7 +313,7 @@ confinit(void)
 	conf.npage = kpages + conf.mem[1].npage;
 	conf.upages = conf.mem[1].npage;
 
-	conf.nproc = 1000;
+	conf.nproc = 4096; /* its a supercomputer damnit */
 	conf.nimage = 200;
 	conf.nswap = 0;
 	conf.nswppo = 0;
