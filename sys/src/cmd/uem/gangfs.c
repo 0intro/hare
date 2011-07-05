@@ -452,6 +452,7 @@ refreshstatus(Status *m)
 	}
 
 	m->lastup = time(0);
+
 	wunlock(&statslock);
 
 	// what's going on...
@@ -645,10 +646,6 @@ initstatus(Status *m)
 	if(loadbuf(m, &m->statsfd)){
 		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
 			;
-if(n > 4){
-  DPRINT(DCUR, "***** WARNING *****: overwriting m->ntask from %d to %d\n", n, 4);
-  n= 4;
-}
 	if(ntask_override)
 		m->ntask = ntask_override;
 	else
@@ -657,14 +654,7 @@ if(n > 4){
 		m->ntask = 1;
 	m->lastup = time(0);
 
-	DPRINT(DEXE, "\tm->name=(%s)\n", m->name);
-	DPRINT(DEXE, "\tm->ntask=(%d)\n", m->ntask);
-	DPRINT(DEXE, "\tm->nchild=(%d)\n", m->nchild);
-	DPRINT(DEXE, "\tm->njobs=(%d)\n", m->njobs);
-	//DPRINT(DEXE, "\tm->devswap[Mem]=(%d)\n", m->devswap[Mem]);
-	//DPRINT(DEXE, "\tm->devswap[Maxmem]=(%d)\n", m->devswap[Maxmem]);
-	//DPRINT(DEXE, "\tm->devsysstat[Load]=(%d)\n", m->devsysstat[Load]);
-	//DPRINT(DEXE, "\tm->devsysstat[Idle]=(%d)\n", m->devsysstat[Idle]);
+	dprint_status(m, "initstatus:", 0);
 }
 
 static void
