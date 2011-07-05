@@ -477,6 +477,7 @@ fillstatbuf(Status *m, char *statbuf)
 	// what's going on...
 	dprint_status(m, "fillstatbuf (after refres)", 1);
 
+	rlock(&statslock);
 	bp+=snprint(bp, 17, "%-15.15s ", mystats.name);
 
 	readnum(0, bp, NUMSIZE, m->ntask, NUMSIZE);
@@ -492,6 +493,8 @@ fillstatbuf(Status *m, char *statbuf)
 	readnum(0, bp, NUMSIZE, m->devswap[Mem], NUMSIZE);
 	bp+=NUMSIZE;
 	readnum(0, bp, NUMSIZE, m->devswap[Maxmem], NUMSIZE);
+	runlock(&statslock);
+
 	bp+=NUMSIZE;
 	*bp = ' '; /* space at the end to help parse things */
 	bp++;
