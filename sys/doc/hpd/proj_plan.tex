@@ -1,0 +1,75 @@
+
+
+%##################################################
+%#
+%# This is a simple template for a GTD project
+%#
+%#                        (c) John (EBo) David 2005
+%#                             (ver) 0.1.1 - 050224
+%#
+%##################################################
+
+\documentclass{article}
+\usepackage{gtd}
+
+%\GTDsilent     % silently strip all GTD Actions and stuff from document
+
+%%% by default, citations in the document are off unless told
+%%% otherwise.  The following two macro's overide this for the
+%%% document
+%\GTDcitation   % turn all citations on
+%\GTDnocitation % turn all citations off
+
+\usepackage[left=2cm,top=2cm,right=2cm,nohead,nofoot]{geometry}
+
+\usepackage[colorlinks,plainpages=false]{hyperref}
+
+\usepackage{amsmath}
+\usepackage{natbib}
+
+%\usepackage[nonumberlist,acronym]{glossaries}
+%\newglossary[nlg]{symbols}{not}{ntn}{Symbols}
+%\makeglossaries
+%\loadglsentries[symbols]{\GTDUserHome/reference/symbols}
+%\loadglsentries{\GTDUserHome/reference/acronyms}
+%\loadglsentries{\GTDUserHome/reference/glossary}
+
+\begin{document}
+\GTDProject[proj=hpd]{A Plan 9 reimplementation of the Hierarchical
+  Patch Dynamics Modeling Platform}
+%  \title{TITLE} % the document title is pre-initialized with the
+                 % project title above.  This can be overwridden
+                 % using \title{}
+%  \author{}     % document author
+%  \date{}       % the date (default is set to today
+\maketitle
+
+\section*{Introduction}
+This is an example project...
+
+\section*{Basic Models}
+
+\section*{Properties}
+
+\section*{Evaluation}
+
+\Action[]{compare cost/benifit of using get/putenv}
+\Action[]{set up regression tests}
+
+\GTDUseBib{\GTDUserHome/reference/gtd.bib}
+\GTDBib[apalike]
+
+%\glsaddall
+%\printglossaries
+%\printglossary[title={Symbols},type={symbols}]
+%\printglossary[title={Acronyms},type={\acronymtype}]
+%\printglossary[title={Glossary}]
+
+\listActions
+\listPurchases
+\listContacts
+\listProjects
+
+\GTDoutput
+
+\end{document}

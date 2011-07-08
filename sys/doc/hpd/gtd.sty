@@ -1,0 +1,1341 @@
+%%
+%% This is file `gtd.sty',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% gtd.dtx  (with options: `package')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from gtd.sty.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file gtd.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{gtd}[2005/02/04 v0.5
+                      Track GTD items in your documents]
+
+\RequirePackage{keyval}
+\RequirePackage{textcomp}
+\RequirePackage{ifthen}
+\RequirePackage{calc}
+
+\def\GTDUserHome{$HOME/gtd}% $ the second dollar sign shuts up the highlighting
+\def\GTDSystemHome{/usr/share/gtd-2}
+
+\newcommand*\gtdlogo{\textsf{GTD}}
+
+\newcommand{\GTDProject}[2][]{%
+  \edef\@GTDProject@parent{}%
+  \edef\@GTDProject@subparent{}%
+%%% test remove %%%  \@ResetKeys{GTDProject}%
+  \@SetKeys{GTDProject}{#1}%
+  %
+  \@namedef{@GTDProject@name}{#2}%
+  \edef\@GTDProject@abriv@def{\@nameuse{@GTDProject@Key@proj}}%
+  \edef\@GTDProject@abriv{\@nameuse{@GTDProject@Key@proj}}%
+  %
+  \@SAVdoItemP[\@nameuse{@GTDProject@Key@cached}]%
+      {GTDProject}{}{\@GTDProject@abriv}{#2}%
+  \@SAVdoItem[\@nameuse{@GTDProject@Key@cached}]%
+      {GTDProject}{}{\@GTDProject@abriv}{#2}%
+  %
+  % setting the title (can be overwridden using \title{}
+  \title{#2}%
+  }
+
+
+\newcommand{\@ResetKeys}[1]{%
+  %%% reset the keys information
+  %\@namedef{@GTDItem@Key@precite}{}%  FIXME: need to reset this to
+  %                those defined in the (sub...)project
+  %\@namedef{@GTDItem@Key@postcite}{}%
+  \edef\@ncite{@nocite}%
+  \ifx\@ncite\@GTDProject@defaultCitation%
+    \@namedef{@#1@Key@hcite}{@nocite}% turn all citations off
+  \else
+    \ifx\@empty\@GTDProject@defaultCitation%
+      \@namedef{@#1@Key@hcite}{@nocite}% this is the default
+    \else
+      \@namedef{@#1@Key@hcite}{}% turn all citations on
+    \fi%
+  \fi
+  \@namedef{@#1@Key@cite}{}%
+  \@namedef{@#1@Key@proj}{}%
+  \@namedef{@#1@Key@status}{O}% status is open by default
+  %
+  \@namedef{@#1@Key@group}{}%
+  %
+  \@namedef{@#1@Key@due}{}%
+  \@namedef{@#1@Key@start}{}%
+  \@namedef{@#1@Key@end}{}%
+  \@namedef{@#1@Key@time}{}%
+  \@namedef{@#1@Key@duration}{}%
+  \@namedef{@#1@Key@followup}{}%
+  %
+  \@namedef{@#1@Key@waiting}{}%
+  \@namedef{@#1@Key@delegated}{}%
+  %
+  \@namedef{@#1@Key@ref}{}%
+  \@namedef{@#1@Key@location}{}%
+  \@namedef{@#1@Key@next}{}%
+  \@namedef{@#1@Key@nextp}{}%
+  %
+  \@namedef{@#1@Key@project}{}%
+  %
+  \@namedef{@#1@Key@who}{}%
+  \@namedef{@#1@Key@where}{}%
+  \@namedef{@#1@Key@cost}{}%
+  %
+  \@namedef{@#1@Key@filter}{}%
+  \@namedef{@#1@Key@format}{}%
+}%
+
+\newcommand{\@SetCache}[2]{% {group}{var_name}
+  \edef\@tmpa{\@nameuse{@#1@Key@#2}}%
+  \ifx\@empty\@tmpa\else%
+      \expandafter\g@addto@macro\csname%
+      @#1@Key@cached\endcsname{,#2=\@nameuse{@#1@Key@#2}}%
+  \fi%
+}%
+
+%%% take a look at: http://docs.miktex.org/manual/texfeatures.html
+%%%  for Piped Input and Output and more on write18
+\newcommand{\osExecuteCommand}[1]{%
+  \bgroup\immediate\write18{(#1)}\egroup}
+
+\newcommand{\osRemove}[2][-f]{%
+  \bgroup\immediate\write18{(rm #1 #2)}\egroup}
+
+\newread\@execfile%
+\newcommand{\osExecuteAndSet}[3][\jobname.exec]{% tmp_file variable command
+  \bgroup\@sanitize%
+  %
+  \osExecuteCommand{(#3)>#1}%\immediate\write18{(#3)>#1}%
+  %
+  \immediate\openin\@execfile=#1%
+  \endlinechar=-1 \read\@execfile to \@exec%
+  \immediate\closein\@execfile%
+  %
+  \global\edef#2{\@exec}%
+  %
+  \osRemove{#1}% \immediate\write18{rm #1}%
+  \egroup%
+}
+
+\newcommand{\osReadAndSet}[2]{% in_file variable
+  \bgroup\@sanitize%
+  %
+  \immediate\openin\@execfile=#1%
+  \endlinechar=-1 \read\@execfile to \@exec%
+  \immediate\closein\@execfile%
+  %
+  \global\edef#2{\@exec}%
+  %
+  \egroup%
+}
+
+\newcommand{\osReadItems}[1]{% in_file variable
+  \bgroup\@sanitize%
+  %
+\input{#1}%
+  \@namedef{@GTDoutput@cached}{\@exec}%
+  %
+  \egroup%
+}
+
+
+\edef\@MaxNext{99999}
+\edef\@GTDProject@abriv{DEF}
+\edef\@GTDProject@abriv@def{DEF}
+\edef\@GTDProject@parent{}%
+\edef\@GTDProject@subparent{}%
+
+\newcommand{\@SetKeys}[2]{%
+  % reset some of the keys to their project defs
+  \@ResetKeys{#1}%
+  %
+  \@namedef{@#1@Key@cached}{group=#1}%
+  \setkeys{@#1@Keys}{#2}%
+  %
+  \edef\@tproj{\@nameuse{@#1@Key@proj}}%
+  \ifx \@empty\@tproj%
+    \edef\@tproj{\@GTDProject@abriv}%
+    \ifx \@empty\@tproj \else%
+      \expandafter\g@addto@macro\csname%
+          @#1@Key@cached\endcsname{,proj=\@tproj}%
+    \fi%
+  \else%
+    \expandafter\g@addto@macro\csname%
+        @#1@Key@cached\endcsname{,proj=\@tproj}%
+  \fi%
+  %
+  \@SetCache{#1}{next}%
+  \@SetCache{#1}{nextp}% to track project level next
+  \@SetCache{#1}{status}%
+  \@SetCache{#1}{cite}%
+  %\@SetCache{#1}{cite}%
+  \@SetCache{#1}{due}%
+  \@SetCache{#1}{start}%
+  \@SetCache{#1}{end}%
+  \@SetCache{#1}{time}%
+  \@SetCache{#1}{duration}%
+  \@SetCache{#1}{followup}%
+  \@SetCache{#1}{waiting}%
+  \@SetCache{#1}{delegated}%
+  \@SetCache{#1}{ref}%
+  \@SetCache{#1}{who}%
+  \@SetCache{#1}{where}%
+  \@SetCache{#1}{cost}%
+  \@SetCache{#1}{filter}%
+  \@SetCache{#1}{format}%
+  \@SetCache{#1}{location}%
+  %
+  % set the default location
+%%% GOOD %%%   \edef\@tloc{\@nameuse{@#1@Key@location}}%
+%%% GOOD %%%   \ifx \@empty\@tloc%
+%%% GOOD %%% \def\PWD{\begingroup\@verbatim\input\jobname.dir\endgroup}%
+%%% GOOD %%%     \@namedef{@#1@Key@location}{\PWD
+%%% GOOD %%%    \ifx \@empty\@tloc \else%
+%%% GOOD %%%      \expandafter\g@addto@macro\csname%
+%%% GOOD %%%        @#1@Key@cached\endcsname{,location=\PWD}%
+%%% GOOD %%%    \fi%
+%%% GOOD %%%  \else%
+%%% GOOD %%%    \expandafter\g@addto@macro\csname%
+%%% GOOD %%%      @#1@Key@cached\endcsname{,location=\PWD}%
+%%% GOOD %%%  \fi%
+  %
+  % if the location was not specified assume that it is the current
+  % directory
+  \edef\@tmpa{#1}%
+  \edef\@tmpb{GTDProject}%
+  \ifx \@tmpa\@tmpb%
+    % FIXME: this is part of the location hack...
+    \osExecuteAndSet{\SOMETHING}{pwd}%
+    \expandafter\g@addto@macro\csname%
+      @#1@Key@cached\endcsname{,location=%
+        \SOMETHING%
+      }%
+    %
+  \fi%
+  %%% make sure that the next project counter is set appropriately
+  \@namedef{@#1@Key@nextp}{\@nameuse{@GTDProject@Key@next}}%
+  \edef\@tmpa{\@nameuse{@GTDProject@Key@next}}
+  \ifx\@empty\@tmpa\else%
+    \expandafter\g@addto@macro\csname%
+      @#1@Key@cached\endcsname{,nextp=\@nameuse{@#1@Key@nextp}}%
+  \fi%
+}%
+
+\newcommand{\GTDDefineGroup}[2][]{% keys, group
+  % predefine the group keys so we can use them here
+  \@DefineKeys{#2}
+
+  % Define the base group and counter
+  \@namedef{@#2}{}
+  \@definecounter{@#2@cnt}
+
+  % get the keys.
+  \@SetKeys{#2}{#1}%
+}%
+
+\newcommand{\@DefineKeys}[1]{%
+  \@namedef{@#1@Key@precite}{}%
+  \@namedef{@#1@Key@postcite}{}%
+   %%% Pre/Post Citemark
+   \define@key{@#1@Keys}{precite}{\@namedef{@#1@Key@precite}{##1}}%
+   \define@key{@#1@Keys}{postcite}{\@namedef{@#1@Key@postcite}{##1}}%
+   \define@key{@#1@Keys}{cite}[]{%
+      \@namedef{@#1@Key@cite}{##1}%
+      % skip the citations
+      \edef\@ncite{@nocite}%
+      \ifx\@ncite\@GTDProject@defaultCitation%
+        \@namedef{@#1@cite}{}%
+        \@namedef{@#1@Key@hcite}{@nocite}%
+      \else%
+        % FIXME: If the cite field is empty (ie cite=) then set
+        % cite it by counter.  (note: nocite is on by default)
+        \ifx\@empty##1%
+          \@namedef{@#1@Key@hcite}{@nocite}%
+        \else%
+          \@namedef{@#1@Key@hcite}{##1}%
+        \fi%
+      \fi%
+   }%
+   \define@key{@#1@Keys}{output}{}%
+   \define@key{@#1@Keys}{nooutput}{}%
+   \define@key{@#1@Keys}{nocite}[]{%
+     \@namedef{@#1@cite}{}%
+     \@namedef{@#1@Key@hcite}{@nocite}}%
+   %
+   %%% Project reference:
+   \define@key{@#1@Keys}{proj}{%
+     %\gdef\@tmpa{\@GTDProject@parent}%
+     %\edef\@tmpa{}%
+     \ifx\@empty\@GTDProject@subparent%
+       \ifx\@empty\@GTDProject@parent%
+         \@namedef{@#1@Key@proj}{##1}%
+       \else
+         \edef\@tmpp{\@GTDProject@parent:##1}
+         \@namedef{@#1@Key@proj}{\@tmpp}%
+       \fi
+     \else
+         \edef\@tmpp{\@GTDProject@subparent:##1}
+         SUBPARENT(\@tmpp) \@namedef{@#1@Key@proj}{\@tmpp}%
+     \fi
+   }%
+   %
+   %%% Status: C/T/O FIXME: what was W supposed to do
+   \define@key{@#1@Keys}{status}{%
+     \@namedef{@#1@Key@status}{##1}%
+     \ifx ##1C%
+     \else\ifx ##1T%
+     \else\ifx ##1O%
+     % check to see if we need to change to uppercase
+     \else\ifx ##1c\@namedef{@#1@Key@status}{C}%
+     \else\ifx ##1t\@namedef{@#1@Key@status}{t}%
+     \else\ifx ##1o\@namedef{@#1@Key@status}{o}%
+     % errors
+     \else%
+       \PackageError{\gtd}{Item status of `##1' is undefined (CTO).}%
+     \fi\fi\fi\fi\fi\fi}%
+   %
+   %%% handle groups
+   \define@key{@#1@Keys}{group}{\@namedef{@#1@Key@group}{##1}}%
+   %
+   %%% Time/date related keys:
+   \define@key{@#1@Keys}{due}{\@namedef{@#1@Key@due}{##1}}%
+   \define@key{@#1@Keys}{start}{\@namedef{@#1@Key@start}{##1}}%
+   \define@key{@#1@Keys}{end}{\@namedef{@#1@Key@end}{##1}}%
+   \define@key{@#1@Keys}{time}{\@namedef{@#1@Key@time}{##1}}%
+   \define@key{@#1@Keys}{duration}{\@namedef{@#1@Key@duration}{##1}}%
+   \define@key{@#1@Keys}{followup}{%
+     \@namedef{@#1@Key@followup}{##1}%
+   }%
+   %
+   %%% This is currently considered the next item
+   \define@key{@#1@Keys}{next}[]{%
+     \edef\@tmpa{##1}%
+      \ifx\@empty\@tmpa%
+        \@namedef{@#1@Key@next}{\@MaxNext}%
+      \else%
+        \@namedef{@#1@Key@next}{##1}%
+      \fi%
+     }%
+   %
+   %%% This is currently considered the next project item
+   \define@key{@#1@Keys}{nextp}[]{%
+     \edef\@tmpa{##1}%
+      \ifx\@empty\@tmpa%
+        \@namedef{@#1@Key@nextp}{\@MaxNext}%
+      \else%
+        \@namedef{@#1@Key@nextp}{##1}%
+      \fi%
+     }%
+   %
+   %%% delay/waiting
+   \define@key{@#1@Keys}{delegated}{\@namedef{@#1@Key@delegated}{##1}}%
+   \define@key{@#1@Keys}{waiting}{\@namedef{@#1@Key@waiting}{##1}}%
+   %
+   %%% the citation reference number
+   \define@key{@#1@Keys}{ref}{\@namedef{@#1@Key@ref}{##1}}%
+   %
+   %%% the project location
+   \define@key{@#1@Keys}{location}{\@namedef{@#1@Key@location}{##1}}%
+   %
+   %%% the title -- used by (sub)project
+   \define@key{@#1@Keys}{project}{\@namedef{@#1@Key@project}{##1}}%
+   %
+   %%% who is to be contacted/responsible
+   \define@key{@#1@Keys}{who}{\@namedef{@#1@Key@who}{##1}}%
+   %
+   %%% where is the item to be done (context?)
+   \define@key{@#1@Keys}{where}{\@namedef{@#1@Key@where}{##1}}%
+   %
+   %%% cost of item/action
+   \define@key{@#1@Keys}{cost}{\@namedef{@#1@Key@cost}{##1}}%
+   %
+   %%% the format to be used for this item
+   \define@key{@#1@Keys}{format}{\@namedef{@#1@Key@format}{##1}}%
+   %
+   %%% the filter to be used for this item
+   \define@key{@#1@Keys}{filter}{\@nameuse{##1}}% run this filter here
+
+   %
+   \define@key{@#1@Keys}{hide}[]{\@namedef{hide@##1}{skip}}%
+   \define@key{@#1@Keys}{show}[]{\@namedef{hide@##1}{}}%
+}%
+
+\newcommand{\GTDsilent}{\@namedef{@GTDProject@silent}{skip}}%
+\newcommand{\GTDnosilent}{\@namedef{@GTDProject@silent}{}}%
+
+\newcommand{\GTDreread}{\@namedef{@GTDProject@reread}{skip}}%
+\newcommand{\GTDnoreread}{\@namedef{@GTDProject@reread}{}}%
+\@namedef{@GTDProject@reread}{}
+
+\newcommand{\GTDcitation}{\def\@GTDProject@defaultCitation{@cite}}%
+\newcommand{\GTDnocitation}{\def\@GTDProject@defaultCitation{@nocite}}%
+
+\@namedef{@GTDProject@defaultCitation}{} % let the command line decide
+
+\@namedef{@GTDSubProject@abriv}{DEF}%
+\@namedef{@GTDSubProject@abriv@def}{DEF}%
+\newcommand{\GTDSubProject}[2][]{%
+  \edef\@GTDProject@parent{\@nameuse{@GTDProject@Key@proj}}%
+  \edef\@GTDProject@subparent{}%
+  %
+  \@SetKeys{GTDProject}{#1}%
+  %
+  \@namedef{@GTDSubProject@name}{#2}%
+  \edef\@GTDSubProject@abriv@def{\@nameuse{@GTDProject@Key@proj}}%
+  \edef\@GTDSubProject@abriv{\@GTDSubProject@abriv@def}%
+  \edef\@GTDProject@abriv{\@GTDSubProject@abriv@def}%
+  %
+  \@SAVdoItemP[\@nameuse{@GTDProject@Key@cached}]%
+      {GTDProject}{}{\@GTDSubProject@abriv}{#2}%
+  \@SAVdoItem[\@nameuse{@GTDProject@Key@cached}]%
+      {GTDProject}{}{\@GTDSubProject@abriv}{#2}%
+  }%
+
+\edef\@GTDSubSubProject@abriv{DEF}%
+\edef\@GTDSubSubProject@abriv@def{DEF}%
+\newcommand{\GTDSubSubProject}[2][]{%
+%%% test remove %%%  \@ResetKeys{GTDItem}%
+  \edef\@GTDProject@subparent{\@nameuse{@GTDProject@Key@proj}}%
+  %
+  \@SetKeys{GTDProject}{#1}%
+  %
+  \@namedef{@GTDSubSubProject@name}{#2}%
+  \edef\@GTDSubSubProject@abriv@def{\@nameuse{@GTDProject@Key@proj}}%
+  \edef\@GTDSubSubProject@abriv{\@GTDSubSubProject@abriv@def}%
+  \edef\@GTDProject@abriv{\@GTDSubSubProject@abriv@def}%
+  %
+  \@SAVdoItemP[\@nameuse{@GTDProject@Key@cached}]%
+      {GTDProject}{}{\@GTDSubSubProject@abriv}{#2}%
+  \@SAVdoItem[\@nameuse{@GTDProject@Key@cached}]%
+      {GTDProject}{}{\@GTDSubSubProject@abriv}{#2}%
+  }%
+
+
+\def\makebib #1{\checkbib #1.bib\\}
+\def\checkbib #1.bib#2\\{#1.bib}
+
+
+\def\GTDUserBib{}%
+\def\GTDSystemBib{\GTDSystemHome/reference/gtd}%
+\def\GTDOtherBib{}%
+\newcommand{\GTDUseBib}[1]{%
+  %  \edef\tmpa{\makebib{#1}}
+  %  \def\tmpb{#1}
+  %  \ifx\tmpa\tmpb\then% <extension was already .bib>
+  %
+  \IfFileExists{#1}
+    {\ifx\@empty\GTDOtherBib\else\g@addto@macro\GTDOtherBib{,}\fi%
+      \g@addto@macro\GTDOtherBib{#1}}%
+    {\IfFileExists{#1.bib}
+       { \ifx\@empty\GTDOtherBib\else\g@addto@macro\GTDOtherBib{,}\fi%
+         \g@addto@macro\GTDOtherBib{#1}}%
+       {\message{****************************************}%
+        \message{WARNING: missing Bib file: "#1" skipping}%
+        \message{****************************************}%
+       }%
+    }%
+}
+
+\newcommand{\GTDBib}[1][plain]{%
+  \bibliographystyle{#1}%
+  %
+  \@namedef{@biblist}{}%
+  %
+  \IfFileExists{\GTDUserBib.bib}%
+               {\ifx\@empty\GTDUserBib\else%
+                 \g@addto@macro\@biblist{\GTDUserBib}\fi}%
+               {}%
+  \IfFileExists{\GTDSystemBib.bib}%
+               {\ifx\@empty\@biblist\else\g@addto@macro\@biblist{,}\fi%
+                 \g@addto@macro\@biblist{\GTDSystemBib}}%
+               {}%
+  %
+  \ifx\@empty\GTDOtherBib\else%
+    \ifx\@empty\@biblist\else\g@addto@macro\@biblist{,}\fi%
+    \g@addto@macro\@biblist{\GTDOtherBib}%
+  \fi%
+  %
+  \bibliography{\@biblist}%
+}%
+
+\newcommand{\listGTDFile}[4][Default:]{%
+  \edef\@tmpa{\@nameuse{hide@#2}}%
+  \ifx\@empty\@tmpa\else%
+    \setcounter{@num@action@cnt}{0}%
+    \setcounter{@num@contact@cnt}{0}%
+    \setcounter{@num@note@cnt}{0}%
+    \setcounter{@num@purchase@cnt}{0}%
+    %
+    \@theItems[#1]{\@nameuse{@#2}}{#2}%
+    \@namedef{GTDFilter@group}{#2}%
+    \@namedef{GTDFilter@filter}{#3}%
+    %
+    \@input{#4}%
+  \fi%
+  }%
+
+\newcount\@numfilter@cnt%
+\newcount\@numfilter@first%
+\newcount\@numfilter@last% FIXME: duplicate -- remove
+\@numfilter@cnt\number0\relax%
+\@numfilter@first\number0\relax%
+\@numfilter@last\number\@MaxNext\relax%
+
+\@namedef{@output@type}{}%
+
+\newcount\@tmp@v%
+\newcommand{\listGTDItems}[3][Default:]{% list_title, group, filter
+  %
+  % skip printing out this group if it is emty...
+  \ifnum\value{@#2@cnt} > 0%
+    \GTDoutput[\jobname.tmp]%
+    \listGTDFile[#1]{#2}{#3}{\jobname.tmp}%
+    \osRemove{\jobname.tmp}%
+  \fi%
+}%
+
+\newcommand{\GTDItem}[3][]{% keys, group, message
+  \edef\@tmpa{\@nameuse{hide@#2}}%
+  \edef\@tmpb{\@nameuse{@GTDProject@silent}}%
+  \edef\@tmpc{skip}%
+  \ifx \@tmpa\@tmpc \else \ifx \@tmpb\@tmpc \else%
+    \begingroup%
+      %%% Make the cite mark. and the items
+      \stepcounter{@#2@cnt}%
+      \stepcounter{@GTDItems@cnt}%
+      %
+      % now get the item attributes
+      %
+      % note: both the specified group AND the GTDItem helper group
+      %   keys are set.  This simplfies writing the filters to
+      %   address the generic group instead of each specific one.
+      %
+      \@SetKeys{GTDItem}{#1}%
+      \@SetKeys{#2}{#1}%
+      %
+      \edef\@hcite{\@nameuse{@GTDItem@Key@hcite}}%
+      \edef\@ccite{\@nameuse{@GTDProject@cite}}%
+      \edef\@ncite{@nocite}%
+      \ifx \@ncite\@ccite% citations are turned off
+        \protected@edef\@thecitemark{%
+          \@nameuse{@#2@Key@precite}%
+          \arabic{@#2@cnt}%
+          \@nameuse{@#2@Key@postcite}}%
+      \else \ifx \@ncite\@hcite% this cite is to be skipped
+        \protected@edef\@thecitemark{%
+          \@nameuse{@#2@Key@precite}%
+          \arabic{@#2@cnt}%
+          \@nameuse{@#2@Key@postcite}}%
+      \else \ifx \@empty\@hcite% cite item in text by counter
+        \protected@edef\@thecitemark{%
+          \@nameuse{@#2@Key@precite}%
+          \arabic{@#2@cnt}%
+          \@nameuse{@#2@Key@postcite}}%
+        \makecitemark%
+      \else% the citemark is specifically given, so use that
+        \protected@edef\@thecitemark{%
+          \@nameuse{@#2@Key@precite}%
+          \@hcite%
+          \@nameuse{@#2@Key@postcite}}%
+        \makecitemark%
+      \fi\fi\fi%
+      %
+      %%% now mark it
+      %
+      \edef\@tmpa{\@nameuse{@#2@Key@next}}%
+      \edef\@tmpb{\@MaxNext}%
+      \ifx\@tmpa\@tmpb %
+        \@SAVdoItemN[\@nameuse{@#2@Key@cached}]{#2}{}{\@GTDProject@abriv:%
+          \@thecitemark}{#3}%
+        \@SAVdoItem[\@nameuse{@#2@Key@cached}]{#2}{}{\@GTDProject@abriv:%
+          \@thecitemark}{#3}%
+      \else%
+        \edef\@tmpa{\@nameuse{@#2@Key@next}}%
+        \edef\@tmpb{}%
+        \ifx\@tmpa\@tmpb %
+          \@SAVdoItemA[\@nameuse{@#2@Key@cached}]{#2}{}{\@GTDProject@abriv:%
+            \@thecitemark}{#3}%
+          \@SAVdoItem[\@nameuse{@#2@Key@cached}]{#2}{}{\@GTDProject@abriv:%
+            \@thecitemark}{#3}%
+        \else%
+          \@SAVdoItemNN[\@nameuse{@#2@Key@cached}]{#2}{}{\@GTDProject@abriv:%
+            \@thecitemark}{#3}%
+          \@SAVdoItem[\@nameuse{@#2@Key@cached}]{#2}{}{\@GTDProject@abriv:%
+            \@thecitemark}{#3}%
+        \fi%
+      \fi%
+    \endgroup%
+    \fi\fi%
+}%
+
+\def\@makecitemark{\hbox{\@textsuperscript{\normalfont\@thecitemark~}}}%
+\def\makecitemark{\@makecitemark}%
+\def\thecitemark{\@thecitemark}%
+\def\@thecitemark{}%
+
+\def\@preItemFMT{%
+  %%% what to do before the item is printed
+  \edef\@tmpa{\@nameuse{@GTDItem@Key@group}}%
+  \edef\@tmpb{GTDProject}%
+  \ifx \@tmpa\@tmpb%
+
+    \noindent
+  \fi%
+}
+\newcommand{\GTDFormatPreItem}[1]{\def\@preItemFMT{#1}}
+
+\def\@statusFMT{%
+   %%% Status: C/T/O
+  {\textbf [%
+      \ifx \@GTDItem@Key@delegated\@empty%
+        \ifx \@GTDItem@Key@waiting\@empty%
+          % write out a blank in the status line iff it is open AND not
+          % waiting for something
+          \def\@tmpa{O}
+          \ifx \@tmpa\@GTDItem@Key@status%
+            ~~%
+          \else%
+            \@nameuse{@GTDItem@Key@status}%
+          \fi%
+        \else W\fi%
+      \else D\fi%
+      ]%
+  }%
+}
+\newcommand{\GTDFormatStatus}[1]{\def\@statusFMT{#1}}
+
+\def\@nextFMT{%
+   %%% Status: C/T/O
+  \ifx \@GTDItem@Key@next\@empty\else%
+    \ifx \@GTDItem@Key@next\@MaxNext%
+       {\textbf (Next:*) }%
+    \else%
+       {\textbf (Next:\@nameuse{@GTDItem@Key@next}) }%
+    \fi%
+  \fi%
+}
+\newcommand{\GTDFormatNext}[1]{\def\@nextFMT{#1}}
+
+\def\@dueFMT{%
+  \ifx \@GTDItem@Key@due\@empty\else%
+       {\textbf (Due:\@nameuse{@GTDItem@Key@due}) }\fi%
+}
+\newcommand{\GTDFormatDue}[1]{\def\@dueFMT{#1}}
+
+\def\@startFMT{%
+  \ifx \@GTDItem@Key@start\@empty\else%
+       {\textbf (Start:\@nameuse{@GTDItem@Key@start}) }\fi%
+}
+\newcommand{\GTDFormatStart}[1]{\def\@startFMT{#1}}
+
+\def\@endFMT{%
+  \ifx \@GTDItem@Key@end\@empty\else%
+       {\textbf (End:\@nameuse{@GTDItem@Key@end}) }\fi%
+}
+\newcommand{\GTDFormatEnd}[1]{\def\@endFMT{#1}}
+
+\def\@timeFMT{%
+  \ifx \@GTDItem@Key@time\@empty\else%
+       {\textbf (Time:\@nameuse{@GTDItem@Key@time}) }\fi%
+}
+\newcommand{\GTDFormatTime}[1]{\def\@timeFMT{#1}}
+
+\def\@durationFMT{%
+  \ifx \@GTDItem@Key@duration\@empty\else%
+       {\textbf (Duration:\@nameuse{@GTDItem@Key@duration}) }\fi%
+}
+\newcommand{\GTDFormatDuration}[1]{\def\@durationFMT{#1}}
+
+\def\@followupFMT{%
+  \ifx \@GTDItem@Key@followup\@empty\else%
+       {\textbf (Followup:\@nameuse{@GTDItem@Key@followup}) }\fi%
+}
+\newcommand{\GTDFormatFollowup}[1]{\def\@followupFMT{#1}}
+
+\def\@delegatedFMT{%
+  \ifx \@GTDItem@Key@delegated\@empty\else%
+       {\textbf (Delegated:\@nameuse{@GTDItem@Key@delegated}) }\fi%
+}
+\newcommand{\GTDFormatDelegated}[1]{\def\@delegatedFMT{#1}}
+
+\def\@waitingFMT{%
+  \ifx \@GTDItem@Key@waiting\@empty\else%
+       {\textbf (Waiting:\@nameuse{@GTDItem@Key@waiting}) }\fi%
+}
+\newcommand{\GTDFormatWaiting}[1]{\def\@waitingFMT{#1}}
+
+\def\@refFMT{%
+  \ifx \@GTDItem@Key@ref\@empty\else%
+       {\textbf (Ref:\@nameuse{@GTDItem@Key@ref}) }\fi%
+}
+\newcommand{\GTDFormatRef}[1]{\def\@refFMT{#1}}
+
+\def\@whoFMT{%
+  \ifx \@GTDItem@Key@who\@empty\else%
+       {\textbf (Who:\@nameuse{@GTDItem@Key@who}) }\fi%
+}
+\newcommand{\GTDFormatWho}[1]{\def\@whoFMT{#1}}
+
+\def\@whereFMT{%
+  \ifx \@GTDItem@Key@where\@empty\else%
+       {\textbf (Where:\@nameuse{@GTDItem@Key@where}) }\fi%
+}
+\newcommand{\GTDFormatWhere}[1]{\def\@whereFMT{#1}}
+
+\def\@costFMT{%
+  \ifx \@GTDItem@Key@cost\@empty\else%
+       {\textbf (Cost:\@nameuse{@GTDItem@Key@cost}) }\fi%
+}
+\newcommand{\GTDFormatCost}[1]{\def\@costFMT{#1}}
+
+\def\@locationFMT{%
+  \ifx \@GTDItem@Key@location\@empty\else%
+       {\textbf (Location:\@nameuse{@GTDItem@Key@location})\\ }\fi%
+}
+\newcommand{\GTDFormatLocation}[1]{\def\@locationFMT{#1}}
+
+\def\@bodyFMT#1{#1\\}
+\newcommand{\GTDFormatBody}[1]{\def\@bodyFMT{#1}}
+
+\def\CitemarkFormat#1{\protected@edef\@thecitemark{#1}}%
+\def\HeaderFormat#1{#1}%
+\def\ItemFormat#1#2{%
+  %
+  %%% what to do before the item
+  \@preItemFMT%
+  %
+  %%% Status: C/T/O
+  \@statusFMT%
+  %
+  %%% now write out the citation
+  {\textbf(#1):} % used to be CitemarkFormat...
+  %%% next...
+  \@nextFMT
+  %
+  %%% Time/date related keys:
+  \@dueFMT
+  \@startFMT
+  \@endFMT
+  \@timeFMT
+  \@durationFMT
+  \@followupFMT
+  %
+  %%% delegated
+  \@delegatedFMT
+  %
+  %%% delay/waiting
+  \@waitingFMT
+  %
+  %%% the citation reference number
+  \@refFMT
+  %
+  %%% who is to be contacted/responsible
+  \@whoFMT
+  %
+  %%% where is the item to be done (context?)
+  \@whereFMT
+  %
+  %%% cost of item/action
+  \@costFMT
+  %
+  %%% FIXME: still need to do:  format? output?
+  %
+  \@bodyFMT{#2}
+  %%% the project location (default current directory)
+  % printing at the end interferes least with the info
+  \@locationFMT
+  %
+}%
+
+%%%%%%%%%%%%%%%%%%%%%%%%% GTD Specialization %%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\listProjects}[1][Projects:]
+   {\listGTDFile[#1]{GTDProject}{\ProjectFilter}{\jobname.gtd}}
+
+\newcommand{\Action}[2][]{\GTDItem[#1]{GTDActions}{#2}}%
+
+
+\newcommand{\listActions}[1][Actions:]%
+  {\listGTDItems[#1]{GTDActions}{\GroupOnlyItemFilter}}%
+
+\newcommand{\listNextActions}[1][Next Actions:]%
+  {\listGTDItems[#1]{GTDActions}%
+    {\GroupOnlyItemFilter\NextFilter\StatusNotCItemFilter}}%
+
+\newcommand{\listSortedNextActions}[1][Sorted Next Actions:]{%
+  %\IfFileExists{\jobname.srt}{}{\GTDSort}%
+  \GTDSort[\jobname.srt]%
+  \listGTDFile[#1]%
+    {GTDActions}%
+    {\GroupOnlyItemFilter\NextFilter\StatusNotCItemFilter}%
+    {\jobname.srt}%
+    \osRemove{\jobname.srt}%
+}%
+
+\newcommand{\listOpenActions}[1][Open Actions:]%
+  {\listGTDItems[#1]{GTDActions}{\GroupOnlyItemFilter\StatusNotCItemFilter}}%
+
+\newcommand{\listDelegatedActions}[1][Delegated To:]%
+  {\listGTDItems[#1]{GTDActions}{\GroupOnlyItemFilter\DelegatedToFilter}}%
+
+\newcommand{\listWaintingForActions}[1][Waiting For:]%
+  {\listGTDItems[#1]{GTDActions}{\GroupOnlyItemFilter\WaintingForFilter}}%
+
+\newcommand{\listFollowupActions}[1][Followup:]%
+  {\listGTDItems[#1]{GTDActions}{\GroupOnlyItemFilter\FollowupFilter}}%
+
+\newcommand{\listFirstNextActions}[2][First Next Actions:]{%
+  %\IfFileExists{\jobname.srt}{}{\GTDSort}
+  \GTDSort[\jobname.srt]%
+  \listGTDFile[#1]%
+    {GTDActions}%
+    {\NFilter{next}{\GroupOnlyItemFilter\NextFilter\StatusNotCItemFilter}{#2}}%
+    {\jobname.srt}%
+    \osRemove{\jobname.srt}%
+ }%
+
+\newcommand{\listFirstNextProjects}[2][First Next Projects:]{%
+  %%\IfFileExists{\jobname.srt}{}{\GTDSort}
+  %\IfFileExists{auto.gtc}{}{\GTDSort}
+  \GTDSort[\jobname.srt]%
+  \listGTDFile[#1]%
+    {GTDProject}%
+    {\NFilter{next}{\GroupOnlyItemFilter\NextFilter\StatusNotCItemFilter}{#2}}%
+    {auto.gtc}%
+    \osRemove{\jobname.srt}%
+  }%
+
+\newcommand{\Purchase}[2][]{\GTDItem[#1]{GTDPurchases}{#2}}%
+\newcommand{\listPurchases}[1][Purchases:]%
+    {\listGTDItems[#1]{GTDPurchases}{\GroupOnlyItemFilter}}%
+
+\newcommand{\Refrence}[2][]{\GTDItem[#1]{GTDRefrences}{#2}}%
+\newcommand{\listRefrences}[1][Refrences:]%
+    {\listGTDItems[#1]{GTDRefrences}{\GroupOnlyItemFilter}}%
+
+\newcommand{\Contact}[2][]{\GTDItem[#1]{GTDContacts}{#2}}%
+\newcommand{\listContacts}[1][Contacts:]%
+    {\listGTDItems[#1]{GTDContacts}{\GroupOnlyItemFilter}}%
+
+\newcommand{\Note}[2][]{\GTDItem[#1]{GTDNotes}{#2}}%
+\newcommand{\listNotes}[1][Notes:]%
+    {\listGTDItems[#1]{GTDNotes}{\GroupOnlyItemFilter}}%
+
+\newcommand{\listNested}[1][Nested:]{%
+    \listGTDItems[#1]{GTDActions}{%
+        \NumNoteFilter\NumPurchaseFilter\NumContactFilter%
+        \NumActionFilter\NumProjectFilter}}%
+
+\newcommand{\listNestedNotCompleted}[1][Nested Not Completed:]{%
+    \listGTDItems[#1]{GTDActions}{%
+        \NumNoteFilter\NumPurchaseFilter\NumContactFilter%
+        \NumActionFilter\NumProjectFilter%
+        \StatusNotCItemFilter
+    }}%
+
+\newcommand{\listSortedNestedNotCompleted}%
+           [1][Sorted Nested NextNot Completed:]{%
+  \GTDSort[\jobname.srt]%
+  \listGTDFile[#1]%
+    {GTDActions}%
+    {\StatusNotCItemFilter%
+     \NumNoteFilter\NumPurchaseFilter%
+     \NumContactFilter\NumActionFilter\NumProjectFilter}%
+    {\jobname.srt}%
+    \osRemove{\jobname.srt}%
+}%
+
+\GTDDefineGroup[]{GTDItem}%
+\GTDDefineGroup[]{GTDProject}%
+\GTDDefineGroup[]{GTDSubProject}%
+\GTDDefineGroup[]{GTDSubSubProject}%
+\GTDDefineGroup[postcite=A]{GTDActions}%
+\GTDDefineGroup[postcite=P]{GTDPurchases}%
+\GTDDefineGroup[postcite=R]{GTDRefrences}%
+\GTDDefineGroup[postcite=C]{GTDContacts}%
+\GTDDefineGroup[postcite=N]{GTDNotes}%
+
+\def\cmpeqval#1#2#3#4{% if ref(#1)==val(#2) then #3 else #4)%
+  \edef\@tmpa{\@nameuse{#1}}%
+  \edef\@tmpb{#2}%
+  \ifx\@tmpa\@tmpb #3\else #4\fi%
+  }%
+\def\cmpneqval#1#2#3#4{% if ref(#1)!=val(#2) then #3 else #4)%
+  \edef\@tmpa{\@nameuse{#1}}%
+  \edef\@tmpb{#2}%
+  \ifx\@tmpa\@tmpb #4\else #3\fi%
+  }%
+
+\@namedef{GroupOnlyItemFilter}{%
+  \cmpneqval{GTDFilter@group}{\@nameuse{GTDKey@group}}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{StatusCItemFilter}{%
+  \cmpneqval{@GTDItem@Key@status}{C}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+\@namedef{StatusNotCItemFilter}{%
+  \cmpeqval{@GTDItem@Key@status}{C}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{StatusTItemFilter}{%
+  \cmpneqval{@GTDItem@Key@status}{T}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+\@namedef{StatusNotTItemFilter}{%
+  \cmpeqval{@GTDItem@Key@status}{T}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{StatusWItemFilter}{%
+  \cmpneqval{@GTDItem@Key@status}{W}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+\@namedef{StatusNotWItemFilter}{%
+  \cmpeqval{@GTDItem@Key@status}{W}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{StatusOItemFilter}{%
+  \cmpneqval{@GTDItem@Key@status}{O}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+\@namedef{StatusNotOItemFilter}{%
+  \cmpeqval{@GTDItem@Key@status}{O}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{ProjectFilter}{%
+  \protected@edef\@thecitemark{\@nameuse{@GTDItem@Key@proj}}%
+  \@namedef{GTDFilter@group}{GTDProject}%
+  \GroupOnlyItemFilter%
+  }%
+
+\@namedef{ActionFilter}{%
+  \@namedef{GTDFilter@group}{GTDActions}%
+  \GroupOnlyItemFilter%
+  \protected@edef\@thecitemark{\@nameuse{@GTDItem@Key@proj}:ALL}%
+  }%
+
+\newcommand{\NextFilter}{%
+  \protected@edef\@thecitemark{%
+    \@nameuse{@GTDItem@Key@proj}\#\@nameuse{@GTDItem@Key@next}}%
+  \cmpeqval{@GTDItem@Key@next}{}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@definecounter{@num@action@cnt}
+\setcounter{@num@action@cnt}{0}
+\newcommand{\NumActionFilter}[1][\@num@actions]{%
+  \edef\@tmpb{false}%
+  \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+  \ifx\@tmpa\@tmpb%
+    \cmpeqval{@GTDItem@Key@group}{GTDActions}%
+      {%
+        \ifnum\value{@num@action@cnt} < \number#1%
+          \stepcounter{@num@action@cnt}%
+        \else%
+          \@namedef{GTDFilter@bool}{true}%
+        \fi%
+      }%
+      {}%
+  \fi%
+}
+
+\@definecounter{@num@purchase@cnt}
+\setcounter{@num@purchase@cnt}{0}
+\newcommand{\NumPurchaseFilter}[1][\@num@purchases]{%
+  \edef\@tmpb{false}%
+  \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+  \ifx\@tmpa\@tmpb%
+    \cmpeqval{@GTDItem@Key@group}{GTDPurchases}%
+      {%
+        \ifnum\value{@num@purchase@cnt} < \number#1%
+          \stepcounter{@num@purchase@cnt}%
+        \else%
+          \@namedef{GTDFilter@bool}{true}%
+        \fi%
+      }%
+      {}%
+  \fi%
+}
+
+\@definecounter{@num@note@cnt}
+\setcounter{@num@note@cnt}{0}
+\newcommand{\NumNoteFilter}[1][\@num@notes]{%
+  \edef\@tmpb{false}%
+  \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+  \ifx\@tmpa\@tmpb%
+    \cmpeqval{@GTDItem@Key@group}{GTDNotes}%
+      {%
+        \ifnum\value{@num@note@cnt} < \number#1%
+          \stepcounter{@num@note@cnt}%
+        \else%
+          \@namedef{GTDFilter@bool}{true}%
+        \fi%
+      }%
+      {}%
+  \fi%
+}
+
+\@definecounter{@num@contact@cnt}
+\setcounter{@num@contact@cnt}{0}
+\newcommand{\NumContactFilter}[1][\@num@contacts]{%
+  \edef\@tmpb{false}%
+  \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+  \ifx\@tmpa\@tmpb%
+    \cmpeqval{@GTDItem@Key@group}{GTDContacts}%
+      {%
+        \ifnum\value{@num@contact@cnt} < \number#1%
+          \stepcounter{@num@contact@cnt}%
+        \else%
+          \@namedef{GTDFilter@bool}{true}%
+        \fi%
+      }%
+      {}%
+  \fi%
+}
+
+\@definecounter{@num@project@cnt}
+\setcounter{@num@project@cnt}{0}
+\newcommand{\NumProjectFilter}[1][\expandafter\number\@num@projects]{%
+  \edef\@tmpb{false}%
+  \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+  \ifx\@tmpa\@tmpb%
+    \cmpeqval{@GTDItem@Key@group}{GTDProject}%
+      {%\ifnum\value{@num@project@cnt} < \number#1%
+          \stepcounter{@num@project@cnt}%\fi%
+      }%
+      {}%
+    %
+    % if the project counter is already to big then turn off all
+    % items too
+      % FIXME: check for off by one...
+    \ifnum\number#1 < \value{@num@project@cnt}%
+        \@namedef{GTDFilter@bool}{true}\fi%
+  \fi%
+}
+
+\newcounter{@numfilter@last}%
+\setcounter{@numfilter@last}{1}%
+\newcommand{\NFilter}[3]{% group, filter, number
+  \protected@edef\@thecitemark{%
+    \@nameuse{@GTDItem@Key@proj}\#\@nameuse{@GTDItem@Key@next}}%
+  #2%
+    \@numfilter@last\number#3\relax%
+    \advance\@numfilter@last\number-1%
+    \cmpeqval{@GTDItem@Key@next}{}%
+           {\@namedef{GTDFilter@bool}{true}}%
+           {%
+             \ifnum\@numfilter@cnt>\@numfilter@last%
+               \@namedef{GTDFilter@bool}{true}%
+             \else%
+               %(PASS)
+               \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+               \edef\@tmpb{true}%
+               \ifx \@tmpa\@tmpb \else%
+                 \advance\@numfilter@cnt\number1%
+               \fi%
+             \fi%
+          }%
+  }%
+
+\@namedef{WaitingForFilter}{%
+  \protected@edef\@thecitemark{%
+    \@nameuse{@GTDItem@Key@proj}\#\@nameuse{@GTDItem@Key@waiting}}%
+  \cmpeqval{@GTDItem@Key@waiting}{}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{NotWaitingForFilter}{%
+  \protected@edef\@thecitemark{%
+    \@nameuse{@GTDItem@Key@proj}\#\@nameuse{@GTDItem@Key@waiting}}%
+  \cmpneqval{@GTDItem@Key@waiting}{}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{DelegatedToFilter}{%
+  \protected@edef\@thecitemark{%
+    \@nameuse{@GTDItem@Key@proj}\#\@nameuse{@GTDItem@Key@delegated}}%
+  \cmpeqval{@GTDItem@Key@delegated}{}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\@namedef{FollowupFilter}{%
+  \protected@edef\@thecitemark{%
+    \@nameuse{@GTDItem@Key@proj}\#\@nameuse{@GTDItem@Key@followup}}%
+  \cmpeqval{@GTDItem@Key@followup}{}%
+            {\@namedef{GTDFilter@bool}{true}}{}}%
+
+\newcount\@tmp@scil\relax%
+\newcount\@tmp@scol\relax%
+\newcount\@tmp@scolZ\relax%
+\@namedef{@GTDoutput@ourdered@cached}{}%
+\newcommand{\GTDoutput}[1][\jobname.gtd]{%
+  \GTDfoutput[#1]{\@nameuse{@GTDoutput@cached}}}%
+
+\newwrite\@GTD@out%
+\newcommand{\GTDfoutput}[2][\jobname.gtd]{%
+  %\GTD@ensure@opened{#1}%
+  %
+  \GTDfoutputNEW[#1]{#2}{}{}{}%
+  }%
+
+\begingroup
+\catcode`_=\active
+\gdef\MakeUnderscoreOther{%    note the global \gdef
+  \catcode`_=\active
+  \def_{\textunderscore\-}%
+}
+\endgroup
+
+\newcommand{\GTDfoutputNEW}[5][\jobname.gtd]{%
+  \immediate\openout\@GTD@out=#1%
+  %
+  \immediate\write\@GTD@out{\@backslashchar makeatletter}%
+  \immediate\write\@GTD@out{\@backslashchar edef \@backslashchar %
+    @tmpa{\@backslashchar @nameuse{@GTDProject@reread}}}
+  \immediate\write\@GTD@out{\@backslashchar ifx \@backslashchar %
+    @tmpa\@backslashchar @empty}
+  \immediate\write\@GTD@out{\@backslashchar begingroup\@backslashchar%
+    MakeUnderscoreOther}%
+  \immediate\write\@GTD@out{\@backslashchar fi}%
+  %
+  \ifx\@empty#2\else\immediate\write\@GTD@out{#2}\fi%
+  \ifx\@empty#3\else\immediate\write\@GTD@out{#3}\fi%
+  \ifx\@empty#4\else\immediate\write\@GTD@out{#4}\fi%
+  \ifx\@empty#5\else\immediate\write\@GTD@out{#5}\fi%
+  %
+  \immediate\write\@GTD@out{\@backslashchar makeatletter}%
+  \immediate\write\@GTD@out{\@backslashchar edef \@backslashchar %
+    @tmpa{\@backslashchar @nameuse{@GTDProject@reread}}}
+  \immediate\write\@GTD@out{\@backslashchar ifx \@backslashchar %
+    @tmpa\@backslashchar @empty}
+  \immediate\write\@GTD@out{\@backslashchar endgroup}%
+  \immediate\write\@GTD@out{\@backslashchar fi}%
+  %
+  \immediate\closeout\@GTD@out%
+  }%
+
+
+\def\@nameaddto#1#2{%
+   \expandafter\let\expandafter\@tmpa\csname #1\endcsname%
+   \expandafter\def\csname #1\expandafter\endcsname\expandafter%
+     {\@tmpa#2}}%
+\def\@nameaddto@x#1#2{%
+   \expandafter\let\expandafter\@tmpa\csname #1\endcsname%
+   \expandafter\xdef\csname #1\expandafter\endcsname\expandafter%
+     {\@tmpa#2}}%
+\def\@nameaddto@e#1#2{%
+   \expandafter\let\expandafter\@tmpa\csname #1\endcsname%
+   \expandafter\edef\csname #1\expandafter\endcsname\expandafter%
+     {\@tmpa#2}}%
+
+\@namedef{@GTDoutput@cachedP}{}%
+\def\@SAVdoItemP[#1]#2#3#4#5{% keys, group, filter, citemark, message
+    \@nameaddto@x{@GTDoutput@cachedP}{\@backslashchar GTDdoItem%
+      [#1]{#2}{#3}{#4}{#5}\@percentchar^^J}}%
+
+\@namedef{@GTDoutput@cachedNN}{}%
+\def\@SAVdoItemNN[#1]#2#3#4#5{% keys, group, filter, citemark, message
+    \@nameaddto@x{@GTDoutput@cachedNN}{\@backslashchar GTDdoItem%
+      [#1]{#2}{#3}{#4}{#5}\@percentchar^^J}}%
+
+\@namedef{@GTDoutput@cachedN}{}%
+\def\@SAVdoItemN[#1]#2#3#4#5{% keys, group, filter, citemark, message
+    \@nameaddto@x{@GTDoutput@cachedN}{\@backslashchar GTDdoItem%
+      [#1]{#2}{#3}{#4}{#5}\@percentchar^^J}}%
+
+\@namedef{@GTDoutput@cachedA}{}%
+\def\@SAVdoItemA[#1]#2#3#4#5{% keys, group, filter, citemark, message
+    \@nameaddto@x{@GTDoutput@cachedA}{\@backslashchar GTDdoItem%
+      [#1]{#2}{#3}{#4}{#5}\@percentchar^^J}}%
+
+\newcount\@ordered@item@cnt%
+\@ordered@item@cnt\number0\relax%
+\def\@SAVdoItem[#1]#2#3#4#5{% keys, group, filter, citemark, message
+  \@nameaddto@x{@GTDoutput@cached}{\@backslashchar GTDdoItem%
+    [#1]{#2}{#3}{#4}{#5}\@percentchar^^J}%
+  %
+  \edef\@tmpa{\@nameuse{@GTDItem@Key@next}}%
+  \@namedef{@unordered@item@val@\number\@ordered@item@cnt}%
+      {\@backslashchar GTDdoItem[#1]{#2}{#3}{#4}{#5}\@percentchar^^J}%
+  \@namedef{@unordered@item@key@\number\@ordered@item@cnt}{\@tmpa}%
+  \@namedef{@ordered@item@val@\number\@ordered@item@cnt}%
+      {\@backslashchar GTDdoItem[#1]{#2}{#3}{#4}{#5}\@percentchar^^J}%
+  \@namedef{@ordered@item@key@\number\@ordered@item@cnt}{\@tmpa}%
+  \advance\@ordered@item@cnt\number1%
+  \@ordered@item@cnt\number\@ordered@item@cnt%
+  %%%SAVE-THE-ITEM (\number\@ordered@item@cnt, #5 )
+}%
+
+\@namedef{@GTDoutput@cached}{}%
+\@definecounter{@GTDItems@cnt}
+\setcounter{@GTDItems@cnt}{0}%
+
+\def\GTDdoItem[#1]#2#3#4#5{% keys, group, filter, citemark, message,
+                           % format?
+\edef\@tmpa{\@nameuse{@GTDProject@reread}}%
+\ifx \@tmpa\@empty
+  \protected@edef\@thecitemark{#4}%
+  %
+  \@namedef{GTDItem@keys}{#1}% set the keys of later processing
+  \@namedef{GTDKey@group}{#2}% set the items group
+  \@namedef{GTDItem@filter}{#3}% cache the filters for processing
+  \@namedef{GTDItem@citemark}{#4}% cache the citemark for processing
+  \@namedef{GTDItem@message}{#5}% cache the message for processing
+  \@namedef{GTDFilter@bool}{false}% preset the filter skip variable
+  %
+  % now run the filters
+  %(#2 = [#1])\\
+  %  \@SetKeys{#2}{#1}%
+%%% test remove %%%  \@ResetKeys{GTDItem}%
+  \@SetKeys{GTDItem}{#1}%
+  %
+  % if the filter is blank there is no reason to test for it... just
+  % use it
+  %\edef\@tmpa{\@nameuse{GTDFilter@filter}}%
+  %\ifx\@empty\@tmpa\else\@nameuse{GTDFilter@filter}\fi%
+  \@nameuse{GTDFilter@filter}
+  %
+  % reset the key variables to the current item. NOTE: the user
+  % defined filters can overwrite the system defined filters so we need
+  % to set the keys a second time to (re)exercise the filters
+%%% test remove %%%   \setkeys{@GTDItem@Keys}{#1}%
+  %
+  \edef\@tmpb{false}%
+  \edef\@tmpa{\@nameuse{GTDFilter@bool}}%
+  \ifx\@tmpa\@tmpb%
+    \ifx\@output@type\@empty% should we skip the output?
+    %
+    % if this is a project then we need to reset the item counters
+    \cmpeqval{@GTDItem@Key@group}{GTDProject}%
+      {%
+        \setcounter{@num@action@cnt}{0}%
+        \setcounter{@num@contact@cnt}{0}%
+        \setcounter{@num@note@cnt}{0}%
+        \setcounter{@num@purchase@cnt}{0}%
+      }{}%
+      \noindent%
+      \edef\@gfrmt{}%
+      %\edef\@gfrmt{\@nameuse{@#1@Key@format}}%
+      \ifx\@empty\@gfrmt%
+        \ItemFormat{#4}{#5}%
+      \else%
+        \@gfrmt{#5}%
+      \fi%
+    \fi%
+  \fi%
+\else%
+      \expandafter\g@addto@macro\csname%
+      @GTDoutput@cached\endcsname{%
+        \@backslashchar GTDdoItem%
+                        [#1]{#2}{#3}{#4}{#5}%
+                        \@percentchar^^J%
+      }%
+      %GTDdoItem
+      \stepcounter{@#2@cnt}%
+      \stepcounter{@GTDItems@cnt}%
+\fi%
+}%
+
+
+\newcommand{\GTDSort}[1][\jobname.srt]{% out file
+  \GTDoutput[\jobname.tmp]%
+  %\immediate\openout\@GTD@out="|gtdsort -i \jobname.tmp -o #1"%
+  \immediate\openout\@GTD@out="|gtdfilter -s -p -a -c -n -P -i \jobname.tmp -o #1"%
+  \immediate\closeout\@GTD@out%
+  %
+  \osRemove{\jobname.tmp}%
+}
+
+\newcommand{\GTDSortAndRead}[1][\jobname.srt]{% out file
+  %
+  % Sort the items to the file
+  \GTDSort[#1]%
+  %
+  % clear the cache
+  \@namedef{@GTDoutput@cached}{}% reclear the cache
+  \setcounter{@GTDItems@cnt}{0}%
+  %
+  % read the items back into the cache
+  \GTDreread%
+  \@input{#1}%
+  \GTDnoreread%
+}
+\newcommand{\GTCRead}[1][auto.gtc]{% out file
+  \GTDreread% turn off item processing when reading
+  \@namedef{@GTDoutput@cached}{}% clear the cache
+  \@input{#1}% input the items
+  \GTDnoreread% go back to regular processing
+}
+
+\newcommand{\numProjects}[1]{\edef\@num@projects{#1}}
+\newcommand{\numActions}[1]{\edef\@num@actions{#1}}
+\newcommand{\numContacts}[1]{\edef\@num@contacts{#1}}
+\newcommand{\numNotes}[1]{\edef\@num@notes{#1}}
+\newcommand{\numPurchases}[1]{\edef\@num@purchases{#1}}
+\edef\@num@projects{99999}
+\edef\@num@actions{99999}
+\edef\@num@contacts{99999}
+\edef\@num@notes{99999}
+\edef\@num@purchases{99999}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%% old implementation... rework %%%%%%%%%%%%%%%%%%%%%%
+
+\def\@theItems[#1]#2#3{% heading stuff
+  \edef\@tmpa{\@nameuse{@GTDProject@silent}}%
+  \edef\@tmpb{skip}%
+  % check for an empty group...
+  %
+  %and now test \@#3@cnt it
+  %
+  % \ifnum\value{@#3@cnt} > 0%
+  \ifx \@tmpa\@tmpb \else%
+    \begingroup%
+      \makeatletter%
+      %
+      % The machinery with \@ResetGT and > here ensures that
+      % \@doanenote works properly even if > is an active character
+      % at the point where \theactions is invoked. > needs to have
+      % catcode 12 when the arguments of \@doanenote are scanned, so
+      % that the > in the string "macro:->" is matched.  The actual
+      % footnote text is not an argument to \@doanenote, but just
+      % follows it in the .ent file; so \@ResetGT can reset the
+      % category code for > that should be used when processing
+      % that text.  That resetting takes place within a
+      % \begingroup-\endgroup block set up by \@doanenote and
+      % \@endanenote, so the catcode for > is back to 12 for the
+      % next note. (FIXME: taken from endnote.sty)
+      %
+      \edef\@tempa{`\string >}%
+      \ifnum\catcode\@tempa=12%
+        \let\@ResetGT\relax%
+      \else%
+        \edef\@ResetGT{\noexpand\catcode\@tempa=\the\catcode\@tempa}%
+        %\@makeother\>%
+      \fi%
+      %
+      \gtdheading{#1}%
+      %#2%
+    \endgroup%
+  \fi%
+}%
+
+\def\gtdheading#1{\section*{#1%
+  \@mkboth{\MakeUppercase{#1}}{\MakeUppercase{#1}}}%
+  \mbox{}\par\vskip-\baselineskip}%
+
+\def\gtdformat{\rightskip\z@\leftskip\z@\parindent=1.8em%
+  \leavevmode\llap{\makecitemark}}%
+
+
+\endinput
+%%
+%% End of file `gtd.sty'.
