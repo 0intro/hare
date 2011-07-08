@@ -35,7 +35,7 @@
 %\loadglsentries{\GTDUserHome/reference/glossary}
 
 \begin{document}
-\GTDProject[proj=PROJ]{TITLE}
+\GTDProject[proj=mpipefs]{mpipefs}
 %  \title{TITLE} % the document title is pre-initialized with the
                  % project title above.  This can be overwridden
                  % using \title{}
@@ -44,10 +44,34 @@
 \maketitle
 
 \section*{Introduction}
-This is an example project... \cite{Allen2003}
+This is an example project...
 
-\GTDUseBib{\GTDUserHome/reference/gtd.bib}
-\GTDBib[apalike]
+Brasil\cite{Brasil:2011}
+
+\section*{Overhead Evaluation}
+\subsection*{Initialization}
+note: deployment without tasks
+\subsection*{Execution With Tasks}
+note: deployment with tasks
+\subsection*{Cleanup}
+
+\section*{Discussion}
+
+\section*{Acknowledgments}
+
+IBM, DOE, ...
+
+\Action[]{look at tbonfs}
+\Action[]{look at tree spawn or treefs?}
+\Action[]{9p good for p2p but not task aggregation}
+
+\Action[]{no select on Plan 9 is a problem because exportfs is acting
+  as a proxy}
+
+\Action[]{}
+
+\GTDUseBib{paper.bib}
+\GTDBib[plain]
 
 %\glsaddall
 %\printglossaries
