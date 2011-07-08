@@ -15,7 +15,7 @@ endif
 
 # beginning of user defined/modified settings
 
-PROJ = proj_plan # mpipes thesis proposal class_mereotopology glos_ex
+PROJ = hpd # mpipes thesis proposal class_mereotopology glos_ex
 
 mpipes.pdf: *.tex
 
