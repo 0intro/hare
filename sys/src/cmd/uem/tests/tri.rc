@@ -1,0 +1,150 @@
+#!/bin/rc
+# 
+# Pretend to mimic the BG/P setup
+#
+
+echo '== Test gangfs across a simulated BlueGene/P node structure =='
+
+# fake the IO node's IP
+IO=128.0.1
+IP=11.$IO
+
+#
+# Parameters
+#
+TESTDIR=.test
+
+GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
+EXECLOG=$TESTDIR'/execfs'-$IP'.log'
+MPIPELOG=$TESTDIR'/mpipefs'-$IP'.log'
+ERRORLOG=$TESTDIR'/error.log'
+
+G_MNTPATH=/n/$IP/proc
+
+#CMD='/bin/date'
+CMD='../8.poke -L '$TESTDIR
+
+# setup 
+#
+#NUM=64 # succeds
+#NUM=75 # succeds
+#NUM=80 # fails
+
+NUM=3
+
+#  NUM=32 # (with 1,4,4) gives
+#    exportfs 929: warning: process exceeds 100 file descriptors
+# and sometimes
+#    exportfs: No more work buffers
+
+I_MAX=1
+J_MAX=1
+K_MAX=4
+
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+fn enum_child {
+	CNUM=`{awk 'BEGIN     {
+               for (i=0; i<'$I_MAX'; i++) 
+	         for (j=0; j<'$J_MAX'; j++) 
+		   for (k=1; k<='$K_MAX'; k++)
+		     printf "%d.%d.%d ", i, j, k
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+fn enum_mid {
+	MNUM=`{awk 'BEGIN     {
+               k=0
+               for (i=0; i<'$I_MAX'; i++) 
+	         for (j=0; j<'$J_MAX'; j++) 
+		     printf "%d.%d.%d ", i, j, k
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	echo 'TESTDIR='$TESTDIR
+	mkdir -p $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat} #`
+	echo res $NUM>>[2] $ERRORLOG
+	echo exec $CMD>>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+
+# Setup
+rfork
+
+#cleanup
+rm -f $TESTDIR'/error.log'  
+rm -f $TESTDIR'/gangfs'* $MPIPELOG $TESTDIR'/mpipefs'* $TESTDIR'/execfs'*
+
+testdir
+
+enum_mid
+enum_child
+
+########################################
+
+# fake the BG/P profile (1 I/O node and 4 CPU nodes)
+echo '############ starting next '$IP' ############' >>[2] $GANGLOG
+cpunode=0 treeip=$IO profile.tri
+
+#srvfs io /n/$IP
+
+# generate the fake middle nodes
+for(i in $MNUM){
+  echo '############ starting next '11.$i' ############' >>[2] $GANGLOG
+  cpunode=2 treeip=$i profile.tri
+}
+
+# generate the fake CPU nodes and mount them
+for(i in $CNUM){
+  echo '############ starting next '11.$i' ############' >>[2] $GANGLOG
+  cpunode=1 treeip=$i profile.tri
+}
+
+########################################
+
+# Tests
+basic
+
+# Cleanup
+#rm -rf $TESTDIR
+#cleanup

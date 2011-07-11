@@ -6,6 +6,7 @@ TARG = \
 	csrv\
 	mpipefs\
 	execfs\
+	exec2fs\
 	execcmd\
 	gangfs\
 	poke\
