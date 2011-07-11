@@ -11,7 +11,7 @@ echo '== UEM Hier Regression =='
 PWD=`{pwd}#`
 CMDPATH=$PWD'/..'
 
-GANGLOG=gangfs.log
+GANGLOG=gang2fs.log
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
 TESTDIR=$PWD/.test
@@ -19,7 +19,7 @@ TESTDIR=$PWD/.test
 METADIR=.meta
 
 E_MNTPATH=/tmp/testbed/E # execfs mount point
-G_MNTPATH=/tmp/testbed/G # gangfs mount point
+G_MNTPATH=/tmp/testbed/G # gang2fs mount point
 
 
 NUM=5
@@ -51,8 +51,8 @@ fn cleanup {
 	unmount /n/master > /dev/null >[2] /dev/null
 
 	rm -f /srv/mpipe*
-	rm -f /srv/execfs*
-	rm -f /srv/gangfs*
+	rm -f /srv/exec*
+	rm -f /srv/gang*
 	rm -f /srv/master*
 	rm -f /srv/child*
 
@@ -60,7 +60,7 @@ fn cleanup {
 	bind '#p' /proc
 
 	kill $O.execcmd | rc
-	kill $O.gangfs | rc
+	kill $O.gang2fs | rc
 	kill $O.execfs | rc
 	kill $O.mpipefs | rc
 }
@@ -93,35 +93,34 @@ fn startup {
 		$CMDPATH/$O.execfs -s execfs$GHEAD -E $CMDPATH/$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		#echo '  '$CMDPATH/$O'.execfs -D -v '$2' -s execfs -E '$CMDPATH/$O'.execcmd -m '$E_MNTPATH' >[2] '$EXECLOG
 		$CMDPATH/$O.execfs -D -v $2 -s execfs$GHEAD -E $CMDPATH/$O.execcmd -m $E_MNTPATH >[2] $EXECLOG
 	}
 	bind -bc '#p' $E_MNTPATH
 
-	echo Starting gangfs parent $PARENT
+	echo Starting gang2fs parent $PARENT
 	if(~ $#* 1) {
-	        echo 'starting gangfs (n='$1') without debug'
+	        echo 'starting gang2fs (n='$1') without debug'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			$CMDPATH/$O.gangfs -R 0 -s gangfs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gang2fs -R 0 -s gang2fs$GHEAD -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			$CMDPATH/$O.gangfs -R 1 -s gangfs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gang2fs -R 1 -s gang2fs$GHEAD -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
 	if not {
-	        echo 'starting gangfs (n='$1') with debug (v='$2')'
+	        echo 'starting gang2fs (n='$1') with debug (v='$2')'
 		if (~ $PARENT 0) {
 			echo '	master mode'
-			$CMDPATH/$O.gangfs -R 0 -s gangfs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gang2fs -R 0 -s gang2fs$GHEAD -D -v $2 -n $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 		if not {
 			echo '	child mode'
-			$CMDPATH/$O.gangfs -R 1 -s gangfs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
+			$CMDPATH/$O.gang2fs -R 1 -s gang2fs$GHEAD -D -v $2 -n $1 -p $PARENT -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG
 		}
 	}
-	mount -ac /srv/gangfs$GHEAD $G_MNTPATH
+	mount -ac /srv/gang2fs$GHEAD $G_MNTPATH
 }
 
 fn startmp {

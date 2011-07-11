@@ -441,7 +441,7 @@ fsattach(Req *r)
 	char *scratch;
 
 	/* need to parse aname */
-	DPRINT(DARG, "args: %s\n", r->ifcall.aname);
+	DPRINT(DARG, "args: (%s) len=%d\n", r->ifcall.aname, r->ifcall.count);
 	/* add a stupid extra field so we can use args(2) */
 	scratch = smprint("mount %s\n", r->ifcall.aname);
 	argc = tokenize(scratch, argv, MAXARGS);
