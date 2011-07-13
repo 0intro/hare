@@ -37,14 +37,18 @@ debug:V: all
 	#rc uem_64.rc 9
 	#rc uem_512.rc 9
 	#rc bg_256.rc 9
-	rc uem_hier.rc 9
+	#rc uem_hier.rc 9
 	#rc pbg_4.rc 12
+	#rc tri.rc 12
+	rc exec2fs.rc 9
 
 kill:VE: 
 	rm -f /srv/mpipe
 	kill $O.execcmd | rc
 	kill $O.gangfs | rc
+	kill $O.gang2fs | rc
 	kill $O.execfs | rc
+	kill $O.exe2cfs | rc
 	kill $O.mpipefs | rc
 	kill exportfs | rc
 	kill import | rc
@@ -52,8 +56,8 @@ kill:VE:
 	broke | rc
 	
 	rm -f /srv/mpipe*
-	rm -f /srv/execfs*
-	rm -f /srv/gangfs*
+	rm -f /srv/exec*
+	rm -f /srv/gang*
 	rm -f /srv/master
 	rm -f /srv/child
 	rm -f /srv/uem
