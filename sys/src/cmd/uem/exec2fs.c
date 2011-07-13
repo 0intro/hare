@@ -62,6 +62,8 @@ static char *srvctl;
 static Channel *iochan;
 static Channel *clunkchan;
 
+extern Srv fs;
+
 static void
 usage(void)
 {
@@ -168,6 +170,8 @@ kickit(void)
 {
 	Channel *pidc = chancreate(sizeof(ulong), 0);
 	ulong pid;
+	File *fdir;
+	char *spid;
 
 	DPRINT(DCUR, "kickit: forking the proc\n");
 	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
@@ -179,9 +183,8 @@ kickit(void)
 	}
 
 	// create a execcmd shadow directory
-	char *spid;
 	spid = smprint("%ld", pid);
-	File *fdir = createfile(fs.tree->root, spid, "exec2fs", DMDIR|0777, (void *)Xpid);
+	fdir = createfile(fs.tree->root, spid, "exec2fs", DMDIR|0777, (void *)Xpid);
 	free(spid);
 	closefile(createfile(fdir, "ctl", "exec2fs", 0666, (void *)Xpctl));
 	closefile(fdir);
