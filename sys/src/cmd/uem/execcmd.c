@@ -118,7 +118,7 @@ main(int argc, char **argv)
 	assert(ret > 0);
 	ctlbuf[ret] = 0;
 
-	DPRINT(DEXC, "got ctlbuf: (%d) %s\n", ret, ctlbuf);
+	DPRINT(DEXC, "got ret=(%d) ctlbuf=(%s) pid=(%d)\n", ret, ctlbuf, pid);
 
 	/* need to open our bit */
 	snprint(fname, 255, "/proc/%d/stdin", pid);
