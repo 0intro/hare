@@ -13,7 +13,7 @@ EXECLOG=$TESTDIR/exec2fs.log
 MPIPELOG=$TESTDIR/mpipefs.log
 ERRORLOG=$TESTDIR/error.log
 
-E_MNTPATH=/tmp/testbed/E
+E_MNTPATH=$TESTDIR/E
 
 #
 # Cleanup Previous Instances
@@ -46,13 +46,12 @@ fn startup {
 	echo Starting mpipefs....
 
 	mkdir -p $E_MNTPATH
-	mkdir -p $TESTDIR
 
 	if(~ $#* 0) {
 		../$O.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+		../$O.mpipefs -v $1 >[2] $MPIPELOG 	# CHATTY
 	}
 
 	mount /srv/mpipe /n/mpipetest test
@@ -62,7 +61,7 @@ fn startup {
 		../$O.exec2fs -s exec2fs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		../$O.exec2fs -D -v $1 -s exec2fs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		../$O.exec2fs -v $1 -s exec2fs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
 	bind -bc '#p' $E_MNTPATH
 
@@ -109,8 +108,6 @@ fn stdout {
 	}
 
 	echo Success!
-	# cleanup
-	rm -rf $TESTDIR/*
 }
 
 fn stdin {
@@ -130,16 +127,17 @@ fn stdin {
 	}
 
 	echo Success!
-	# cleanup
-	rm -rf $TESTDIR/*
 }
 
 # Setup
 rfork
 
 cleanup
-startup $1
+shutdown
+
 testdir
+
+startup $1
 
 # Note: the current tests die on the 4'th run of either stdout or
 # stdin.  If I run cleanup**startup between each it runs fine.  For

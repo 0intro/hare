@@ -185,8 +185,13 @@ kickit(void)
 	// create a execcmd shadow directory
 	spid = smprint("%ld", pid);
 	fdir = createfile(fs.tree->root, spid, "exec2fs", DMDIR|0777, (void *)Xpid);
-	free(spid);
 	closefile(createfile(fdir, "ctl", "exec2fs", 0666, (void *)Xpctl));
+
+	closefile(createfile(fdir, "stdin",  "exec2fs", 0666, (void *)Xpctl));
+	closefile(createfile(fdir, "stdout", "exec2fs", 0666, (void *)Xpctl));
+	closefile(createfile(fdir, "stderr", "exec2fs", 0666, (void *)Xpctl));
+
+	free(spid);
 	closefile(fdir);
 
 	chanfree(pidc);
@@ -260,10 +265,11 @@ fsopen(Req *r)
 	}
 	DPRINT(DFID, "\tctlfd=(%d)\n", e->rctlfd);
 
+
 	n = snprint(fname, STRMAX, "%s/%d", procpath, e->pid);
 	assert(n > 0);
 
-	/* asserts are heavy handed, but help with debug */
+	// asserts are heavy handed, but help with debug
 	n = mpipe(fname, "stdin");
 	assert(n > 0);
 	n = mpipe(fname, "stdout");
