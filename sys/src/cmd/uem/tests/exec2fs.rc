@@ -1,0 +1,165 @@
+#!/bin/rc
+# 
+# Exec2fs Regression
+#
+
+echo '== Exec2fs Regression =='
+
+#
+# Parameters
+#
+TESTDIR=.test
+EXECLOG=$TESTDIR/exec2fs.log
+MPIPELOG=$TESTDIR/mpipefs.log
+ERRORLOG=$TESTDIR/error.log
+
+E_MNTPATH=/tmp/testbed/E
+
+#
+# Cleanup Previous Instances
+#
+fn cleanup {
+	echo Cleaning up previous runs.
+
+	rm -f $E_MNTPATH /tmp/testbed
+	rm -rf $TESTDIR
+}
+
+fn shutdown {
+	echo Shutting down previous runs.
+
+	# FIXME: should there be multiple mpipes?
+	unmount /n/mpipetest > /dev/null >[2] /dev/null
+	unmount $E_MNTPATH > /dev/null >[2] /dev/null
+
+	rm -f /srv/mpipe
+	rm -f /srv/exec2fs
+
+	unmount /proc > /dev/null >[2] /dev/null
+	bind '#p' /proc
+}
+
+#
+# Startup exec2fs 
+#
+fn startup {
+	echo Starting mpipefs....
+
+	mkdir -p $E_MNTPATH
+	mkdir -p $TESTDIR
+
+	if(~ $#* 0) {
+		../$O.mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
+
+	mount /srv/mpipe /n/mpipetest test
+
+	echo Starting exec2fs.
+	if(~ $#* 0) {
+		../$O.exec2fs -s exec2fs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG 
+	}
+	if not {
+		../$O.exec2fs -D -v $1 -s exec2fs -E ../$O.execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+	}
+	bind -bc '#p' $E_MNTPATH
+
+	bind -bc .  /$objtype/bin
+	bind -bc .. /$objtype/bin
+}
+
+#
+# Setup a test directory
+#
+fn testdir {
+	mkdir -p $TESTDIR
+}
+
+fn myexecstdin {
+	mypid=`{cat} #`
+
+	echo -n exec /bin/cat >>[2] exec2fs.log >>[2] $ERRORLOG
+	cat $TESTDIR/test > $E_MNTPATH/$mypid/stdin >>[2] $ERRORLOG
+	cat $E_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+}
+
+fn myexecstdout {
+	mypid=`{cat} #`
+
+	echo -n exec /bin/cat $TESTDIR/test >>[2] $ERRORLOG
+	cat $E_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+}
+
+fn stdout {
+	echo -n Basic Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexecstdout <>$E_MNTPATH/clone >[1=0]
+
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
+fn stdin {
+	echo -n Stdin Test....
+
+	# initialize files
+	echo Hello Squidboy > $TESTDIR/test
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexecstdin <>$E_MNTPATH/clone >[1=0]
+
+	# verify results
+	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	rm -rf $TESTDIR/*
+}
+
+# Setup
+rfork
+
+cleanup
+startup $1
+testdir
+
+# Note: the current tests die on the 4'th run of either stdout or
+# stdin.  If I run cleanup**startup between each it runs fine.  For
+# now I am leaving it at two tests and will look into it later.
+
+# Tests
+stdout
+stdin	#failing
+
+# FIXME: running dubug with more than 3 stdin/stdout tests or regress
+# with more than 1, causes the clone to fail while opening
+# /proc/#/ctl.  Ex:
+#
+# can't open: '/tmp/testbed/E/clone' exec2fs: fsopen: opening
+# [/proc/220943/ctl] failed: '/proc/220943/ctl' process exited mk: rc
+# mpipefs.rc rc ...  : exit status=rc 220177: rc 220903: error
+#
+
+# you can run cleanup/startup between each one to force it to work...
+
+#shutdown
+
+#cleanup
