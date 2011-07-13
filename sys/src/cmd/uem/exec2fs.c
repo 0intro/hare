@@ -74,6 +74,8 @@ enum
 	STACK = (8 * 1024),
 	STRMAX = 255,
 	Xclone = 1,
+	Xpid,
+	Xpctl,
 };
 
 typedef struct Exec Exec;
@@ -168,20 +170,21 @@ kickit(void)
 	ulong pid;
 
 	DPRINT(DCUR, "kickit: forking the proc\n");
-	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG); // RFENVG,RFNOTEG,RFNAMEG
+	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
 	DPRINT(DCUR, "\tnpid=(%d)\n", npid);
-	// FIXME: 9vx/native problem...
+
 	pid = recvul(pidc);
 	if(pid==0) {
 		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
 	}
-/* FIXME: debuging... the proc still is there...
-procrfork(lsproc, (void *) pidc, STACK, RFFDG);
-ulong lspid = recvul(pidc);
-if(lspid==0) {
-	DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
-}
-*/
+
+	// create a execcmd shadow directory
+	char *spid;
+	spid = smprint("%ld", pid);
+	File *fdir = createfile(fs.tree->root, spid, "exec2fs", DMDIR|0777, (void *)Xpid);
+	free(spid);
+	closefile(createfile(fdir, "ctl", "exec2fs", 0666, (void *)Xpctl));
+	closefile(fdir);
 
 	chanfree(pidc);
 
@@ -476,8 +479,8 @@ cleanup(Srv *)
 
 	DPRINT(DCUR, "cleanup: (%d) mounted. unmounting...\n", num_mnts);
 	char *fname = (char *) emalloc9p(STRMAX);
-	flushmp("/n/mpipetest"); /* flush pipe to be sure */
 
+// FIXME: reexamine with /$pid/ctl, etc...
 /*** FIXME: already removed when the execcmd dies
 	int i, ret;
 	for(i=num_mnts-1; i>=0; i--) {
