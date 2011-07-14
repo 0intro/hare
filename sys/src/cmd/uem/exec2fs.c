@@ -297,7 +297,8 @@ fsopen(Req *r)
 	// FIXME: test hack.  Fix later, and possibly give a cmdl
 	//   option
 	// n = snprint(fname, STRMAX, "%s/%d/ctl", procpath, e->pid);
-	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
+	// n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
+	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
 	assert(n > 0);
 
 	/* grab ahold of the ctl file */
