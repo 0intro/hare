@@ -22,6 +22,9 @@
 #include <9p.h>
 #include <debug.h>
 
+static char defaultpath[] =	"/proc";
+static char *procpath, *mmount;
+
 char Estdios[] = "execcmd: couldn't open stdios";
 char Ebadctl[] = "execcmd: bad ctl command";
 char Ebadexec[] = "execcmd: bad exec command";
@@ -44,6 +47,36 @@ enum {	/* DEBUG LEVELS (complimentary with execfs */
 	DARG = 10,	/* arguments */
 };
 
+/* FIXME: debugging... */
+enum
+{
+	STACK = (8 * 1024),
+};
+char *extpath = 0;
+static void
+lsproc(void *arg)
+{
+	Channel *pidc = arg;
+	// FIXME: procpath currently not used
+	char *path = procpath;
+
+	if (extpath)
+		path = extpath;
+
+//	Channel *pidc = chancreate(sizeof(ulong), 0);
+//	char *path = arg;
+
+	threadsetname("exec2fs-lsproc");
+	DPRINT(DFID, "lsproc (%p) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
+	       pidc, "/bin/ls", "ls", "-l", path, getpid());
+	procexecl(pidc, "/bin/ls", "ls", path, nil);
+
+	sendul(pidc, 0);
+
+	threadexits(nil);
+
+}
+
 static void
 usage(void)
 {
@@ -52,7 +85,7 @@ usage(void)
 }
 
 void
-main(int argc, char **argv)
+threadmain(int argc, char **argv)
 {
 	int stdinfd;
 	int stdoutfd;
@@ -69,6 +102,9 @@ main(int argc, char **argv)
 	
 	int pid = getpid();
 
+	procpath = defaultpath;
+	mmount = defaultpath;
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
@@ -79,6 +115,12 @@ main(int argc, char **argv)
 		break;
 	case 's':
 		srvctl = ARGF();
+		break;
+	case 'm':	/* mntpt override */
+		procpath = ARGF();
+		break;
+	case 'M':	/* mntpt override */
+		mmount = ARGF();
 		break;
 	case 'L':
 		logdir = ARGF();
@@ -106,6 +148,9 @@ main(int argc, char **argv)
 	} 
 
 	DPRINT(DEXC, "Inside execution wrapper: logdir=%s vflag=%d debugfd=%d\n", logdir, vflag, debugfd);
+	DPRINT(DEXC, "\tsrvctl=%s\n", srvctl);
+	DPRINT(DEXC, "\tprocpath=%s\n", procpath);
+	DPRINT(DEXC, "\tmmount=%s\n", mmount);
 
 	/* open our files */
 	ctlfd = open(srvctl, ORDWR|OCEXEC);
@@ -121,14 +166,19 @@ main(int argc, char **argv)
 	DPRINT(DEXC, "got ret=(%d) ctlbuf=(%s) pid=(%d)\n", ret, ctlbuf, pid);
 
 	/* need to open our bit */
-	snprint(fname, 255, "/proc/%d/stdin", pid);
+	snprint(fname, 255, "%s/%d/stdin", mmount, pid);
 	stdinfd = open(fname, OREAD);
+	DPRINT(DCUR, "stdin=(%s) stdinfd=(%d)\n", fname, stdinfd);
 	assert(stdinfd > 0);
-	snprint(fname, 255, "/proc/%d/stdout", pid);
+
+	snprint(fname, 255, "%s/%d/stdout", mmount, pid);
 	stdoutfd = open(fname, OWRITE);
+	DPRINT(DCUR, "stdout=(%s) stdoutfd=(%d)\n", fname, stdoutfd);
 	assert(stdoutfd > 0);
-	snprint(fname, 255, "/proc/%d/stderr", pid);
+
+	snprint(fname, 255, "%s/%d/stderr", mmount, pid);
 	stderrfd = open(fname, OWRITE);
+	DPRINT(DCUR, "stderr=(%s) stderrfd=(%d)\n", fname, stderrfd);
 	assert(stderrfd > 0);
 
 	DPRINT(DEXC, "after opening stdio pipes\n");
@@ -174,7 +224,8 @@ main(int argc, char **argv)
 			debugfd = 2;
 			free(fname);
 			free(ctlbuf);
-			
+
+//exits(0);			
 			/* go baby go */
 			exec(cb->f[1], &cb->f[1]);
 
