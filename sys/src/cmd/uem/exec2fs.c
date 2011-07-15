@@ -56,7 +56,7 @@ static char defaultpath[] =	"/proc";
 static char defaultsrvpath[] =	"exec2fs";
 static char defaultcmdpath[] =	"/bin/execcmd";
 static char defaultsrvmpipe[] =	"mpipe";
-static char *procpath, *srvpath, *cmdpath, *srvmpipe;
+static char *procpath, *srvpath, *cmdpath, *srvmpipe, *mmount;
 static char *logdir = nil;
 static char *srvctl;
 static Channel *iochan;
@@ -89,15 +89,6 @@ struct Exec
 	int rctlfd;	/* actual control channel */
 };
 
-enum
-{
-	Cexec,
-};
-
-Cmdtab ctltab[]={
-	Cexec,	"exec", 0,
-};
-
 static int
 mpipe(char *path, char *name)
 {
@@ -123,31 +114,6 @@ mpipe(char *path, char *name)
 	return ret;
 }
 
-/* FIXME: debugging... */
-char *extpath = 0;
-static void
-lsproc(void *arg)
-{
-	Channel *pidc = arg;
-	char *path = procpath;
-
-	if (extpath)
-		path = extpath;
-
-//	Channel *pidc = chancreate(sizeof(ulong), 0);
-//	char *path = arg;
-
-	threadsetname("exec2fs-lsproc");
-	DPRINT(DFID, "lsproc (%p) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
-	       pidc, "/bin/ls", "ls", "-l", path, getpid());
-	procexecl(pidc, "/bin/ls", "ls", path, nil);
-
-	sendul(pidc, 0);
-
-	threadexits(nil);
-
-}
-
 /* call the execution wrapper */
 static void
 cloneproc(void *arg)
@@ -158,12 +124,11 @@ cloneproc(void *arg)
 
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%d", vflag), "-L", logdir, "-m", procpath, getpid());
-	// FIXME: error -- should not call path or just do a bind to
-	// find the programs...
+	       "-v", smprint("%d", vflag), "-L", logdir, "-m", procpath, "-M", mmount, getpid());
+
 	if(logdir)
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%d", vflag), "-L", logdir, "-m", procpath, nil);
+			  smprint("%d", vflag), "-L", logdir, "-m", procpath, "-M", mmount, nil);
 	else
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
 			  smprint("%d", vflag), "-m", procpath, nil);
@@ -179,35 +144,6 @@ kickit(void)
 {
 	Channel *pidc = chancreate(sizeof(ulong), 0);
 	ulong pid;
-	File *fdir;
-	char *spid;
-	// create a execcmd shadow directory
-
-static int access=99990;
-access++;
-spid = smprint("%ld", access);
-fdir = createfile(fs.tree->root, spid, "exec2fs", DMDIR|0777, (void *)Xpid);
-closefile(createfile(fdir, "ctl", "exec2fs", 0666, (void *)Xpctl));
-closefile(createfile(fdir, "woof", "exec2fs", 0666, (void *)Xpctl));
-closefile(fdir);
-
-if(1){
-	int n;
-	char *fname = smprint("%s/%ld", procpath, access); // puts it in execcmd's namespace
-	//char *fname = smprint("/%ld", pid); // fails with /$pid file does not exist message
-                                              // and hangs somewhere in execcmd
-	//char *fname = smprint("%ld", pid);
-	assert(fname != nil);
-
-	// asserts are heavy handed, but help with debug
-	n = mpipe(fname, "stdin");
-	assert(n > 0);
-//	n = mpipe(fname, "stdout");
-//	assert(n > 0);
-//	n = mpipe(fname, "stderr");
-//	assert(n > 0);
-	free(fname);
-}
 
 	DPRINT(DCUR, "kickit: forking the proc\n");
 	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
@@ -217,25 +153,6 @@ if(1){
 	if(pid==0) {
 		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
 	}
-
-/* FIXME: debuging... the proc still is there... */
-static once=0;
-if(once){
-extpath=smprint("%s/%ld", procpath, pid);
-//Channel *pidc = chancreate(sizeof(ulong), 0);
-procrfork(lsproc, (void *)pidc, STACK, RFFDG);
-
-ulong lspid = recvul(pidc);
-chanfree(pidc);
-if(lspid==0) {
-	DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
-}
-once = 0;
-}
-/**/
-
-	free(spid);
-	closefile(fdir);
 
 	chanfree(pidc);
 
@@ -294,25 +211,32 @@ fsopen(Req *r)
 	/* grab actual reference to real control channel -- which
 	 * should be on the actual /proc so we can isolate real
 	 * proc/mount/name-space issues */
-	// FIXME: test hack.  Fix later, and possibly give a cmdl
-	//   option
-	// n = snprint(fname, STRMAX, "%s/%d/ctl", procpath, e->pid);
-	// n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
 	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
 	assert(n > 0);
 
 	/* grab ahold of the ctl file */
+	DPRINT(DCUR, "fsopen: opening %s\n", fname);
 	if((e->rctlfd = open(fname, OWRITE)) < 0) {
-		DPRINT(DERR, "*ERROR*: opening %s failed: %r\n", fname);
+		DPRINT(DERR, "\n*ERROR*: opening %s failed: %r\n", fname);
 		err = smprint("exec2fs: fsopen: opening [%s] failed: %r", fname);
 		goto error;
 	}
 	DPRINT(DFID, "\tctlfd=(%d)\n", e->rctlfd);
 
-if(1){
-	n = snprint(fname, STRMAX, "%s/%d", procpath, e->pid);
+	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
 	DPRINT(DCUR, "fsopen: mounting on %s\n", fname);
 	assert(n > 0);
+
+	int cfd;
+
+	// FIXME: collapse into creating a full path
+	n = snprint(fname, STRMAX, "%s", mmount);
+	cfd = create(fname, OREAD, DMDIR|0777);
+	if(cfd>0)close(cfd);
+
+	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
+	cfd = create(fname, OREAD, DMDIR|0777);
+	if(cfd>0)close(cfd);
 
 	// asserts are heavy handed, but help with debug
 	n = mpipe(fname, "stdin");
@@ -321,22 +245,7 @@ if(1){
 	assert(n > 0);
 	n = mpipe(fname, "stderr");
 	assert(n > 0);
-/* FIXME: debuging... the proc still is there... */
-static once=1;
-if(once){
-extpath=smprint("%s/%d", procpath, e->pid);
-Channel *pidc = chancreate(sizeof(ulong), 0);
-procrfork(lsproc, (void *)pidc, STACK, RFFDG);
 
-ulong lspid = recvul(pidc);
-chanfree(pidc);
-if(lspid==0) {
-	DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
-}
-once = 0;
-}
-/**/
-}
 	// FIXME: hack to keep track of mnts
 	qlock(&lck);
 	mnts = erealloc9p(mnts, (num_mnts+1)*sizeof(int));
@@ -663,6 +572,7 @@ threadmain(int argc, char **argv)
 
 	procpath = defaultpath;
 	cmdpath = defaultcmdpath;
+	mmount = nil;
 
 	ARGBEGIN{
 	case 'D':
@@ -688,11 +598,17 @@ threadmain(int argc, char **argv)
 	case 'M':
 		srvmpipe = ARGF();
 		break;
+	case 'Z':
+		mmount = ARGF();
+		break;
 	default:
 		DPRINT(DERR, "ERROR: bad argv (%s)\n", *argv);
 		fprint(2, "ERROR: bad argv (%s)\n", *argv);
 		usage();
 	}ARGEND
+
+	 if (mmount == nil)
+		 mmount = procpath;
 
 	if(argc > 0){
 		int i;
@@ -707,10 +623,10 @@ threadmain(int argc, char **argv)
 
 	srvctl = smprint("/srv/exec2fs-%d", getpid());
 	DPRINT(DFID, "Main: srvctl=(%s)\n", srvctl);
+	DPRINT(DCUR, "\tmmount=(%s)\n", mmount);
 
 	fs.tree = alloctree("exec2fs", "exec2fs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "exec2fs", 0666, (void *)Xclone));
-	closefile(createfile(fs.tree->root, "bla", "exec2fs", 0666, (void *)Xpctl));
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
