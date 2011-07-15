@@ -8,8 +8,6 @@ echo '== Exec2fs Regression =='
 #
 # Parameters
 #
-DEBUG='-v '$1
-
 TESTDIR=.test
 EXECLOG=$TESTDIR/exec2fs.log
 MPIPELOG=$TESTDIR/mpipefs.log
@@ -17,6 +15,8 @@ ERRORLOG=$TESTDIR/error.log
 
 #E_MNTPATH=/tmp/testbed/E
 E_MNTPATH=$TESTDIR/E
+#M_MNTPATH=$TESTDIR/E/mpipe
+M_MNTPATH=$TESTDIR/M
 
 #
 # Cleanup Previous Instances
@@ -24,7 +24,7 @@ E_MNTPATH=$TESTDIR/E
 fn cleanup {
 	echo Cleaning up previous runs.
 
-	rm -f $E_MNTPATH /tmp/testbed
+	rm -f $E_MNTPATH $M_MNTPATH  /tmp/testbed
 	rm -rf $TESTDIR
 }
 
@@ -34,6 +34,7 @@ fn shutdown {
 	# FIXME: should there be multiple mpipes?
 	unmount /n/mpipetest > /dev/null >[2] /dev/null
 	unmount $E_MNTPATH > /dev/null >[2] /dev/null
+	unmount $M_MNTPATH > /dev/null >[2] /dev/null
 
 	rm -f /srv/mpipe
 	rm -f /srv/exec2fs
@@ -46,34 +47,39 @@ fn shutdown {
 #
 # Startup exec2fs 
 #
-fn startup {
+fn startup_mpipe {
 	echo Starting mpipefs....
 
-	mkdir -p $E_MNTPATH
-
 	if(~ $#* 0) {
-		../$O.mpipefs >[2] $MPIPELOG 
+		../$O.mpipefs >[2] $MPIPELOG # $M_MNTPATH
 	}
 	if not {
-		../$O.mpipefs $DEBUG >[2] $MPIPELOG 	# CHATTY
+		../$O.mpipefs -v $1 >[2] $MPIPELOG # CHATTY
 	}
+}
 
-	mount /srv/mpipe /n/mpipetest test
-
+fn startup_exec2fs {
 	echo Starting exec2fs.
 	if(~ $#* 0) {
-		../$O.exec2fs -s exec2fs -E ../$O.execcmd -m $E_MNTPATH -L $TESTDIR >[2] $EXECLOG 
+		../$O.exec2fs -s exec2fs -E ../$O.execcmd -m $E_MNTPATH -L $TESTDIR -Z $M_MNTPATH >[2] $EXECLOG 
 	}
 	if not {
-		../$O.exec2fs $DEBUG -s exec2fs -E ../$O.execcmd -m $E_MNTPATH -L $TESTDIR >[2] $EXECLOG  	# CHATTY
+		../$O.exec2fs -v $1 -s exec2fs -E ../$O.execcmd -m $E_MNTPATH -L $TESTDIR -Z $M_MNTPATH >[2] $EXECLOG  	# CHATTY
 	}
-	#bind -bc '#p' $E_MNTPATH # causes an overwright because bind is not deep...
+}
+
+fn startup {
+	mkdir -p $TESTDIR
+	mkdir -p $E_MNTPATH $M_MNTPATH 
+
+	startup_exec2fs $1
+	startup_mpipe $1
 
 	bind -bc .  /$objtype/bin
 	bind -bc .. /$objtype/bin
 }
 
-#
+
 # Setup a test directory
 #
 fn testdir {
@@ -84,15 +90,15 @@ fn myexecstdin {
 	mypid=`{cat} #`
 
 	echo -n exec /bin/cat >>[2] exec2fs.log >>[2] $ERRORLOG
-	cat $TESTDIR/test > $E_MNTPATH/$mypid/stdin >>[2] $ERRORLOG
-	cat $E_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	cat $TESTDIR/test > $M_MNTPATH/$mypid/stdin >>[2] $ERRORLOG
+	cat $M_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn myexecstdout {
 	mypid=`{cat} #`
 
 	echo -n exec /bin/cat $TESTDIR/test >>[2] $ERRORLOG
-	cat $E_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	cat $M_MNTPATH/$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn stdout {
@@ -139,7 +145,7 @@ rfork
 cleanup
 shutdown
 
-testdir
+#testdir
 
 startup $1
 
@@ -147,9 +153,18 @@ startup $1
 # stdin.  If I run cleanup**startup between each it runs fine.  For
 # now I am leaving it at two tests and will look into it later.
 
-# Tests
+# Tests -- do it several times to verify that it does not die as before
+stdin
 stdout
-stdin	#failing
+
+stdin
+stdout
+
+stdin
+stdout
+
+stdin
+stdout
 
 # FIXME: running dubug with more than 3 stdin/stdout tests or regress
 # with more than 1, causes the clone to fail while opening
