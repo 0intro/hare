@@ -1032,6 +1032,9 @@ cleanupgang(void *arg)
 	Gang *g = arg;
 	char fname[255];
 
+	/* Clean up subsessions? */
+	releasesessions(g);
+
 	/* make sure that the std files are completely flushed */
 	flushgang(arg);
 
@@ -1052,8 +1055,7 @@ cleanupgang(void *arg)
 		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
 	gangrefdec(g, "cleanupgang");
 
-	/* TODO: Clean up subsessions? */
-	
+
 	/* close it out */
 	g->status=GANG_CLOSED;
 printgang(g);
@@ -1082,7 +1084,6 @@ releasegang(Gang *g)
 			}
 		}
 		
-		releasesessions(g);
 		chanfree(g->chan);
 		free(g);
 	}
