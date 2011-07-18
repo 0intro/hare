@@ -8,69 +8,50 @@ echo '== Gangfs Regression =='
 #
 # Parameters
 #
-O=8.
-CMD=../$O
-
 GANGLOG=gangfs.log
 EXECLOG=execfs.log
 MPIPELOG=mpipefs.log
-ERRORLOG=error.log
 TESTDIR=.test
-
-E_MNTPATH=/tmp/testbed/E # execfs mount point
-G_MNTPATH=/tmp/testbed/G # gangfs mount point
 
 #
 # Cleanup Previous Instances
 #
 fn cleanup {
 	echo Cleaning up previous runs.
-	unmount $E_MNTPATH   > /dev/null >[2] /dev/null
-	unmount $G_MNTPATH   > /dev/null >[2] /dev/null
-
-	rm -rf /tmp/testbed
 	rm -f /srv/mpipe
-	rm -f /srv/execfs
-	rm -f /srv/gangfs
-
+	unmount /n/test > /dev/null >[2] /dev/null
 	unmount /proc > /dev/null >[2] /dev/null
 	bind '#p' /proc
-
-	rm -f $GANGLOG $EXECLOG $MPIPELOG $ERRORLOG
+	kill mpipfs | rc
+	kill execfs | rc
+	kill gangfs | rc
 }
 
 #
 # Startup execfs 
 #
 fn startup {
-
-	mkdir -p $E_MNTPATH $G_MNTPATH
-
-	echo Starting mpipefs....
-	if(~ $#* 0) {
-		$CMD^mpipefs >[2] $MPIPELOG 
-	}
-	if not {
-		$CMD^mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
-	}
-
 	echo Starting execfs.
 	if(~ $#* 0) {
-		$CMD^execfs -s execfs -E $CMD^execcmd -m $E_MNTPATH >[2] $EXECLOG 
+		execfs >[2] $EXECLOG 
 	}
 	if not {
-		$CMD^execfs -D -v $1 -s execfs -E $CMD^execcmd -m $E_MNTPATH >[2] $EXECLOG  	# CHATTY
+		execfs -D -v $1 >[2] $EXECLOG  	# CHATTY
 	}
-	bind -b '#p' $E_MNTPATH
-
 	echo Starting gangfs.
 	if(~ $#* 0) {
-		$CMD^gangfs -R 0 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG 
+		gangfs >[2] $GANGLOG 
 	}
 	if not {
-		$CMD^gangfs -R 0 -D -v $1 -m $G_MNTPATH -E $E_MNTPATH >[2] $GANGLOG  	# CHATTY
+		gangfs -D -v $1 >[2] $GANGLOG  	# CHATTY
 	}
-	mount /srv/gangfs $G_MNTPATH
+	echo Starting mpipefs....
+	if(~ $#* 0) {
+		mpipefs >[2] $MPIPELOG 
+	}
+	if not {
+		mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+	}
 }
 
 #
@@ -81,27 +62,27 @@ fn testdir {
 }
 
 fn myexec {
-	mypid=`{cat} #`
-	echo res 5 >>[2] $ERRORLOG
-	echo exec /bin/cat $TESTDIR/test >>[2] $ERRORLOG
-	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	mypid=`{cat}
+	echo res 5 >>[2] error.log
+	echo exec /bin/cat $TESTDIR/test >>[2] error.log
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexec2 {
-	mypid=`{cat} #`
-	echo res 5 >>[2] $ERRORLOG
-	echo exec /bin/cat >>[2] $ERRORLOG
-	cat $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] $ERRORLOG
-	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	mypid=`{cat}
+	echo res 5 >>[2] error.log
+	echo exec /bin/cat >>[2] error.log
+	cat $TESTDIR/test > /proc/g$mypid/stdin >>[2] error.log
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn myexec3 {
-	mypid=`{cat} #`
-	echo enum >>[2] $ERRORLOG
-	echo res 5 >>[2] $ERRORLOG
-	echo exec /bin/cat >>[2] $ERRORLOG
-	read -n 5 $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] $ERRORLOG &
-	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	mypid=`{cat}
+	echo enum >>[2] error.log
+	echo res 5 >>[2] error.log
+	echo exec /bin/cat >>[2] error.log
+	read -n 5 $TESTDIR/test > /proc/g$mypid/stdin >>[2] error.log &
+	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] error.log
 }
 
 fn basic {
@@ -112,10 +93,10 @@ fn basic {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec <>$G_MNTPATH/gclone >[1=0]
+	myexec <>/proc/gclone >[1=0]
 
 	# verify results (yes, I'm lazy)
-	cat $TESTDIR/test >  $TESTDIR/test2
+	cat $TESTDIR/test > $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
@@ -138,10 +119,10 @@ fn stdin {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec2 <>$G_MNTPATH/gclone >[1=0]
+	myexec2 <>/proc/gclone >[1=0]
 
 	# verify results (yes, I'm lazy)
-	cat $TESTDIR/test >  $TESTDIR/test2
+	cat $TESTDIR/test > $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
 	cat $TESTDIR/test >> $TESTDIR/test2
@@ -160,16 +141,16 @@ fn enum {
 	echo -n Enumerated STDIN Test....
 
 	# initialize files
-	echo one   >  $TESTDIR/test
-	echo two   >> $TESTDIR/test
+	echo one > $TESTDIR/test
+	echo two >> $TESTDIR/test
 	echo three >> $TESTDIR/test
-	echo four  >> $TESTDIR/test
-	echo five  >> $TESTDIR/test
+	echo four >> $TESTDIR/test
+	echo five >> $TESTDIR/test
 
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec3 <>$G_MNTPATH/gclone >[1=0]
+	myexec3 <>/proc/gclone >[1=0]
 
 	# verify results 
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
@@ -186,13 +167,12 @@ fn enum {
 rfork
 
 cleanup
-testdir
 startup $1
+testdir
 
 # Tests
 basic
 stdin
-
 enum
 
 # Cleanup
