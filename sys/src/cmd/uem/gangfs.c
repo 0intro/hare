@@ -966,7 +966,6 @@ static void
 cleanupgang(void *arg)
 {
 	Gang *g = arg;
-	char fname[255];
 
 	DPRINT(DCLN, "cleanupgang: flushing\n");
 
@@ -975,24 +974,6 @@ cleanupgang(void *arg)
 
 	/* make sure that the std files are completely flushed */
 	flushgang(arg);
-
-	DPRINT(DCLN, "cleanupgang: unmounting stdin, stdout, and stderr\n");
-
-	/* unmount the std files and remove their references */
-	snprint(fname, 255, "%s/g%d/stdin", gangpath, g->index);
-	if(unmount(0, fname) == -1)
-		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
-	gangrefdec(g, "cleanupgang");
-
-	snprint(fname, 255, "%s/g%d/stdout", gangpath, g->index);
-	if(unmount(0, fname) == -1)
-		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
-	gangrefdec(g, "cleanupgang");
-
-	snprint(fname, 255, "%s/g%d/stderr", gangpath, g->index);
-	if(unmount(0, fname) == -1)
-		DPRINT(DERR, "cleanupgang: *ERROR* unable to unmount %s: %r\n", fname);
-	gangrefdec(g, "cleanupgang");
 
 	/* close it out */
 	g->status=GANG_CLOSED;
@@ -1980,6 +1961,7 @@ fsclunk(Fid *fid)
 			if(g->ctlref == 0) {
 				if(mystats.next == nil)
 					mystats.njobs -= g->size;
+
 				g->status=GANG_CLOSING;
 				wunlock(&glock);
 				DPRINT(DFID, "fsclunk: g->status=GANG_CLOSING for gang %p path=%s\n", g, g->path);
