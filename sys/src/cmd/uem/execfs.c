@@ -40,13 +40,6 @@ static char Epid[] = "stupid pid problem";
 static char Esrv[] = "couldn't create srv file";
 static char Ewtf[] = "I have no idea what could be going wrong here";
 
-enum {	/* DEBUG LEVELS */
-	DERR = 0,	/* error */
-	DCUR = 1,	/* current - temporary trace */
-	DFID = 9,	/* fid tracking */
-	DARG = 10,	/* arguments */
-};
-
 QLock lck;
 int num_mnts = 0;
 int *mnts = nil;
@@ -145,15 +138,15 @@ cloneproc(void *arg)
 
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%d", vflag), "-L", logdir, getpid());
+	       "-v", smprint("%ld", vflag), "-L", logdir, getpid());
 	// FIXME: error -- should not call path or just do a bind to
 	// find the programs...
 	if(logdir)
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%d", vflag), "-L", logdir, nil);
+			  smprint("%ld", vflag), "-L", logdir, nil);
 	else
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%d", vflag), nil);
+			  smprint("%ld", vflag), nil);
 	DPRINT(DERR, "cloneproc: execcmd failed!: %r\n");
 
 	sendul(pidc, 0); /* failure */
@@ -603,7 +596,7 @@ threadmain(int argc, char **argv)
 	case 'v':
 		x = ARGF();
 		if(x)
-			vflag = atoi(x);
+			vflag = atol(x);
 		break;		
 	case 's':	/* specify server name */
 		srvpath = ARGF();

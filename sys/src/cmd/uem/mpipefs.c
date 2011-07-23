@@ -76,21 +76,6 @@ char Ebadspec[] = "bad mount specification arguments";
 char Esplice[] = "splice couldnt open target";
 char Ebadhdr[] = "unknown packet header";
 
-enum {	/* DEBUG LEVELS */
-	DERR = 0,	/* error */
-	DCUR = 1,	/* current - temporary trace */
-	DHDR = 2,	/* packet headers */
-	DOPS = 3,	/* operation tracking */
-	DWRT = 4,	/* writer */
-	DRDR = 5,	/* reader */
-	DBCA = 6,	/* broadcast */
-	DSPT = 7,	/* splice to */
-	DSPF = 8,	/* splice from */
-	DFID = 9,	/* fid tracking */
-	DARG = 10,	/* arguments */
-};
-
-
 /*
  * Right now there are two types of pipe:
  *	1) normal - writers match to readers
@@ -1280,7 +1265,7 @@ threadmain(int argc, char **argv)
 	case 'v':
 		x = ARGF();
 		if(x)
-			vflag = atoi(x);
+			vflag = atol(x);
 		break;
 	case 's':
 		srvpath = ARGF();

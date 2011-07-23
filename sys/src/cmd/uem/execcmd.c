@@ -39,14 +39,6 @@ Cmdtab ctltab[]={
 	Cexec,	"exec", 0,
 };	
 
-enum {	/* DEBUG LEVELS (complimentary with execfs */
-	DERR = 0,	/* error */
-	DCUR = 1,	/* current - temporary trace */
-	DFID = 2,	/* fid tracking */
-	DEXC = 3,	/* debug execcmd */
-	DARG = 10,	/* arguments */
-};
-
 /* FIXME: debugging... */
 enum
 {
@@ -99,6 +91,7 @@ threadmain(int argc, char **argv)
 	char *srvctl = nil;
 	char *logfile;
 	char *logdir = nil;
+	char *x;
 	
 	int pid = getpid();
 
@@ -110,8 +103,9 @@ threadmain(int argc, char **argv)
 		chatty9p++;
 		break;
 	case 'v':
-		vflag = atoi(ARGF());
-		assert(vflag >= 0);
+		x = ARGF();
+		if(x)
+			vflag = atol(x);
 		break;
 	case 's':
 		srvctl = ARGF();

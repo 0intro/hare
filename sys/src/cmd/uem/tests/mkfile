@@ -40,7 +40,7 @@ debug:V: all
 	#rc uem_hier.rc 9
 	#rc pbg_4.rc 12
 	#rc tri.rc 12
-	rc exec2fs.rc 9
+	rc exec2fs.rc 0xFFFFF
 
 kill:VE: 
 	rm -f /srv/mpipe

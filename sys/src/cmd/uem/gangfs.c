@@ -66,22 +66,6 @@ char Enotimp[] = "not implemented yet";
 char Etolong[] = "ctl message too long";
 char Enomem[] = "out of memory";
 
-
-enum {	/* DEBUG LEVELS */
-	DERR = 0,	/* error */
-	DCUR = 1,	/* current - temporary trace */
-	DPIP = 2,	/* interactions with multipipes */
-	DGAN = 3,	/* gang tracking */
-	DEXE = 4,	/* execfs interactions */
-	DBCA = 5,	/* broadcast operations */
-	DCLN = 7,	/* cleanup tracking */
-	DFID = 8,	/* fid tracking */
-	DREF = 9,	/* ref count tracking */
-	DARG = 10,	/* arguments */
-	DSTS = 11,	/* status */
-	DNET = 12,	/* remote access */
-};
-
 enum
 {
 	STACK = (8 * 1024),
@@ -2090,7 +2074,7 @@ threadmain(int argc, char **argv)
 	case 'v':
 		x = ARGF();
 		if(x)
-			vflag = atoi(x);
+			vflag = atol(x);
 		break;
 	case 'p':	/* specify parent */
 		parent = ARGF();

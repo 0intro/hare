@@ -40,13 +40,6 @@ static char Epid[] = "stupid pid problem";
 static char Esrv[] = "couldn't create srv file";
 static char Ewtf[] = "I have no idea what could be going wrong here";
 
-enum {	/* DEBUG LEVELS */
-	DERR = 0,	/* error */
-	DCUR = 1,	/* current - temporary trace */
-	DFID = 9,	/* fid tracking */
-	DARG = 10,	/* arguments */
-};
-
 QLock lck;
 int num_mnts = 0;
 int *mnts = nil;
@@ -124,14 +117,14 @@ cloneproc(void *arg)
 
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%d", vflag), "-L", logdir, "-m", procpath, "-M", mmount, getpid());
+	       "-v", smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount, getpid());
 
 	if(logdir)
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%d", vflag), "-L", logdir, "-m", procpath, "-M", mmount, nil);
+			  smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount, nil);
 	else
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%d", vflag), "-m", procpath, nil);
+			  smprint("%ld", vflag), "-m", procpath, nil);
 	DPRINT(DERR, "cloneproc: execcmd failed!: %r\n");
 
 	sendul(pidc, 0); /* failure */
@@ -587,7 +580,7 @@ threadmain(int argc, char **argv)
 	case 'v':
 		x = ARGF();
 		if(x)
-			vflag = atoi(x);
+			vflag = atol(x);
 		break;		
 	case 's':	/* specify server name */
 		srvpath = ARGF();
@@ -622,8 +615,8 @@ threadmain(int argc, char **argv)
 	}
 
 	srvctl = smprint("/srv/exec2fs-%d", getpid());
-	DPRINT(DFID, "Main: srvctl=(%s)\n", srvctl);
-	DPRINT(DCUR, "\tmmount=(%s)\n", mmount);
+	DPRINT(DARG, "Main: srvctl=(%s)\n", srvctl);
+	DPRINT(DARG, "\tmmount=(%s)\n", mmount);
 
 	fs.tree = alloctree("exec2fs", "exec2fs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "exec2fs", 0666, (void *)Xclone));
@@ -633,12 +626,12 @@ threadmain(int argc, char **argv)
 	clunkchan = chancreate(sizeof(void *), 0);
 
 	iothread_id = proccreate(iothread, nil, STACK);
-	DPRINT(DFID, "Main: srvpath=(%s) procpath=(%s)\n",
+	DPRINT(DARG, "Main: srvpath=(%s) procpath=(%s)\n",
 	       srvpath, procpath);
-	DPRINT(DFID, "Main: main pid=(%d) iothread=(%d)\n",
+	DPRINT(DARG, "Main: main pid=(%d) iothread=(%d)\n",
 	       getpid(), threadpid(iothread_id));
-	DPRINT(DFID, "Main: logdir=(%s)\n", logdir);
-	DPRINT(DFID, "\tsrvmpipe=(%s)\n", srvmpipe);
+	DPRINT(DARG, "Main: logdir=(%s)\n", logdir);
+	DPRINT(DARG, "\tsrvmpipe=(%s)\n", srvmpipe);
 
 	threadpostmountsrv(&fs, srvpath, procpath, MBEFORE);
 	threadexits(0);
