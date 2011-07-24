@@ -27,6 +27,9 @@
 #include <stdio.h>
 #include <debug.h>
 
+static char Ebadfd[] = "bad fd";
+static char Ebadprint[] = "bad snprint";
+static char Enoctl[] = "bad ctl message";
 static char Enopid[] =	"process not initialized";
 static char Eoverflow[] = "ctl buffer overflow";
 static char Ebadctl[] = "bad ctl message";
@@ -69,8 +72,6 @@ enum
 	STACK = (8 * 1024),
 	STRMAX = 255,
 	Xclone = 1,
-	Xpid,
-	Xpctl,
 };
 
 typedef struct Exec Exec;
@@ -115,16 +116,16 @@ cloneproc(void *arg)
 
 	threadsetname("exec2fs-cloneproc");
 
-	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) pid=(%d): %r\n",
+	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s)\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount, getpid());
+	       "-v", smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount);
 
 	if(logdir)
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
 			  smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount, nil);
 	else
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%ld", vflag), "-m", procpath, nil);
+			  smprint("%ld", vflag), "-m", procpath, "-M", mmount, nil);
 	DPRINT(DERR, "cloneproc: execcmd failed!: %r\n");
 
 	sendul(pidc, 0); /* failure */
@@ -153,8 +154,9 @@ kickit(void)
 }
 
 static void
-fsopen(Req *r)
+fsopen(void *arg)
 {
+	Req *r = (Req*) arg;
 	int n;
 	int p[2];
 	int fd;
@@ -164,11 +166,20 @@ fsopen(Req *r)
 	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
 
-	if(f->file->aux != (void *)Xclone) {
-		DPRINT(DFID, "fsopen: f->file->aux != (void *)Xclone\n");
+	if(f->file->aux == nil) {
+		DPRINT(DFID, "fsopen: f->file->aux == nil\n");
 		respond(r, nil);
 		return;
 	}
+
+	if(f->file->aux != (void*)Xclone) {
+			DPRINT(DCUR, "fsopen: !Xclone...\n");
+			DPRINT(DFID, "fsopen: f->file->aux->type != Xclone\n");
+			respond(r, nil);
+			return;
+	}
+
+	/* The following section is for Xclone */
 
 	e = emalloc9p(sizeof(Exec));
 	memset(e, 0, sizeof(Exec));
@@ -198,14 +209,22 @@ fsopen(Req *r)
 	 * channel.  If any of these fail, then e->pid will be < 2, and
 	 * this is a hard failure, so crash instead of dieing
 	 * gracefully */
-	DPRINT(DFID, "number of new pids=(%d)\n", e->pid);
-	assert(e->pid > 2);	/* assumption for our ctl channels */
+	DPRINT(DFID, "execcmd's pid=(%d)\n", e->pid);
+	if(e->pid <= 2){
+		DPRINT(DERR, "*ERROR*: execcmd's pid=(%d) should be greater than 2\n", e->pid);
+		err = estrdup9p(Enopid);
+		goto error;
+	}
 
 	/* grab actual reference to real control channel -- which
 	 * should be on the actual /proc so we can isolate real
 	 * proc/mount/name-space issues */
 	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
-	assert(n > 0);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*:  bad snprint #1\n");
+		err = estrdup9p(Enoctl);
+		goto error;
+	}
 
 	/* grab ahold of the ctl file */
 	DPRINT(DCUR, "fsopen: opening %s\n", fname);
@@ -218,26 +237,48 @@ fsopen(Req *r)
 
 	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
 	DPRINT(DCUR, "fsopen: mounting on %s\n", fname);
-	assert(n > 0);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*: bad snprint #2\n");
+		err = estrdup9p(Ebadprint);
+		goto error;	
+	}
 
-	int cfd;
+	n = snprint(fname, STRMAX, "%d", e->pid);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*: bad snprint #3\n");
+		err = estrdup9p(Ebadprint);
+		goto error;	
+	}
 
-	// FIXME: collapse into creating a full path
-	n = snprint(fname, STRMAX, "%s", mmount);
-	cfd = create(fname, OREAD, DMDIR|0777);
-	if(cfd>0)close(cfd);
+	closefile(createfile(fs.tree->root, fname, "exec2fs", DMDIR|0777, nil));
+	DPRINT(DCUR, "\tcreated submount point %s\n", fname);
 
 	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
-	cfd = create(fname, OREAD, DMDIR|0777);
-	if(cfd>0)close(cfd);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*: bad snprint #4\n");
+		err = estrdup9p(Ebadprint);
+		goto error;	
+	}
 
 	// asserts are heavy handed, but help with debug
 	n = mpipe(fname, "stdin");
-	assert(n > 0);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*: bad mpipe for stdin\n");
+		err = estrdup9p(Empipe);
+		goto error;	
+	}
 	n = mpipe(fname, "stdout");
-	assert(n > 0);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*: bad mpipe for stdout\n");
+		err = estrdup9p(Empipe);
+		goto error;	
+	}
 	n = mpipe(fname, "stderr");
-	assert(n > 0);
+	if(n <= 0){
+		DPRINT(DERR, "*ERROR*: bad mpipe for stderr\n");
+		err = estrdup9p(Empipe);
+		goto error;	
+	}
 
 	// FIXME: hack to keep track of mnts
 	qlock(&lck);
@@ -294,11 +335,15 @@ fswrite(Req *r)
 	Exec *e = f->aux;
 	char ctlbuf[256];
 	int ret;
-	
+
 	if(e == 0) {
 		respond(r, Ebadfid);
 	}
-	assert(e->ctlfd != -1);
+
+	if(e->ctlfd == -1) {
+		DPRINT(DERR, "*ERROR*(fswrite): %s for ctl file: %r\n", Ebadfd);
+		respond(r, Ebadfd);
+	}
 
 	DPRINT(DFID, "fswrite: ctlfd=(%d) count=(%d) pid=(%d)\n",
 	       e->ctlfd, r->ifcall.count, getpid());
@@ -396,24 +441,104 @@ cleanupsession(void *arg)
 {
 	int pid = (int) arg;
 	char *path = (char *) emalloc9p(STRMAX);
-
-	DPRINT(DFID, "cleanupsession: pid=(%d)\n", getpid());
-
-	/* BUG: what if we can't get to them because proc is already
-	 * closed? */
-	snprint(path, STRMAX, "%s/%d", procpath, pid);
+	
+	snprint(path, STRMAX, "%s/%d", mmount, pid);
+	
+	/* this is a hack on trying to clean things up */
+	DPRINT(DFID, "cleanupsession: checking stuff in pid dir (%s)\n", path);
+	Dir *db;
+	db = dirstat(path);
+	if(db->qid.type&QTDIR){
+		free(db);
+		DPRINT(DFID, "cleanupsession: got a dir...\n");
+		
+		int fd = open(path, OREAD);
+		if(fd == -1){
+			DPRINT(DFID, "cleanupsession: fd == -1\n");
+			return;
+		}
+		int n = dirreadall(fd, &db);
+		DPRINT(DFID, "\tn=(%d)\n", n);
+		if(n < 0){
+			DPRINT(DFID, "cleanupsession: n < 0\n");
+			return;
+		}
+		int i;
+		for(i=0; i<n; i++){
+			int ret;
+			DPRINT(DFID, "\tname=(%s)\n", db[i].name);
+//	  ret = unmount(db[i].name, path);
+			
+			snprint(path, STRMAX, "%s/%d/%s", mmount, pid,db[i].name);
+			ret = remove(path);
+//	*ERROR*: could not remove (/tmp/testbed/E/1403/stderr): remove prohibited 
+			
+			
+//	  ret = unmount(0, path);
+//*ERROR*: could not remove (/tmp/testbed/E/1237/stderr): not mounted 
+			if(ret==-1)
+				DPRINT(DFID, "\t*ERROR*: could not remove (%s): %r\n", path);
+		}
+		
+	}
+/**/
+	int ret;
+	
+//	DPRINT(DFID, "cleanupsession: unmounting and killing %s pid=(%d)\n", path, pid);
+//	ret = unmount(0, path);
+//	if(ret == -1) {
+//		DPRINT(DFID, "*ERROR*: unmounting stuff on (%s) failed\n", path);
+//	}
+	
+	
+	
+	// FIXME: remove the direcotry -- removefile causes an about
+	snprint(path, STRMAX, "%d", pid);
+//	ret = 0;
+//	qlock(&lck);
+	File *dir= walkfile(fs.tree->root, path);
+	
+	DPRINT(DFID, "cleanupsession: dir->ref (%d)\n", dir->ref);
+	
+	
+	
+//	Readdir *rd = opendirfile(dir);
+//	uchar buf[256];
+//	long bla=  readdirfile(rd, buf, 256);
+//	DPRINT(DFID, "cleanupsession: buf=(%s)\n", buf);
+//	DPRINT(DFID, "cleanupsession: dirname=(%s)\n", rd->dir->name);
+	
+//          void     closedirfile(Readdir *rdir)
+//          int      hasperm(File *file, char *uid, int p)
+//
+//	closedirfile(rd);
 
 /*
-	DPRINT(DFID, "cleanupsession: unmounting and killing %s pid=(%d)\n", path, pid);
-	ret = unmount(0, path);
-	if(ret == -1) {
-		DPRINT(DFID, "  ERROR: unmounting (%d) failed\n", pid);
-	}
-	ret = postnote(PNPROC, pid, "kill");
-	if(ret == -1) {
-		DPRINT(DFID, "  ERROR: postnote (%d) failed\n", pid);
+	if(dir!=nil && dir->ref!=0){
+		File *f= walkfile(dir, "stdin");
+		if(f != nil){
+			ret = removefile(f);
+//		qunlock(&lck);
+			DPRINT(DFID, "removing pid dir (%s)\n", "stdin");
+			if(ret)
+				DPRINT(DFID, "\t*ERROR*: could not remove file  (%s)\n", "stdin");
+		}
+		else
+		DPRINT(DFID, "\t*WARNING*: no (%s)\n", "stdin");	
 	}
 */
+
+	if(dir!=nil && dir->ref==0){
+		ret = removefile(dir);
+//		qunlock(&lck);
+		DPRINT(DFID, "removing pid dir (%s)\n", path);
+		if(ret)
+			DPRINT(DFID, "\t*ERROR*: could not remove file  (%s)\n", path);
+	}
+//	else
+//		qunlock(&lck);
+	
+
 	free(path);
 }
 
@@ -422,7 +547,6 @@ fsclunk(Fid *f)
 {
 	DPRINT(DFID, "fsclunk: %p fid=%d aux=%p\n", f, f->fid, f->aux);
 
-	// FIXME: this section of the code appears to never be run.  Where is aus supposed to be set?
 	if(f->aux) {
 		Exec *e = f->aux;
 
@@ -496,7 +620,7 @@ iothread(void*)
 
 		switch(r->ifcall.type){
 		case Topen:
-			fsopen(r);
+			proccreate(fsopen, (void *) r, STACK);
 			break;
 		case Twrite:
 			fswrite(r);

@@ -13,10 +13,11 @@ EXECLOG=$TESTDIR/exec2fs.log
 MPIPELOG=$TESTDIR/mpipefs.log
 ERRORLOG=$TESTDIR/error.log
 
-#E_MNTPATH=/tmp/testbed/E
-E_MNTPATH=$TESTDIR/E
-#M_MNTPATH=$TESTDIR/E/mpipe
-M_MNTPATH=$TESTDIR/M
+E_MNTPATH=/tmp/testbed/E
+#E_MNTPATH=$TESTDIR/E
+
+#M_MNTPATH=$TESTDIR/M
+M_MNTPATH=$E_MNTPATH
 
 #
 # Cleanup Previous Instances
@@ -177,6 +178,6 @@ stdout
 
 # you can run cleanup/startup between each one to force it to work...
 
-#shutdown
+shutdown
 
 #cleanup
