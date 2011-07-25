@@ -101,6 +101,15 @@ nuke:V:
 	rm -f *.[$OS] y.tab.? lex.yy.c y.debug y.output [$OS].??* *.acid $TARG
 	rm -f *.log
 
+deploy:V:
+	objtype=power mk all
+	dircp ../uem /n/9/sys/src/cmd/uem
+	cp q.gangfs /n/9/power/bin/gangfs
+	cp q.mpipefs /n/9/power/bin/mpipefs
+	cp q.execfs /n/9/power/bin/execfs
+	cp q.execcmd /n/9/power/bin/execcmd
+	cp q.csrv /n/9/power/bin/csrv	
+
 anl_mount:
 	srv tcp!9.3.45.4!1127 anlgw
 	mount /srv/anlgw /n/anl
