@@ -42,6 +42,26 @@ debug:V: all
 	#rc tri.rc 12
 	rc exec2fs.rc 0xFFFFF
 
+test_simple:V: all
+	# for 9vx and small system tests
+	#rc execfs.rc 9
+	#rc uem_64.rc 9
+	#rc uem_512.rc 9
+	#rc uem_hier.rc 9
+	#rc tri.rc 12
+	#rc mpipefs.rc 0xFFFFF
+	#rc exec2fs.rc 0xFFFFF
+	rc gangfs.rc 0xFFFFF
+
+test_medium:V: all
+	# for medium sized testing which stress tests 9vs and other small systems 
+	#   (not guarnteed to run)
+	rc pbg_4.rc 0xFFFFF
+
+test_big:V: all
+	# for the BG and other large system tests
+	#rc bg_256.rc 9
+
 kill:VE: 
 	rm -f /srv/mpipe
 	kill $O.execcmd | rc

@@ -1,13 +1,16 @@
 #!/bin/rc
 
-DEBUG='-v 11'
+DEBUG=''
+if(~ $#* 0) {
+  DEBUG='-v '$1
+}
 
 IP=11.$treeip
 
 TESTDIR=.test
 
 GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
-EXECLOG=$TESTDIR'/execfs-'$IP'.log'
+EXECLOG=$TESTDIR'/exec2fs-'$IP'.log'
 MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
 
 O=8.
@@ -62,10 +65,10 @@ if(! test -e '/net/cs'){
 	}
 
 	rm -f $EXECLOG
-	if(! test -e '/srv/execfs-'$IP){
-	    echo 'starting execfs-'$IP
-	    $CMDPATH^execfs $DEBUG -s execfs-$IP -E $CMDPATH^execcmd -L $TESTDIR -M mpipe-$IP >>[2] $EXECLOG
-	    mount -ca /srv/execfs-$IP /n/$IP/proc
+	if(! test -e '/srv/exec2fs-'$IP){
+	    echo 'starting exec2fs-'$IP
+	    $CMDPATH^exec2fs $DEBUG -s exec2fs-$IP -E $CMDPATH^execcmd -L $TESTDIR -M mpipe-$IP >>[2] $EXECLOG
+	    mount -ca /srv/exec2fs-$IP /n/$IP/proc
 	}
 
 	# if we are an ionode
@@ -81,7 +84,7 @@ if(! test -e '/net/cs'){
 		#$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n $IP -M mpipe-$IP >>[2] $GANGLOG
 		#mount -ca /srv/gangfs-$IP /n/$IP/proc
 
-		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n io -M mpipe-$IP >>[2] $GANGLOG
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n io -M /srv/mpipe-$IP -N 4 >>[2] $GANGLOG
 		mount -ca /srv/gangfs-$IP /n/io/proc
  	  }
 	}
@@ -90,7 +93,7 @@ if(! test -e '/net/cs'){
 		echo 'starting gangfs on CPU node treeip='$IP
 		#$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p 11.$IO -n $IP -M mpipe-$IP >>[2] $GANGLOG
 
-		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p io -n $IP -M mpipe-$IP >>[2] $GANGLOG
+		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p io -n $IP -M /srv/mpipe-$IP -N 4 >>[2] $GANGLOG
 
 		mount -ca /srv/gangfs-$IP /n/$IP/proc
 	  }

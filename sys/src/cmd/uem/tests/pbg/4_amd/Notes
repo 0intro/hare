@@ -1,4 +1,0 @@
-
-This is setting up a single session and not 4 (on AMD).  This causes
-all the tasks to be assigned to the first gang.
-

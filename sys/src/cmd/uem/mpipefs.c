@@ -306,7 +306,10 @@ addnewreader(Mpipe *mp, Fidaux *aux)
 	int count;
 	int min = mp->numr[0];
 	aux->chan = chancreate(sizeof(Req *), 0);
-	assert(aux->chan != nil);
+	if(aux->chan == nil) {
+		DPRINT(DERR, "*ERROR*: addnewreader attempting to operate on a null chanel\n");
+		return ;
+	}
 
 	if(mp->mode == MPThangingup || mp->mode == MPThungup || mp->mode == MPTcleanup) {
 		DPRINT(DBCA,"[%s](%p) WARNING: mp mode set to not running\n");
@@ -896,7 +899,10 @@ fsbcast(Req *r, Mpipe *mp)
 	char *err = nil;
 	void *bakaux;
 
-	assert(reterr != nil);
+	if(reterr == nil) {
+		DPRINT(DERR, "*ERROR*: chancreate returned a null chanel\n");
+		return nil;
+	}
 
 	/* backup r->aux for splicefrom case */
 	bakaux = r->aux;
@@ -1022,7 +1028,10 @@ splicefrom(void *arg) {
 			}
 
 			raux->other = dummy;
-			assert(raux->chan != 0);
+			if(raux->chan == nil) {
+				DPRINT(DERR, "*ERROR*: raux->chan is nil\n");
+				goto exit;
+			}
 			if(sendp(raux->chan, &tr) != 1) {
 				DPRINT(DERR, "*ERROR*: [%s](%p) splicefrom: %s\n", mp->name, mp, Ehangup);
 				goto exit;
@@ -1176,7 +1185,10 @@ fswrite(void *arg)
 		}
 	}
 			
-	assert(raux->chan != 0);
+	if(raux->chan == nil) {
+		DPRINT(DERR, "*ERROR*: raux->chan is nil\n");
+		goto out;
+	}
 	if(sendp(raux->chan, r) != 1)
 		respond(r, Ehangup);
 

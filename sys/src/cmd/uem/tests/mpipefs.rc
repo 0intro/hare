@@ -8,8 +8,10 @@ echo '== Multipipe Regression =='
 #
 # Parameters
 #
-MPIPELOG=mpipefs.log
-TESTDIR=.test
+TESTDIR=.test/mpipefs
+#TESTDIR=/tmp/testbed
+
+MPIPELOG=$TESTDIR/mpipefs.log
 DEBUG_LEVEL=0
 
 #
@@ -17,9 +19,13 @@ DEBUG_LEVEL=0
 #
 fn cleanup {
 	echo Cleaning up previous runs...
-	#unmount /n/mpipetest > /dev/null >[2] /dev/null
-	rm -f /srv/mpipe
-	#kill mpipefs | rc
+	unmount /n/mpipetest > /dev/null >[2] /dev/null
+	rm -f /srv/mpipe*
+	kill $O.mpipefs | rc
+	rm -f /srv/mpipe*
+
+	unmount /proc
+	bind '#p' /proc
 }
 
 #
@@ -28,10 +34,12 @@ fn cleanup {
 fn startup {
 	echo Starting mpipefs....
 	if(~ $#* 0) {
+echo 'not DEBUGGING'
 		../$O.mpipefs >[2] $MPIPELOG 
 	}
 	if not {
-		../$O.mpipefs -D -v $1 >[2] $MPIPELOG 	# CHATTY
+echo 'DEBUGGING'
+		../$O.mpipefs -v $1 >[2] $MPIPELOG
 		DEBUG_LEVEL=$1
 	}
 }
@@ -173,7 +181,6 @@ fn simplepipe {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 #
@@ -218,7 +225,7 @@ fn multipipe {
 		./$O.mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
 	}
 	if not {
-		./$O.mp-writer -D -n $NUM_PASSED -s 8192 /n/mpipetest/data
+		./$O.mp-writer -n $NUM_PASSED -s 8192 /n/mpipetest/data
 	}
 
 	# wait for children to finish
@@ -274,7 +281,6 @@ fn multipipe {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 fn enum {
@@ -318,7 +324,6 @@ fn enum {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 # TODO: 8192 is not long enough, but anything above 64k breaks
@@ -362,7 +367,6 @@ fn longmsg {
 	echo Success!
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 # Broadcast test
@@ -415,7 +419,6 @@ fn bcast {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 #
@@ -449,7 +452,6 @@ fn splicefrom {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 #
@@ -491,7 +493,6 @@ fn splicefrombcast {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 #
@@ -517,7 +518,6 @@ fn spliceto {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 #
@@ -560,7 +560,6 @@ fn splicetochain {
 	unmount /n/stage1
 	unmount /n/stage2
 	unmount /n/stage3
-	rm -rf $TESTDIR/*
 }
 
 #
@@ -602,22 +601,20 @@ fn splicetobcast {
 
 	# cleanup
 	unmount /n/mpipetest
-	rm -rf $TESTDIR/*
 }
 
 # Setup
 rfork
 
 cleanup
-startup $*
 testdir
+startup $*
 
 # Tests
 named
 simplepipe
 longmsg
-#  TODO: will this really happen deterministicly?
-multipipe  #<--- FAILS sometimes due to non-determinsm
+multipipe
 enum 
 bcast
 splicefrom
@@ -625,8 +622,9 @@ spliceto
 splicetobcast
 splicefrombcast
 splicetochain
+exit 0
 
 # Cleanup
-rm -f $TESTDIR
+#rm -f $TESTDIR
 cleanup
 
