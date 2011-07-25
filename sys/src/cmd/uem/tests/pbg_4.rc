@@ -12,7 +12,15 @@ IP=11.$IO
 #
 # Parameters
 #
-TESTDIR=.test
+if(~ $#* 0) {
+    DEBUG=''
+}
+if not {
+  DEBUG=$1
+}
+echo 'DEBUG='$DEBUG
+
+TESTDIR=.test/pbg
 
 GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
 EXECLOG=$TESTDIR'/exec2fs'-$IP'.log'
@@ -37,7 +45,7 @@ CMD='../8.poke -L '$TESTDIR
 NUM=16
 
 I_MAX=1
-J_MAX=4
+J_MAX=1
 K_MAX=4
 
 fn enum_tests {
@@ -112,14 +120,14 @@ enum_srv
 
 # fake the BG/P profile (1 I/O node and 4 CPU nodes)
 echo '############ starting next '$IP' ############' >>[2] $GANGLOG
-cpunode=0 treeip=$IO profile.pbg
+cpunode=0 treeip=$IO profile.pbg $DEBUG
 
 #srvfs io /n/$IP
 
 # generate tje fake CPU nodes and moutn them
 for(i in $SRVNUM){
   echo '############ starting next '11.$i' ############' >>[2] $GANGLOG
-  cpunode=1 treeip=$i profile.pbg
+  cpunode=1 treeip=$i profile.pbg $DEBUG
 }
 
 ########################################

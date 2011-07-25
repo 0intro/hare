@@ -55,7 +55,7 @@ test_simple:V: all
 
 test_medium:V: all
 	# for medium sized testing which stress tests 9vs and other small systems 
-	#   (not guarnteed to run)
+	#   (not guarnteed to run but should)
 	rc pbg_4.rc 0xFFFFF
 
 test_big:V: all
