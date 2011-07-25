@@ -260,7 +260,7 @@ fsopen(void *arg)
 		goto error;	
 	}
 
-	// asserts are heavy handed, but help with debug
+	/* mount the mpipes */
 	n = mpipe(fname, "stdin");
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*: bad mpipe for stdin\n");

@@ -122,10 +122,14 @@ threadmain(int argc, char **argv)
 	default:
 		/* break */
 		usage();
-		assert(0);
+		exits("argument");
 	}ARGEND
 
-	assert(argc == 0);
+	if(argc != 0){
+		DPRINT(DERR, "*ERROR*: number of argument mismatch\n");
+		usage();
+		exits("number of arguments");
+	}
 
 	/* move the  log file generation outside the test directory */
 	if(vflag > 0) {
@@ -134,7 +138,10 @@ threadmain(int argc, char **argv)
 		else
 			logfile = smprint("execcmd-%d.log", getpid());
 		debugfd = create(logfile, OWRITE, 0666);
-		assert(debugfd > 2);
+		if(debugfd <= 2){
+			DPRINT(DERR, "*ERROR*: could not open log file (%s)\n", logfile);
+			exits("logfile");
+		}
 
 		//sleep(100);
 		DPRINT(DEXC, "Main: logfile=%s\n", logfile);
@@ -148,13 +155,19 @@ threadmain(int argc, char **argv)
 
 	/* open our files */
 	ctlfd = open(srvctl, ORDWR|OCEXEC);
-	assert(ctlfd>= 0);
+	if(ctlfd < 0){
+		DPRINT(DERR, "*ERROR*: could not open server ctl (%s)\n", srvctl);
+		exits("srvctl");
+	}
 	remove(srvctl);
 
 	DPRINT(DEXC, "After srv ctl open\n");
 
 	ret = read(ctlfd, ctlbuf, 255);
-	assert(ret > 0);
+	if(ret <= 0){
+		DPRINT(DERR, "*ERROR*: ctl read failed\n");
+		exits("ctl read");
+	}
 	ctlbuf[ret] = 0;
 
 	DPRINT(DEXC, "got ret=(%d) ctlbuf=(%s) pid=(%d)\n", ret, ctlbuf, pid);
@@ -163,22 +176,19 @@ threadmain(int argc, char **argv)
 	snprint(fname, 255, "%s/%d/stdin", mmount, pid);
 	stdinfd = open(fname, OREAD);
 	DPRINT(DCUR, "stdin=(%s) stdinfd=(%d)\n", fname, stdinfd);
-	assert(stdinfd > 0);
 
 	snprint(fname, 255, "%s/%d/stdout", mmount, pid);
 	stdoutfd = open(fname, OWRITE);
 	DPRINT(DCUR, "stdout=(%s) stdoutfd=(%d)\n", fname, stdoutfd);
-	assert(stdoutfd > 0);
 
 	snprint(fname, 255, "%s/%d/stderr", mmount, pid);
 	stderrfd = open(fname, OWRITE);
 	DPRINT(DCUR, "stderr=(%s) stderrfd=(%d)\n", fname, stderrfd);
-	assert(stderrfd > 0);
 
 	DPRINT(DEXC, "after opening stdio pipes\n");
 
 	if((stdinfd < 0)||(stdoutfd < 0)||(stderrfd < 0)) {
-		DPRINT(DEXC, "some sort of issue opening stdio pipes\n");
+		DPRINT(DERR, "*ERROR*: some sort of issue opening stdio pipes\n");
 
 		write(ctlfd, Estdios, strlen(Estdios));
 		exits("stdios");
@@ -187,7 +197,10 @@ threadmain(int argc, char **argv)
 	DPRINT(DEXC, "reporting partial success\n");
 
 	ret = write(ctlfd, "1", 1);	/* report partial sucess */
-	assert(ret > 0);
+	if(ret <= 0){
+		DPRINT(DERR, "*ERROR*: ctl write failed\n");
+		exits("ctl write");
+	}
 
 
 	DPRINT(DEXC, "waiting for cmds\n");
