@@ -228,16 +228,22 @@ fsopen(Req *r)
 	 * this is a hard failure, so crash instead of dieing
 	 * gracefully */
 	DPRINT(DFID, "number of new pids=(%d)\n", e->pid);
-	assert(e->pid > 2);	/* assumption for our ctl channels */
+	if(e->pid <= 2) {
+		DPRINT(DERR, "fsopen: *ERROR*: e->pid assertion failed: %d\n", e->pid);
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
 
 	/* grab actual reference to real control channel -- which
 	 * should be on the actual /proc so we can isolate real
 	 * proc/mount/name-space issues */
-	// FIXME: test hack.  Fix later, and possibly give a cmdl
-	//   option
-	// n = snprint(fname, STRMAX, "%s/%d/ctl", procpath, e->pid);
-	n = snprint(fname, STRMAX, "/proc/%d/ctl", e->pid);
-	assert(n > 0);
+
+	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
+	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: snprint fname failed: %d\n", n);
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
 	
 	/* grab ahold of the ctl file */
 	if((e->rctlfd = open(fname, OWRITE)) < 0) {
@@ -248,15 +254,31 @@ fsopen(Req *r)
 	DPRINT(DFID, "\tctlfd=(%d)\n", e->rctlfd);
 
 	n = snprint(fname, STRMAX, "%s/%d", procpath, e->pid);
-	assert(n > 0);
+	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: snprint base proc directory failed: %d\n", n);
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
 
 	/* asserts are heavy handed, but help with debug */
 	n = mpipe(fname, "stdin");
-	assert(n > 0);
+	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: mpipe mount failed: %d\n", n);
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
 	n = mpipe(fname, "stdout");
-	assert(n > 0);
+	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: mpipe mount failed: %d\n", n);
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
 	n = mpipe(fname, "stderr");
-	assert(n > 0);
+	if(n < 0) {
+		DPRINT(DERR, "fsopen: *ERROR*: mpipe mount failed: %d\n", n);
+		err = estrdup9p(Ectlchan);
+		goto error;	
+	}
 
 	// FIXME: hack to keep track of mnts
 	qlock(&lck);
