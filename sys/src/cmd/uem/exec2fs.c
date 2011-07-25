@@ -222,7 +222,7 @@ fsopen(void *arg)
 	n = snprint(fname, STRMAX, "#p/%d/ctl", e->pid);
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*:  bad snprint #1\n");
-		err = estrdup9p(Enoctl);
+		err = estrdup9p(Ebadprint);
 		goto error;
 	}
 
@@ -230,7 +230,7 @@ fsopen(void *arg)
 	DPRINT(DCUR, "fsopen: opening %s\n", fname);
 	if((e->rctlfd = open(fname, OWRITE)) < 0) {
 		DPRINT(DERR, "\n*ERROR*: opening %s failed: %r\n", fname);
-		err = smprint("exec2fs: fsopen: opening [%s] failed: %r", fname);
+		err = estrdup9p(Enoctl);
 		goto error;
 	}
 	DPRINT(DFID, "\tctlfd=(%d)\n", e->rctlfd);
