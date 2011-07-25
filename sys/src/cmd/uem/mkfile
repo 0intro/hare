@@ -53,7 +53,7 @@ dirsnuke:V: nuke
 	}
 	cd $p
 
-debug regress:VE: all
+debug regress test_simple test_medium test_big:VE: all
 	p=`{pwd}
 	for(i in $DIRS) @{
 		cd $i
