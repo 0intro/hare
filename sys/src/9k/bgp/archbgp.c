@@ -278,7 +278,8 @@ meminit(unsigned cnsbase)
 	void cnkmbinit(int, int);
 	void cnkmbfree(unsigned);
 
-#define TMFM	(64)					/* Too Many F'ing MiB */
+/* was 48, tried 64, now bumping to 128 */
+#define TMFM	(128)					/* Too Many F'ing MiB */
 	/*
 	 * BG/P has 2 or 4 GiB. Low-level boot only sets up a
 	 * single TMFM*MiB of TLB entries, let's stick with that for now.
@@ -315,7 +316,6 @@ meminit(unsigned cnsbase)
 
 	sys->tom = n/MiB;
 
-	/* was 48, try 64 */
 	conf.mem[0].base = PGROUND(PADDR(sys->memstart));
 	conf.mem[0].npage = (TMFM*MiB - conf.mem[0].base)/BY2PG;
 	conf.mem[1].base = TMFM*MiB;
