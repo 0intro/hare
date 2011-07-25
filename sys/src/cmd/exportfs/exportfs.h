@@ -78,9 +78,9 @@ enum
 	Npsmpt		= 32,
 */
 
-	MAXPROC		= 200,
+	MAXPROC		= 1024,
 	FHASHSIZE	= 256,
-	Nr_workbufs 	= 200,
+	Nr_workbufs 	= 1024,
 	Fidchunk	= 1000,
 	Npsmpt		= 128,
 
