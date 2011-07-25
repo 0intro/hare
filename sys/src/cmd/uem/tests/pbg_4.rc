@@ -15,7 +15,7 @@ IP=11.$IO
 TESTDIR=.test
 
 GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
-EXECLOG=$TESTDIR'/execfs'-$IP'.log'
+EXECLOG=$TESTDIR'/exec2fs'-$IP'.log'
 MPIPELOG=$TESTDIR'/mpipefs'-$IP'.log'
 ERRORLOG=$TESTDIR'/error.log'
 
@@ -27,13 +27,14 @@ CMD='../8.poke -L '$TESTDIR
 # setup 
 #
 #NUM=64 # succeds
-NUM=75 # succeds
+#NUM=75 # succeds
 #NUM=80 # fails
 
 #  NUM=32 # (with 1,4,4) gives
 #    exportfs 929: warning: process exceeds 100 file descriptors
 # and sometimes
 #    exportfs: No more work buffers
+NUM=16
 
 I_MAX=1
 J_MAX=4
