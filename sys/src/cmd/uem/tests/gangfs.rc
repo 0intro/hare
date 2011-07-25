@@ -11,6 +11,15 @@ echo '== Gangfs Regression =='
 O=8.
 CMD=../$O
 
+DEBUG='-v 0x00000'
+if(~ $#* 0) {
+    DEBUG=''
+}
+if not {
+  DEBUG='-v '$1
+}
+echo 'DEBUG='$DEBUG
+
 TESTDIR=.test/gangfs
 #TESTDIR=/tmp/testbed
 
@@ -58,12 +67,7 @@ fn shutdown {
 fn startup_mpipe {
 	echo Starting mpipefs....
 
-	if(~ $#* 0) {
-		$CMD^mpipefs >[2] $MPIPELOG # $M_MNTPATH
-	}
-	if not {
-		$CMD^mpipefs -v $1 >[2] $MPIPELOG # CHATTY
-	}
+	$CMD^mpipefs $DEBUG >[2] $MPIPELOG # $M_MNTPATH
 }
 
 #
@@ -71,22 +75,15 @@ fn startup_mpipe {
 #
 fn startup_exec2fs {
 	echo Starting exec2fs.
-	if(~ $#* 0) {
-		$CMD^exec2fs -s exec2fs -E $CMD^execcmd -m $E_MNTPATH -L $TESTDIR -Z $M_MNTPATH >[2] $EXECLOG 
-	}
-	if not {
-		$CMD^exec2fs -v $1 -s exec2fs -E $CMD^execcmd -m $E_MNTPATH -L $TESTDIR -Z $M_MNTPATH >[2] $EXECLOG  	# CHATTY
-	}
+
+	$CMD^exec2fs $DEBUG -s exec2fs -E $CMD^execcmd -m $E_MNTPATH -L $TESTDIR -Z $M_MNTPATH >[2] $EXECLOG
 }
 
 fn startup_gangfs {
 	echo Starting gangfs.
-	if(~ $#* 0) {
-		$CMD^gangfs -R 0 -m $G_MNTPATH -E $E_MNTPATH -N 4 >[2] $GANGLOG 
-	}
-	if not {
-		$CMD^gangfs -v $1 -R 0 -m $G_MNTPATH -E $E_MNTPATH -N 4 >[2] $GANGLOG  	# CHATTY
-	}
+
+	$CMD^gangfs $DEBUG -m $G_MNTPATH -E $E_MNTPATH -N 4 >[2] $GANGLOG 
+	#mount -ca /srv/gangfs $G_MNTPATH
 }
 
 fn startup {
@@ -109,14 +106,14 @@ fn testdir {
 }
 
 fn myexec {
-	mypid=`{cat}
+	mypid=`{cat} #`
 	echo res 5 >>[2] $ERRORLOG
 	echo exec /bin/cat $TESTDIR/test >>[2] $ERRORLOG
 	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn myexec2 {
-	mypid=`{cat}
+	mypid=`{cat} #`
 	echo res 5 >>[2] $ERRORLOG
 	echo exec /bin/cat >>[2] $ERRORLOG
 	cat $TESTDIR/test > /proc/g$mypid/stdin >>[2] $ERRORLOG
@@ -124,7 +121,7 @@ fn myexec2 {
 }
 
 fn myexec3 {
-	mypid=`{cat}
+	mypid=`{cat} #`
 	echo enum >>[2] $ERRORLOG
 	echo res 5 >>[2] $ERRORLOG
 	echo exec /bin/cat >>[2] $ERRORLOG
@@ -140,7 +137,7 @@ fn basic {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec <>/proc/gclone >[1=0]
+	myexec <>$G_MNTPATH/gclone >[1=0]
 
 	# verify results (yes, I'm lazy)
 	cat $TESTDIR/test > $TESTDIR/test2
@@ -166,7 +163,7 @@ fn stdin {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec2 <>/proc/gclone >[1=0]
+	myexec2 <>$G_MNTPATH/gclone >[1=0]
 
 	# verify results (yes, I'm lazy)
 	cat $TESTDIR/test > $TESTDIR/test2
@@ -197,7 +194,7 @@ fn enum {
 	echo > $TESTDIR/test1
 
 	# execute test
-	myexec3 <>/proc/gclone >[1=0]
+	myexec3 <>$G_MNTPATH/gclone >[1=0]
 
 	# verify results 
 	if(! cmp -s $TESTDIR/test $TESTDIR/test1) {
