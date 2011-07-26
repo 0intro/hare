@@ -26,6 +26,7 @@
 #include <libsec.h>
 #include <stdio.h>
 #include <debug.h>
+#include <timeit.h>
 
 static char Ebadfd[] = "bad fd";
 static char Ebadprint[] = "bad snprint";
@@ -203,7 +204,11 @@ fsopen(void *arg)
 	e->ctlfd = p[1];
      
 	/* ask for a new child process */
+// FIXME: remember this must be multi-threaded
+stamp("before kickit");
 	e->pid = (int) kickit();
+stamp("after kickit");
+timeit_dt(-1, "DT: kickit");
 
 	/* cloneproc generates stdin, stdout, and stderr for the ctl
 	 * channel.  If any of these fail, then e->pid will be < 2, and
@@ -442,6 +447,9 @@ cleanupsession(void *arg)
 	int pid = (int) arg;
 	char *path = (char *) emalloc9p(STRMAX);
 	
+	stamp("cleanupsession");
+	timeit_dump();
+
 	snprint(path, STRMAX, "%s/%d", mmount, pid);
 	
 	/* this is a hack on trying to clean things up */
@@ -737,6 +745,10 @@ threadmain(int argc, char **argv)
 		}
 		usage();
 	}
+
+	timeit_init();
+	// FIXME: give it a real name...
+	timeit_setout((logdir==nil)?"exec2fs_timestamp.dat":smprint("%s/exec2fs_timestamp.dat",logdir));
 
 	srvctl = smprint("/srv/exec2fs-%d", getpid());
 	DPRINT(DARG, "Main: srvctl=(%s)\n", srvctl);
