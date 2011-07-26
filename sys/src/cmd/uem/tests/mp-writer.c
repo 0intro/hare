@@ -1,6 +1,8 @@
 #include <u.h>
 #include <libc.h>
 
+#define MAXSTR 256
+
 int chatty = 0;
 char *mppath;
 
@@ -35,12 +37,12 @@ int
 streamout(int fd, ulong which, char *path)
 {
 	int n; 
-	char hdr[255];
+	char hdr[MAXSTR];
 	ulong tag = ~0;
 	char pkttype='>';
 
 	/* header byte is at offset ~0 */
-	n = snprint(hdr, 31, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
+	n = snprint(hdr, MAXSTR, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
 	n = pwrite(fd, hdr, n+1, tag);
 	
 	return n;
@@ -50,12 +52,12 @@ int
 streamin(int fd, ulong which, char *path)
 {
 	int n; 
-	char hdr[255];
+	char hdr[MAXSTR];
 	ulong tag = ~0;
 	char pkttype='<';
 
 	/* header byte is at offset ~0 */
-	n = snprint(hdr, 31, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
+	n = snprint(hdr, MAXSTR, "%c\n%lud\n%lud\n%s\n", pkttype, (ulong)0, which, path);
 	n = pwrite(fd, hdr, n+1, tag);
 	
 	return n;
@@ -65,12 +67,12 @@ int
 pipewrite(int fd, char *data, ulong size, ulong which)
 {	
 	int n; 
-	char hdr[255];
+	char hdr[MAXSTR];
 	ulong tag = ~0;
 	char pkttype='p';
 
 	/* header byte is at offset ~0 */
-	n = snprint(hdr, 31, "%c\n%lud\n%lud\n\n", pkttype, size, which);
+	n = snprint(hdr, MAXSTR, "%c\n%lud\n%lud\n\n", pkttype, size, which);
 	n = pwrite(fd, hdr, n+1, tag);
 	if(n <= 0)
 		return n;
