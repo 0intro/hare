@@ -11,8 +11,8 @@ echo '== Exec2fs Regression =='
 O=8.
 CMD=../$O
 
-TESTDIR=.test/exec2fs
-#TESTDIR=/tmp/testbed
+#TESTDIR=.test/exec2fs
+TESTDIR=/tmp/testbed/exec2fs
 
 EXECLOG=$TESTDIR/exec2fs.log
 MPIPELOG=$TESTDIR/mpipefs.log

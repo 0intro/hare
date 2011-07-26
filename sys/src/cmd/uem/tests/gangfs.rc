@@ -20,8 +20,8 @@ if not {
 }
 echo 'DEBUG='$DEBUG
 
-TESTDIR=.test/gangfs
-#TESTDIR=/tmp/testbed
+#TESTDIR=.test/gangfs
+TESTDIR=/tmp/testbed/gangfs
 
 GANGLOG=$TESTDIR/gangfs.log
 EXECLOG=$TESTDIR/exec2fs.log

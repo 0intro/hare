@@ -15,8 +15,8 @@ echo '************************ IP = '$IP
 9fs $IP
 
 
-#TESTDIR=/tmp/uem_test
-TESTDIR=/n/frontend/home/ericvh/tmp/.test
+TESTDIR=/tmp/uem_test
+#TESTDIR=/n/frontend/home/ericvh/tmp/.test
 
 ERRORLOG=$TESTDIR'/error-'$IP'.log'
 

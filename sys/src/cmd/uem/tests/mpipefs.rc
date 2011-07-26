@@ -8,8 +8,8 @@ echo '== Multipipe Regression =='
 #
 # Parameters
 #
-TESTDIR=.test/mpipefs
-#TESTDIR=/tmp/testbed
+#TESTDIR=.test/mpipefs
+TESTDIR=/tmp/testbed/mpipefs
 
 MPIPELOG=$TESTDIR/mpipefs.log
 DEBUG_LEVEL=0

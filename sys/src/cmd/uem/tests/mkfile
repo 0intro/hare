@@ -90,6 +90,7 @@ tidy:VE: kill
 	rm -f *.log
 	rm -f *.acid
 	rm -rf .test .meta
+	rm -rf /tmp/testbed
 
 acid:V: execfs.acid execcmd.acid mpipefs.acid gangfs.acid
 

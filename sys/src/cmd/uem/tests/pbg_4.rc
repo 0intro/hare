@@ -20,7 +20,8 @@ if not {
 }
 echo 'DEBUG='$DEBUG
 
-TESTDIR=.test/pbg
+#TESTDIR=.test/pbg
+TESTDIR=/tmp/testbed/pbg
 
 GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
 EXECLOG=$TESTDIR'/exec2fs'-$IP'.log'
@@ -34,14 +35,11 @@ CMD='../8.poke -L '$TESTDIR
 
 # setup 
 #
-#NUM=64 # succeds
-#NUM=75 # succeds
+#NUM=64 # succeds on 9vx with extended memory and procs
+#NUM=75 # succeds on 9vx with extended memory and procs
 #NUM=80 # fails
 
-#  NUM=32 # (with 1,4,4) gives
-#    exportfs 929: warning: process exceeds 100 file descriptors
-# and sometimes
-#    exportfs: No more work buffers
+# 16 should always work
 NUM=16
 
 I_MAX=1
