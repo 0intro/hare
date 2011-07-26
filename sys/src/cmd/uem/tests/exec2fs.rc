@@ -29,7 +29,7 @@ M_MNTPATH=$E_MNTPATH
 fn cleanup {
 	echo Cleaning up previous runs.
 
-	rm -f $E_MNTPATH $M_MNTPATH  /tmp/testbed
+	rm -f $E_MNTPATH $M_MNTPATH
 	rm -rf $TESTDIR
 }
 
@@ -77,9 +77,6 @@ fn startup_exec2fs {
 }
 
 fn startup {
-	mkdir -p $TESTDIR
-	mkdir -p $E_MNTPATH $M_MNTPATH 
-
 	startup_exec2fs $1
 	startup_mpipe $1
 
@@ -92,6 +89,7 @@ fn startup {
 #
 fn testdir {
 	mkdir -p $TESTDIR
+	mkdir -p $E_MNTPATH $M_MNTPATH 
 }
 
 fn myexecstdin {
@@ -153,13 +151,9 @@ rfork
 cleanup
 shutdown
 
-#testdir
+testdir
 
 startup $1
-
-# Note: the current tests die on the 4'th run of either stdout or
-# stdin.  If I run cleanup**startup between each it runs fine.  For
-# now I am leaving it at two tests and will look into it later.
 
 # Tests -- do it several times to verify that it does not die as before
 stdin
@@ -173,17 +167,6 @@ stdout
 
 stdin
 stdout
-
-# FIXME: running dubug with more than 3 stdin/stdout tests or regress
-# with more than 1, causes the clone to fail while opening
-# /proc/#/ctl.  Ex:
-#
-# can't open: '/tmp/testbed/E/clone' exec2fs: fsopen: opening
-# [/proc/220943/ctl] failed: '/proc/220943/ctl' process exited mk: rc
-# mpipefs.rc rc ...  : exit status=rc 220177: rc 220903: error
-#
-
-# you can run cleanup/startup between each one to force it to work...
 
 shutdown
 

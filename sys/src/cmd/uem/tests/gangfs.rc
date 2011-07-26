@@ -30,8 +30,8 @@ ERRORLOG=$TESTDIR/error.log
 
 E_MNTPATH=$TESTDIR/E
 
-M_MNTPATH=$TESTDIR/M
-#M_MNTPATH=$E_MNTPATH
+#M_MNTPATH=$TESTDIR/M
+M_MNTPATH=$E_MNTPATH
 
 G_MNTPATH=$TESTDIR/G
 
@@ -61,37 +61,30 @@ fn shutdown {
 	bind '#p' /proc
 }
 
-#
-# Startup mpipefs 
-#
 fn startup_mpipe {
 	echo Starting mpipefs....
 
-	$CMD^mpipefs $DEBUG >[2] $MPIPELOG # $M_MNTPATH
+	$CMD^mpipefs $DEBUG -s mpipe $M_MNTPATH >[2] $MPIPELOG
 }
 
-#
-# Startup exec2fs 
-#
 fn startup_exec2fs {
 	echo Starting exec2fs.
 
-	$CMD^exec2fs $DEBUG -s exec2fs -E $CMD^execcmd -m $E_MNTPATH -L $TESTDIR -Z $M_MNTPATH >[2] $EXECLOG
+	$CMD^exec2fs $DEBUG -s exec2fs -E $CMD^execcmd -m $E_MNTPATH -L $TESTDIR -M mpipe -Z $M_MNTPATH >[2] $EXECLOG
 }
 
 fn startup_gangfs {
 	echo Starting gangfs.
 
 	$CMD^gangfs $DEBUG -m $G_MNTPATH -E $E_MNTPATH -N 4 >[2] $GANGLOG 
-	#mount -ca /srv/gangfs $G_MNTPATH
 }
 
+#
+# Startup mpipefs 
+#
 fn startup {
-	mkdir -p $TESTDIR
-	mkdir -p $E_MNTPATH $M_MNTPATH $G_MNTPATH 
-
-	startup_exec2fs $1
 	startup_mpipe $1
+	startup_exec2fs $1
 	startup_gangfs $1
 
 	bind -bc .  /$objtype/bin
@@ -103,21 +96,23 @@ fn startup {
 #
 fn testdir {
 	mkdir -p $TESTDIR
+	mkdir -p $E_MNTPATH $M_MNTPATH $G_MNTPATH 
+
 }
 
 fn myexec {
 	mypid=`{cat} #`
 	echo res 5 >>[2] $ERRORLOG
 	echo exec /bin/cat $TESTDIR/test >>[2] $ERRORLOG
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn myexec2 {
 	mypid=`{cat} #`
 	echo res 5 >>[2] $ERRORLOG
 	echo exec /bin/cat >>[2] $ERRORLOG
-	cat $TESTDIR/test > /proc/g$mypid/stdin >>[2] $ERRORLOG
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	cat $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] $ERRORLOG
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn myexec3 {
@@ -125,8 +120,8 @@ fn myexec3 {
 	echo enum >>[2] $ERRORLOG
 	echo res 5 >>[2] $ERRORLOG
 	echo exec /bin/cat >>[2] $ERRORLOG
-	read -n 5 $TESTDIR/test > /proc/g$mypid/stdin >>[2] $ERRORLOG &
-	cat /proc/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+	read -n 5 $TESTDIR/test > $G_MNTPATH/g$mypid/stdin >>[2] $ERRORLOG &
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
 }
 
 fn basic {
@@ -151,8 +146,6 @@ fn basic {
 	}
 
 	echo Success!
-	# cleanup
-	rm -rf $TESTDIR/*
 }
 
 fn stdin {
@@ -177,8 +170,6 @@ fn stdin {
 	}
 
 	echo Success!
-	# cleanup
-	rm -rf $TESTDIR/*
 }
 
 fn enum {
@@ -203,22 +194,23 @@ fn enum {
 	}
 
 	echo Success!
-	# cleanup
-	rm -rf $TESTDIR/*
 }
 
 # Setup
 rfork
 
 cleanup
-startup $1
+
 testdir
+startup $1
 
 # Tests
 basic
+
 stdin
+
 enum
 
-# Cleanup
-rm -rf $TESTDIR
-cleanup
+shutdown
+
+#cleanup

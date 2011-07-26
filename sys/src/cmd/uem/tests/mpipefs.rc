@@ -18,6 +18,13 @@ DEBUG_LEVEL=0
 # Cleanup Previous Instances
 #
 fn cleanup {
+	echo Cleaning up previous runs.
+
+	rm -f $E_MNTPATH $M_MNTPATH
+	rm -rf $TESTDIR
+}
+
+fn shutdown {
 	echo Cleaning up previous runs...
 	unmount /n/mpipetest > /dev/null >[2] /dev/null
 	rm -f /srv/mpipe*
@@ -624,7 +631,6 @@ splicefrombcast
 splicetochain
 exit 0
 
-# Cleanup
-#rm -f $TESTDIR
-cleanup
+shutdown
 
+#cleanup
