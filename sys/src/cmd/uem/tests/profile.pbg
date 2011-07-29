@@ -11,7 +11,8 @@ echo 'DEBUG='$DEBUG
 
 IP=11.$treeip
 
-TESTDIR=.test/pbg
+#TESTDIR=.test/pbg
+TESTDIR=/tmp/testbed/pbg
 
 GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
 EXECLOG=$TESTDIR'/exec2fs-'$IP'.log'
