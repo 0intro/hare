@@ -12,7 +12,8 @@ TARG = \
 	gang2fs\
 	poke\
 
-HFILES = debug.h
+HFILES = debug.h\
+       timeit.h
 
 DIRS = tests
 
@@ -53,7 +54,7 @@ dirsnuke:V: nuke
 	}
 	cd $p
 
-debug regress test_simple test_medium test_big:VE: all
+debug regress test_simple test_medium test_big test_scale:VE: all
 	p=`{pwd}
 	for(i in $DIRS) @{
 		cd $i
