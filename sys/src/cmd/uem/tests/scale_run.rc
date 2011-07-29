@@ -3,52 +3,46 @@
 # a UEM Scale Test Run
 #
 
+TESTDIR=pbg_scale
+
 R_MAX=16
 #R_MAX=2048
 
 TESTNUM=''
 
 fn enum_tests {
-    switch($#*){
-	case 0
-	    TESTNUM=`{awk 'BEGIN     {
-	 	for (i = 1; i <= '$R_MAX'; i*=2) printf "%d ",i
-		exit }'}
-	    #`# shut up the code coloring bug...
-	case 1
-	    TESTNUM=`{awk 'BEGIN     {
-	 	for (i = 1; i <= '$R_MAX'; i*=2) printf "%d_%d ",i,'$1'
-		exit }'}
-	    #`# shut up the code coloring bug...
-	case *
-	    echo Usage: tests ... >[1=2]
-	    exit usage
-    }
+    TESTNUM=`{awk 'BEGIN     {
+	for (i = 1; i <= '$R_MAX'; i*=2) printf "%d ",i
+	exit }'}
+     #`# shut up the code coloring bug...
 }
 
+if(~ $#* 0) DEBUG='0x00'
+if not DEBUG=$1
+
 enum_tests
-#if(~ $#* 0) enum_tests
-#if not enum_tests $1
 
 echo -n 'TESTNUM= '
 echo $TESTNUM
 
 EXT='1'
 
+mkdir -p $TESTDIR
+
 for(i in $TESTNUM){
   echo '############ starting next '$i' ############'
   mk tidy
-  rc scale.rc $i 0x00
+  rc scale.rc $i $DEBUG
 
   echo '############ processing /'$i'/ ############'
   if(~ $#* 0) {
-      mv pbg_scale/time_$i^.dat  pbg_scale/time_$i^_sav.dat
-      $O.time-stat -i pbg_scale/time_$i^_sav.dat -o  pbg_scale/time_$i^.out
+      mv $TESTDIR/time_$i^.dat  $TESTDIR/time_$i^_sav.dat
+      $O.time-stat -i $TESTDIR/time_$i^_sav.dat -o  $TESTDIR/time_$i^.out
   }
   if not {
-      mv pbg_scale/time_$i^.dat  pbg_scale/time_$i^_$1^_sav.dat
-      $O.time-stat -i pbg_scale/time_$i^_$1^_sav.dat -o  pbg_scale/time_$i^_$1^.out
+      mv $TESTDIR/time_$i^.dat  $TESTDIR/time_$i^_$1^_sav.dat
+      $O.time-stat -i $TESTDIR/time_$i^_$1^_sav.dat -o  $TESTDIR/time_$i^_$1^.out
   }
-  mk tidy
   echo ''
 }
+mk tidy
