@@ -802,6 +802,9 @@ static Gang *
 newgang(void) 
 {
 	Gang *mygang = emalloc9p(sizeof(Gang));
+	Gang *current;
+
+	static int master_gang_index = -1;
 
 	if(mygang == nil)
 		return nil;
@@ -812,21 +815,17 @@ newgang(void)
 	wlock(&glock);
 	if(glist == nil) {
 		glist = mygang;
-		mygang->index = 0;
 	} else {
-		int last = -1;
-		Gang *current;
-		for(current=glist; current->next != nil; current = current->next) {
-			if(current->index != last+1) {
-				break;
-			}
-			last++;
-		}
-		mygang->next = current->next;
+		/* allways append to the end */
+		for(current=glist; current->next!=nil; current=current->next);
 		current->next = mygang;
-		mygang->index = current->index+1;
 	}
 
+	// FIXME: it is possible that the master_gang_index could wrap
+	//   arround, but that would require > 2^31 -1 gangs.  Ignorre for now.
+	mygang->index = master_gang_index;
+
+	mygang->index = 0;
 	mygang->ctlref = 1; 
 	mygang->refcount = 1;
 	mygang->imode = CMbcast;	/* broadcast mode default */
@@ -1318,7 +1317,7 @@ setupstdio(Session *s)
 
 	/* First, bind remote session/gang to sub-session directory */
 	if(s->remote)
-		snprint(buf, 255, "%s/g%d", s->path, s->pid);
+		snprint(buf, 255, "%s/g%d", s->path, g->index);
 	else
 		snprint(buf, 255, "%s/%d", s->path, s->pid);
 
@@ -1331,7 +1330,7 @@ setupstdio(Session *s)
 
 	/* Splicefrom parent stdin to child stdin */
 	if(s->remote)
-		snprint(buf, 255, "%s/g%d/stdin", s->path, s->pid);
+		snprint(buf, 255, "%s/g%d/stdin", s->path, g->index);
 	else
 		snprint(buf, 255, "%s/%d/stdin", s->path, s->pid);
 
@@ -1344,9 +1343,10 @@ setupstdio(Session *s)
 
 	/* Spliceto parent stdout from child stdout */
 	if(s->remote)
-		snprint(buf, 255, "%s/g%d/stdout", s->path, s->pid);
+		snprint(buf, 255, "%s/g%d/stdout", s->path, g->index);
 	else
 		snprint(buf, 255, "%s/%d/stdout", s->path, s->pid);
+
 	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
@@ -1356,9 +1356,10 @@ setupstdio(Session *s)
 
 	/* Spliceto parent stderr from child stderr */
 	if(s->remote)
-		snprint(buf, 255, "%s/g%d/stderr", s->path, s->pid);
+		snprint(buf, 255, "%s/g%d/stderr", s->path, g->index);
 	else
 		snprint(buf, 255, "%s/%d/stderr", s->path, s->pid);
+
 	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
