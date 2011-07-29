@@ -89,36 +89,148 @@ add_stamp(vlong s, char *tag)
 	}
 }
 
-void
-timeit_dt(int num, char *tag)
+vlong
+timeit_ent_dt(Tentry *e1, Tentry *e2)
 {
-	TimeIt *t = current;
-	int p, i=t->n-1;
-	vlong end;
+	if(e1==nil || e2==nil)
+		return 0;
+	if(e2->stamp > e1->stamp)
+		return e2->stamp - e1->stamp;
+	else
+		return e1->stamp - e2->stamp;
+}
 
-	if(i < 0){
-		t = t->prev;
-		if(t == nil)
-			goto err;
-		i = t->n -1;
-	}
+Tentry *
+timeit_index(int num)
+{
+	TimeIt *t=root;
+	Tentry *e;
+	int i;
 
-	end = t->ent[i].stamp;
+	if(num < 0)
+		goto err;
 
-	for(p=i-1; num >= 0; num--, p--){
-		if(p < 0){
-			t = t->prev;
+	for(i=0; num >= 0; num--, i--){
+		if(i >= t->n){
+			t = t->next;
 			if(t == nil)
 				goto err;
-			p = t->n -1;
+			i = 0;
+			if(t->n == 0)
+				goto err;
 		}
 		if(num==0)
 			break;
 	}
 
-	add_stamp(end-t->ent[p].stamp, tag);
+	e = &t->ent[i];
 
-	return;
+	return e;
+
+err:
+	DPRINT(DERR, "*ERROR*: timeit_index attemped to access non existant element\n");
+	add_stamp(0, "*ERROR*: timeit_index attemped to access non existant element");
+	return nil;
+}
+
+Tentry *
+timeit_last(void)
+{
+	if(current==nil || current->n==0)
+		goto err;
+
+	return &current->ent[current->n -1];
+
+err:
+	DPRINT(DERR, "*ERROR*: timeit_last attemped to access non existant element\n");
+	add_stamp(0, "*ERROR*: timeit_last attemped to access non existant element");
+	return nil;
+}
+
+Tentry *
+timeit_offset(Tentry *s, int num)
+{
+	TimeIt *t;
+	Tentry *e;
+	int b, p;
+	int ds;
+	int pid;
+
+	if(s == nil)
+		return nil;
+	if(num == 0)
+		return s;
+
+	pid = s->pid;
+
+	// find the element in the list
+	for(b=0,t=root; t!=nil; b++){
+		if(b >= t->n){
+			t = t->next;
+			b = 0;
+			if(t==nil || t->n==0)
+				goto err;
+		}
+		if(&t->ent[b] == s)
+			break;
+	}
+
+	ds = -1;
+	if(num<0)
+		ds = 1;
+
+	for(p=b-ds,num+=ds; num!=0; p-=ds){
+		if(p >= t->n){
+			t = t->next;
+			if(t == nil)
+				goto err;
+			if(t->n == 0)
+				goto err;
+			p = 0;
+		}
+		if(p < 0){
+			t = t->prev;
+			if(t == nil)
+				goto err;
+			if(t->n == 0)
+				goto err;
+			p = t->n -1;
+		}
+		if(pid == t->ent[p].pid)
+			num+=ds;
+		if(num==0)
+			break;
+	}
+
+	// termination sanity check
+	if(p>=t->n || p<0){
+		goto err;
+	}
+
+	e = &t->ent[p];
+
+	return e;
+
+err:
+	DPRINT(DERR, "*ERROR*: timeit_offset attemped to access non existant element\n");
+	add_stamp(0, "*ERROR*: timeit_offset attemped to access non existant element");
+	return nil;
+	
+}
+
+void
+timeit_dt(int num, char *tag)
+{
+	Tentry *e1, *e2;
+
+	e1 = timeit_last();
+	e2 = timeit_offset(e1, num);
+	if(e1==nil || e2==nil)
+		goto err;
+
+	add_stamp(timeit_ent_dt(e1,e2), tag);
+
+	return; 
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_dt attemped to access non existant element\n");
@@ -172,5 +284,11 @@ timeit_init(void)
 		exits("atexit failed");
 	}
 	stamp("timeit initalized");
+}
+
+void
+timeit_end(void)
+{
+	stamp("timeit stopped");
 }
 
