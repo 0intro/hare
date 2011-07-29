@@ -14,8 +14,8 @@ main(int argc, char *argv[])
 	ulong now;
 	char *logdir = ".";
 	char *logfile, *ofile;
-	char *t;
 	int fd;
+	int n=0;
 
 	logfile = smprint("datestamp-%d.log", getpid());
 
@@ -23,6 +23,7 @@ main(int argc, char *argv[])
 	case 'u':	uflg = 1; break;
 	case 'L':	logdir = ARGF(); break;
 	case 'F':	logfile = ARGF(); break;
+	case 'N':	n=1; break;
 	default:	fprint(2, "usage: date [-u] [-L out_dir] [-F out_file]\n"); exits("usage");
 	}ARGEND
 
@@ -30,13 +31,6 @@ main(int argc, char *argv[])
 		fprint(2,"*ERROR*: %s\n", Etomany);
 		exits(Etomany);
 	 }
-
-	now = time(0);
-
-	if(uflg)
-		t = asctime(gmtime(now));
-	else
-		t = ctime(now);
 
 	ofile = smprint("%s/%s", logdir, logfile);
 	fd = create(ofile, OWRITE, 0664);
@@ -46,8 +40,24 @@ main(int argc, char *argv[])
 		exits(err);
 	}
 
-	fprint(fd, "%s", t);
-	print("%s", t);
+	if(n){
+		vlong t = nsec();
+
+		fprint(fd, "%lld\n", t);
+		print("%lld\n", t);
+	} else {
+		char *t;
+
+		now = time(0);
+
+		if(uflg)
+			t = asctime(gmtime(now));
+		else
+			t = ctime(now);
+
+		fprint(fd, "%s", t);
+		print("%s", t);
+	}
 
 	exits(0);
 }
