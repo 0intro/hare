@@ -752,6 +752,7 @@ threadmain(int argc, char **argv)
 	iothread_id = proccreate(iothread, nil, STACK);
 	DPRINT(DARG, "Main: srvpath=(%s) procpath=(%s)\n",
 	       srvpath, procpath);
+	DPRINT(DARG, "\t-v=(0x%X)\n",vflag);
 	DPRINT(DARG, "Main: main pid=(%d) iothread=(%d)\n",
 	       getpid(), threadpid(iothread_id));
 	DPRINT(DARG, "Main: logdir=(%s)\n", logdir);
