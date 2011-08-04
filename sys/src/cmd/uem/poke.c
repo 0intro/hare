@@ -13,17 +13,16 @@ main(int argc, char *argv[])
 {
 	ulong now;
 	char *logdir = ".";
-	char *logfile, *ofile;
-	int fd;
+	char *logfile = nil, *ofile;
+	int fd=1;
 	int n=0;
-
-	logfile = smprint("datestamp-%d.log", getpid());
 
 	ARGBEGIN{
 	case 'u':	uflg = 1; break;
 	case 'L':	logdir = ARGF(); break;
 	case 'F':	logfile = ARGF(); break;
 	case 'N':	n=1; break;
+	// FIXME: need to turn on/of the logging
 	default:	fprint(2, "usage: date [-u] [-L out_dir] [-F out_file]\n"); exits("usage");
 	}ARGEND
 
@@ -32,18 +31,21 @@ main(int argc, char *argv[])
 		exits(Etomany);
 	 }
 
-	ofile = smprint("%s/%s", logdir, logfile);
-	fd = create(ofile, OWRITE, 0664);
-	if(fd<0){
-		char *err = smprint("could not open %s", ofile);
-		fprint(2,"*ERROR*: %s\n", err);
-		exits(err);
+	if(logfile != nil) {
+		ofile = smprint("%s/%s-%d.log", logdir, logfile, getpid());
+		fd = create(ofile, OWRITE, 0664);
+		if(fd<0){
+			char *err = smprint("could not open %s", ofile);
+			fprint(2,"*ERROR*: %s\n", err);
+			exits(err);
+		}
 	}
 
 	if(n){
 		vlong t = nsec();
 
-		fprint(fd, "%lld\n", t);
+		if(logfile != nil)
+			fprint(fd, "%lld\n", t);
 		print("%lld\n", t);
 	} else {
 		char *t;
@@ -55,7 +57,8 @@ main(int argc, char *argv[])
 		else
 			t = ctime(now);
 
-		fprint(fd, "%s", t);
+		if(logfile != nil)
+			fprint(fd, "%s", t);
 		print("%s", t);
 	}
 
