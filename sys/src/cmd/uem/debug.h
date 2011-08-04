@@ -28,6 +28,7 @@ static int debugfd = 2;
 #define DSPF 0x08000	/* splice from */
 #define DSPT 0x10000	/* splice to */
 #define DEXC 0x20000	/* debug execcmd */
+#define DCLK 0x40000	/* clunks */
 
 static void
 DPRINT(ulong dcmd, char *fmt, ...)
