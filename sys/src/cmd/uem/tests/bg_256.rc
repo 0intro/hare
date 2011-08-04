@@ -15,7 +15,8 @@ echo '************************ IP = '$IP
 9fs $IP
 
 
-TESTDIR=/tmp/uem_test
+TIMEDIR=/n/frontend/home/ericvh/tmp/time
+TESTDIR=/tmp/testbed
 #TESTDIR=/n/frontend/home/ericvh/tmp/.test
 
 ERRORLOG=$TESTDIR'/error-'$IP'.log'
@@ -33,8 +34,9 @@ echo '************************ PWD = '$PWD
 #NUM=16
 #NUM=32 # works
 
-NUM=64
-#NUM=256
+if(~ $#NUM 0) NUM=64
+
+TIMINGTST=$TESTDIR'/time_'$NUM'.dat'
 
 I_MAX=4
 J_MAX=4
@@ -67,14 +69,38 @@ fn enum_srv {
 #
 fn testdir {
 	echo 'TESTDIR='$TESTDIR
-	mkdir -p $TESTDIR
+	mkdir -p $TESTDIR $TIMEDIR
 }
 
 fn myexec {
 	mypid=`{cat} #`
+
+	echo -n 'BEGIN ' > $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+
 	echo -n res $NUM >>[2] $ERRORLOG
+
+	echo -n 'RES   ' >> $TIMINGTST 
+	/bin/poke -N >> $TIMINGTST
+
 	echo -n exec $CMD >>[2] $ERRORLOG
+
+	echo -n 'EXEC  ' >> $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+
+	#echo -n 'IN    ' >> $TIMINGTST
+	#/bin/poke -N >> $TIMINGTST
+
 	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+
+	echo -n 'OUT   ' >> $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+
+	# FIXME: end session/termination?
+	#   termination handled automatically in the background
+
+	echo -n 'TERM  ' >> $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
 }
 
 fn basic {
@@ -114,7 +140,7 @@ enum_srv
 
 echo 'Serving CPU Nodes='
 for(i in $SRVNUM) {
-  echo -n ' '$i
+  echo -n ' '$i' '
   if(! test -e '/srv/'$i)
     9fs $i
   if(! test -e '/n/'$i){
@@ -128,6 +154,10 @@ echo ''
 
 # Tests
 basic
+echo -n 'DONE ' >> $TIMINGTST
+/bin/poke -N >> $TIMINGTST
+
+cp $TIMINGTST $TIMEDIR/
 
 # Cleanup
 #cleanup
