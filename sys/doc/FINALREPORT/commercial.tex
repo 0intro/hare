@@ -1,7 +1,60 @@
 \chapter{Commercial Impact}
 \section{Cray}
 \section{IBM}
+IBM Research's invovlement in this project has been extremely valuable in exploring
+ways to broaden the applicability of the BlueGene hardware through alternative software
+stacks.  It has allowed us to explore hardware features which aren't used by the production
+software as well as explore alternative schemes for scalability and reliability which are
+difficult or impossible under the production software.  This alternative view has given us
+new insights which can then be incorporated into future hardware designs as well as future
+production system software.
+
 \subsection{9p}
+
+In particular, our involvement in the HARE project has increased the visibility and use
+of the Plan 9 resource sharing protocol, known as 9p, within the broader IBM community.
+In particular, during the course of the HARE project we incorporated both 9p and the XCPU
+workload management system into a hybrid computing platform called the Virtual Power
+Environment~\cite{VPE}, which was developed for the Marenustrum supercomputer at the Barcelona 
+Supercomputing Center.  Infrastructures derrived from the original VPE idea are still
+under development by HPC Links under the product named VERTEX~\cite{vertex}.
+Experiences from the VPE effort were factored back into XCPU
+resulting in the creation of the XCPU2~\cite{xcpu2} workload mangaement framework which then was
+factored back into the HARE project as XCPU3~\cite{xcpu3} and the 
+Unified Execution Model~\cite{uem}.  The fundamental components, Linux kernel support, and
+advanced XCPU models were all developed as a direct result of the HARE funding.
+
+Outside of the high performance computing area, the 9p protocol has achieved great success
+within the emerging virtualization and cloud computing area as the defacto cloud computing
+paravirtualized file system under Linux.  In coordination with IBM Research, development
+teams have created a virtio~\cite{virtio} transport for 9p and incorporated a 9p server into
+Qemu~\cite{qemu} which allows any KVM machines to be able to directly mount file systems
+from the host~\cite{virtfs}.  This technology has been part of the main line kernel for about
+a year and is being incorporated into the commercial Linux distributions.
+
+\subsection{Hybrid Kernels}
+
+Additionally, our experiences with hybrid environments on BlueGene with different kernel
+types running on different nodes has led us towards a hybrid kernel model for future
+massive multicore platforms where we are looking at taking advantage of running different
+types of kernels on different cores in order to improve performance and efficiency by
+insulating application cores from operating system noise.  These so called "hybrid" kernels
+are currently being evaluated to be the default production kernel on future platforms.
+
+\subsection{Analytics}
+
+Several of the workload distribution methodologies we explored 
+during the HARE project are also being evaluated for use in large-scale
+analytics systems.  In particular, the unified execution model and PUSH~\cite{PUSH}
+workflow are being looked at for application within analytics clusters as an alternative to
+Hadoop for certain scenarios and the multipipe technology developed as part of HARE is
+also being evaluated for integration into several internal projects.
+
+In addition to workflow management, IBM is also exploring the application of
+9p synthetic and static file system technologies to analytics file systems which
+can be used with our execution model or with more conventional analytics software
+such as Hadoop. 
+
 \section{Coraid}
 Coraid is a fast-growing vendor of network disk systems used in cloud computing centers. 
 Coraid uses the trace software we developed\cite{plan9trace} for Blue Gene. 
