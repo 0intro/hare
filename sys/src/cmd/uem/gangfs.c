@@ -1392,13 +1392,13 @@ cloneproc(void *arg)
 	       buf, sess->remote);
 
 	/* FUTURE: This shouldn't be necessary with exec2fs */
-	for(retries=0; retries <= 10; retries++) {
+	for(retries=0; retries <= 50; retries++) {
 		sess->fd = open(buf, ORDWR);
 
 		if(sess->fd <= 0) {
 			sleep(100);
-			DPRINT(DERR, "WARNING: retry: %d opening execfs returned %d: %r -- retrying\n", 
-			       retries, sess->fd);
+			DPRINT(DERR, "WARNING: retry: %d on %d:%d opening execfs returned %d: %r -- retrying\n", 
+			       retries, sess->index, sess->subindex, sess->fd);
 			continue;
 		}
 
@@ -1938,20 +1938,20 @@ fsclunk(Fid *fid)
 {
 	Gang *g = fid->aux;
 
-	DPRINT(DFID, "fsclunk: %d\n", fid->fid);
+	DPRINT(DCLK, "fsclunk: %d\n", fid->fid);
 	if(TYPE(fid->qid) == Qctl) {
-		DPRINT(DFID, "\tand its a ctl\n");
+		DPRINT(DCLK, "\tand its a ctl\n");
 		if(g) {
 			wlock(&glock);
 			g->ctlref--;	
-			DPRINT(DREF, "\tctlref=%d\n", g->ctlref);
+			DPRINT(DCLK, "\tctlref=%d\n", g->ctlref);
 			if(g->ctlref == 0) {
 				if(mystats.next == nil)
 					mystats.njobs -= g->size;
 
 				g->status=GANG_CLOSING;
 				wunlock(&glock);
-				DPRINT(DFID, "fsclunk: g->status=GANG_CLOSING for gang %p path=%s\n", g, g->path);
+				DPRINT(DCLK, "fsclunk: g->status=GANG_CLOSING for gang %p path=%s\n", g, g->path);
 				proccreate(cleanupgang, (void *)g, STACK); 
 			} else {
 				wunlock(&glock);
@@ -1961,7 +1961,7 @@ fsclunk(Fid *fid)
 		}
 	} else {
 		if(g) {
-			DPRINT(DFID, "fsclunk: releasing gang %p path=%s\n", g, g->path);
+			DPRINT(DCLK, "fsclunk: releasing gang %p path=%s\n", g, g->path);
 			releasegang(g);
 		}
 	}
@@ -2021,7 +2021,7 @@ clunkproxy(Fid *f)
 	/* really freaking clunky, but not sure what else to do */
 	Req *r = emalloc9p(sizeof(Req));
 
-	DPRINT(DFID, "clunkproxy: %p fidnum=%d aux=%p pid=%d\n", 
+	DPRINT(DCLK, "clunkproxy: %p fidnum=%d aux=%p pid=%d\n", 
 	       f, f->fid, f->aux, getpid());
 
 	r->ifcall.type = Tclunk;
@@ -2030,7 +2030,7 @@ clunkproxy(Fid *f)
 		fprint(2, "iochan hungup");
 		threadexits("iochan hungup");
 	}
-	DPRINT(DFID, "clunkproxy: waiting on response\n");
+	DPRINT(DCLK, "clunkproxy: waiting on response\n");
 	recvp(clunkchan);
 }
 
