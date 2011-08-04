@@ -813,6 +813,7 @@ newgang(void)
 	mygang->chan = chancreate(sizeof(void *), 0);
 
 	wlock(&glock);
+	master_gang_index++;
 	if(glist == nil) {
 		glist = mygang;
 	} else {
@@ -822,10 +823,11 @@ newgang(void)
 	}
 
 	// FIXME: it is possible that the master_gang_index could wrap
-	//   arround, but that would require > 2^31 -1 gangs.  Ignorre for now.
+	//   arround, but that would require > 2^31 -1 gangs.
+	//   Ignorre for now.
+	DPRINT(DGAN, "newgang: index=%d\n", master_gang_index);
 	mygang->index = master_gang_index;
 
-	mygang->index = 0;
 	mygang->ctlref = 1; 
 	mygang->refcount = 1;
 	mygang->imode = CMbcast;	/* broadcast mode default */
@@ -1837,7 +1839,7 @@ fswrite(void *arg)
 			free(buf);
 			return;	
 		}
-		DPRINT(DCUR, "fswrite(Qgstat): statuswrite buf: %s\n", buf);
+		DPRINT(DSTS, "fswrite(Qgstat): statuswrite buf: %s\n", buf);
 		err = statuswrite(buf);	/* TODO: add error checking & reporting */
 		free(buf);
 		if(err) {
@@ -2068,6 +2070,12 @@ threadmain(int argc, char **argv)
 	procpath   = defaultpath;
 	execfspath = defaultpath;
 
+	int i;
+	vflag = 0xFFFFF;
+	DPRINT(DCUR, "Main: argc=%d argv=", argc);
+	for(i=0; i<argc; i++)
+		DPRINT(DCUR, "\t[%s]", argv[i]);
+
 	ARGBEGIN{
 	case 'D':
 		chatty9p++;
@@ -2134,6 +2142,7 @@ threadmain(int argc, char **argv)
 	DPRINT(DFID, "\tsrvpath=(%s) procpath=(%s) mysysname=(%s)\n", 
 	       srvpath, procpath, mysysname);
 	DPRINT(DFID, "\tsrvmpipe=(%s)\n", srvmpipe);
+	DPRINT(DFID, "\tvflag=(0x%x)\n", vflag);
 
 	if(parent) {
 		DPRINT(DFID, "      has parent=(%s)\n", parent);
