@@ -1,0 +1,150 @@
+#!/bin/rc
+# 
+# a UEM Scale Test Run
+#
+
+# 1 is for the BG
+if(~ $#BG 0) BG=1
+if(~ $BG 0) O=8
+
+if(~ $BG 0) CMDPATH=$O.
+if not CMDPATH=''
+
+
+if(~ $#R_MAX 0){
+    if(~ $BG 1) R_MAX=1
+    if not R_MAX=8
+}
+#R_MAX=16
+#R_MAX=256
+#R_MAX=2048
+
+#TESTNUM=''
+
+# fake the IO node's IP
+IO=128.0.1
+IP=11.$IO
+
+fn enum_tests {
+    TESTNUM=`{awk 'BEGIN     {
+	for (i = 1; i <= '$R_MAX'; i*=2) printf "%d ",i
+	exit }'}
+     #`# shut up the code coloring bug...
+}
+
+if(~ $BG 0) {
+    I_MAX=1
+    J_MAX=1
+    K_MAX=4
+}
+if not {
+    I_MAX=4
+    J_MAX=4
+    K_MAX=4
+}
+
+fn enum_srv {
+	SRVNUM=`{awk 'BEGIN     {
+               for (i=0; i<'$I_MAX'; i++) 
+	         for (j=0; j<'$J_MAX'; j++) 
+		   for (k=1; k<='$K_MAX'; k++)
+		     printf "%d.%d.%d ", i, j, k
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+if(~ $#* 0) DEBUG='0xFFDFF'
+if not DEBUG=$1
+
+if(~ $#TESTNUM 0) enum_tests
+enum_srv
+
+echo -n 'TESTNUM= '
+echo $TESTNUM
+
+echo 'making output directories'
+LOCALDIR=bg_scale
+mkdir -p $LOCALDIR
+
+TESTDIR=/tmp/testbed/sbg
+mkdir -p $TESTDIR
+
+  if(~ $BG 0){
+      #rc tidy
+      echo '############ starting next '$IP' ############'
+      #cpunode=0 treeip=$IO profile.pbg $DEBUG
+      cpunode=0 treeip=$IO profile.pbg $DEBUG
+
+      mount -c /srv/io /n/io
+  
+      # generate the fake CPU nodes and mount them
+      for(i in $SRVNUM){
+	  echo '############ starting next '11.$i' ############'
+	  cpunode=1 treeip=$i profile.pbg $DEBUG
+      }
+  } 
+  if not {
+      echo '############ starting next '$IP' ############'
+  #      cpunode=0 treeip=$IO rc profile.anl $DEBUG
+  #      srvfs $IP /
+  #      mount -c /srv/$IP /n/$IP
+#      mount -c /srv/io /n/$IP
+      mount -c /srv/io /n/io
+  #      cpunode=0 treeip=$IO profile.anl $DEBUG
+  
+      for(i in $SRVNUM){
+      9fs 11.$i
+  #	  echo '############ starting next '11.$i' ############'
+  #	  cpunode=1 treeip=$i profile.anl $DEBUG
+      }
+  }
+
+for(i in $TESTNUM){
+  # clean out the previous run and leave the last one in case it dies
+#  rc tidy
+
+#  echo -n 'Serving CPU Nodes='
+#  echo $SRVNUM
+#  if(~ $BG 0){
+#      rc tidy
+#      echo '############ starting next '$IP' ############'
+#      cpunode=0 treeip=$IO profile.pbg $DEBUG
+#  
+#      # generate the fake CPU nodes and mount them
+#      for(i in $SRVNUM){
+#	  echo '############ starting next '11.$i' ############'
+#	  cpunode=1 treeip=$i profile.pbg $DEBUG
+#      }
+#  } 
+#  if not {
+#      echo '############ starting next '$IP' ############'
+#  #      cpunode=0 treeip=$IO rc profile.anl $DEBUG
+#  #      srvfs $IP /
+#  #      mount -c /srv/$IP /n/$IP
+#      mount -c /srv/io /n/$IP
+#      mount -c /srv/io /n/io
+#  #      cpunode=0 treeip=$IO profile.anl $DEBUG
+#  
+#      for(i in $SRVNUM){
+#      9fs 11.$i
+#  #	  echo '############ starting next '11.$i' ############'
+#  #	  cpunode=1 treeip=$i profile.anl $DEBUG
+#      }
+#  }
+  
+  echo '############ starting next '$i' ############'
+  #mk tidy
+  rc bg_scale.rc $i $DEBUG
+
+#  echo '############ processing /'$i'/ ############'
+#  if(~ $#* 0 1) {
+#      mv $TESTDIR/time_$i^.dat  $LOCALDIR/time_$i^_sav.dat
+#      $CMDPATH^time-stat -i $LOCALDIR/time_$i^_sav.dat -o  $LOCALDIR/time_$i^.out
+#  }
+#  if not {
+#      mv $TESTDIR/time_$i^.dat  $LOCALDIR/time_$i^_$1^_sav.dat
+#      $CMDPATH^time-stat -i $LOCALDIR/time_$i^_$2^_sav.dat -o  $LOCALDIR/time_$i^_$2^.out
+#  }
+#  echo ''
+}
+#mk tidy

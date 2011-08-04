@@ -1,0 +1,186 @@
+#!/bin/rc
+# 
+# Pretend to mimic the BG/P setup
+#
+
+echo '== Test gangfs across a simulated BlueGene/P node structure =='
+
+# fake the IO node's IP
+IO=128.0.1
+IP=11.$IO
+
+#TESTDIR=.test/sbg
+TESTDIR=/tmp/testbed/sbg
+
+GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
+EXECLOG=$TESTDIR'/exec2fs'-$IP'.log'
+MPIPELOG=$TESTDIR'/mpipefs'-$IP'.log'
+ERRORLOG=$TESTDIR'/error.log'
+
+#G_MNTPATH=/n/$IP/proc
+G_MNTPATH=/n/io/proc
+
+#CMD='/bin/date'
+
+# setup 
+#
+#NUM=64 # succeds on 9vx with extended memory and procs
+#NUM=75 # succeds on 9vx with extended memory and procs
+#NUM=80 # fails
+
+# 16 should always work
+NUM=$1
+
+TIMINGTST=$TESTDIR'/time_'$NUM'.dat'
+
+if(~ $BG 0) {
+    I_MAX=1
+    J_MAX=1
+    K_MAX=4
+}
+if not {
+    I_MAX=4
+    J_MAX=4
+    K_MAX=4
+}
+
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+fn enum_srv {
+	SRVNUM=`{awk 'BEGIN     {
+               for (i=0; i<'$I_MAX'; i++) 
+	         for (j=0; j<'$J_MAX'; j++) 
+		   for (k=1; k<='$K_MAX'; k++)
+		     printf "%d.%d.%d ", i, j, k
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	echo 'TESTDIR='$TESTDIR
+	mkdir -p $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat} #`
+
+	echo -n 'BEGIN ' >> $TIMINGTST
+	$CMDPATH^poke -N >> $TIMINGTST
+
+	echo res $NUM>>[2] $ERRORLOG
+
+	echo -n 'RES   ' >> $TIMINGTST 
+	$CMDPATH^poke -N >> $TIMINGTST >>[2] $TIMINGTST 
+
+	echo exec $CMDPATH^poke -L $TESTDIR>>[2] $ERRORLOG
+
+	echo -n 'EXEC  ' >> $TIMINGTST
+	$CMDPATH^poke -N >> $TIMINGTST >>[2] $TIMINGTST 
+
+	#echo -n 'IN    ' >> $TIMINGTST
+	#$CMDPATH^poke -N >> $TIMINGTST >>[2] $TIMINGTST 
+
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+
+	echo -n 'OUT   ' >> $TIMINGTST
+	$CMDPATH^poke -N >> $TIMINGTST >>[2] $TIMINGTST 
+
+	# FIXME: end session/termination?
+	#   termination handled automatically in the background
+
+	echo -n 'TERM  ' >> $TIMINGTST
+	$CMDPATH^poke -N >> $TIMINGTST >>[2] $TIMINGTST 
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+
+# Setup
+rfork
+
+#cleanup
+#rm -f $TESTDIR'/error.log'  
+#rm -f $TESTDIR'/gangfs'* $MPIPELOG $TESTDIR'/mpipefs'* $TESTDIR'/exe'*
+
+testdir
+
+enum_srv
+
+########################################
+
+echo -n '' > $TIMINGTST
+
+echo -n 'SETUP ' >> $TIMINGTST
+$CMDPATH^poke -N >> $TIMINGTST
+
+echo 'Serving IO Node='11.$IO
+#mount -cb /srv/11.$IO /n/11.$IO
+#mount -cb /srv/io /n/io
+
+echo -n 'Serving CPU Nodes='
+echo $SRVNUM
+for(i in $SRVNUM) {
+  echo -n ' '11.$i
+
+# 1 is for the BG
+#  if(~ $BG 0){
+#    if(! test -e '/srv/'11.$i)
+#      9fs 11.$i
+#
+#    if(! test -e '/n/'11.$i){
+#      echo '  mounting '11.$i
+#      mount -cb /srv/11.$i /n/11.$i
+#    }
+#  } 
+
+#  if not {
+#      echo '  mounting '11.$i
+#      mount -cb /srv/11.$i /n/11.$i
+#  }
+}
+echo ''
+########################################
+
+# Tests
+basic
+
+echo -n 'DONE ' >> $TIMINGTST
+$CMDPATH^poke -N >> $TIMINGTST
+
+SCALETST=sbg
+mkdir -p $SCALETST
+cp $TIMINGTST $SCALETST
+
+# Cleanup
+#rm -rf $TESTDIR
+#cleanup
