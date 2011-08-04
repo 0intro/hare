@@ -1,0 +1,132 @@
+power +dev
+	l
+	lfpu
+	hummer
+	clock
+	kmap
+	main
+	arch
+	mmu
+	random
+	fpu
+	syscall
+	trap
+	ppcmul64fract
+	bic
+	qmalloc
+
+	cnksyscall cnksysemu
+
+boot cpu
+	tcp
+
+rootdir
+	bgp.rr
+	/power/bin/echo
+	/power/bin/test
+	/power/bin/paqfs
+	/power/bin/rc
+	../root/rcmain
+	bgp.rc boot
+
+conf
+	int cpuserver = 1;
+	#include "version.h"
+	
+dev +dev
+	root
+	cons		archbgp
+	env
+	pipe
+	proc
+	mnt
+	srv
+	dup
+	ssl
+	cap
+	kprof
+	trace		trace
+#	probe		probe probepower
+
+	ip		arp chandial ip ipv6 ipaux iproute netif netlog nullmedium pktmedium ptclbsum inferno
+
+	ether		netif
+	
+	sd
+	aoe
+
+	uart
+
+	arch
+
+	gib
+	torus		frag
+	tree		tree
+	segment
+	
+sd +dev
+	sdaoe	sdscsi
+
+uart +dev
+	uartcns		archbgp uartmb
+	
+ip +dev
+	tcp
+	udp
+	ipifc
+	icmp
+	icmp6
+
+link +dev
+	etherx	toe ethermii xgxspcs
+
+	ethermedium
+	netdevmedium
+	treemedium
+	torusmedium
+	loopbackmedium
+
+misc +dev
+	cache
+	exportfs
+
+dir
+	cnk
+	ip
+	port
+
+lib
+	libc
+	libip
+	libsec
+
+port
+	alarm
+	allocb
+	chan
+	dev
+	devtab
+	edf
+	fault
+	image
+	latin1
+	page
+	parse
+	pgrp
+	portclock
+	print
+	proc
+	ps
+	qio
+	qlock
+	rebootcmd
+	segment
+	noswap
+	sysauth
+	syscallfmt
+	sysfile
+	sysproc
+	sysseg
+	systab
+	taslock
+	tod
