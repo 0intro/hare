@@ -141,7 +141,7 @@ profile: anl_mount
 	cp tests/bg_256.rc /n/anl/n/local/home/ericvh/tmp/bg_256.rc
 	cp tests/bg_scale.rc /n/anl/n/local/home/ericvh/tmp/bg_scale.rc
 	cp tests/bg_scale_run.rc /n/anl/n/local/home/ericvh/tmp/bg_scale_run.rc
-	cp tests/tidy /n/anl/n/local/home/ericvh/tmp/tidy
+	#cp tests/tidy /n/anl/n/local/home/ericvh/tmp/tidy
 	cp tests/profile.anl /n/anl/n/local/home/ericvh/tmp/profile.anl
 
 anl_run: anl_mount
