@@ -34,27 +34,28 @@ regress:V: all
 debug:V: all
 	#rc mpipefs.rc 9
 	#rc execfs.rc 9
-	#rc gangfs.rc 0xFFFFF
+	#rc gangfs.rc 0xFFDFF
 	#rc uem_64.rc 9
 	#rc uem_512.rc 9
 	#rc bg_256.rc 9
 	#rc uem_hier.rc 9
-	rc pbg_4.rc 0xFFFFF
+	#rc pbg_4.rc 0xFFDFF
 	#rc tri.rc 12
-	#rc exec2fs.rc 0xFFFFF
+	#rc exec2fs.rc 0xFFDFF
+	rc bg_scale_run.rc 0xFFDFF
 
 test_simple:V: all
 	# for 9vx and small system tests
 	#rc uem_hier.rc 9
-	rc mpipefs.rc 0xFFFFF
-	rc exec2fs.rc 0xFFFFF
-	rc gangfs.rc 0xFFFFF
+	rc mpipefs.rc 0xFFDFF
+	rc exec2fs.rc 0xFFDFF
+	rc gangfs.rc 0xFFDFF
 	#rc tri.rc 12
 
 test_medium:V: all
 	# for medium sized testing which stress tests 9vs and other small systems 
 	#   (not guarnteed to run but should)
-	rc pbg_4.rc 0xFFFFF
+	rc pbg_4.rc 0xFFDFF
 	#rc uem_64.rc 9
 	#rc uem_512.rc 9
 
@@ -66,7 +67,9 @@ test_scale:V: all
 	# for initial timing tests
 	#mk tidy
 	#rc scale.rc 16 0x00
-	rc scale_run.rc
+	#rc bg_scale_run.rc 0xFFDFF
+	rc bg_scale_run.rc 0x00
+	#rc scale_run.rc 0xFFDFF
 
 kill:VE: 
 	rm -f /srv/mpipe
