@@ -5,7 +5,7 @@
 
 TESTDIR=pbg_scale
 
-R_MAX=16
+R_MAX=1
 #R_MAX=2048
 
 TESTNUM=''
@@ -45,4 +45,4 @@ for(i in $TESTNUM){
   }
   echo ''
 }
-mk tidy
+#mk tidy

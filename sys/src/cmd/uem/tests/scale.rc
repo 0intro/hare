@@ -33,7 +33,8 @@ EXECLOG=$TESTDIR'/exec2fs'-$IP'.log'
 MPIPELOG=$TESTDIR'/mpipefs'-$IP'.log'
 ERRORLOG=$TESTDIR'/error.log'
 
-G_MNTPATH=/n/$IP/proc
+#G_MNTPATH=/n/$IP/proc
+G_MNTPATH=/n/io/proc
 
 #CMD='/bin/date'
 CMD='../8.poke -L '$TESTDIR
@@ -123,7 +124,7 @@ fn basic {
 
 
 # Setup
-rfork
+#rfork
 
 #cleanup
 rm -f $TESTDIR'/error.log'  
@@ -142,7 +143,7 @@ echo -n 'BEGIN: ' > $TIMINGTST
 echo '############ starting next '$IP' ############' >>[2] $GANGLOG
 cpunode=0 treeip=$IO profile.pbg $DEBUG
 
-#srvfs io /n/$IP
+mount -cb /srv/io /n/io
 
 # generate tje fake CPU nodes and moutn them
 for(i in $SRVNUM){
