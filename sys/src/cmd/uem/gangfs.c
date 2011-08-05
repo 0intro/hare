@@ -469,58 +469,6 @@ idlechild(Status *m)
 	return lowest;
 }
 
-static char *
-statuswrite(char *buf)
-{
-	char name[16];
-	Status *m;
-	int ret;
-	char *bp;
-	int a[7];
-	
-	/* grab name and match it to our children */
-	strecpy(name, name+sizeof name, buf);
-
-	/* truncate name to first space */
-	bp = strchr(name, ' ');
-	if(bp != 0)
-		*bp = 0;
-
-	m = findchild(&mystats, name);
-	if(m == nil) {
-		DPRINT(DSTS, "\tcreating new status for (%s)\n", name);
-		m = emalloc9p(sizeof(Status));
-		if(m == nil)
-			return Enomem;
-
-		memset(m, 0, sizeof(Status));
-		strncpy(m->name, name, 16);
-		wlock(&statslock);
-		m->next = mystats.next;
-		mystats.next = m;
-		mystats.nchild++;
-		wunlock(&statslock);
-	}
-
-	ret = readints(buf+16, 7, a);
-	if(ret == 0) {
-		DPRINT(DERR, "statuswrite: readints returned %d\n", ret);
-		return Estatparse;
-	} else {
-		m->ntask = a[0];
-		m->nchild = a[1];
-		m->njobs = a[2];
-		m->devsysstat[Load] = a[3];
-		m->devsysstat[Idle] = a[4];
-		m->devswap[Mem] = a[5];
-		m->devswap[Maxmem] = a[6];
-	}
-
-	m->lastup = time(0); 
-
-	return nil;
-}
-
 static void
 updatestatus(void *arg)
 {
@@ -552,37 +500,6 @@ updatestatus(void *arg)
 	close(parentfd);
 	free(parentpath);
 	free(statbuf);
-}
-
-static void
-initstatus(Status *m)
-{
-	int n = 0;
-	uvlong a[nelem(m->devsysstat)];
-
-	DPRINT(DSTS, "initstatus:\n");
-
-	memset(m, 0, sizeof(Status));
-	strncpy(m->name, mysysname, 15);
-	m->name[15] = 0;
-
-	m->swapfd = open("/dev/swap", OREAD);
-	assert(m->swapfd > 0);
-
-	m->statsfd = open("/dev/sysstat", OREAD);
-	assert(m->statsfd > 0);
-
-	if(loadbuf(m, &m->statsfd)){
-		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
-			;
-	}
-
-	if(ntask_override)
-		m->ntask = ntask_override;
-	else
-		m->ntask = n;
-
-	m->lastup = time(0);
 }
 
 static void
@@ -674,6 +591,92 @@ out:
 	free(mtpt);
 	return err;
 }	
+
+static char *
+statuswrite(char *buf)
+{
+	char name[16];
+	Status *m;
+	int ret;
+	char *bp;
+	int a[7];
+	
+	/* grab name and match it to our children */
+	strecpy(name, name+sizeof name, buf);
+
+	/* truncate name to first space */
+	bp = strchr(name, ' ');
+	if(bp != 0)
+		*bp = 0;
+
+	m = findchild(&mystats, name);
+	if(m == nil) {
+		DPRINT(DSTS, "\tcreating new status for (%s)\n", name);
+		m = emalloc9p(sizeof(Status));
+		if(m == nil)
+			return Enomem;
+
+		memset(m, 0, sizeof(Status));
+		strncpy(m->name, name, 16);
+		wlock(&statslock);
+		m->next = mystats.next;
+		mystats.next = m;
+		mystats.nchild++;
+		wunlock(&statslock);
+
+		// FIXME: try moving checkmount to initstatus
+		checkmount(m->name);
+	}
+
+	ret = readints(buf+16, 7, a);
+	if(ret == 0) {
+		DPRINT(DERR, "statuswrite: readints returned %d\n", ret);
+		return Estatparse;
+	} else {
+		m->ntask = a[0];
+		m->nchild = a[1];
+		m->njobs = a[2];
+		m->devsysstat[Load] = a[3];
+		m->devsysstat[Idle] = a[4];
+		m->devswap[Mem] = a[5];
+		m->devswap[Maxmem] = a[6];
+	}
+
+	m->lastup = time(0); 
+
+	return nil;
+}
+
+static void
+initstatus(Status *m)
+{
+	int n = 0;
+	uvlong a[nelem(m->devsysstat)];
+
+	DPRINT(DSTS, "initstatus:\n");
+
+	memset(m, 0, sizeof(Status));
+	strncpy(m->name, mysysname, 15);
+	m->name[15] = 0;
+
+	m->swapfd = open("/dev/swap", OREAD);
+	assert(m->swapfd > 0);
+
+	m->statsfd = open("/dev/sysstat", OREAD);
+	assert(m->statsfd > 0);
+
+	if(loadbuf(m, &m->statsfd)){
+		for(n=0; readnums(m, nelem(m->devsysstat), a, 0); n++)
+			;
+	}
+
+	if(ntask_override)
+		m->ntask = ntask_override;
+	else
+		m->ntask = n;
+
+	m->lastup = time(0);
+}
 
 static void
 gangrefinc(Gang *g, char *where)
@@ -1604,7 +1607,8 @@ resgang(Gang *g)
 
 	current = mystats.next;
 	for(count = 0; count < scount; count++) {
-		checkmount(current->name);
+		// FIXME: try moving checkmount to initstatus
+		// checkmount(current->name);
 
 		if(njobs[count] == 0)
 			continue;
@@ -1957,7 +1961,7 @@ fsclunk(Fid *fid)
 				wunlock(&glock);
 			}
 		} else {
-			DPRINT(DERR, "*WARNING*: fsclunk: ctl fid %d without aux\n", fid->fid);
+			DPRINT(DCLK, "*WARNING*: fsclunk: ctl fid %d without aux\n", fid->fid);
 		}
 	} else {
 		if(g) {
@@ -2070,11 +2074,13 @@ threadmain(int argc, char **argv)
 	procpath   = defaultpath;
 	execfspath = defaultpath;
 
+	/*
 	int i;
 	vflag = 0xFFFFF;
 	DPRINT(DCUR, "Main: argc=%d argv=", argc);
 	for(i=0; i<argc; i++)
 		DPRINT(DCUR, "\t[%s]", argv[i]);
+	*/
 
 	ARGBEGIN{
 	case 'D':
