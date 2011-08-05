@@ -5,6 +5,90 @@
 
 echo '== Test gangfs across a BlueGene/P node =='
 
+IP=`{echo $ip | sed 's% .*%%'} #`
+if(~ $#NUM 0) NUM=128
+
+TIMEDIR=/n/frontend/home/ericvh/tmp/time
+TESTDIR=/tmp/testbed
+G_MNTPATH=/proc
+
+ERRORLOG=$TESTDIR'/error-'$IP'.log'
+
+CMD='/bin/poke -L '$TESTDIR
+
+TIMINGTST=$TESTDIR'/time_'$NUM'.dat'
+
+fn myexec {
+	mypid=`{cat} #`
+
+	echo -n 'BEGIN ' > $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+
+	echo -n res $NUM #>>[2] $ERRORLOG
+
+	echo -n 'RES   ' >> $TIMINGTST 
+	/bin/poke -N >> $TIMINGTST
+
+	echo -n exec $CMD #>>[2] $ERRORLOG
+
+	echo -n 'EXEC  ' >> $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+
+	#echo -n 'IN    ' >> $TIMINGTST
+	#/bin/poke -N >> $TIMINGTST
+
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 #>>[2] $ERRORLOG
+
+	echo -n 'OUT   ' >> $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+
+	# FIXME: end session/termination?
+	#   termination handled automatically in the background
+
+	echo -n 'TERM  ' >> $TIMINGTST
+	/bin/poke -N >> $TIMINGTST
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+basic
+
+echo -n 'DONE ' >> $TIMINGTST
+/bin/poke -N >> $TIMINGTST
+
+cp $TIMINGTST $TIMEDIR/
+
+exit 0
+
+
+
+#################################################
+#################################################
+#################################################
+
+
 #
 # Parameters
 #
@@ -34,7 +118,7 @@ echo '************************ PWD = '$PWD
 #NUM=16
 #NUM=32 # works
 
-if(~ $#NUM 0) NUM=64
+if(~ $#NUM 0) NUM=128
 
 TIMINGTST=$TESTDIR'/time_'$NUM'.dat'
 
@@ -161,3 +245,10 @@ cp $TIMINGTST $TIMEDIR/
 
 # Cleanup
 #cleanup
+
+exit 0
+
+#######################################################################
+#######################################################################
+#######################################################################
+#######################################################################
