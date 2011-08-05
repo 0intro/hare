@@ -34,6 +34,18 @@ usage(void)
 */
 
 void
+print_dt(int fd, Ent *e1, Ent *e2)
+{
+	vlong dt = e1->tstamp - e2->tstamp;
+	double fdt = ((double)dt) / ((double)1000000000LL);
+	fprint(fd," %lld", dt);
+	fprint(fd," %f", fdt);
+
+	fprint(fd," (%s-%s)", e1->tag, e2->tag);
+	fprint(fd,"\n");
+}
+
+void
 main(int argc, char *argv[])
 {
 	int i, n;
@@ -77,10 +89,14 @@ main(int argc, char *argv[])
 
 	/* read in the data */
 	for (i=0; i<MAXENT; i++){
-		n = fscanf(fin, "%s%ld", ent[i].tag, &(ent[i].tstamp));
+		char line[256];
+		
+		n = fscanf(fin, "%s%s", ent[i].tag, line);
+		ent[i].tstamp = strtoll(line,nil,10);
 		if(n<=0)
 			break;
 	}
+	i--;
 
 	if(i>=MAXENT){
 		fprint(2, "*error*: ran out of space\n");
@@ -88,20 +104,21 @@ main(int argc, char *argv[])
 	}
 
 	/* process what we have */
-	for (n=0; n<i; n++){
-		fprint(fdout,"%lld %s\n", ent[n].tstamp, ent[n].tag);
-	}
+	if(list)
+		for (n=0; n<=i; n++){
+			fprint(fdout,"%lld %s\n", ent[n].tstamp, ent[n].tag);
+		}
 
 	/* process what we have */
-	vlong dt;
-	for (n=1; n<i; n++){
-		dt = ent[n].tstamp - ent[n-1].tstamp;
-		fprint(fdout,"%lld (%s-%s)\n", dt, ent[n].tag, ent[n-1].tag);
-	}
+	for (n=1; n<=i; n++)
+		print_dt(fdout, &ent[n], &ent[n-1]);
+
+	/* do the subtotal */
+	print_dt(fdout, &ent[i-1], &ent[0]);
+
 	/* do the total */
-	dt = ent[i-1].tstamp - ent[0].tstamp;
-	fprint(fdout,"%lld total=(%s-%s)\n", dt, ent[i-1].tag, ent[0].tag);
-	
+	print_dt(fdout, &ent[i], &ent[0]);
+
 	fclose(fin);
 	fclose(fout);
 	exits(0);
