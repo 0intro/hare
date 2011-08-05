@@ -23,6 +23,8 @@ if not DEBUG=$2
 #}
 echo 'DEBUG='$DEBUG
 
+if(~ $#O 0) O=8
+
 #TESTDIR=.test/pbg
 TESTDIR=/tmp/testbed/pbg
 
@@ -45,7 +47,7 @@ CMD='../8.poke -L '$TESTDIR
 # 16 should always work
 NUM=$1
 
-TIMINGTST=$TESTDIR'/time_'$NUM'.dat'
+TIMINGTST=$TESTDIR^'/time_'^$NUM^'.dat'
 
 I_MAX=1
 J_MAX=1
