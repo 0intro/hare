@@ -10,6 +10,8 @@ if not {
 }
 echo 'DEBUG='$DEBUG
 
+if(~ $#treeip 0) treeip=128.0.1 
+
 IP=11.$treeip
 
 #TESTDIR=.test/pbg
@@ -61,7 +63,7 @@ if(! test -e '/net/cs'){
 		#srvfs uem /proc
 		srvfs $IP /
 	}
-	mount -c /srv/$IP /n/$IP
+	mount -cb /srv/$IP /n/$IP
 
 	# start up the UEM stuff
  	rm -f $MPIPELOG
@@ -69,14 +71,14 @@ if(! test -e '/net/cs'){
 	    echo 'starting mpipe-'$IP
 	    $CMDPATH^mpipefs $DEBUG -s mpipe-$IP >>[2] $MPIPELOG
 	}
-	mount -ca /srv/mpipe-$IP /n/$IP/proc
+	mount -cb /srv/mpipe-$IP /n/$IP/proc
 
 	rm -f $EXECLOG
 	if(! test -e '/srv/exec2fs-'$IP){
 	    echo 'starting exec2fs-'$IP
 	    $CMDPATH^exec2fs $DEBUG -s exec2fs-$IP -E $CMDPATH^execcmd -L $TESTDIR -M mpipe-$IP >>[2] $EXECLOG
 	}
-	mount -ca /srv/exec2fs-$IP /n/$IP/proc
+	mount -cb /srv/exec2fs-$IP /n/$IP/proc
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
@@ -85,7 +87,7 @@ if(! test -e '/net/cs'){
 		echo 'starting IO server'
 		srvfs io /
 	  }
-	  mount -c /srv/io /n/io
+	  mount -cb /srv/io /n/io
  	  rm -f $GANGLOG
 	  if(! test -e '/srv/gangfs-'$IP){
 		echo 'starting gangfs on IO node treeip='$IP
@@ -98,13 +100,13 @@ if(! test -e '/net/cs'){
 		echo 'starting gangfs on CPU node treeip='$IP
 		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p io -n $IP -M /srv/mpipe-$IP -N 4 >>[2] $GANGLOG
 	  }
-	  mount -ca /srv/gangfs-$IP /n/$IP/proc
+	  mount -cb /srv/gangfs-$IP /n/$IP/proc
 	}
 
         #csrv
 }
 
-mount -ca /srv/$IP /n/$IP
+mount -cb /srv/$IP /n/$IP
 
 #echo okay squidboy?
 
