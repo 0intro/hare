@@ -1,18 +1,33 @@
 #!/bin/rc
 
-#DEBUG='-v 9'
-DEBUG='-v 10'
+DEBUG=(-v 0x00000)
+#DEBUG=(-v 0xFFDFF)
+
+#if(~ $#* 0) {
+#    DEBUG=''
+#}
+#if not {
+#  DEBUG=(-v $1)
+#}
+echo $DEBUG
+
+if(~ $#CMDPATH 0) CMDPATH=''
 
 # calc IP
 IP=11.$treeip(1)
 
 # /n/home/lib/profile
-#TESTDIR=/tmp/uem_test
-TESTDIR=/n/frontend/home/ericvh/tmp/.test
+
+TESTDIR=/tmp/testbed
+#TESTDIR=/n/frontend/home/ericvh/tmp/.test
 
 GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
-EXECLOG=$TESTDIR'/execfs-'$IP'.log'
+EXECLOG=$TESTDIR'/exec2fs-'$IP'.log'
 MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
+
+GANGLOG=/dev/null
+EXECLOG=/dev/null
+MPIPELOG=/dev/null
 
 if(~ $cpunode '1'){
 	i=`{cat /net/ipifc/clone} #`
@@ -46,28 +61,35 @@ if not
 	mkdir -p $TESTDIR
 
 	# start up the UEM stuff
-	#execfs -m /n/io/proc
+	#exec2fs -m /n/io/proc
 	rm -f $EXECLOG
-	echo '***** starting execfs (on '$IP' with execcmd log on '$TESTDIR') *****'
-	execfs $DEBUG -L $TESTDIR >>[2] $EXECLOG
+	echo '***** starting exec2fs (on '$IP' with execcmd log on '$TESTDIR') *****'
+	$CMDPATH^exec2fs $DEBUG -L $TESTDIR >>[2] $EXECLOG
 
 	# FIXME: segmented names.  Will need two names for child and
 	# parent.
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
+		if(! test -e '/srv/io'){
+			echo 'starting IO server'
+			srvfs io /
+			mount -c /srv/io /n/io
+		}
  		rm -f $GANGLOG $MPIPELOG
 		echo '***** starting gangfs (master='$IP') *****'
-		gangfs $DEBUG -n io >>[2] $GANGLOG
+		$CMDPATH^gangfs $DEBUG -n io >>[2] $GANGLOG
+echo $CMDPATH^gangfs $DEBUG -n io
 	}
 	if (~ $cpunode '1'){
 		echo '***** starting gangfs (child='$IP') *****'
-		gangfs $DEBUG -p io -n $IP >>[2] $GANGLOG
+		$CMDPATH^gangfs $DEBUG -p io -n $IP >>[2] $GANGLOG
+echo $CMDPATH^gangfs $DEBUG -p io -n $IP
 	}
 
 	#csrv
 	echo '***** starting mpipefs (on '$IP') *****'
-	mpipefs $DEBUG >>[2] $MPIPELOG
+	$CMDPATH^mpipefs $DEBUG >>[2] $MPIPELOG
 
 	# adds an extra hop but allows visibility of mpipefs
 	srvfs uem /proc
