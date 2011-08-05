@@ -11,6 +11,7 @@ TARG = \
 	gangfs\
 	gang2fs\
 	poke\
+	stat_run\
 
 HFILES = debug.h\
        timeit.h
