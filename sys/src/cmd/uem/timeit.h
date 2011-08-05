@@ -53,6 +53,9 @@ timeit_setfd(int fd)
 void
 timeit_setout(char *outfile)
 {
+	if(outfile==nil)
+		return;
+
 	int fd = create(outfile, OWRITE, 0666);
 	if (fd > 0)
 		timeit_fd = fd;
