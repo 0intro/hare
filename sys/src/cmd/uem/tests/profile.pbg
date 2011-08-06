@@ -2,10 +2,7 @@
 
 DEBUG=(-v 0x00000)
 DEBUG=(-v 0xFFDFF)
-#if(~ $#* 0) {
-#    DEBUG=()
-#}
-#if not {
+#if(! ~ $#* 0) {
 #  DEBUG=(-v  $1)
 #}
 echo $DEBUG
