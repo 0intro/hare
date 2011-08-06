@@ -77,7 +77,7 @@ kill:VE:
 	kill $O.gangfs | rc
 	kill $O.gang2fs | rc
 	kill $O.execfs | rc
-	kill $O.exe2cfs | rc
+	kill $O.exec2fs | rc
 	kill $O.mpipefs | rc
 	kill exportfs | rc
 	kill import | rc
