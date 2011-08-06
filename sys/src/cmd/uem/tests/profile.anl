@@ -1,12 +1,8 @@
 #!/bin/rc
 
 DEBUG=(-v 0x00000)
-#DEBUG=(-v 0xFFDFF)
-
-#if(~ $#* 0) {
-#    DEBUG=''
-#}
-#if not {
+DEBUG=(-v 0xFFDFF)
+#if(! ~ $#* 0) {
 #  DEBUG=(-v $1)
 #}
 echo $DEBUG
@@ -25,9 +21,9 @@ GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
 EXECLOG=$TESTDIR'/exec2fs-'$IP'.log'
 MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
 
-GANGLOG=/dev/null
-EXECLOG=/dev/null
-MPIPELOG=/dev/null
+#GANGLOG=/dev/null
+#EXECLOG=/dev/null
+#MPIPELOG=/dev/null
 
 if(~ $cpunode '1'){
 	i=`{cat /net/ipifc/clone} #`
