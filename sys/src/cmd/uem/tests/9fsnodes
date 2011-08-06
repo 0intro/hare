@@ -20,7 +20,7 @@ enum_srv
 echo 'Serving CPU Nodes='
 for(i in $SRVNUM) {
   echo '  '$i
-  9fs $i
-  mount -cb /srv/$i /n/$i
-  #bind -ac /proc /n/$i/proc
+  #9fs $i
+  #mount -cb /srv/$i /n/$i
+  import -A $i / /n/$i
 }
