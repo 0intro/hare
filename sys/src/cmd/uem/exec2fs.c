@@ -1,5 +1,5 @@
 /*
-	execfs - proc file system execution wrapper
+	exec2fs - proc file system execution wrapper
 
 	Copyright (C) 2010, IBM Corporation, 
  		Eric Van Hensbergen (bergevan@us.ibm.com)
