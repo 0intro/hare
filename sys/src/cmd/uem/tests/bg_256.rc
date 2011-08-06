@@ -12,7 +12,7 @@ TIMEDIR=/n/frontend/home/ericvh/tmp/time
 TESTDIR=/tmp/testbed
 G_MNTPATH=/proc
 
-ERRORLOG=$TESTDIR'/error-'$IP'.log'
+#ERRORLOG=$TESTDIR'/error-'$IP'.log'
 
 CMD='/bin/poke -L '$TESTDIR
 
