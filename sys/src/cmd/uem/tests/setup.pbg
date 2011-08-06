@@ -54,7 +54,7 @@ if(~ $#* 1 2){
 }
 
 I_MAX=1
-J_MAX=4
+J_MAX=2
 K_MAX=4
 
 fn enum_tests {
