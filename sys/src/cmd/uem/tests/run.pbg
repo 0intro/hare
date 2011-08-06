@@ -1,0 +1,90 @@
+#!/bin/rc
+# 
+# Pretend to mimic the BG/P setup
+#
+
+echo '== Test gangfs across a simulated BlueGene/P node structure =='
+
+
+#
+# Parameters
+#
+
+if(~ $#O 0) O=8
+
+TESTDIR=.test/pbg
+#TESTDIR=/tmp/testbed/pbg
+
+ERRORLOG=$TESTDIR'/error.log'
+
+#G_MNTPATH=/n/$IP/proc
+G_MNTPATH=/n/io/proc
+
+#CMD='/bin/date'
+CMD='../8.poke -L '$TESTDIR
+
+# setup 
+#
+#NUM=64 # succeds on 9vx with extended memory and procs
+#NUM=75 # succeds on 9vx with extended memory and procs
+#NUM=80 # fails
+
+# 16 should always work
+if(~ $#* 1 2){
+    NUM=$1
+}
+
+fn myexec {
+	mypid=`{cat} #`
+
+	echo -n 'RES: ' >[1=2]
+	../$O.poke -N >[1=2]
+	echo res $NUM>>[2] $ERRORLOG
+
+	echo -n 'EXEC: ' >[1=2]
+	../$O.poke -N >[1=2]
+	echo exec $CMD>>[2] $ERRORLOG
+
+	echo -n 'AGG: ' >[1=2]
+	../$O.poke -N >[1=2]
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+
+	echo -n 'TERM: ' >[1=2]
+	../$O.poke -N >[1=2]
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	echo '' >[1=2]
+	echo -n 'BEGIN: ' >[1=2]
+	../$O.poke -N >[1=2]
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+mount -cb /srv/io /n/io
+
+########################################
+
+if(~ $#* 0) NUM=5
+
+basic

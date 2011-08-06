@@ -1,0 +1,177 @@
+#!/bin/rc
+# 
+# Pretend to mimic the BG/P setup
+#
+
+echo '== Test gangfs across a simulated BlueGene/P node structure =='
+
+# fake the IO node's IP
+IO=128.0.1
+IP=11.$IO
+
+#
+# Parameters
+#
+if(~ $#* 0 1) DEBUG=()
+if not DEBUG=$2
+DEBUG=(-v 0xFFDFF)
+
+#if(~ $#* 1) {
+#    DEBUG=''
+#}
+#if not {
+#  DEBUG=$2
+#}
+echo $DEBUG
+
+if(~ $#O 0) O=8
+
+TESTDIR=.test/pbg
+#TESTDIR=/tmp/testbed/pbg
+
+GANGLOG=$TESTDIR'/gangfs'-$IP'.log'
+EXECLOG=$TESTDIR'/exec2fs'-$IP'.log'
+MPIPELOG=$TESTDIR'/mpipefs'-$IP'.log'
+ERRORLOG=$TESTDIR'/error.log'
+
+#G_MNTPATH=/n/$IP/proc
+G_MNTPATH=/n/io/proc
+
+#CMD='/bin/date'
+CMD='../8.poke -L '$TESTDIR
+
+# setup 
+#
+#NUM=64 # succeds on 9vx with extended memory and procs
+#NUM=75 # succeds on 9vx with extended memory and procs
+#NUM=80 # fails
+
+# 16 should always work
+if(~ $#* 1 2){
+    NUM=$1
+
+    TIMINGTST=$TESTDIR^'/time_'^$NUM^'.dat'
+}
+
+I_MAX=1
+J_MAX=4
+K_MAX=4
+
+fn enum_tests {
+	TESTNUM=`{awk 'BEGIN     {
+               for (i = 1; i <= '$1'; i++) printf "%d ", i
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+fn enum_srv {
+	SRVNUM=`{awk 'BEGIN     {
+               for (i=0; i<'$I_MAX'; i++) 
+	         for (j=0; j<'$J_MAX'; j++) 
+		   for (k=1; k<='$K_MAX'; k++)
+		     printf "%d.%d.%d ", i, j, k
+               exit }'}
+	#`# shut up the code coloring bug...
+}
+
+#
+# Setup a testdirp
+#
+fn testdir {
+	echo 'TESTDIR='$TESTDIR
+	mkdir -p $TESTDIR
+}
+
+fn myexec {
+	mypid=`{cat} #`
+
+	echo -n 'RES: ' >> $TIMINGTST
+	../$O.poke -N >> $TIMINGTST
+	echo res $NUM>>[2] $ERRORLOG
+
+	echo -n 'EXEC: ' >> $TIMINGTST
+	../$O.poke -N >> $TIMINGTST
+	echo exec $CMD>>[2] $ERRORLOG
+
+	echo -n 'AGG: ' >> $TIMINGTST
+	../$O.poke -N >> $TIMINGTST
+	cat $G_MNTPATH/g$mypid/stdout > $TESTDIR/test1 >>[2] $ERRORLOG
+
+	echo -n 'TERM: ' >> $TIMINGTST
+	../$O.poke -N >> $TIMINGTST
+}
+
+fn basic {
+	echo -n 'Basic Test for NUM='$NUM' procs....'
+
+	# initialize files
+	echo > $TESTDIR/test1
+
+	# execute test
+	myexec <>$G_MNTPATH/gclone >[1=0]
+
+	# verify results -- date returns time time in seconds, so
+	# simply varify that the number of procs returned are the same
+	# as those requested.
+	LEN=`{wc -l $TESTDIR/test1 | sed 's% *[a-zA-Z0-9/.]*$%%'} #`
+	echo -n ' (LEN='$LEN') '
+	if(! ~ $LEN $NUM) {
+		echo FAILED!
+		exit 'stdout: test failed'
+	}
+
+	echo Success!
+	# cleanup
+	#rm -rf $TESTDIR/*
+}
+
+
+# Setup
+rfork
+
+#cleanup
+#rm -f $TESTDIR'/error.log'  
+#rm -f $TESTDIR'/gangfs'* $MPIPELOG $TESTDIR'/mpipefs'* $TESTDIR'/execfs'*
+
+testdir
+
+enum_srv
+
+########################################
+
+if(! ~ $#* 0){
+    echo -n 'BEGIN: ' > $TIMINGTST
+    ../$O.poke -N >> $TIMINGTST
+}
+
+# fake the BG/P profile (1 I/O node and 4 CPU nodes)
+echo '############ starting next '$IP' ############' >>[2] $GANGLOG
+cpunode=0 treeip=$IO profile.pbg $DEBUG
+
+#mount -c /srv/io /n/io
+
+# generate tje fake CPU nodes and moutn them
+for(i in $SRVNUM){
+  echo '############ starting next '11.$i' ############' >>[2] $GANGLOG
+  cpunode=1 treeip=$i profile.pbg $DEBUG
+}
+
+########################################
+
+# if there are no requests, jut setup and do not run
+
+# Tests
+if(~ $#* 0) exit 0
+
+basic
+
+echo -n 'DONE: ' >> $TIMINGTST
+../$O.poke -N >> $TIMINGTST
+
+SCALETST=pbg_scale
+mkdir -p $SCALETST
+cp $TIMINGTST $SCALETST
+
+# Cleanup
+#rm -rf $TESTDIR
+#cleanup
