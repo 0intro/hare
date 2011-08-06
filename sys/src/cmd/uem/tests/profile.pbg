@@ -2,20 +2,20 @@
 
 DEBUG=(-v 0x00000)
 DEBUG=(-v 0xFFDFF)
-if(~ $#* 0) {
-    DEBUG=''
-}
-if not {
-  DEBUG=(-v  $1)
-}
-echo 'DEBUG='$DEBUG
+#if(~ $#* 0) {
+#    DEBUG=()
+#}
+#if not {
+#  DEBUG=(-v  $1)
+#}
+echo $DEBUG
 
 if(~ $#treeip 0) treeip=128.0.1 
 
 IP=11.$treeip
 
-#TESTDIR=.test/pbg
-TESTDIR=/tmp/testbed/sbg
+TESTDIR=.test/pbg
+#TESTDIR=/tmp/testbed/sbg
 
 GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
 EXECLOG=$TESTDIR'/exec2fs-'$IP'.log'
@@ -24,26 +24,6 @@ MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
 O=8
 PWD=`{pwd}#`
 CMDPATH=$PWD'/../'$O.
-
-#if(~ $cpunode '1'){
-#	i=`{cat /net/ipifc/clone}
-#	echo bind torus /dev/torus > /net/ipifc/$i/ctl
-#	echo add 10.$xyzip(1) $xyzip(2) 10.$xyzip(3) > /net/ipifc/$i/ctl
-#}
-#
-## fire up a cache
-#if(~ $cpunode '0') {
-#	ramcfs -a $fsaddr -n /n/cache
-#	bind /n/cache/n/local /n/frontend
-#	bind -c /n/frontend^$fshome /n/home
-#	bind -c /n/frontend^$plan9root /n/root
-#}
-
-## bind our shit for now
-#bind -a /n/root /
-#bind -b /n/root/power/bin /bin
-#bind -b /n/root/rc/bin /bin
-#bind -a /n/root/sys /sys
 
 # should already be running!
 if(! test -e '/net/cs'){
@@ -58,55 +38,46 @@ if(! test -e '/net/cs'){
 
 	# adds an extra hop but allows visibility of mpipefs
 	# we need to export the file system before starting gangfs
-	if(! test -e /srv/$IP){
-		echo 'exporting '$IP
-		#srvfs uem /proc
-		srvfs $IP /
-	}
-	mount -cb /srv/$IP /n/$IP
+	echo 'exporting '$IP
+	srvfs $IP /
+	mount -ca /srv/$IP /n/$IP
 
 	# start up the UEM stuff
  	rm -f $MPIPELOG
-	if(! test -e '/srv/mpipe-'$IP){
-	    echo 'starting mpipe-'$IP
-	    $CMDPATH^mpipefs $DEBUG -s mpipe-$IP >>[2] $MPIPELOG
-	}
-	mount -cb /srv/mpipe-$IP /n/$IP/proc
+	echo 'starting mpipe-'$IP
+	$CMDPATH^mpipefs $DEBUG -s mpipe-$IP >>[2] $MPIPELOG
 
 	rm -f $EXECLOG
-	if(! test -e '/srv/exec2fs-'$IP){
-	    echo 'starting exec2fs-'$IP
-	    $CMDPATH^exec2fs $DEBUG -s exec2fs-$IP -E $CMDPATH^execcmd -L $TESTDIR -M mpipe-$IP >>[2] $EXECLOG
-	}
-	mount -cb /srv/exec2fs-$IP /n/$IP/proc
+	echo 'starting exec2fs-'$IP
+	$CMDPATH^exec2fs $DEBUG -s exec2fs-$IP -E $CMDPATH^execcmd -L $TESTDIR -M mpipe-$IP >>[2] $EXECLOG
 
 	# if we are an ionode
 	if (~ $cpunode '0'){
 	  # FIXME: this assumes that the IO node is created first...
-	  if(! test -e '/srv/io'){
-		echo 'starting IO server'
 		srvfs io /
-	  }
-	  mount -cb /srv/io /n/io
- 	  rm -f $GANGLOG
-	  if(! test -e '/srv/gangfs-'$IP){
+		mount -cb /srv/io /n/io
+
+ 		rm -f $GANGLOG
 		echo 'starting gangfs on IO node treeip='$IP
+		# -m /n/io/proc 
 		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -n io -M /srv/mpipe-$IP -N 4 >>[2] $GANGLOG
-	  }
-	  mount -ca /srv/gangfs-$IP /n/io/proc
+		mount -ca /srv/gangfs-$IP /n/io/proc
+
+		mount -cb /srv/exec2fs-$IP /n/io/proc
+		mount -cb /srv/mpipe-$IP /n/io/proc
 	}
 	if (~ $cpunode '1'){
-	  if(! test -e '/srv/gangfs-'$IP){
 		echo 'starting gangfs on CPU node treeip='$IP
 		$CMDPATH^gangfs $DEBUG -s gangfs-$IP -p io -n $IP -M /srv/mpipe-$IP -N 4 >>[2] $GANGLOG
-	  }
-	  mount -cb /srv/gangfs-$IP /n/$IP/proc
+		mount -ca /srv/gangfs-$IP /n/$IP/proc
+
+		mount -ca /srv/exec2fs-$IP /n/$IP/proc
+		mount -ca /srv/mpipe-$IP /n/$IP/proc
 	}
 
-        #csrv
+#	echo 'exporting '$IP
+#	srvfs $IP /
 }
 
-mount -cb /srv/$IP /n/$IP
-
-#echo okay squidboy?
-
+# no need to mount as it is done inside the rforked section 
+#mount -c /srv/$IP /n/$IP
