@@ -58,9 +58,8 @@ main(int argc, char **argv)
 	char *tmpfile="tests/.test/tmp1";
 	char *srvnm="io";
 	char *log_file=nil;
-	int i, ret, num_tasks=1;
+	int i, num_tasks=1;
 	char *x;
-	int p[2];
 	int loop=0;
 	char line[1024], gstdout[1024];
 
@@ -152,7 +151,7 @@ for(loop=(loop==1)?num_tasks:0; loop>0; loop=(loop==1)?0:loop/2){
 			break;
 	}
 	if(gfdo < 0){
-		DPRINT(DERR, "*ERROR*: could not open stdout file (%s)\n", line);
+		DPRINT(DERR, "*ERROR*: could not open stdout file (%s)\n", gstdout);
 		exits("could not open stdout");
 	}
 
@@ -177,6 +176,7 @@ for(loop=(loop==1)?num_tasks:0; loop>0; loop=(loop==1)?0:loop/2){
 /*
   // FIXME: bind sais this is inconsistent
 	if(tmpfile!=nil){
+		int ret;
 		//close(gfdo);
 		ret = bind(tmpfile, gstdout, MBEFORE);
 		if(ret < 0){
@@ -188,6 +188,7 @@ for(loop=(loop==1)?num_tasks:0; loop>0; loop=(loop==1)?0:loop/2){
 */
 
 	dup(tmpfd, 1);
+//	int p[2];
 //	pipe(p);
 //	dup(p[1], 1);
 //	close(p[0]);
