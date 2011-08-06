@@ -573,7 +573,7 @@ checkmount(char *addr)
 	/* we need to wait for this to be done */
 	while((tmp = dirstat(mtpt)) == nil) { /* ugh, arbitrary 100ms delay */
 		if(retries++ > 1009) {
-			DPRINT(DERR, "*ERROR*: checkmount: import not complete after 10 seconds, giving up\n");
+			DPRINT(DERR, "*ERROR*: checkmount: import for (%s) not complete after 10 seconds, giving up\n", dest);
 			err = -1;
 			break;
 		}
@@ -1400,7 +1400,7 @@ cloneproc(void *arg)
 
 		if(sess->fd <= 0) {
 			sleep(100);
-			DPRINT(DERR, "WARNING: retry: %d on %d:%d opening execfs returned %d: %r -- retrying\n", 
+			DPRINT(DERR, "WARNING: retry: %d on %d:%d opening exec2fs returned %d: %r -- retrying\n", 
 			       retries, sess->index, sess->subindex, sess->fd);
 			continue;
 		}
@@ -1412,7 +1412,7 @@ cloneproc(void *arg)
 		}
 
 		sleep(100);
-		DPRINT(DERR, "WARNING: retry: %d execfs's pread=(%d) failed for fd=(%d): %r -- retrying\n", 
+		DPRINT(DERR, "WARNING: retry: %d exec2fs's pread=(%d) failed for fd=(%d): %r -- retrying\n", 
 		       retries, n, sess->fd);
 		close(sess->fd);
 	}
@@ -1422,7 +1422,7 @@ cloneproc(void *arg)
 
 	if(retries > 10) {
 		DPRINT(DERR, "*ERROR* giving up\n");
-		sendp(sess->chan, smprint("execfs returning %r"));
+		sendp(sess->chan, smprint("exec2fs returning %r"));
 		threadexits(Ebadpid);
 	}
 
