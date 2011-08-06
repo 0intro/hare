@@ -117,8 +117,13 @@ anl_mount:
 	mount /srv/anlgw /n/anl
 	bind /n/anl/net /net
 
-anl: profile
+anl_build:
 	objtype=power mk all
+	
+	#cd ../exportfs
+	#objtype=power mk anl
+
+anl: anl_build profile
 	cp q.poke /n/anl/n/local/home/ericvh/9/power/bin/poke
 	cp q.gangfs /n/anl/n/local/home/ericvh/9/power/bin/gangfs
 	cp q.mpipefs /n/anl/n/local/home/ericvh/9/power/bin/mpipefs
@@ -126,16 +131,9 @@ anl: profile
 	cp q.exec2fs /n/anl/n/local/home/ericvh/9/power/bin/exec2fs
 	cp q.execcmd /n/anl/n/local/home/ericvh/9/power/bin/execcmd
 	cp q.csrv /n/anl/n/local/home/ericvh/9/power/bin/csrv
-	
-	#cd tests
-	#objtype=power mk all
-	#cp q.time-stat /n/anl/n/local/home/ericvh/9/power/bin/time-stat
-	#cd ../
-	
-	cd ../exportfs
-	objtype=power mk anl
-	cp q.out /n/anl/n/local/home/ericvh/9/power/bin/exportfs
-	
+	cp q.stat_run /n/anl/n/local/home/ericvh/9/power/bin/stat_run
+	#cp ../exportfs/q.out /n/anl/n/local/home/ericvh/9/power/bin/exportfs
+	cp tests/9fsnodes  /n/anl/n/local/home/ericvh/tmp/9fsnodes
 
 profile: anl_mount
 	cp tests/profile.anl /n/anl/n/local/home/ericvh/lib/profile
