@@ -53,13 +53,16 @@ mountgang(char *srv, char *path, char *name)
 void
 main(int argc, char **argv)
 {
-	char *command, *tmpfile="/tmp/tmp1", *procpath="/n/io/proc";
+	char *command, *procpath="/n/io/proc";
+	//char *tmpfile="/tmp/tmp1";
+	char *tmpfile="tests/.test/tmp1";
 	char *srvnm="io";
 	char *log_file=nil;
-	int i, num_tasks=1;
+	int i, ret, num_tasks=1;
 	char *x;
 	int p[2];
-	char line[1024];
+	int loop=0;
+	char line[1024], gstdout[1024];
 
 	ARGBEGIN{
 	case 'D':
@@ -75,6 +78,9 @@ main(int argc, char **argv)
 		break;
 	case 'l':
 		log_file = ARGF();
+		break;
+	case 'L':
+		loop = 1;
 		break;
 	case 't':
 		tmpfile = ARGF();
@@ -96,18 +102,19 @@ main(int argc, char **argv)
 		strcat(command, argv[i]);
 	}
 
-	DPRINT(DCUR, "Main: command=(%s)\n", command);
-	DPRINT(DCUR, "\ttmpfile=(%s)\n", tmpfile);
-	DPRINT(DCUR, "\tprocpath=(%s)\n", procpath);
-	DPRINT(DCUR, "\tnum_tasks=(%d)\n", num_tasks);
+	DPRINT(DARG, "Main: command=(%s)\n", command);
+	DPRINT(DARG, "\ttmpfile=(%s)\n", tmpfile);
+	DPRINT(DARG, "\tprocpath=(%s)\n", procpath);
+	DPRINT(DARG, "\tnum_tasks=(%d)\n", num_tasks);
 
 	mountgang(srvnm, "/n/io", "");
 
-	pipe(p);
 
 	timeit_init();
 	if(log_file)
 		timeit_setout(log_file);
+
+for(loop=(loop==1)?num_tasks:0; loop>0; loop=(loop==1)?0:loop/2){
 
 	int gfdi, gfdo=-1;
 	snprint(line, 1024, "%s/gclone", procpath);
@@ -117,6 +124,10 @@ main(int argc, char **argv)
 
 	}
 
+	if(loop)
+		num_tasks = loop;
+
+	fprint(2, "num_tests=%d\n", num_tasks);
 	stamp("BEGIN");
 
 	fprint(gfdi, "res %d", num_tasks);
@@ -130,14 +141,13 @@ main(int argc, char **argv)
 		exits("could not read clone file");
 	}
 	gnum = atoi(line);
-	//scanf(gfdi, "", &gnum);
-	print("gnum = %d\n", gnum);
+	DPRINT(DFID, "Main: gclone number = g%d\n", gnum);
 
 	// FIXME: find a better way to find the gang ID.  R/W gfdi returns 0
 	int gpid;
 	for(gpid=0; gpid<100; gpid++){
-		snprint(line, 1024, "%s/g%d/stdout", procpath, gpid);
-		gfdo = open(line,OREAD);
+		snprint(gstdout, 1024, "%s/g%d/stdout", procpath, gpid);
+		gfdo = open(gstdout,OREAD);
 		if(gfdo > 0)
 			break;
 	}
@@ -145,39 +155,77 @@ main(int argc, char **argv)
 		DPRINT(DERR, "*ERROR*: could not open stdout file (%s)\n", line);
 		exits("could not open stdout");
 	}
+
 	stamp("finish opening stdout");
+
 
 	fprint(gfdi, "exec %s", command);
 	
 	stamp("EXEC");
 
-	smprint(line, 1024, "%s", tmpfile);
+	sprint(line, "%s", tmpfile);
+	print("opening tmpfile %s\n", line);
 	int tmpfd;
 	if((tmpfd=open(line,OWRITE)) < 0){
-		DPRINT(DERR, "*ERROR*: could not open tmpfile (%s)\n",  line);
-		exits("could not open tmpfile");
+		if((tmpfd=create(line,OWRITE,0666)) < 0){
+			DPRINT(DERR, "*ERROR*: could not open tmpfile (%s)\n", line);
+			exits("could not open tmpfile");
+		}
 
 	}
 
-//		dup(p[1], 1);
-//		close(p[0]);
-//		close(p[1]);
+/*
+  // FIXME: bind sais this is inconsistent
+	if(tmpfile!=nil){
+		//close(gfdo);
+		ret = bind(tmpfile, gstdout, MBEFORE);
+		if(ret < 0){
+			DPRINT(DERR, "bind failed: %r\n");
+			exits("bind failed");
+		}
+	}
+	dup(gfdo, 1);
+*/
 
-	// FIXME: there is a better way to do this than here.
-//	do{
+	dup(tmpfd, 1);
+//	pipe(p);
+//	dup(p[1], 1);
+//	close(p[0]);
+//	close(p[1]);
+
+/**/
+	// FIXME: there is a better way to do this than here...
+	for(i=0; i<num_tasks; i++){
 		n = read(gfdo, line, 1024);
-		fprint(2,"READ: %d (%s)\n", n, line);
-		//n = write(tmpfd, line, n);
-		n = write(2, line, n);
-		fprint(2,"WRITE: %d\n", n);
-//	} while(n>0);
+		if(n<=0) break;
+
+		n = write(1, line, n);
+		if(n<=0) break;
+	};
+/**/
 
 	stamp("OUT");
 
 	stamp("TERM");
 
+	timeit_setfd(2);
 	timeit_end();
 
+	timeit_settype(TIMIT_FLOAT);
+
+	timeit_tag_dt("BEGIN", "RES", "Time for RES");
+	timeit_tag_dt("finish opening stdout", "EXEC", "Time for EXEC");
+	timeit_tag_dt("EXEC", "OUT", "Time for OUT");
+	timeit_tag_dt("OUT", "TERM", "Time for TERM");
+
+	timeit_tag_dt("BEGIN", "OUT", "Total time");
+
 	close(tmpfd);
+
+	timeit_dump();
+	fprint(2, "\n");
+
+} // end for loop
+
 }
 
