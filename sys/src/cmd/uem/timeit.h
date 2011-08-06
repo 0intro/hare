@@ -9,11 +9,18 @@
       optionally uses atexit to automatically dump timestamps
  */
 
+enum{
+	TIMIT_DEFAULT=0,
+	TIMIT_FLOAT,
+	TIMIT_END,
+};
+
 typedef struct Tentry Tentry;
 struct Tentry {
 	vlong stamp;
 	long pid;
 	char *tag;
+	int flag;
 };
 
 typedef struct TimeIt TimeIt;
@@ -30,8 +37,18 @@ static TimeIt *root = nil;
 static TimeIt *current = nil;
 static max_entries = 1024;
 static int timeit_fd = 1;
+static int default_flag=0;
 
 static TimeIt *timeit_new(int num);
+
+int
+timeit_settype(int flag)
+{
+	if(flag>=TIMIT_DEFAULT && flag<TIMIT_END)
+		default_flag=flag;
+
+	return default_flag;
+}
 
 int
 timeit_setmax(int num)
@@ -67,10 +84,22 @@ void
 timeit_dump(void)
 {
 	int i;
+	// FIXME: no need for the extra var.  Just use root instead of t->
 	TimeIt *t = root;
+	double fdt;
 	while(t != nil){
 		for (i=t->last_dump+1; i<t->n; i++){
-			fprint(timeit_fd, "%lud %llud %s\n", t->ent[i].pid, t->ent[i].stamp, t->ent[i].tag);
+			switch(t->ent[i].flag){
+			case TIMIT_FLOAT:
+				fdt = ((double)t->ent[i].stamp)/((double)1000000000LL);
+				fprint(timeit_fd, "%lud %f %s\n",
+				       t->ent[i].pid, fdt, t->ent[i].tag);
+				break;
+			default:
+				fprint(timeit_fd, "%lud %llud %s\n",
+				       t->ent[i].pid, t->ent[i].stamp, t->ent[i].tag);
+				break;
+			}
 			t->last_dump = i;
 		}
 		t = t->next;
@@ -83,6 +112,7 @@ add_stamp(vlong s, char *tag)
 	current->ent[current->n].stamp = s;
 	current->ent[current->n].pid = getpid();
 	current->ent[current->n].tag = tag;
+	current->ent[current->n].flag = default_flag;
 
 	/* ensure that the next one is always valid */
 	current->n++;
@@ -133,6 +163,26 @@ timeit_index(int num)
 err:
 	DPRINT(DERR, "*ERROR*: timeit_index attemped to access non existant element\n");
 	add_stamp(0, "*ERROR*: timeit_index attemped to access non existant element");
+	return nil;
+}
+
+Tentry *
+timeit_find(char *tag)
+{
+	TimeIt *t=root;
+	int i;
+
+	if(tag==nil)
+		goto err;
+
+	for(i=t->n-1; i>=0; i--)
+		if(!strcmp(t->ent[i].tag, tag))
+			return  &t->ent[i];
+
+err:
+	DPRINT(DERR, "*ERROR*: timeit_find tag=(%s) not found\n", 
+	       (tag==nil)?"<nil>":tag);
+	add_stamp(0, "*ERROR*: timeit_find tag not found");
 	return nil;
 }
 
@@ -292,6 +342,32 @@ timeit_init(void)
 void
 timeit_end(void)
 {
-	stamp("timeit stopped");
+	stamp("End Timer");
+}
+
+void
+timeit_tag_dt(char *tag1, char *tag2, char *new_tag)
+{
+	Tentry *t1 = timeit_find(tag1);
+	Tentry *t2 = timeit_find(tag2);
+	vlong dt;
+
+	if(t1==nil || t2==nil)
+		goto err;
+
+	if(t2->stamp > t1->stamp)
+		dt = t2->stamp - t1->stamp;
+	else
+		dt = t1->stamp - t2->stamp;
+
+	add_stamp(dt, new_tag);
+
+	return;
+
+err:
+	DPRINT(DERR, "*ERROR*: timeit_tag_dt failed on tag1=(%s) tag2=(%s)\n",
+	       (tag1==nil)?"<nil>":tag1,
+	       (tag2==nil)?"<nil>":tag2);
+	add_stamp(0, "*ERROR*: timeit_tag_dt failed");
 }
 
