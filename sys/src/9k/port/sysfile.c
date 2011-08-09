@@ -359,7 +359,7 @@ sysclose(Ar0* ar0, va_list list)
 	ar0->i = 0;
 }
 
-long
+static long
 unionread(Chan *c, void *va, long n)
 {
 	int i;
