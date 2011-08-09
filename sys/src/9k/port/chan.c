@@ -493,7 +493,7 @@ eqqid(Qid a, Qid b)
 	return a.path == b.path && a.vers == b.vers;
 }
 
-int
+static int
 eqchan(Chan *a, Chan *b, int skipvers)
 {
 	if(a->qid.path != b->qid.path)
