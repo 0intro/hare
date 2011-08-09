@@ -387,12 +387,8 @@ iprint(char *fmt, ...)
 	va_end(arg);
 	locked = iprintcanlock(&iprintlock);
 	for(i = 0; i < nconsdevs; i++)
-		if((consdevs[i].flags&Ciprint) != 0){
-			if(consdevs[i].q != nil)
-				qiwrite(consdevs[i].q, buf, n);
-			else
-				consdevs[i].fn(buf, n);
-		}
+		if((consdevs[i].flags&Ciprint) != 0)
+			consdevs[i].fn(buf, n);
 	if(locked)
 		unlock(&iprintlock);
 	splx(s);
