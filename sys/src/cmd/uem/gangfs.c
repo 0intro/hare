@@ -24,6 +24,7 @@
 #include <libsec.h>
 #include <stdio.h>
 #include "debug.h"
+#include "timeit.h"
 
 int remote_override = 0;
 int remote = 0;
@@ -534,7 +535,7 @@ static int
 checkmount(char *addr)
 {
 	char *dest = estrdup9p(addr);
-	int retries = 0;
+	int retries;
 	int err = 0;
 	int fd;
 	char *srvpt = smprint("/srv/%s", addr);
@@ -568,10 +569,31 @@ checkmount(char *addr)
 
 	/* no dir, spawn off an import */
 	DPRINT(DNET, "\tno dir, spawn off an import +++\n");
+/*
+	for (retries=0, err=-1; retries<=5000; retries++){
+		if(0==retries%1000)
+			proccreate(startimport, dest, STACK);
+
+		// we need to wait for this to be done 
+		if((tmp = dirstat(mtpt)) == nil){
+			err = 0;
+			break;
+		}
+
+		// ugh, arbitrary delay 
+		sleep(10);
+	}
+	if(err)
+		DPRINT(DERR, "*ERROR*: checkmount: import for (%s) not complete after 10 seconds, giving up\n", dest);
+*/
+
+
+
+for (retries=0, tmp=nil; retries<=5 && tmp==nil; retries++){
 	proccreate(startimport, dest, STACK);
 
-	/* we need to wait for this to be done */
-	while((tmp = dirstat(mtpt)) == nil) { /* ugh, arbitrary 100ms delay */
+	// we need to wait for this to be done 
+	while((tmp = dirstat(mtpt)) == nil) { // ugh, arbitrary 100ms delay
 		if(retries++ > 1009) {
 			DPRINT(DERR, "*ERROR*: checkmount: import for (%s) not complete after 10 seconds, giving up\n", dest);
 			err = -1;
@@ -579,6 +601,7 @@ checkmount(char *addr)
 		}
 		sleep(10);
 	}
+}
 
 out:
 	if(srvpt)
@@ -993,6 +1016,9 @@ releasegang(Gang *g)
 	}
 
 	wunlock(&glock);
+
+	// FIXME: dump the time stamps
+	timeit_dump();
 }
 
 static void
@@ -1328,7 +1354,9 @@ setupstdio(Session *s)
 
 	snprint(dest, 255, "%s/g%d/%d", gangpath, g->index, s->index);
 
+if(!s->remote)stamp("Before local bind");
 	n = bind(buf, dest, MREPL);
+if(!s->remote)timeit_tag_dt_float("Before local bind", "Time for local bind");
 	DPRINT(DEXE, "\tbind buf=(%s) dest=(%s) ret=%d\n", buf, dest, n);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
@@ -1341,7 +1369,9 @@ setupstdio(Session *s)
 
 	snprint(dest, 255, "%s/g%d/stdin", xgangpath, g->index);
 	DPRINT(DEXE, "\tsplicefrom buf=(%s) dest=(%s)\n", buf, dest);
+if(!s->remote)stamp("Before local splicefrom/stdin");
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
+if(!s->remote)timeit_tag_dt_float("Before local splicefrom/stdin", "Time for local splicefrom/stdin");
 	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
@@ -1354,7 +1384,9 @@ setupstdio(Session *s)
 
 	snprint(dest, 255, "%s/g%d/stdout", xgangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
+if(!s->remote)stamp("Before local spliceto/stdout");
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
+if(!s->remote)timeit_tag_dt_float("Before local spliceto/stdout", "Time for local spliceto/stdout");
 	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
@@ -1367,11 +1399,14 @@ setupstdio(Session *s)
 
 	snprint(dest, 255, "%s/g%d/stderr", xgangpath, g->index);
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
+if(!s->remote)stamp("Before local spliceto/stderr");
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
+if(!s->remote)timeit_tag_dt_float("Before local spliceto/stderr", "Time for local spliceto/stderr");
 	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
 
+if(!s->remote)timeit_tag_dt_float("Before local bind", "Time for local setupstdio");
 	return nil;
 }
 
@@ -1386,22 +1421,27 @@ cloneproc(void *arg)
 	int n = -1;
 	char *err;
 
-	if(sess->remote)
+	if(sess->remote){
 		snprint(buf, 255, "%s/gclone", sess->path);
-	else
+//stamp("gclone");
+	}else{
 		snprint(buf, 255, "%s/clone", sess->path);
+stamp("clone");
+	}
 
 	DPRINT(DEXE, "cloneproc: **** clone proc %s (remote=%d)\n",
 	       buf, sess->remote);
 
 	/* FUTURE: This shouldn't be necessary with exec2fs */
-	for(retries=0; retries <= 50; retries++) {
+if(!sess->remote)stamp("Before sess");
+	for(retries=0; retries <= 10; retries++) {
 		sess->fd = open(buf, ORDWR);
 
 		if(sess->fd <= 0) {
-			sleep(100);
-			DPRINT(DERR, "WARNING: retry: %d on %d:%d opening exec2fs returned %d: %r -- retrying\n", 
-			       retries, sess->index, sess->subindex, sess->fd);
+stamp("sess sleep1");
+			sleep(0);
+			DPRINT(DERR, "WARNING: retry: %d opening execfs returned %d: %r -- retrying\n", 
+			       retries, sess->fd);
 			continue;
 		}
 
@@ -1410,12 +1450,15 @@ cloneproc(void *arg)
 			buf[n] = 0;
 			break;
 		}
+stamp("sess sleep2");
 
-		sleep(100);
-		DPRINT(DERR, "WARNING: retry: %d exec2fs's pread=(%d) failed for fd=(%d): %r -- retrying\n", 
+		sleep(0);
+		DPRINT(DERR, "WARNING: retry: %d execfs's pread=(%d) failed for fd=(%d): %r -- retrying\n", 
 		       retries, n, sess->fd);
 		close(sess->fd);
 	}
+
+if(!sess->remote)timeit_tag_dt_float("Before sess", "Time for local sess");
 
 	DPRINT(DEXE, "\tcontrol channel on sess->fd=(%d) for subsession (%d) pread=(%d)\n",
 	       sess->fd, sess->subindex, n);
@@ -1441,6 +1484,7 @@ cloneproc(void *arg)
 	DPRINT(DEXE, "cloneproc: sess->pid=%ld buf=(%s)\n", sess->pid, buf);
 
 	/* if we are a remote session, setup backmount */
+//stamp("Before remote");
 	if(sess->remote) {
 		DPRINT(DEXE, "Attempting to remote checkmount %s on %s\n", 
 		       mysysname, sess->path);
@@ -1472,6 +1516,7 @@ cloneproc(void *arg)
 	}
 
 	/* finish by setting up stdio */
+if(!sess->remote)stamp("Before local setupstdio");
 	if(err = setupstdio(sess)) {
 		DPRINT(DEXE, "reporting failure from stdio setup session %d:%d: %s\n", 
 				sess->index, sess->subindex, err);
@@ -1480,6 +1525,7 @@ cloneproc(void *arg)
 		DPRINT(DEXE, "reporting success from session %d:%d\n", sess->index, sess->subindex);
 		sendp(sess->chan, nil);
 	}
+if(!sess->remote)timeit_tag_dt_float("Before local setupstdio", "Time for local setupstdio outer");
 
 error:
 	threadexits(nil);
@@ -1525,9 +1571,13 @@ reslocal(Gang *g)
 	g->sess = emalloc9p(sizeof(Session)*g->size);
 	
 	for(count = 0; count < g->size; count++) {
+stamp("Before local setupsession");
 		setupsess(g, &g->sess[count], nil, 0, count);
+timeit_tag_dt_float("Before local setupsession", "Time for local setupsession");
 		DPRINT(DEXE, "reslocal: reservation: count=%d out of %d\n", count+1, g->size);
+stamp("Before local cloneproc");
 		proccreate(cloneproc, &g->sess[count], STACK);
+timeit_tag_dt_float("Before local cloneproc", "Time for local cloneproc");
 	}
 
 	/* 
@@ -1538,15 +1588,19 @@ reslocal(Gang *g)
      *
      */
 
+stamp("Before local recvp");
 	for(count = 0; count < g->size; count++) {
 		char *myerr;
 		DPRINT(DEXE, "\twaiting on reservation: count=%d out of %d\n", 
 						count+1, g->size);
+stamp("local recvp");
 		myerr = recvp(g->sess[count].chan);
+timeit_tag_dt_float("local recvp", "Time for single local recvp");
 		if(myerr != nil) 
 			err = myerr;
 		/* MAYBE: retry here? for reliability ? */
 	}
+timeit_tag_dt_float("Before local recvp", "Time for local recvp total");
 	
 	return err;
 }
@@ -1582,6 +1636,7 @@ resgang(Gang *g)
 	remaining = size;
 	/* walk children tree, allocating cores and incrementing stats.njobs
 		counting sessions and keeping children per subsession in an array? */
+//stamp("Before walk");
 	for(current=mystats.next; current !=nil; current = current->next) {
 		int avail = current->ntask - current->njobs;
 		if(avail >= remaining) {
@@ -1596,7 +1651,11 @@ resgang(Gang *g)
 		if(njobs[scount] > 0)	/* only increment when we've allocated a subnode */
 			scount++;
 	}
-	
+//stamp("After walk");
+//timeit_settype(TIMIT_FLOAT);
+//timeit_tag_dt("Before walk", "After walk", "Time for walk");
+//timeit_settype(TIMIT_DEFAULT);
+
 	scount++; /* count instead of index now */
 	
 	/* allocate subsessions */
@@ -1606,23 +1665,29 @@ resgang(Gang *g)
 	DPRINT(DGAN, "Gang opening up %d sessions\n", scount);
 
 	current = mystats.next;
+stamp("Before loop");
 	for(count = 0; count < scount; count++) {
-		// FIXME: try moving checkmount to initstatus
-		// checkmount(current->name);
+//stamp("Before checkmount");
+		checkmount(current->name);
+//timeit_dt_last_float("Time for checkmount");
 
 		if(njobs[count] == 0)
 			continue;
 		DPRINT(DGAN, "resgang: Session %d Target %s Njobs: %d From %s\n",
 		       count, current->name, njobs[count], mysysname);
 		
+//stamp("Before setupsess");
 		setupsess(g, &g->sess[count], current->name, njobs[count], count);
-		
+//timeit_dt_last_float("Time for setupsess");
+
 		proccreate(cloneproc, &g->sess[count], STACK);
 		current = current->next;
 	}
+timeit_tag_dt_float("Before loop", "Time for loop");
 
 	DPRINT(DGAN, "waiting on %d sessions\n", scount);
 
+stamp("Before loop2");
 	for(count = 0; count < scount; count++) {
 		char *myerr;
 		DPRINT(DGAN, "\twaiting on reservation: count=%d out of %d\n", count+1, scount);
@@ -1636,6 +1701,7 @@ resgang(Gang *g)
 			g->status = GANG_BROKE;
 		}
 	}
+timeit_dt_last_float("Time for loop2");
 
 	return err;
 }
@@ -1687,6 +1753,7 @@ cmdres(Req *r, int num)
 			respond(r, Ebadimode);
 			goto cleanuperror;
 	};
+stamp("Before mpipes");
 	if (mpipe(dest, "stdout") < 0) {  
 		respond(r, Estdout);
 		goto cleanuperror;
@@ -1695,14 +1762,20 @@ cmdres(Req *r, int num)
 		respond(r, Estderr);
 		goto cleanuperror;
 	}
+timeit_dt_last_float("Time for mpipes");
 
 	g->size = num;
 
 	/* this assumes top down reservation model */
-	if(mystats.nchild)
+	if(mystats.nchild){
+		stamp("Before resgang");
 		err = resgang(g);
-	else
+timeit_tag_dt_float("Before resgang", "Time for RES gang");
+	}else{
+stamp("Before reslocal");
 		err = reslocal(g);
+timeit_tag_dt_float("Before reslocal", "Time for RES local");
+	}
 
 	if(err) {
 		DPRINT(DERR, "*ERROR*: problem establishing gang reservation: %s\n", err);
@@ -2158,6 +2231,9 @@ threadmain(int argc, char **argv)
 		}
 		proccreate(updatestatus, (void *)parent, STACK);
 	}
+
+	timeit_init();
+	//timeit_setsilent(1);
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
