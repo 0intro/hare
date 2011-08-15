@@ -2,6 +2,9 @@
 # 
 # a UEM Scale Test Run
 #
+# to run on the BG:
+#    R_MAX=4 # or the max number of tasks
+#    rc bg_run 0xFFDFF
 
 # 1 is for the BG
 if(~ $#BG 0) BG=1
@@ -10,6 +13,8 @@ if(~ $BG 0) O=8
 if(~ $BG 0) CMDPATH=$O.
 if not CMDPATH=''
 
+
+if(~ $#R_MIN 0) R_MIN=1
 
 if(~ $#R_MAX 0){
     if(~ $BG 1) R_MAX=1
@@ -27,7 +32,7 @@ IP=11.$IO
 
 fn enum_tests {
     TESTNUM=`{awk 'BEGIN     {
-	for (i = 1; i <= '$R_MAX'; i*=2) printf "%d ",i
+	for (i = '$R_MAX'; i >= '$R_MIN'; i/=2) printf "%d ",i
 	exit }'}
      #`# shut up the code coloring bug...
 }
