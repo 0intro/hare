@@ -14,6 +14,7 @@ enum{
 	TIMIT_FLOAT,
 	TIMIT_SILENT,
 	TIMIT_END,
+	TIMIT_ORDERED,
 };
 
 typedef struct Tentry Tentry;
@@ -39,13 +40,29 @@ static TimeIt *current = nil;
 static max_entries = 1024;
 static int timeit_fd = 1;
 static int default_flag=0;
-
 static int silent=0;
 
-#define slice(X) X=nsec()
-#define sec_cnv 1000000000LL
-//#define slice(X) cycles(&X)
-//#define sec_cnv 850000000LL // FIXME: this is an estimte
+static int use_cycles=0;
+static uvlong sec_cnv=1000000000LL;
+
+
+static void
+tslice(uvlong *t)
+{
+	if(use_cycles){
+		sec_cnv = 850000000LL;
+		cycles(t);
+	}else{
+		sec_cnv = 1000000000LL;
+		*t = nsec();
+	}
+}
+
+void
+timeit_setcycles(int flag)
+{
+	use_cycles=flag;
+}
 
 double
 timeit_cnv_float(uvlong t)
@@ -109,7 +126,6 @@ void
 timeit_dump(void)
 {
 	int i;
-	// FIXME: no need for the extra var.  Just use root instead of t->
 	TimeIt *t = root;
 	double fdt;
 	if(silent) return;
@@ -139,7 +155,7 @@ timeit_dump(void)
 static void
 add_stamp(vlong s, char *tag, int pid)
 {
-	if(root==nil) return;
+	if(root==nil || current==nil) return;
 	qlock(&timelck);
 	current->ent[current->n].stamp = s;
 	current->ent[current->n].pid = pid;
@@ -411,7 +427,7 @@ timeit_dt_last_float(char *tag)
 
 	int i;
 	uvlong t;
-	slice(t);
+	tslice(&t);
 
 	if(root==nil) return;
 
@@ -466,7 +482,7 @@ void
 stamp(char *tag)
 {
 	uvlong ticks;
-	slice(ticks);
+	tslice(&ticks);
 
 	if(root==nil) return;
 	add_stamp(ticks, tag, getpid());
@@ -530,7 +546,7 @@ timeit_tag_dt_float(char *tag1, char *new_tag)
 	vlong dt;
 
 	uvlong time;
-	slice(time);
+	tslice(&time);
 
 	if(root==nil) return;
 	if(t1==nil)
