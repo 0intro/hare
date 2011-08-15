@@ -217,6 +217,7 @@ fprint(2,"f/stime = %ulld\n", ttime);
 		// FIXME: there is a better way to do this than here...
 		DPRINT(DFID, "num_tasks=(%d) for output\n", num_tasks);
 		for(i=0; i<num_tasks; i++){
+			// read in a full buffer....
 			n = read(gfdo, line, 1024);
 			if(n<=0) break;
 			
@@ -225,7 +226,8 @@ fprint(2,"f/stime = %ulld\n", ttime);
 		};
 		
 		stamp("OUT");
-		
+
+		// FIXME: close the ctl file timing...
 		stamp("TERM");
 		
 		timeit_setfd(2);
