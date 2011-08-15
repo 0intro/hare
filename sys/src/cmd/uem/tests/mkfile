@@ -42,7 +42,12 @@ debug:V: all
 	#rc pbg_4.rc 0xFFDFF
 	#rc tri.rc 12
 	#rc exec2fs.rc 0xFFDFF
-	rc bg_scale_run.rc 0xFFDFF
+	#rc bg_scale_run.rc 0xFFDFF
+	../8.stat_run -N 16 -t /tmp/output /bin/date
+	../8.stat_run -N 8 -t /tmp/output /bin/date
+	../8.stat_run -N 4 -t /tmp/output /bin/date
+	../8.stat_run -N 2 -t /tmp/output /bin/date
+	../8.stat_run -N 1 -t /tmp/output /bin/date
 
 test_simple:V: all
 	# for 9vx and small system tests
