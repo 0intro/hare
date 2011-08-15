@@ -61,7 +61,7 @@ main(int argc, char **argv)
 	char *log_file=nil;
 	int i, num_tasks=1;
 	char *x;
-	int loop=0;
+	int loop=0, use_cycles=0;
 	char line[1024], gstdout[1024];
 
 	ARGBEGIN{
@@ -87,6 +87,9 @@ main(int argc, char **argv)
 		break;
 	case 'N':
 		num_tasks = atoi(ARGF());
+		break;
+	case 'C':
+		use_cycles = 1;
 		break;
 	default:
 		usage();
@@ -121,7 +124,8 @@ fprint(2,"f/stime = %ulld\n", ttime);
 
 	timeit_init();
 	timeit_settype(TIMIT_DEFAULT);
-		
+	timeit_setcycles(use_cycles);
+
 	if(log_file)
 		timeit_setout(log_file);
 
