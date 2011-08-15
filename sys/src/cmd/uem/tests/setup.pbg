@@ -15,6 +15,7 @@ IP=11.$IO
 if(~ $#* 0 1) DEBUG=()
 if not DEBUG=$2
 DEBUG=(-v 0xFFDFF)
+DEBUG=(-v 0x00000)
 
 #if(~ $#* 1) {
 #    DEBUG=''
@@ -148,7 +149,7 @@ if(! ~ $#* 0){
 echo '############ starting next '$IP' ############' >>[2] $GANGLOG
 cpunode=0 treeip=$IO profile.pbg $DEBUG
 
-#mount -c /srv/io /n/io
+mount -c /srv/io /n/io
 
 # generate tje fake CPU nodes and moutn them
 for(i in $SRVNUM){
@@ -162,6 +163,8 @@ for(i in $SRVNUM){
 
 # Tests
 if(~ $#* 0) exit 0
+
+exit 0
 
 basic
 
