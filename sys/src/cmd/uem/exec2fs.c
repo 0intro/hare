@@ -182,6 +182,8 @@ fsopen(void *arg)
 	Fid *f = r->fid;
 	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
+
+	// FIXME: this should only be done on clone
 	char *srvbuf = smprint("/srv/exec2fs-%d", getpid()); /* srvctl name buffer */
 
 ////stamp("fsopen aux");
@@ -240,7 +242,7 @@ fsopen(void *arg)
 
 	/* ask for a new child process */
 	qlock(&lck);
-	srvctl = srvbuf;
+	srvctl = srvbuf; // write down the channel instead.
 	e->pid = (int) kickit();
 	qunlock(&lck);
 //stamp("After kickit");
