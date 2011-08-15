@@ -26,6 +26,7 @@
 #include <libsec.h>
 #include <stdio.h>
 #include <debug.h>
+#include "timeit.h"
 
 static char Ebadfd[] = "bad fd";
 static char Ebadprint[] = "bad snprint";
@@ -54,7 +55,7 @@ static char defaultcmdpath[] =	"/bin/execcmd";
 static char defaultsrvmpipe[] =	"mpipe";
 static char *procpath, *srvpath, *cmdpath, *srvmpipe, *mmount;
 static char *logdir = nil;
-static char *srvctl;
+static char *srvctl = nil;
 static Channel *iochan;
 static Channel *clunkchan;
 
@@ -116,17 +117,27 @@ cloneproc(void *arg)
 
 	threadsetname("exec2fs-cloneproc");
 
+	DPRINT(DARG, "Main: srvctl=(%s)\n", srvctl);
+	DPRINT(DARG, "\tmmount=(%s)\n", mmount);
+
 	DPRINT(DFID, "cloneproc pidc=(%p) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s) (%s)\n",
 	       pidc, cmdpath, "execcmd", "-s", srvctl,
-	       "-v", smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount);
+	       "-v", smprint("0x%lx", vflag), "-L", logdir, "-m", procpath, "-M", mmount);
 
+//stamp("Before execcmd clone");
 	if(logdir)
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
 			  smprint("%ld", vflag), "-L", logdir, "-m", procpath, "-M", mmount, nil);
 	else
 		procexecl(pidc, cmdpath, "execcmd", "-s", srvctl, "-v", 
-			  smprint("%ld", vflag), "-m", procpath, "-M", mmount, nil);
+			  smprint("0x%lx", vflag), "-m", procpath, "-M", mmount, nil);
 	DPRINT(DERR, "cloneproc: execcmd failed!: %r\n");
+// should never get here...
+//stamp("After execcmd clone");
+
+//timeit_settype(TIMIT_FLOAT);
+//timeit_tag_dt("Before execcmd clone", "After execcmd clone", "Time for execcmd clone");
+//timeit_settype(TIMIT_DEFAULT);
 
 	sendul(pidc, 0); /* failure */
 	threadexits(nil);
@@ -139,6 +150,7 @@ kickit(void)
 	Channel *pidc = chancreate(sizeof(ulong), 0);
 	ulong pid;
 
+//stamp("Before kickit");
 	DPRINT(DCUR, "kickit: forking the proc\n");
 	int npid = procrfork(cloneproc, (void *) pidc, STACK, RFFDG);
 	DPRINT(DCUR, "\tnpid=(%d)\n", npid);
@@ -147,6 +159,11 @@ kickit(void)
 	if(pid==0) {
 		DPRINT(DERR, "*ERROR*: Problem with cloneproc\n");
 	}
+//stamp("After kickit");
+
+//timeit_settype(TIMIT_FLOAT);
+//timeit_tag_dt("Before kickit", "After kickit", "Time for kickit");
+//timeit_settype(TIMIT_DEFAULT);
 
 	chanfree(pidc);
 
@@ -165,16 +182,21 @@ fsopen(void *arg)
 	Fid *f = r->fid;
 	char *fname = (char *) emalloc9p(STRMAX);	/* pathname buffer */
 	char *ctlbuf = (char *) emalloc9p(STRMAX);	/* error string from wrapper */
+	char *srvbuf = smprint("/srv/exec2fs-%d", getpid()); /* srvctl name buffer */
 
+////stamp("fsopen aux");
 	if(f->file->aux == nil) {
 		DPRINT(DFID, "fsopen: f->file->aux == nil\n");
+////stamp("ERROR 12");
 		respond(r, nil);
 		return;
 	}
 
+//stamp("fsopen Xclone");
 	if(f->file->aux != (void*)Xclone) {
 			DPRINT(DCUR, "fsopen: !Xclone...\n");
 			DPRINT(DFID, "fsopen: f->file->aux->type != Xclone\n");
+//stamp("ERROR 11");
 			respond(r, nil);
 			return;
 	}
@@ -184,26 +206,44 @@ fsopen(void *arg)
 	e = emalloc9p(sizeof(Exec));
 	memset(e, 0, sizeof(Exec));
 
-	/* setup bootstrap ctlfd */
+// free srvctl
+
+//stamp("fsopen pipe");
+	pipe(p);
+
+// FIXME: moved inside of lock, but should remove the prints
 	DPRINT(DFID, "fsopen: srvctl=(%s) pid=(%d)\n", srvctl, getpid());
 
-	pipe(p);
+	/* setup bootstrap ctlfd */
 	qlock(&lck);
+	srvctl = srvbuf;
 	fd = create(srvctl, OWRITE, 0666);
 	qunlock(&lck);
 	if(fd < 0) {
 		DPRINT(DFID, "fsopen failed for srvctl=(%s): %r\n", srvctl);
 		err = estrdup9p(Esrv);
+//		char *tag=smprint("ERROR 10: fsopen failed for srvctl=(%s): %r\n", srvctl);
+////stamp(tag);
+////timeit_settype(TIMIT_FLOAT);
+////timeit_tag_dt("fsopen pipe", tag, "Time failed open");
+////timeit_settype(TIMIT_DEFAULT);
+////stamp("ERROR 10");
 		goto error;
 	}
+////stamp("After create");
 
 	fprint(fd, "%d", p[0]);
 	close(fd);
 	close(p[0]);
 	e->ctlfd = p[1];
-     
+//stamp("After close pipes");
+
 	/* ask for a new child process */
+	qlock(&lck);
+	srvctl = srvbuf;
 	e->pid = (int) kickit();
+	qunlock(&lck);
+//stamp("After kickit");
 
 	/* cloneproc generates stdin, stdout, and stderr for the ctl
 	 * channel.  If any of these fail, then e->pid will be < 2, and
@@ -213,6 +253,7 @@ fsopen(void *arg)
 	if(e->pid <= 2){
 		DPRINT(DERR, "*ERROR*: execcmd's pid=(%d) should be greater than 2\n", e->pid);
 		err = estrdup9p(Enopid);
+//stamp("ERROR 9");
 		goto error;
 	}
 
@@ -223,40 +264,50 @@ fsopen(void *arg)
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*:  bad snprint #1\n");
 		err = estrdup9p(Ebadprint);
+//stamp("ERROR 8");
 		goto error;
 	}
+//stamp("After ctl name");
 
 	/* grab ahold of the ctl file */
 	DPRINT(DCUR, "fsopen: opening %s\n", fname);
 	if((e->rctlfd = open(fname, OWRITE)) < 0) {
 		DPRINT(DERR, "\n*ERROR*: opening %s failed: %r\n", fname);
 		err = estrdup9p(Enoctl);
+//stamp("ERROR 7");
 		goto error;
 	}
 	DPRINT(DFID, "\tctlfd=(%d)\n", e->rctlfd);
+//stamp("After ctl creation");
 
-	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
-	DPRINT(DCUR, "fsopen: mounting on %s\n", fname);
-	if(n <= 0){
-		DPRINT(DERR, "*ERROR*: bad snprint #2\n");
-		err = estrdup9p(Ebadprint);
-		goto error;	
-	}
+//  FIXME: this gets overwritten and is not used....
+//	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
+//	DPRINT(DCUR, "fsopen: mounting on %s\n", fname);
+//	if(n <= 0){
+//		DPRINT(DERR, "*ERROR*: bad snprint #2\n");
+//		err = estrdup9p(Ebadprint);
+//		goto error;	
+//	}
+////stamp("After mount name");
 
 	n = snprint(fname, STRMAX, "%d", e->pid);
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*: bad snprint #3\n");
 		err = estrdup9p(Ebadprint);
+//stamp("ERROR 7");
 		goto error;	
 	}
+//stamp("After mount name");
 
 	closefile(createfile(fs.tree->root, fname, "exec2fs", DMDIR|0777, nil));
 	DPRINT(DCUR, "\tcreated submount point %s\n", fname);
+//stamp("After createfile");
 
 	n = snprint(fname, STRMAX, "%s/%d", mmount, e->pid);
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*: bad snprint #4\n");
 		err = estrdup9p(Ebadprint);
+//stamp("ERROR 6");
 		goto error;	
 	}
 
@@ -265,20 +316,26 @@ fsopen(void *arg)
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*: bad mpipe for stdin\n");
 		err = estrdup9p(Empipe);
+//stamp("ERROR 6");
 		goto error;	
 	}
+//stamp("After stdin");
 	n = mpipe(fname, "stdout");
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*: bad mpipe for stdout\n");
 		err = estrdup9p(Empipe);
+//stamp("ERROR 5");
 		goto error;	
 	}
+//stamp("After stdout");
 	n = mpipe(fname, "stderr");
 	if(n <= 0){
 		DPRINT(DERR, "*ERROR*: bad mpipe for stderr\n");
 		err = estrdup9p(Empipe);
+//stamp("ERROR 4");
 		goto error;	
 	}
+//stamp("After stderr");
 
 	// FIXME: hack to keep track of mnts
 	qlock(&lck);
@@ -292,22 +349,36 @@ fsopen(void *arg)
 	if(n < 0) {
 		DPRINT(DERR, "fsopen: *ERROR*: execcmd write failed\n");
 		err = estrdup9p(Ectlchan);
+//stamp("ERROR 3");
 		goto error;	
 	}
+//stamp("After write 1");
 
 	/* check for partial success: execcmd has opened stdio */
 	n = read(e->ctlfd, ctlbuf, STRMAX);
 	if(n < 0) {
 		DPRINT(DERR, "fsopen: *ERROR*: execcmd read failed\n");
 		err = estrdup9p(Ectlchan);
+//stamp("ERROR 2");
 		goto error;	
 	}
 	if(n != 1) {
 		DPRINT(DERR, "fsopen: *ERROR*: execcmd n != 1\n");
 		ctlbuf[n] = 0;
 		err = estrdup9p(ctlbuf);
+//stamp("ERROR 1");
 		goto error;
 	}
+//stamp("After read 1");
+//timeit_settype(TIMIT_FLOAT);
+//timeit_tag_dt("fsopen pipe", "After close pipes", "Time for fsopen pipes");
+//timeit_tag_dt("After close pipes", "After kickit", "Time for fsopen kickit");
+//timeit_tag_dt("After kickit", "After ctl creation", "Time for fsopen ctl");
+//timeit_tag_dt("After ctl creation", "After createfile", "Time for createfile");
+//timeit_tag_dt("After createfile", "After stderr", "Time for std");
+//timeit_tag_dt("After stderr", "After read 1", "Time for write/read");
+//timeit_tag_dt("fsopen pipe", "After read 1", "Time for sess");
+//timeit_settype(TIMIT_DEFAULT);
 
 	f->aux = e;
 	DPRINT(DCUR, "fsopen: sucseeded - setting f->aux = e (%p)\n", f->aux);
@@ -444,6 +515,9 @@ cleanupsession(void *arg)
 	
 	snprint(path, STRMAX, "%s/%d", mmount, pid);
 	
+	// FIXME: dump the time //stamps
+	//timeit_dump();
+
 	/* this is a hack on trying to clean things up */
 	DPRINT(DFID, "cleanupsession: checking stuff in pid dir (%s)\n", path);
 	Dir *db;
@@ -595,6 +669,7 @@ cleanup(Srv *)
 
 
 	DPRINT(DFID, "freeing the server, io and clunk channel\n");
+// FIXME: move the srvctl (and possibly more) outside
 	remove(srvctl);
 	chanfree(iochan);
 	chanfree(clunkchan);
@@ -620,6 +695,7 @@ iothread(void*)
 
 		switch(r->ifcall.type){
 		case Topen:
+			// FIXME srvctl should no longer be global...
 			proccreate(fsopen, (void *) r, STACK);
 			break;
 		case Twrite:
@@ -738,12 +814,11 @@ threadmain(int argc, char **argv)
 		usage();
 	}
 
-	srvctl = smprint("/srv/exec2fs-%d", getpid());
-	DPRINT(DARG, "Main: srvctl=(%s)\n", srvctl);
-	DPRINT(DARG, "\tmmount=(%s)\n", mmount);
-
 	fs.tree = alloctree("exec2fs", "exec2fs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "exec2fs", 0666, (void *)Xclone));
+
+	timeit_init();
+	//timeit_setsilent(1);
 
 	/* spawn off a io thread */
 	iochan = chancreate(sizeof(void *), 0);
