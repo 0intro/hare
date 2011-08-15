@@ -1,7 +1,6 @@
 #!/bin/rc
 
 DEBUG=(-v 0x00000)
-DEBUG=(-v 0xFFDFF)
 #if(! ~ $#* 0) {
 #  DEBUG=(-v $1)
 #}
@@ -17,13 +16,15 @@ IP=11.$treeip(1)
 TESTDIR=/tmp/testbed
 #TESTDIR=/n/frontend/home/ericvh/tmp/.test
 
+DEBUG=(-v 0xFFDFF)
 GANGLOG=$TESTDIR'/gangfs-'$IP'.log'
 EXECLOG=$TESTDIR'/exec2fs-'$IP'.log'
 MPIPELOG=$TESTDIR'/mpipefs-'$IP'.log'
 
-#GANGLOG=/dev/null
-#EXECLOG=/dev/null
-#MPIPELOG=/dev/null
+DEBUG=(-v 0x00000)
+GANGLOG=/dev/null
+EXECLOG=/dev/null
+MPIPELOG=/dev/null
 
 if(~ $cpunode '1'){
 	i=`{cat /net/ipifc/clone} #`
