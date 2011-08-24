@@ -235,12 +235,12 @@ fprint(2,"f/stime = %ulld\n", ttime);
 
 		timeit_settype(TIMIT_FLOAT);
 
-		timeit_tag_dt("BEGIN", "RES", "Time for stat_run RES");
-		timeit_tag_dt("finish opening stdout", "EXEC", "Time for EXEC");
-		timeit_tag_dt("EXEC", "OUT", "Time for OUT");
-		timeit_tag_dt("OUT", "TERM", "Time for TERM");
+		timeit_tag_dt2_sec("BEGIN", "RES", "Time for stat_run RES");
+		timeit_tag_dt2_sec("finish opening stdout", "EXEC", "Time for EXEC");
+		timeit_tag_dt2_sec("EXEC", "OUT", "Time for OUT");
+		timeit_tag_dt2_sec("OUT", "TERM", "Time for TERM");
 		
-		timeit_tag_dt("BEGIN", "OUT", "Total time");
+		timeit_tag_dt2_sec("BEGIN", "OUT", "Total time");
 		
 		if(tmpfd>1)
 			close(tmpfd);
