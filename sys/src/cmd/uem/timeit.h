@@ -10,16 +10,18 @@
  */
 
 enum{
-	TIMIT_DEFAULT=0,
-	TIMIT_FLOAT,
-	TIMIT_SILENT,
+	TIMIT_DEFAULT=0x0,
+	TIMIT_FLOAT=0x1,
+	TIMIT_DT=0x2,
+	TIMIT_SILENT=0x4,
 	TIMIT_END,
-	TIMIT_ORDERED,
+	TIMIT_USED=0x8,
 };
 
 typedef struct Tentry Tentry;
 struct Tentry {
 	uvlong stamp;
+	double dt;
 	long pid;
 	char *tag;
 	int flag;
@@ -29,7 +31,7 @@ typedef struct TimeIt TimeIt;
 struct TimeIt {
 	int max_entries;
 	int n;
-	int last_dump;
+	long last_pid;
 	Tentry *ent;
 	TimeIt *next;
 	TimeIt *prev;
@@ -65,7 +67,7 @@ timeit_setcycles(int flag)
 }
 
 double
-timeit_cnv_float(uvlong t)
+timeit_cnv_sec(uvlong t)
 {
 	double dt = ((double) t);
 	double ct = ((double) sec_cnv);
@@ -122,45 +124,79 @@ timeit_setout(char *outfile)
 
 QLock timelck;
 
+int
+timit_ent_cmp(void *v1, void *v2)
+{
+	Tentry *e1 = (Tentry*) v1;
+	Tentry *e2 = (Tentry*) v2;
+
+//if((e1->pid-e2->pid) < 0)
+//	print("(swap) %d %d\n", e1->pid,e2->pid);
+
+		return (int)e1->pid-e2->pid;
+//	else
+//		return (int)e1->stamp-e2->stamp;
+}
+
 void
 timeit_dump(void)
 {
 	int i;
-	TimeIt *t = root;
-	double fdt;
+	TimeIt *t;
 	if(silent) return;
 	if(root==nil) return;
 
 	qlock(&timelck);
-	while(t != nil){
-		for (i=t->last_dump+1; i<t->n; i++){
-			switch(t->ent[i].flag){
-			case TIMIT_FLOAT:
-				fdt = ((double)t->ent[i].stamp)/((double)sec_cnv);
-				fprint(timeit_fd, "%lud %f %s\n",
-				       t->ent[i].pid, fdt, t->ent[i].tag);
-				break;
-			default:
-				fprint(timeit_fd, "%lud %llud %s\n",
-				       t->ent[i].pid, t->ent[i].stamp, t->ent[i].tag);
-				break;
+	for(t=root; t!=nil; t=t->next){
+		for (i=0; i<t->n; i++){
+			if(t->ent[i].flag & TIMIT_USED)
+				continue;
+			if(t->ent[i].pid != t->last_pid){
+				fprint(timeit_fd, "\n");
+				t->last_pid = t->ent[i].pid;
 			}
-			t->last_dump = i;
+			if(t->ent[i].flag & (TIMIT_FLOAT|TIMIT_DT)){
+				fprint(timeit_fd, "%p %lud %f %s\n",
+				       root, t->ent[i].pid, t->ent[i].dt, t->ent[i].tag);
+			}else{
+				fprint(timeit_fd, "%p %lud %llud %s\n",
+				       root, t->ent[i].pid, t->ent[i].stamp, t->ent[i].tag);
+			}
+			t->ent[i].flag |= TIMIT_USED;
 		}
-		t = t->next;
 	}
 	qunlock(&timelck);
 }
 
-static void
+void
+timeit_dump_ordered(void)
+{
+	TimeIt *t;
+	if(silent) return;
+	if(root==nil) return;
+
+	qlock(&timelck);
+	for(t=root; t!=nil; t=t->next)
+		qsort(t->ent, t->n -1, sizeof(Tentry), timit_ent_cmp);
+
+	qunlock(&timelck);
+
+	timeit_dump();	
+}
+
+static Tentry *
 add_stamp(vlong s, char *tag, int pid)
 {
-	if(root==nil || current==nil) return;
+	Tentry *e;
+
+	if(root==nil || current==nil) return nil;
 	qlock(&timelck);
-	current->ent[current->n].stamp = s;
-	current->ent[current->n].pid = pid;
-	current->ent[current->n].tag = tag;
-	current->ent[current->n].flag = default_flag;
+	e = &current->ent[current->n];
+	e->stamp = s;
+	e->dt = 0.0;
+	e->pid = pid;
+	e->tag = tag;
+	e->flag = default_flag;
 
 	/* ensure that the next one is always valid */
 	current->n++;
@@ -169,6 +205,18 @@ add_stamp(vlong s, char *tag, int pid)
 		current->next->prev = current;
 	}
 	qunlock(&timelck);
+
+	return e;
+}
+
+Tentry *
+stamp(char *tag)
+{
+	uvlong ticks;
+	tslice(&ticks);
+
+	if(root==nil) return nil;
+	return add_stamp(ticks, tag, getpid());
 }
 
 vlong
@@ -216,7 +264,7 @@ timeit_index(int num)
 err:
 	qunlock(&timelck);
 	DPRINT(DERR, "*ERROR*: timeit_index attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_index attemped to access non existant element", getpid());
+	stamp("*ERROR*: timeit_index attemped to access non existant element");
 	return nil;
 }
 
@@ -242,7 +290,7 @@ timeit_find(char *tag, int pid)
 err:
 	DPRINT(DERR, "*ERROR*: timeit_find tag=(%s) not found\n", 
 	       (tag==nil)?"<nil>":tag);
-	add_stamp(0, "*ERROR*: timeit_find tag not found", getpid());
+	stamp("*ERROR*: timeit_find tag not found");
 	return nil;
 }
 
@@ -263,7 +311,7 @@ timeit_find(char *tag)
 err:
 	DPRINT(DERR, "*ERROR*: timeit_find tag=(%s) not found\n", 
 	       (tag==nil)?"<nil>":tag);
-	add_stamp(0, "*ERROR*: timeit_find tag not found");
+	stamp("*ERROR*: timeit_find tag not found");
 	return nil;
 }
 */
@@ -279,7 +327,7 @@ timeit_last(void)
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_last attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_last attemped to access non existant element", getpid());
+	stamp("*ERROR*: timeit_last attemped to access non existant element");
 	return nil;
 }
 
@@ -298,7 +346,7 @@ timeit_last_index(void)
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_last_pid attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_last_pid attemped to access non existant element", pid);
+	stamp("*ERROR*: timeit_last_pid attemped to access non existant element");
 	return -1;
 }
 
@@ -314,7 +362,7 @@ timeit_last_pid(void)
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_last_pid attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_last_pid attemped to access non existant element", getpid());
+	stamp("*ERROR*: timeit_last_pid attemped to access non existant element");
 	return nil;
 }
 
@@ -388,7 +436,7 @@ timeit_offset(Tentry *s, int num)
 err:
 	qunlock(&timelck);
 	DPRINT(DERR, "*ERROR*: timeit_offset attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_offset attemped to access non existant element", getpid());
+	stamp("*ERROR*: timeit_offset attemped to access non existant element");
 	return nil;
 	
 }
@@ -399,35 +447,29 @@ timeit_dt(int num, char *tag)
 	Tentry *e1, *e2;
 
 	if(root==nil) return;
-fprint(2, "here1\n");
+
 	e1 = timeit_last_pid();
 	e2 = timeit_offset(e1, num);
 	if(e1==nil || e2==nil)
 		goto err;
-fprint(2, "here2\n");
-	add_stamp(timeit_ent_dt(e1,e2), tag, getpid());
 
-fprint(2, "here3\n");
+	Tentry *e = stamp(tag);
+
+	e->dt = (double) timeit_ent_dt(e1,e2);
+	e->flag = TIMIT_DT;
+
 	return; 
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_dt attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_dt attemped to access non existant element", getpid());
+	stamp("*ERROR*: timeit_dt attemped to access non existant element");
 	return;
 }
 
 void
-timeit_dt_last_float(char *tag)
+timeit_dt_last_sec(char *tag)
 {
-//	if(root==nil) return;
-//	timeit_settype(TIMIT_FLOAT);
-//	timeit_dt(-1, tag);
-//	timeit_settype(TIMIT_DEFAULT);
-
-
 	int i;
-	uvlong t;
-	tslice(&t);
 
 	if(root==nil) return;
 
@@ -435,16 +477,17 @@ timeit_dt_last_float(char *tag)
 	if(i<0)
 		goto err;
 
-	fprint(2,"\nDT[%d] = %ulld \n", i, t - current->ent[i].stamp);
-	timeit_settype(TIMIT_FLOAT);
-	add_stamp(t - current->ent[i].stamp, tag, getpid());
-	timeit_settype(TIMIT_DEFAULT);
+	Tentry *e = stamp(tag);
+
+	e->dt = timeit_cnv_sec(e->stamp - current->ent[i].stamp);
+	e->flag = TIMIT_FLOAT | TIMIT_DT;
+
 
 	return; 
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_dt attemped to access non existant element\n");
-	add_stamp(0, "*ERROR*: timeit_dt attemped to access non existant element", getpid());
+	stamp("*ERROR*: timeit_dt attemped to access non existant element");
 	return;
 }
 
@@ -453,7 +496,7 @@ err:
 static void
 timeit_atexit(void)
 {
-	timeit_dump();
+	timeit_dump_ordered();
 }
 
 static TimeIt *
@@ -466,7 +509,8 @@ timeit_new(int num)
 	}
 	t->max_entries = num;
 	t->n = 0;
-	t->last_dump = -1;
+	t->last_pid = -1;
+
 	t->ent = malloc(num*sizeof(Tentry));
 	if(t->ent == nil) {
 		fprint(2, "timeit_new: out of memory allocating %d\n", (int)num*sizeof(Tentry));
@@ -476,16 +520,6 @@ timeit_new(int num)
 	t->prev = nil;
 
 	return t;
-}
-
-void
-stamp(char *tag)
-{
-	uvlong ticks;
-	tslice(&ticks);
-
-	if(root==nil) return;
-	add_stamp(ticks, tag, getpid());
 }
 
 void
@@ -511,23 +545,25 @@ timeit_end(void)
 }
 
 void
-timeit_tag_dt(char *tag1, char *tag2, char *new_tag)
+timeit_tag_dt2(char *tag1, char *tag2, char *new_tag)
 {
 	int pid = getpid();
 	Tentry *t1 = timeit_find(tag1, pid);
 	Tentry *t2 = timeit_find(tag2, pid);
-	vlong dt;
 
 	if(root==nil) return;
 	if(t1==nil || t2==nil)
 		goto err;
 
-	if(t2->stamp > t1->stamp)
-		dt = t2->stamp - t1->stamp;
-	else
-		dt = t1->stamp - t2->stamp;
+	Tentry *e = stamp(new_tag);
 
-	add_stamp(dt, new_tag, getpid());
+	if(t2->stamp > t1->stamp)
+		e->dt = timeit_cnv_sec(t2->stamp - t1->stamp);
+	else
+		e->dt = timeit_cnv_sec(t1->stamp - t2->stamp);
+
+	e->flag = TIMIT_DT;
+
 
 	return;
 
@@ -535,35 +571,58 @@ err:
 	DPRINT(DERR, "*ERROR*: timeit_tag_dt failed on tag1=(%s) tag2=(%s)\n",
 	       (tag1==nil)?"<nil>":tag1,
 	       (tag2==nil)?"<nil>":tag2);
-	add_stamp(0, "*ERROR*: timeit_tag_dt failed", getpid());
+	stamp("*ERROR*: timeit_tag_dt failed");
 }
 
 void
-timeit_tag_dt_float(char *tag1, char *new_tag)
+timeit_tag_dt2_sec(char *tag1, char *tag2, char *new_tag)
 {
 	int pid = getpid();
 	Tentry *t1 = timeit_find(tag1, pid);
-	vlong dt;
+	Tentry *t2 = timeit_find(tag2, pid);
 
-	uvlong time;
-	tslice(&time);
+	if(root==nil) return;
+	if(t1==nil || t2==nil)
+		goto err;
+
+	Tentry *e = stamp(new_tag);
+
+	if(t2->stamp > t1->stamp)
+		e->dt = timeit_cnv_sec(t2->stamp - t1->stamp);
+	else
+		e->dt = timeit_cnv_sec(t1->stamp - t2->stamp);
+
+	e->flag = TIMIT_FLOAT | TIMIT_DT;
+
+
+	return;
+
+err:
+	DPRINT(DERR, "*ERROR*: timeit_tag_dt failed on tag1=(%s) tag2=(%s)\n",
+	       (tag1==nil)?"<nil>":tag1,
+	       (tag2==nil)?"<nil>":tag2);
+	stamp("*ERROR*: timeit_tag_dt failed");
+}
+
+void
+timeit_tag_dt_sec(char *tag1, char *new_tag)
+{
+	int pid = getpid();
+	Tentry *t1 = timeit_find(tag1, pid);
 
 	if(root==nil) return;
 	if(t1==nil)
 		goto err;
 
-	timeit_settype(TIMIT_FLOAT);
+	Tentry *e = stamp(new_tag);
 
-	dt = time - t1->stamp;
-
-	add_stamp(dt, new_tag, getpid());
-
-	timeit_settype(TIMIT_DEFAULT);
+	e->dt = timeit_cnv_sec(e->stamp - t1->stamp);
+	e->flag = TIMIT_FLOAT | TIMIT_DT;
 
 	return;
 
 err:
 	DPRINT(DERR, "*ERROR*: timeit_tag_dt failed on tag1=(%s)\n",
 	       (tag1==nil)?"<nil>":tag1);
-	add_stamp(0, "*ERROR*: timeit_tag_dt failed", getpid());
+	stamp("*ERROR*: timeit_tag_dt failed");
 }

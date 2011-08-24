@@ -1018,7 +1018,7 @@ releasegang(Gang *g)
 	wunlock(&glock);
 
 	// FIXME: dump the time stamps
-	timeit_dump();
+	timeit_dump_ordered();
 }
 
 static void
@@ -1356,7 +1356,7 @@ setupstdio(Session *s)
 
 if(!s->remote)stamp("Before local bind");
 	n = bind(buf, dest, MREPL);
-if(!s->remote)timeit_tag_dt_float("Before local bind", "Time for local bind");
+if(!s->remote)timeit_tag_dt_sec("Before local bind", "Time for local bind");
 	DPRINT(DEXE, "\tbind buf=(%s) dest=(%s) ret=%d\n", buf, dest, n);
 	if(n < 0)
 		return smprint("couldn't bind %s %s: %r\n", buf, dest);
@@ -1371,7 +1371,7 @@ if(!s->remote)timeit_tag_dt_float("Before local bind", "Time for local bind");
 	DPRINT(DEXE, "\tsplicefrom buf=(%s) dest=(%s)\n", buf, dest);
 if(!s->remote)stamp("Before local splicefrom/stdin");
 	n = splicefrom(buf, dest); /* execfs initiates splicefrom gangfs */
-if(!s->remote)timeit_tag_dt_float("Before local splicefrom/stdin", "Time for local splicefrom/stdin");
+if(!s->remote)timeit_tag_dt_sec("Before local splicefrom/stdin", "Time for local splicefrom/stdin");
 	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
@@ -1386,7 +1386,7 @@ if(!s->remote)timeit_tag_dt_float("Before local splicefrom/stdin", "Time for loc
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 if(!s->remote)stamp("Before local spliceto/stdout");
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stdout */
-if(!s->remote)timeit_tag_dt_float("Before local spliceto/stdout", "Time for local spliceto/stdout");
+if(!s->remote)timeit_tag_dt_sec("Before local spliceto/stdout", "Time for local spliceto/stdout");
 	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
@@ -1401,12 +1401,12 @@ if(!s->remote)timeit_tag_dt_float("Before local spliceto/stdout", "Time for loca
 	DPRINT(DEXE, "\tspliceto buf=(%s) dest=(%s)\n", buf, dest);
 if(!s->remote)stamp("Before local spliceto/stderr");
 	n = spliceto(buf, dest); /* execfs initiates spliceto gangfs stderr */
-if(!s->remote)timeit_tag_dt_float("Before local spliceto/stderr", "Time for local spliceto/stderr");
+if(!s->remote)timeit_tag_dt_sec("Before local spliceto/stderr", "Time for local spliceto/stderr");
 	DPRINT(DEXE, "\t\tret=%d\n", n);
 	if(n < 0)
 		return smprint("setupstdio: %r\n");
 
-if(!s->remote)timeit_tag_dt_float("Before local bind", "Time for local setupstdio");
+if(!s->remote)timeit_tag_dt_sec("Before local bind", "Time for local setupstdio");
 	return nil;
 }
 
@@ -1458,7 +1458,7 @@ stamp("sess sleep2");
 		close(sess->fd);
 	}
 
-if(!sess->remote)timeit_tag_dt_float("Before sess", "Time for local sess");
+if(!sess->remote)timeit_tag_dt_sec("Before sess", "Time for local sess");
 
 	DPRINT(DEXE, "\tcontrol channel on sess->fd=(%d) for subsession (%d) pread=(%d)\n",
 	       sess->fd, sess->subindex, n);
@@ -1525,7 +1525,7 @@ if(!sess->remote)stamp("Before local setupstdio");
 		DPRINT(DEXE, "reporting success from session %d:%d\n", sess->index, sess->subindex);
 		sendp(sess->chan, nil);
 	}
-if(!sess->remote)timeit_tag_dt_float("Before local setupstdio", "Time for local setupstdio outer");
+if(!sess->remote)timeit_tag_dt_sec("Before local setupstdio", "Time for local setupstdio outer");
 
 error:
 	threadexits(nil);
@@ -1573,11 +1573,11 @@ reslocal(Gang *g)
 	for(count = 0; count < g->size; count++) {
 stamp("Before local setupsession");
 		setupsess(g, &g->sess[count], nil, 0, count);
-timeit_tag_dt_float("Before local setupsession", "Time for local setupsession");
+timeit_tag_dt_sec("Before local setupsession", "Time for local setupsession");
 		DPRINT(DEXE, "reslocal: reservation: count=%d out of %d\n", count+1, g->size);
 stamp("Before local cloneproc");
 		proccreate(cloneproc, &g->sess[count], STACK);
-timeit_tag_dt_float("Before local cloneproc", "Time for local cloneproc");
+timeit_tag_dt_sec("Before local cloneproc", "Time for local cloneproc");
 	}
 
 	/* 
@@ -1595,12 +1595,12 @@ stamp("Before local recvp");
 						count+1, g->size);
 stamp("local recvp");
 		myerr = recvp(g->sess[count].chan);
-timeit_tag_dt_float("local recvp", "Time for single local recvp");
+timeit_tag_dt_sec("local recvp", "Time for single local recvp");
 		if(myerr != nil) 
 			err = myerr;
 		/* MAYBE: retry here? for reliability ? */
 	}
-timeit_tag_dt_float("Before local recvp", "Time for local recvp total");
+timeit_tag_dt_sec("Before local recvp", "Time for local recvp total");
 	
 	return err;
 }
@@ -1669,7 +1669,7 @@ stamp("Before loop");
 	for(count = 0; count < scount; count++) {
 //stamp("Before checkmount");
 		checkmount(current->name);
-//timeit_dt_last_float("Time for checkmount");
+//timeit_dt_last_sec("Time for checkmount");
 
 		if(njobs[count] == 0)
 			continue;
@@ -1678,12 +1678,12 @@ stamp("Before loop");
 		
 //stamp("Before setupsess");
 		setupsess(g, &g->sess[count], current->name, njobs[count], count);
-//timeit_dt_last_float("Time for setupsess");
+//timeit_dt_last_sec("Time for setupsess");
 
 		proccreate(cloneproc, &g->sess[count], STACK);
 		current = current->next;
 	}
-timeit_tag_dt_float("Before loop", "Time for loop");
+timeit_tag_dt_sec("Before loop", "Time for loop");
 
 	DPRINT(DGAN, "waiting on %d sessions\n", scount);
 
@@ -1701,7 +1701,7 @@ stamp("Before loop2");
 			g->status = GANG_BROKE;
 		}
 	}
-timeit_dt_last_float("Time for loop2");
+timeit_dt_last_sec("Time for loop2");
 
 	return err;
 }
@@ -1762,7 +1762,7 @@ stamp("Before mpipes");
 		respond(r, Estderr);
 		goto cleanuperror;
 	}
-timeit_dt_last_float("Time for mpipes");
+timeit_dt_last_sec("Time for mpipes");
 
 	g->size = num;
 
@@ -1770,11 +1770,11 @@ timeit_dt_last_float("Time for mpipes");
 	if(mystats.nchild){
 		stamp("Before resgang");
 		err = resgang(g);
-timeit_tag_dt_float("Before resgang", "Time for RES gang");
+timeit_tag_dt_sec("Before resgang", "Time for RES gang");
 	}else{
 stamp("Before reslocal");
 		err = reslocal(g);
-timeit_tag_dt_float("Before reslocal", "Time for RES local");
+timeit_tag_dt_sec("Before reslocal", "Time for RES local");
 	}
 
 	if(err) {
@@ -2233,6 +2233,10 @@ threadmain(int argc, char **argv)
 	}
 
 	timeit_init();
+	// char *tnb = smprint("timeit-%s",mysysname);
+	// timeit_setout(tnb);
+	// free(tnb);
+
 	//timeit_setsilent(1);
 
 	/* spawn off a io thread */
