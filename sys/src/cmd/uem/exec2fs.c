@@ -819,7 +819,7 @@ threadmain(int argc, char **argv)
 	fs.tree = alloctree("exec2fs", "exec2fs", DMDIR|0555, nil);
 	closefile(createfile(fs.tree->root, "clone", "exec2fs", 0666, (void *)Xclone));
 
-	timeit_init();
+	//timeit_init();
 	//timeit_setsilent(1);
 
 	/* spawn off a io thread */
