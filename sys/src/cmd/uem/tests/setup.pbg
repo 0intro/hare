@@ -15,7 +15,7 @@ IP=11.$IO
 if(~ $#* 0 1) DEBUG=()
 if not DEBUG=$2
 DEBUG=(-v 0xFFDFF)
-DEBUG=(-v 0x00000)
+#DEBUG=(-v 0x00000)
 
 #if(~ $#* 1) {
 #    DEBUG=''
