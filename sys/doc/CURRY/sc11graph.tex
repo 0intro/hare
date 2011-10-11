@@ -18,9 +18,9 @@ Eric Van Hensbergen \thanks{IBM}
 \\ 
 Jim McKie, 
 \thanks{Bell Laboratories, Murray Hill, NJ, USA }
-Charles Forsyth
+Charles Forsyth, 
 \thanks{Vita Nuova, Ldt.} 
-%Roger Pearce\thanks{Lawrence Livermore National Laboratory}
+Roger Pearce\thanks{Lawrence Livermore National Laboratory}
 }
 %\institute{Ronald G. Minnich \at Sandia National Labs, Livermore, CA, 94550,
 %    USA\\Tel.: 925-294-4713 %
@@ -399,20 +399,43 @@ The modifications described in the previous section can be considered as general
 that any device can be extended to take advantage of them. We have even created Curried pipes. 
 
 In this section we consider specializations that are very specific to the Blue Gene Torus, and motivated
-by applications that need support for asynchronous short messages. 
+by an important application, graph search, that is not adequately supported on that platform today. 
 These specializations extend the kernel in non-general ways, to accomodate an interface that is key to the performance of the machine. 
-The extensions are inspired by Active Messages\cite{von1992active},  and tailored to the needs of these applicatons. 
+The extensions are inspired by Active Messages\cite{von1992active},  and tailored to the needs of the graph application. 
 
-From the point of view of these applications, even the overhead of an MPI send is so high that the programmers 
-frequently write complex 
+\subsubsection{The graph search problem: motivating intrusive changes}
+
+Graph search on a massive scale (trillions of nodes)
+is an important problem in computing. 
+Processing   large  graphs   is  becoming   increasingly  important
+for  many domains such as social networks and bioinformatics. 
+In a graph data structure,
+relationships are stored using vertices and edges; a vertex
+may represent an object or concept, and the relationships between them
+are represented by edges.  The power of graph data structures lies in
+the ability to encode complex relationships between data and provide a
+framework to analyze the impact of the relationships.
+
+Unfortunately, many algorithms and implementations do not
+scale with increasing  graph sizes.  Graph search  places difficult requirements on HPC systems, such that in many cases
+programmers are reluctant to run it on anything but a shared-memory machine. 
+From the point of view of these applications, even the overhead of an MPI send is so high that the programmers write complex 
 queue software that batches small messages into larger ones: the programmers implement queues to reduce the overhead of the many
 queues hidden in the stacked layers  of communications libraries and hardware. There is a performance cost to stacked abstractions. 
 
-Two useful programming constructs for these applications are a very fast send for short messages, and a shared-memory ring for received
+In contrast to using a  more globally synchronous MPI-based
+approach to this problem, we advocate an asynchronous approach for graph analysis\cite{Pearce2010}
+and are building messaging infrastructure to accommodate the needs
+of applications requiring lightweight asynchronous messaging.
+Recently, a challenging graph processing benchmark has been released,
+The Graph500 \cite{Graph500}, which involves computing a Breadth-First
+Search on massive scale-free graphs.
+
+Two useful programming constructs for this application are a very fast send for short messages, and a shared-memory ring for received
 messages. In all cases, the messages are less than 100 bytes. 
 Because the hardware implements a shared-memory ring, it is not necessary to implement the rings 3 times at 3 levels in software for the send side. On the receive side, the hardware also 
 implements a shared-memory ring, but it is important to dequeue messages from this ring as quickly as possible; the delivery rate of messages might not match well to the consumption rate of the 
-algorithm, and a receive-side overrun is not easy to recover from on the Torus. The send interface is a function which transmits one short message at a time; the receive interface
+algorithm, and a receive-side overrun is not easy to recover from on the Torus. The interface we present to the user is a function which transmits one short message at a time; and which 
 provides the programmer with a function that dequeues messages from a shared-memory ring into an array of messages. The library is called amring, for Active Message Rings. 
 
 In Figure \ref{amringexample} we show a usage of the interface for the common ``MPI Ring'' benchmark. The library provides {\tt myrank} and {\tt nrank}, indicating a processes
@@ -514,6 +537,7 @@ with no address translation needed.
 \section{Results for two networks}
 \subsection{Global Barrier Network}
 We achieved our goal of sub-microsecond bits to the wire. With the traditional write path, it took approximately 3,000 cycles per write. Since the BG/P uses 850 MHz PowerPC processors, this means a normal write takes approximately 3.529 microseconds. However, when using the private system calls, it only takes around 620 cycles to do a write, or 0.729 microseconds. The overall speedup is 4.83. 
+The result is a potential ping-pong performance of slightly under 3 microseconds, which is competitive wth the best OS bypass performance. 
 
 \subsection{Torus Network}
 The Torus network consists of a 3D toroidal mesh with 6 500 Mbyte/second links. Packets consist of one or more 
@@ -521,16 +545,14 @@ The Torus network consists of a 3D toroidal mesh with 6 500 Mbyte/second links. 
 proc is approximately 12.5 microseconds (round trip time is 25 microseconds). The Plan 9 performance was not nearly as good -- the one way time was 25 microseconds. 
 
 We should keep this 25 microseconds in perspective. These are 850 Mhz Power PC RISC CPUs: 
-their instruction performance is about that of a high end network card CPU. The send involves several interrupts and scheduling operations, as we are counting remote receive overhead too. 
-The increased time for Plan 9 
+their instruction performance is about that of a high end network card CPU. The send involves several interrupts and scheduling operations, as we are counting remote receive overhead too. The increased time for Plan 9 
 to perform this operation is due to the fact that a lot more instructions have to run. 
 
 A set of simple changes to the injection (i.e. transmit) side of the driver shaved 8 microseconds from the total time, 
-reducing send overhead from 11 microseconds to 2.8, and one-way time to 17 microseconds. 
-We did not break the one microsecond barrier in this case, although work continues, but we did get the one way latency to a much more competitive value.
+reducing send overhead from 11 microseconds to 2.8. We did not break the one microsecond barrier in this case, although work continues, but we did get the one way latency to a much more competitive value.
 
 \subsection{Fast system call bypass results on the Torus}
-Using the ``System call bypass''  fast send, we achieved Torus injection rates of 862 thousand packets/second, or four times the rate of MPI as measured by injection test from the Sandia Messaging Benchmarks\cite{barrett2009application}. 
+Using the "System call bypass"  fast send, we achieved Torus injection rates of 862 thousand packets/second, or four times the rate of MPI as measured by injection test from the Sandia Messaging Benchmarks\cite{barrett2009application}. 
 We measured a packet reception rate, using the same benchmarks, of 
 606 thousand packets
 per second. 
@@ -541,13 +563,8 @@ per second.
 %\label{default}
 %\end{center}
 %\end{figure}
-We have not yet equaled the performance of the MPI library on the ring benchmark. MPI takes 5.2 microseconds per hop, and amrings take 7.5 microseconds. 
-We are working to further 
-optimize our performance. That said, applications which layer queueing on top of MPI use MPI polling
-functions to determine when it is safe to do a message send; these functions take over .5
-microsecond {\em for each call}. A program which calls the MPI poll more than five times per message
-should run 
-faster using amrings. 
+
+As of this writing we are still working on the graph benchmark. Indications are that it will perform well, but we are exercising a hardware issue which we will have resolved by time of publication. 
 
 \section{Conclusions and Future Work}
 The primary function of an operating system is to provide a virtualized set of resources such 
@@ -560,11 +577,8 @@ Still worse, to make the network a multiuser device, operating systems
 functionality is moved into the network interface itself, as in Infiniband interfaces, which provide virtualization at the interface level. 
 Frequently, the performance of OS bypass is cited without taking into account the high overhead of these user-level operating systems, and the problems inherent in creating layers of redundant functions between the operating system and programs. 
 
-This paper shows an alternative to the false choice of slow operating systems paths or fast user-level operating systems paths. 
-It is possible to use a general-purpose operating system for I/O and still achieve high performance. 
-While we are not yet equalling the performance of user-level MPI libraries in all areas, we have created an OS-based interface to a high performance network, 
-one which provides effective support for applications needing high performance for asynchronous short messages; and which
-allows for multi-user access with protection while still being competitive with user-level network drivers. 
+This paper shows an alternative to the false choice of slow operating systems paths or fast user-level operating systems paths. It is possible to use a general-purpose operating system for I/O and still achieve high performance. While we are not yet equalling the user-level MPI libraries, we are coming from behind, as the user-level libraries and associated network hardware have benefited from 20 years of co-design. 
+We wonder what would be possible were the operating system and the hardware designed together, with high performance I/O in mind. 
 
 \section{Acknowledgements}
 This work is support by the DOE Office of Advanced Scientific Computing Research. IBM has provided support from 2006 to the present. This research used resources of the Argonne Leadership Computing Facility

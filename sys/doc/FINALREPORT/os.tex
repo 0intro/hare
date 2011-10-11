@@ -38,7 +38,42 @@ The Currying and per-process system calls together form a new type of interface 
 kernels. 
 
 \subsection{Shared Heap}
-Shared data is an important part of HPC applications. 
+Currying reduces the overhead for process-driven operations. It does nothing for interrupt-driven
+operations, because interrupts, by design, do not occur in a process context. Page pinning is used 
+to resolve this problem on Linux systems: process memory mappings are communicated to the driver
+and ``pinned'' into place. Page pinning adds a great deal of code to a kernel; in some cases the
+pinning code for (e.g.) Linux is larger than all of Plan~9 itself. 
+
+We implemented a ``shared heap'' model in Plan~9. All process heaps, the kernel, and the drivers 
+share a common address space, consisting of the top 1.5 Gbytes of memory. All heap (not text, stack,
+or data, 
+just heap) is allocated from this shared 1.5 Gbytes of memory. 
+A given heap address in a process, kernel, or interrupt handler will
+point to the same piece of memory. In contrast, in a standard OS, the same heap address in each 
+process points to different memory. Note that a shared heap address space does not imply that 
+all the data in the heap itself is shared between all the processes.  
+Processes can share parts of the heap, but are typically limited to their own private piece, and 
+can not see other processes heap data. 
+
+Processes can easily pass pointers to each other because 
+a given heap pointer has the same meaning in every process. Processes can communicate an address 
+to the driver for use by the interrupt handler and there is no need for complex pinning, because the 
+address has the same meaning in every machine context. 
+
+We further modified the BG/P Torus driver to implement queues on the receive side. As packets are 
+received  by the interrupt handler they are directly moved to the queues. 
+\footnote{These queues are 
+very similar to those provided on the T3D. In the T3D, however, they were implemented in hardware. }
+Finally, once the driver and kernel were extended, we created a library to allow processes to 
+send from the shared heap and receive into queues in the shared heap. 
+
+Our resulting performance was better than that of the MPI library, even while using 
+the kernel for I/O. In fact a simple ping-pong code ran with about 1/3 the latency 
+of MPI. Our code was about 100 times smaller than the MPI library. Further, 
+the device could be made to work for multiple independent applications, which is not possible
+on BG/P hardware if the direct-access MPI libraries are used. We thus showed that if a 
+kernel provides the proper abstractions, it is not necessary to run the network device driver
+in user memory, as is done today. 
 
 \section{File Systems}
 \subsection{Compute Node Caches}
