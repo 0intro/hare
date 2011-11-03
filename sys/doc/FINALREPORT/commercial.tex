@@ -1,13 +1,19 @@
 \chapter{Commercial Impact}
 \section{Cray}
+We developed the Fixed Time Quantum\cite{ftq} benchmark in order to support quantitative evaluation of 
+OS noise. Cray used this benchmark to evaluate and improve the performance of their Compute Node
+Linux product\cite{kaplan2007cray}. 
+
 \section{IBM}
-IBM Research's invovlement in this project has been extremely valuable in exploring
+IBM Research's involvement in this project has been extremely valuable in exploring
 ways to broaden the applicability of the BlueGene hardware through alternative software
 stacks.  It has allowed us to explore hardware features which aren't used by the production
 software as well as explore alternative schemes for scalability and reliability which are
 difficult or impossible under the production software.  This alternative view has given us
 new insights which can then be incorporated into future hardware designs as well as future
 production system software.
+
+IBM also used FTQ to instrument the Blue Gene kernel\cite{bgpftq}.
 
 \subsection{9p}
 
@@ -65,3 +71,14 @@ kernels ship with the tracing software always installed and enabled.
 The capability provided by the software is so useful, and the performance impact so small, 
 that Coraid decided that it should always be available. 
 
+\section{Google}
+As a first step in the FAST-OS project, in 2005 we 
+funded the creation of  a compiler toolchain (C compiler, linker, and assembler) for Plan 9 on the 
+AMD/Intel 64-bit architectures, known as Opteron and EM64-T.
+As per a basic requirement of the project, these
+tools were created as open source. 
+
+Google has recently released a new programming language called Go. Go supports, among other 
+architectures, the AMD/Intel 64-bit CPUs. For these CPUs, Google adapted the  Plan 9 C toolchain
+we created. There is hence a very direct link from the FAST-OS funding to Google's Go programming 
+language, a language which is seeing very wide adoption. 

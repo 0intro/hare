@@ -28,10 +28,10 @@ each time. For the Blue Gene global barrier device, the overhead for the system 
 
 In \cite{currying} we describe the possible approaches to resolving this problem. We developed two 
 several extensions to Plan~9 that allowed the kernel to Curry the arguments to the read and write
-system calls. The result: the file descriptor and point/length information is checked once, and the
+system calls. The result: the file descriptor and pointer/length information is checked once, and the
 result stored in a cache held in the proc struct (per-process information) in the kernel. The per-process structure is 
 also extended with a private system call table. When the process makes a private system
-call, all the standard checking is skipped and the cached values are used instead. This 
+call, all the standard checking is skipped and the pre-validated cached values are used instead. This 
 new system call path resulted in a 5-fold reduction in overhead, to 729 nanoseconds. 
 
 The Currying and per-process system calls together form a new type of interface to operating system
