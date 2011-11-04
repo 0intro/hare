@@ -9,6 +9,40 @@
 \tableofcontents
 \pagebreak
 
+This report documents the results of work done over a 6 year period under the FAST-OS 
+programs. The first effort was called Right-Weight Kernels, (RWK) and was concerned with 
+improving measurements of OS noise so it could be treated quantitatively; 
+and evaluating the use of two operating systems, Linux
+and Plan~9, on HPC systems and determining how these operating systems needed
+to be extended or changed for HPC, while still retaining their general-purpose nature. 
+
+The second program, HARE, explored the creation of alternative runtime models, 
+building on RWK. All of the HARE work was done on Plan~9. 
+
+The organizations included LANL (RWK) and Sandia (RWK, HARE), as the PI moved to Sandia; 
+IBM; Bell Labs; and Vita Nuova, as a subcontractor to Bell Labs. In any given year, 
+the funding was suffcient to cover a PI from each organization part time. 
+
+Even given this limited funding, the two efforts had outsized impact: 
+\begin{itemize}
+\item Helped Cray decide to use Linux, instead of a custom kernel, and provided
+the tools needed to make Linux perform well
+\item Created a successor operating system to Plan~9, NIX, which has been taken in 
+by Bell Labs for further development
+\item Created a standard system measurement tool, Fixed Time Quantum or FTQ, which is widely
+used for measuring operating systems impact on applications
+\item Spurred the use of the 9p protocol in several organizations, including IBM
+\item Built software in use at many companies, including IBM, Cray, and Google
+\item Spurred the creation of alternative runtimes for use on HPC systems
+\item Demonstrated that, with proper modifications, a general purpose operating systems
+can provide communications up to 3 times as effective as user-level libraries
+\end{itemize}
+
+We describe details of these impacts in the following sections. The rest of this 
+report is organized as follows: first, we describe commercial impact; next, 
+we describe the FTQ benchmark and its impact in more detail; operating systems
+and runtime research follows; we discuss infrastructure software; and close with a 
+description of the new NIX  operating system, future work, and conclusions. 
 \input{commercial}
 \input{ftq}
 \input{os}
@@ -16,12 +50,59 @@
 \input{infrastructure}
 
 \chapter{NIX}
-TODO: Talk about early NIX work
+
 \chapter{Future Work}
 TODO: More to the point areas for
 future work.
 \chapter{Conclusions}
-TODO: Need summary.
+
+This work was done as part of the FAST-OS program and its successor. 
+The ground was prepared for the FAST-OS programs in a series of meetings held in
+the eary 2000s. One of the PIs earliest talks dates from 2002. In 2003, we made
+the following arguments: 
+\begin{itemize}
+\item Linux is fun and working now; enjoy it
+\item Linux is not forever
+\item Some fundamental properties of the Unix model have fatal flaws
+\item We are entering a period of “architecture flux” 
+\item We need diversity in OS research now to prepare for new, strange machines
+\item DOE can succeed in creating a successful, diverse OS research community
+\end{itmemize}
+
+We might ask: is any of this less true now that our community is faced with 
+the challenge of scaling parallelism up 1000-fold? We would argue that 
+the problem is even worse. While this program may have had successes, in some 
+sense the community
+still plowing the same ruts. The extant machines still largely run Linux, and the 
+problems we predicted in 2003 (for the 2012 timeframe) are starting to 
+come to pass: with each new version, Linux gets just a bit slower, as it grows in size 
+and complexity and the processors do not get any faster. As we stated in 2003, 
+``At some point, like all other OSes, it’s [Linux] going to fall over''. 
+Several large companies, in private conversation, have told the PI that one of the
+biggest management headaches they have is dealing with the increasing complexity of 
+the Linux kernel, version to version. 
+
+Did FAST-OS succeed? That is a harder question. In the sense of industry impact, we 
+clearly had great success. In the sense of building a vibrant community of OS researchers
+in DOE, we had some success; there is very good OS work going on at Argonne, Oak Ridge, 
+and Sandia, and on a smaller scale, other Labs. 
+
+Those are hard-won gains, and maintaining them 
+will not be easy: OS research continues to come under 
+pressure for both budget reasons and 
+from those who believe that industry will just supply an OS as a turnkey 
+answer, in spite of all historical evidence to the contrary. No standard OS has ever worked
+for the large scale without substantial measurement and change. 
+
+When FAST-OS started, the discussion was whether the DOE Labs would have any OS 
+knowledge or capability left by the end of the decade. FAST-OS and its successor
+program created a culture of competency in the DOE Labs and attracted some very 
+capable collaboraters from outside the labs. 
+In the end, we count this research, 
+and the larger program that funded it, as a success. Whether
+the gains we have made will be maintained is a question that can only 
+be answered at the end of {\em this} decade. 
+
 \bibliographystyle{abbrvnat}
 
 \bibliography{all}
