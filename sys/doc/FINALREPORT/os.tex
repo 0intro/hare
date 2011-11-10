@@ -77,6 +77,64 @@ in user memory, as is done today.
 
 \section{File Systems}
 \subsection{Compute Node Caches}
+
+We needed to reduce the load on the file server shared by thousands of
+nodes in a Blue Gene Plan 9 cluster. The intent was to execute the caching
+mechanisms on the I/O nodes as well as look at spreading them out amongst 
+the compute nodes depending on the I/O requirements of a particular 
+application.  
+
+Plan 9 had two existing caching mechanisms for 9P file servers: a volatile 
+cache controlled by devmnt, and a persistent disk-based cache managed by 
+the user-level server cfs.
+Both sent the server all 9P requests except reads satisfied by the cache.
+Cfs was quickly converted to a ramcfs that used the large memory of a
+Blue Gene I/O node instead of a disk, but most 9P traffic still passed
+through. A redesign produced fscfs, which breaks the direct link
+between its client's 9P transactions and those it makes to the server,
+producing a dramatic reduction in traffic seen by the server.
+
+Fscfs is a normal, user-level C application, using libthread for internal 
+concurrency. Like cfs, it is a 9P transducer: it acts as a client to a 
+remote 9P file server on one connection, and acts as a 9P server to its 
+client on another connection. (Once that connection is mounted in the name 
+space, many client processes can share it.) To provide data caching, fscfs 
+uses the same strategy as the existing caches: it makes a copy of the ­data
+as it passes through in either direction, and stores it in a local cache. 
+Subsequent read requests for the same data will be satisfied from the cache. 
+Write requests are passed through to the server, replacing data in the 
+cache if successful. Cached data is associated with each active file, but the 
+memory it occupies is managed on a least-recently-used basis across the 
+whole set of files. When a specified threshold for the cache has been reached, 
+the oldest cached data is discarded.
+
+Fscfs maintains a path tree representing all the paths walked in that tree, 
+successfully or 
+unsuccessfully. A successful walk results in an end-point that records a
+handle referring to that point in the server's hierarchy. (Note that 
+intermediate names need not have server handles.) If a walk from a
+given point failed at some stage, that is noted by a special path value at 
+that point in the tree, which gives the error string explaining why the walk 
+failed. If a subsequent walk from the client retraces an existing path, 
+fscfs can send the appropriate response itself, including failures and walks 
+that were only partially successful. If names remain in the walk request 
+after traversing the existing path, fscfs allocates a new handle for the new 
+path end-point, sends the whole request to the server, and updates the path 
+appropriately from the server's response. Remembering failures is a
+great help when, for instance, many processes on many nodes are enumerating 
+possible names for different possible versions of (say) Python library 
+files or shared libraries, most of which do not exist. (It would be more 
+rational to change the soft ware not to do pointless searches, but it is not 
+always possible to change components from standard distributions.)
+
+Fscfs is just over 2,000 lines of C code, including some intended for future 
+use. It has more than satisfied our initial requirements, although much more 
+can be done. It aggregates common operations in a general but straightforward 
+way. Its path cache is similar to Matuszekps file handle cache in his NFS cache,
+and closer to 9P home, some of the subtle cases in handles management in 
+fscfs seem to turn up in the implementation of 9P in the Linux kernel, 
+where Linux lacks anything corresponding exactly to a 9P handle.
+
 \section{New network communications models}
 \subsection{Active Message Support}
 \subsection{What are we calling Charles stuff?}
