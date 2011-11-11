@@ -1,0 +1,138 @@
+\subsection{Data network basics}
+The Blue Gene system provides several data networks.
+The IO nodes are linked by Ethernet, with connections through switches to the outside world, providing a conventional IP network.
+The CPU nodes are connected by the Torus; and the IO and CPU nodes are linked in a collective network.
+The only path from a CPU node to the outside (including external file service) is through the collective to an IO node, and then through the IP network on the Ethernet.
+The Ethernet supports large packets (`jumbo frames').
+The collective and Torus, however, provide only small packets: 256 and 240 bytes of user data respectively.
+On BG/P, compared to BG/L, the Torus has extra DMA interfaces to the Torus that
+can automatically fragment messages into the network's tiny payloads,
+although the recipient must still reassemble messages.
+
+The Plan 9 IP stack is completely independent of the MAC layers: a small 
+\emph{medium} driver connects the bottom of the IP stack to the files representing the driver for a given MAC level.
+For example, the Ether medium driver opens \texttt{/net/ether0/data}, reads and writes the file, converting as it does so between the Ether packets the device expects and IP packets, adding and removing MAC headers, and invoking ARP as required.
+It was a simple task to write specific medium drivers for each of the Torus and collective networks, just several hundred lines each.
+Note that unlike some other systems on Blue Gene, Plan 9 therefore does not emulate an Ethernet on either torus or collective to implement IP. Not only is the MAC-level framing of IP packets specific to each device, but there is no need for ARP (which historically has been a problem when attempting to scale to thousands of nodes).
+
+Raw access (ie, non-IP) to each network is also provided, through specific device files in the name space, such as \texttt{/net/torusdata}; in fact, it is the same interface used by the IP medium drivers.
+Applications that use the networks outside IP often need to send messages larger than the hardware's payload.
+We therefore added a simple fragmentation protocol, allowing messages of up to 64 kbytes to be exchanged across the network.
+The implementation is about 300 lines, allowing for an implementation entirely in software on BG/L, and a hybrid implementation on BG/P that takes advantage on the Torus of support in the DMA subsystem for fragmentation, using a software header encoding that allows correct but efficient reassembly at the receiver even when several nodes are communicating with the same recipient.
+Note that combining fragmentation with IP is worthwhile: the basic IP header is 20 bytes, and TCP adds 20 more, which is a non-trivial overhead for the tiny Torus and collective packets.
+Fragmentation allows one TCP/IP header to be used for a large message, which is then fragmented; although there is overhead in fragment reassembly, the resulting message traverses the IP stack only once, instead of many packets.
+
+\subsection{Transport protocols}
+
+As noted elsewhere, Plan 9 uses the 9P protocol to implement a range of system and application services, including distributed services, such as those provided by the Unified Execution Model.
+Unusually for modern network protocols, 9P is not 9P/IP: it is not expressly an Internet protocol.
+It can use any underlying transport that provides reliable, sequential (in-order) delivery; the current version of 9P does not even require the transport to respect 9P message boundaries.
+Having implemented an IP network above both Torus and collective networks, and thus TCP/IP, we could immediately deploy 9P.
+The Blue Gene environment, however, like many supercomputer systems, makes it easy to experiment with alternative protocol designs and implementations.
+Although the nodes, directly or indirectly, access resources on outside networks such as file service or graphics display, much of the communication is intra- and inter-node.
+Furthermore, it is easy to change the protocol implementation at all nodes from run to run, simply as a by-product of rebooting the system.
+By contrast, there are many barriers to experimenting with new protocols on the Internet.
+For example, Plan 9 historically had a reliable datagram protocol, called IL/IP, tuned to the needs of 9P.
+It has seen reducing use because on the wider Internet, intervening routers and firewalls do not recognise the protocol; nor is it easy to change them to do so.
+
+As well as supporting 9P, which is a reliable point-to-point conversation between client and server,
+we wanted to support reliable messaging between arbitrary pairs of processes (between any nodes).
+On Blue Gene, of course, the underlying hardware networks provide just such reliable delivery, at least in principle, and we had added fragmentation to allow larger, more expressive messages.
+On the other hand, in the larger context of the project, we were interested in fault-tolerance, including operation on unreliable or failing networks.
+Furthermore, because of its intended use for a single application using MPI, the hardware's properties are not quite right for 9P, or even general inter-process messaging.
+Most obviously, reliability and flow-control are between nodes, not between collections of processes on those nodes.
+Adding multiplexing of inter-node channels, for example by running IP, requires keeping the receiver `live' (ie, unblocked) at all times, to prevent the hardware flow-control from triggering and causing deadlock. Thus, for reliable communication, the hardware level flow-control is neither necessary nor sufficient, and flow-control must be added somewhere in the multiplexing software stack.
+
+Multiplexing, datagram and transport protocols are superficially straightforward, but typically become burdened with much practical detail, for connection establishment, error control, flow control, and congestion control. \cite{John-Day-Patterns-of-Network-Archictures}
+Rather than risk the time to develop a complete protocol from scratch,
+we decided to adopt and adapt an existing complete protocol definition, or more probably a suitable subset of one,
+limiting the implementation to just what we needed in the Blue Gene environment.
+We needed multiplexed messaging connections for 9P, and reliable but connectionless messaging for computational work.
+The first attempt was loosely based on the Xpress Transport Protocol,\cite{xtp}
+which had the attraction of supporting unreliable and reliable datagrams, and reliable connections as supersets of each other.
+The protocol essentially microcodes the effects desired by the application level;
+thus, a reliable datagram includes one protocol header that declares a new connection, transfers data into it, requests an acknowledgement, and closes the connection;
+a reliable connection instead puts those operations in the headers of distinct messages, in particular leaving the connection open after the first message, and taking advantage of the context thus established to abbreviate subsequent messages.
+Plan 9's TCP/IP has 3236 lines for the TCP level, 706 for the IP level, and some auxiliary code.
+By contrast, the XTP prototype had 1740 lines of code, and needed no IP level, but
+supported not just TCP-like connections, but reliable datagrams as well.
+Unfortunately, connection establishment and reset in XTP still seemed overly complex for this application, requiring message exchanges and timers.
+A second attempt was made (reusing much of the code), inspired by a much older protocol \emph{delta-t}.\cite{delta-t}
+It was simpler than XTP, and had a unique, timer-based approach to connection management.
+Briefly, in delta-t a logical connection exists between every possible sender and every possible receiver, but a connection is quiescent---thus requiring no state on either sender or receiver---if no message has been sent or received for a specified interval.
+The delta-t designers observed that timers are required to detect time out, and to provide protection against lost messages on connection close, but the timers can be used instead to make the connection messages redundant.
+Thus, to use a connection, a process simply sends a message on it, and the receiver then creates the state for the connection. After an optional acknowledgement, if no further messages are received (or the receiving process has no reply), the connection becomes quiescent and the state is removed. In the original protocol there are therefore no extra messages for connection establishment or shutdown, and the protocol can carry a single message efficiently.
+An old quip is that one cannot afford to have (say) TCP/IP connections between every pair of 65,000 nodes.
+With the delta-t approach, the pair-wise connections (logically) exist but cost nothing, until messages are actually sent, when the transient state can carry as much data as needed, reliably, and without extra messaging for connection establishment.
+
+On the other hand, and currently the primary use, a delta-t connection can carry 9P traffic between a client and a 9P server. Because the interface to the protocol (ie, \texttt{/net/pk}) obeys the Plan 9 name space conventions for networks, applications can use the protocol instead of TCP/IP without change.
+
+\subsection{Bulk messaging}
+
+On BG/L, the Torus network hardware presented a collection of memory-mapped FIFOs as its interface, accessed from the processor by explicit loads and stores.
+The BG/P Torus hardware hides that detail behind a collection of rings of DMA descriptors, and new DMA hardware moves the data between memory and selected FIFOs.
+The hardware goes much further, however, which required revisiting the software network interfaces to the Torus.
+(The collective networks were unchanged.)
+In particular, the hardware provided new DMA operations: \emph{put} and \emph{remote get}, implemented by special packets interpreted by the DMA engine.
+The Put operation causes the hardware to send an arbitrarily-large block of memory from one node, across the Torus, directly into a block of memory on a specified target node.
+The destination address is specified as an offset from a base address in a table on the remote node, selected by a `counter ID' specified by the sender.
+In the other direction, one node sends a Remote Get packet to a second node, causing
+its DMA engine to execute a \emph{Put} operation.
+Usually the target of the Put is the first node, so that the original message thus gets the relevant data from the second node efficiently using DMA.
+
+To exploit the BG/P extensions, the Plan 9 Torus driver was extended to implement a lightweight protocol for bulk messaging. A process wishing to use bulk messaging opens the file \texttt{/net/torusbig}, and sends and receives messages using write and read system calls. The first 32 bytes of the data in each read or write is a software header giving source and destination network addresses, an operation code, a parameter, and 24 bytes of uninterpreted data for use by the application.
+That is followed by the data of the bulk message itself.
+The uninterpreted data might contain values for subaddressing, or metadata describing the data, but that is up to the application. The operation code and its parameter are reserved to the protocol subsystem.
+
+Bulk messaging is a network protocol. Writes and reads are not matched, let alone synchronised, even in the implementation of the protocol. A write causes a bulk message to be sent to the destination node, which is queued until some reader does a read.
+The application data attached to the message might be used to associate requests and replies in an application level algorithm, perhaps by library code,
+but that is outside the messaging protocol.
+
+In the Torus driver, the protocol implementation uses the normal Torus packet channels, but bulk message control packets are specially marked, and interpreted by the interrupt handler on the destination node. A bulk write request sends a Get control message to the destination. The control message includes the metadata from the request, and addressing information for the data. If the destination cannot process the request, it will reply with a Nak. Otherwise, it will issue a DMA Remote Get request, quoting the addressing information it was given. The hardware on both source and destination nodes is programmed to signal an interrupt when the transfer completes. The sending node marks the bulk request done; the receiver queues the data to be read. Control packets carry tags to allow requests to be cancelled, acknowledged, or nak'd if required.
+
+Note that the bulk writer is not required to wait for the transmission to complete,
+allowing the usual overlap provided by buffering.
+More subtly, although the transfer is logically a `put' from source to destination,
+the \emph{receiving} kernel initiates the transfer using a DMA Remote Get.
+There are several reasons. First, the parameters for a DMA Put require the sender to specify the correct index in a table on the \emph{receiver}, and that can only be known by global convention or prior arrangement (ie, through a previous exchange of messages), neither of which supports dynamic communication well. Second, the receiver needs to find the memory to receive the data, and might be receiving from many other nodes.
+Having the receiver start the transfer allows various forms of flow control.
+Most important, however, using DMA Remote Get is more robust against node failure.
+If the sending node fails and stops, the request will fail or time out.
+If the sending node fails and restarts, at worst the Get request will fetch incorrect
+data, or receive an error. The metadata can be used to check the data.
+By contrast, if a DMA Put is used, and a destination node fails and restarts,
+it is possible that, without an error being notified, the put will transfer into
+whatever memory is addressed at the time by the table index parameter,
+corrupting the target node.
+
+\subsection{IO segments}
+
+For initial experiment, we limited messages to 128 kbytes, because of
+addressing constraints in the system. We did, however, want bulk messaging
+to be able to send much larger chunks of data.
+Furthermore, the normal read and write system calls imply copying,
+which is obviously inefficient.
+We changed the system to allow both restrictions to be removed,
+by solving a more general problem. We added a simple form of cross-domain reference.
+
+A process can attach a special type of segment intended to be used for IO.
+The segment is backed by physically-contiguous memory, usable by hardware DMA.
+Inspired by the x-kernel \cite{x-kernel}, fbufs \cite{fbufs}, and System 360's LOCATE mode, two new system calls were added:
+
+
+\begin{center}
+      Message readmsg(int fd, uint iolimit)
+      int writemsg(int fd, Message m)
+\end{center}
+
+Like the read system call, readmsg fetches data from the file denoted by file descriptor fd,
+but instead of having the user provide a buffer address, readmsg returns a Message value
+that refers to the data read (ie, the buffer address), and any associated metadata (eg, source address). Similarly, writemsg accepts a Message value instead of a single buffer address.
+The data address in the Message can be an ordinary address in the process.
+but it can also be a reference to an IO segment.
+Such references can be passed between user process and device driver through the kernel.
+There are primitives to manage the memory in an IO segment.
+
+In the HARE implementation on BG/P, IO segments and the system calls are restricted to use with particular devices, specifically the Torus.
+Since then, however, we have revised and extended the scheme in the context of the 64-bit NIX work,
+to handle IO to arbitrary devices, and support interprocess communication.
