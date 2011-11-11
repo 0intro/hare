@@ -17,7 +17,9 @@ and Plan~9, on HPC systems and determining how these operating systems needed
 to be extended or changed for HPC, while still retaining their general-purpose nature. 
 
 The second program, HARE, explored the creation of alternative runtime models, 
-building on RWK. All of the HARE work was done on Plan~9. 
+building on RWK. All of the HARE work was done on Plan~9. The HARE reseachers
+were mindful of the very good Linux and LWK work being done at other labs and saw no
+need to recreate it. 
 
 The organizations included LANL (RWK) and Sandia (RWK, HARE), as the PI moved to Sandia; 
 IBM; Bell Labs; and Vita Nuova, as a subcontractor to Bell Labs. In any given year, 
@@ -51,10 +53,73 @@ description of the new NIX  operating system, future work, and conclusions.
 
 \chapter{NIX}
 
+NIX is an operating system designed for manycore CPUs in which not 
+all cores are capable of running an operating system. Examples of such 
+systems abound, most recently in the various GPU systems. While most 
+heterogeneous systems treat the non-OS cores as a subordinate system, 
+in NIX they are treated as peers (or even superiors) of the 
+OS cores. NIX has been influenced by our work on Blue Gene and more traditional
+clusters.  
+
+NIX
+features a heterogeneous CPU model and can use a shared address space
+if it is available. 
+NIX partitions cores by function: Timesharing Cores, or
+TCs; Application Cores, or ACs; and Kernel Cores, or KCs.  One or more
+TC runs traditional applications.  KCs are optional, running kernel
+functions on demand.  ACs are also optional, devoted to running an
+application with no interrupts; not even clock interrupts.  Unlike
+traditional kernels, functions are not static: the number of TCs, KCs,
+and ACs can change as needed.  Also unlike traditional
+systems, applications can communicate by sending messages to the TC
+kernel, instead of system call traps.  These messages are "active"
+taking advantage of the shared-memory nature of manycore CPUs to pass
+pointers to data and code to coordinate cores.
+
 \chapter{Future Work}
-TODO: More to the point areas for
-future work.
+%Over the period of these two projects, we have shown that with appropriate 
+%modifications, general purpose operating systems can be used for HPC computers. 
+%We have developed tools that show the quantitative benefit of these 
+%This experience confirms the experience of industry. 
+This research has suggested a number of new directions for HPC. 
+\begin{itemize}
+\item New operating systems that step outside the stale Light-Weight Kernel/General Kernel
+argument. We have shown that one such kernel, NIX, can support the desirable attributes of both
+and even outperform LWKs at the things they do best. 
+\item Network IO can and should be done in the kernel, and future research should 
+work out the API.
+\item Network software that does not assume a perfect network needs to be created and put into use. 
+\item File systems must change to make explicit use of hierarchy. The ratio of Compute Nodes to IO Nodes should not be 
+statically defined by wires, as it is today, but defined by the needs of the application, and hence flexible. 
+\end{itemize}
+
 \chapter{Conclusions}
+
+While no commercial HPC vendor is using Plan~9, they are using much of the other software we developed, 
+including the 64-bit compiler toolchain, FTQ, and NIX. 
+There are other lessons learned: 
+\begin{itemize}
+\item OS bypass is not required for good network performance. ``Conventional knowledge
+bypass'' is much more important: if we can get runtime libraries to accomodate 
+such concepts as a shared heap address space, we can reduce runtime and OS 
+complexity and remove OS bypass for the most part. 
+\item The idea of quantitative measurement of OS noise was controversial when we first proposed it in 2004. 
+In fact, there is a wealth of signal processing software and knowledge that can be applied to HPC. We need
+to move beyond qualitative descriptions to quantitative measurements. Adjectives should be avoided
+when numbers can be supplied. 
+\item Users want a Unix-like API, even on systems like Blue Gene which do not run Unix on all nodes. 
+Key requirements such as sockets, dynamic libraries, and a reasonably standard file system
+interface can not be waved away. Light Weight Kernels that fail to provide these services
+will either change (as did the CNK) or be abandoned by the vendor (as was Catamount). 
+\item We should As pointed out above, ``Thus, for reliable communication, the hardware level flow-control is neither necessary nor sufficient, 
+and flow-control must be added somewhere in the multiplexing software stack.'' Communications networks
+on future architectures could be made simpler, faster, more reliable, and lower power by taking 
+this fact into account. 
+\item We need to move beyond simply gluing hardware interfaces into existing kernel designs in non-optimal ways. 
+One of the worst examples of this tendency can be seen in the Linux drivers for HPC networks: they all emulate an Ethernet. 
+This emulation results in ineffeciencies and poor software structure. Ethernet interfaces are for Ethernet networks. There is no need to have a network interface for a
+Torus emulate and Ethernet, as it does on Compute Node Linux on the Cray. 
+\end{itemize}
 
 This work was done as part of the FAST-OS program and its successor. 
 The ground was prepared for the FAST-OS programs in a series of meetings held in
@@ -72,12 +137,12 @@ the following arguments:
 We might ask: is any of this less true now that our community is faced with 
 the challenge of scaling parallelism up 1000-fold? We would argue that 
 the problem is even worse. While this program may have had successes, in some 
-sense the community
+sense the community is 
 still plowing the same ruts. The extant machines still largely run Linux, and the 
 problems we predicted in 2003 (for the 2012 timeframe) are starting to 
 come to pass: with each new version, Linux gets just a bit slower, as it grows in size 
 and complexity and the processors do not get any faster. As we stated in 2003, 
-``At some point, like all other OSes, it’s [Linux] going to fall over''. 
+``At some point, like all other OSes, it is [Linux] going to fall over''. 
 Several large companies, in private conversation, have told the PI that one of the
 biggest management headaches they have is dealing with the increasing complexity of 
 the Linux kernel, version to version. 
@@ -94,17 +159,31 @@ from those who believe that industry will just supply an OS as a turnkey
 answer, in spite of all historical evidence to the contrary. No standard OS has ever worked
 for the large scale without substantial measurement and change. 
 
+DOE needs to build on the success of these programs by continuing
+to fund new, innovative research that will 
+help vendors set new directions. At the same time, DOE Labs should almost never be in the business of 
+providing production software; nor should commercial uptake of every last bit of research be the measure 
+by which the research is measured. Failure should always be an option. If there are no failures, 
+then the research is not nearly aggressive enough. 
+
 When FAST-OS started, the discussion was whether the DOE Labs would have any OS 
 knowledge or capability left by the end of the decade. FAST-OS and its successor
 program created a culture of competency in the DOE Labs and attracted some very 
-capable collaboraters from outside the labs. 
+capable commercial and research partners  from outside the labs. 
 In the end, we count this research, 
 and the larger program that funded it, as a success. Whether
 the gains we have made will be maintained is a question that can only 
 be answered at the end of {\em this} decade. 
 
-\bibliographystyle{abbrvnat}
+%\bibliographystyle{abbrvnat} 
+\bibliographystyle{plain}
 
 \bibliography{all}
+
+\appendix
+\section{NIX}
+See attached document.
+This document will appear in Bell Labs Technical Journal and was the subject
+of a talk at a Bell Labs Technical Conference in Antwerp, Belgium, Oct. 2011. 
 
 \end{document}

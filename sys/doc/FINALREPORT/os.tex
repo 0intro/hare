@@ -94,12 +94,13 @@ through. A redesign produced fscfs, which breaks the direct link
 between its client's 9P transactions and those it makes to the server,
 producing a dramatic reduction in traffic seen by the server.
 
-Fscfs is a normal, user-level C application, using libthread for internal 
+Fscfs is a normal, user-level C application, using the Plan~9 thread
+library, libthread, for internal 
 concurrency. Like cfs, it is a 9P transducer: it acts as a client to a 
 remote 9P file server on one connection, and acts as a 9P server to its 
 client on another connection. (Once that connection is mounted in the name 
 space, many client processes can share it.) To provide data caching, fscfs 
-uses the same strategy as the existing caches: it makes a copy of the ­data
+uses the same strategy as the existing caches: it makes a copy of the data
 as it passes through in either direction, and stores it in a local cache. 
 Subsequent read requests for the same data will be satisfied from the cache. 
 Write requests are passed through to the server, replacing data in the 
@@ -137,7 +138,16 @@ where Linux lacks anything corresponding exactly to a 9P handle.
 
 \section{New network communications models}
 \subsection{Active Message Support}
-\subsection{What are we calling Charles stuff?}
+As a performance measurement experiment we implemented 
+Active Messages in the Torus driver. Our implementation 
+of shared heaps, mentioned above, allowed us to do the active message
+operation in the torus interrupt handler. The result was an 
+ability to perform remote put/get/queue insert at a rate roughly 
+three times greater than when MPI was used. 
+
+\subsection{High performance network transport}
+\input{netstuff}
+
 \section{Kittyhawk Kernels and VMM}
 
 Supercomputers and clouds both strive to make a large number of 
@@ -157,7 +167,7 @@ boot of multiple images across compute nodes within a single BG/P
 allocation, the Kittyhawk team also ported a Linux compute node
 implementation complete with an Ethernet interface to the high-performance
 collective and torus networks~\cite{kh-systemsjournal}.  
-This allowed Linux applications to run unmodified om Blue Gene compute 
+This allowed Linux applications to run unmodified on Blue Gene compute 
 nodes without incurring the performance 
 overhead of reflecting sockets and I/O operations thorugh user space
 helpers as in ZeptoOS.  It also enabled more conventional storage solutions
