@@ -36,7 +36,7 @@ MPI calls by calls to a small library using our primitives.  (The
 library provides \emph{reduce} and \emph{allreduce} operations, for
 instance.)  The revised program is written in a straightforward style,
 like a simple network application, as if the communication were
-synchronous, but the kernel and its protocol drivers exploit exploit
+synchronous, but the kernel and its protocol drivers exploit
 the potential for concurrency and overlap.  As another example, we
 have been experimenting with a small library and associated services
 that creates a distributed spanning tree (which can be made
@@ -141,7 +141,7 @@ multiplexing software stack.
 Multiplexing, datagram and transport protocols are superficially
 straightforward, but typically become burdened with much practical
 detail, for connection establishment, error control, flow control, and
-congestion control. \cite{John-Day-Patterns-of-Network-Archictures}
+congestion control. %\cite{John-Day-Patterns-of-Network-Archictures}
 Rather than risk the time to develop a complete protocol from scratch,
 we decided to adopt and adapt an existing complete protocol
 definition, or more probably a suitable subset of one, limiting the
@@ -165,7 +165,7 @@ connections, but reliable datagrams as well.  Unfortunately,
 connection establishment and reset in XTP still seemed overly complex
 for this application, requiring message exchanges and timers.  A
 second attempt was made (reusing much of the code), inspired by a much
-older protocol \emph{delta-t}.\cite{delta-t} It was simpler than XTP,
+older protocol \emph{delta-t}.\cite{watson1989delta} It was simpler than XTP,
 and had a unique, timer-based approach to connection management.
 Briefly, in delta-t a logical connection exists between every possible
 sender and every possible receiver, but a connection is
@@ -285,13 +285,14 @@ added a simple form of cross-domain reference.
 
 A process can attach a special type of segment intended to be used for
 IO.  The segment is backed by physically-contiguous memory, usable by
-hardware DMA.  Inspired by the x-kernel \cite{x-kernel}, fbufs
+hardware DMA.  Inspired by the x-kernel \cite{hutchinson1991x}, fbufs
 \cite{fbufs}, and System 360's LOCATE mode, two new system calls were
 added:
 
 
 \begin{center}
       Message readmsg(int fd, uint iolimit)
+
       int writemsg(int fd, Message m)
 \end{center}
 

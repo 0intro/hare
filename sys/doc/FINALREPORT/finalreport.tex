@@ -1,5 +1,7 @@
 \documentclass{report}
 \usepackage{graphicx}
+\usepackage{appendix}
+\usepackage{pdfpages}
 \title{HARE: Final Report}
 \author{Sandia National Labs, IBM, Bell Labs, Vita Nuova}
 \date{\today}
@@ -58,8 +60,9 @@ all cores are capable of running an operating system. Examples of such
 systems abound, most recently in the various GPU systems. While most 
 heterogeneous systems treat the non-OS cores as a subordinate system, 
 in NIX they are treated as peers (or even superiors) of the 
-OS cores. NIX has been influenced by our work on Blue Gene and more traditional
-clusters.  
+OS cores. 
+Many  additional features of NIX were created based on what we learned from 
+the RWK and HARE projects. 
 
 NIX
 features a heterogeneous CPU model and can use a shared address space
@@ -76,6 +79,26 @@ kernel, instead of system call traps.  These messages are "active"
 taking advantage of the shared-memory nature of manycore CPUs to pass
 pointers to data and code to coordinate cores.
 
+NIX has transparent support for a near-unlimited range of page sizes. 
+On the 64-bit x86 family, for example, NIX supports 2 MiB and 1 GiB pages. 
+Support for 1 GiB pages is crucial to performance: on one popular 
+graph application we measured a 2x speedup when 1 GiB pages were used 
+instead of 2 MiB pages. 
+The implementation allows for virtual pages, e.g., one could 
+provide 16KiB pages that are a concatenation of physical 4 KiB pages. 
+These virtual pages would allow us to reduce the number of page 
+faults an application causes, although they would not reduce 
+TLB pressure. 
+
+NIX gives us the best of many worlds. Applications can own a core, 
+and will not even be preempted by a clock tick, as they are even 
+on Light Weight Kernels today. At the same time, the full capability 
+of a general purpose operating system is available on core nearby. 
+We feel that NIX represents the shape of future operating systems
+on manycore systems that are being built now. 
+
+Further information on NIX can be found in Appendis A. 
+
 \chapter{Future Work}
 %Over the period of these two projects, we have shown that with appropriate 
 %modifications, general purpose operating systems can be used for HPC computers. 
@@ -87,8 +110,13 @@ This research has suggested a number of new directions for HPC.
 argument. We have shown that one such kernel, NIX, can support the desirable attributes of both
 and even outperform LWKs at the things they do best. 
 \item Network IO can and should be done in the kernel, and future research should 
-work out the API.
-\item Network software that does not assume a perfect network needs to be created and put into use. 
+work out the API. OS Bypass should be bypassed. 
+\item Network software that does not assume a perfect network needs to be created and put into use.
+This change in turn will allow innovation to occur in 
+HPC hardware. 
+\item HPC hardware needs to change so that it can provide near-perfect
+information about failures, but not nodes that never fail. Software 
+can handle faults in a far more flexible manner than hardware. 
 \item File systems must change to make explicit use of hierarchy. The ratio of Compute Nodes to IO Nodes should not be 
 statically defined by wires, as it is today, but defined by the needs of the application, and hence flexible. 
 \end{itemize}
@@ -117,8 +145,14 @@ on future architectures could be made simpler, faster, more reliable, and lower 
 this fact into account. 
 \item We need to move beyond simply gluing hardware interfaces into existing kernel designs in non-optimal ways. 
 One of the worst examples of this tendency can be seen in the Linux drivers for HPC networks: they all emulate an Ethernet. 
-This emulation results in ineffeciencies and poor software structure. Ethernet interfaces are for Ethernet networks. There is no need to have a network interface for a
-Torus emulate and Ethernet, as it does on Compute Node Linux on the Cray. 
+This emulation results in ineffeciencies and poor software structure: 
+the Jaguar system, for example, has 30,000 hardwired ARP-table entries 
+{\em on each node} so that the TCP/IP address in $[x,y,z]$ form 
+can be mapped to an Ethernet address in $[x,y,z]$ form. 
+Ethernet interfaces are for Ethernet networks. There is no need to have a network interface for an
+HPC network 
+emulate an Ethernet, as it does on Compute Node Linux on the Cray or 
+ZeptoOS on BG/P. 
 \end{itemize}
 
 This work was done as part of the FAST-OS program and its successor. 
@@ -145,12 +179,12 @@ and complexity and the processors do not get any faster. As we stated in 2003,
 ``At some point, like all other OSes, it is [Linux] going to fall over''. 
 Several large companies, in private conversation, have told the PI that one of the
 biggest management headaches they have is dealing with the increasing complexity of 
-the Linux kernel, version to version. 
+the Linux kernel, version to version, as it gains more features and bulk.  
 
 Did FAST-OS succeed? That is a harder question. In the sense of industry impact, we 
 clearly had great success. In the sense of building a vibrant community of OS researchers
 in DOE, we had some success; there is very good OS work going on at Argonne, Oak Ridge, 
-and Sandia, and on a smaller scale, other Labs. 
+and Sandia, and on a smaller scale, at other Labs. 
 
 Those are hard-won gains, and maintaining them 
 will not be easy: OS research continues to come under 
@@ -159,11 +193,27 @@ from those who believe that industry will just supply an OS as a turnkey
 answer, in spite of all historical evidence to the contrary. No standard OS has ever worked
 for the large scale without substantial measurement and change. 
 
+Further, the challenges 
+in the worlds of Google, Amazon, and Facebook are now much bigger 
+and freer of past constraints: just this year Google announced 
+the Exacycle initiative, and is delivering one billion core
+hours for researchers. 
+Further, the scale of the commercial world's file storage problems now dwarfs 
+anything that is facing DOE. Hiring and keeping people at 
+DOE Labs is becoming ever more challenging, absent support for 
+new and novel approaches to DOE problems. People are not excited
+by the idea of spending the next 10 years of their career supporting 
+the legacy software produced over the last quarter century. 
+
 DOE needs to build on the success of these programs by continuing
 to fund new, innovative research that will 
-help vendors set new directions. At the same time, DOE Labs should almost never be in the business of 
-providing production software; nor should commercial uptake of every last bit of research be the measure 
-by which the research is measured. Failure should always be an option. If there are no failures, 
+help vendors set new directions. 
+At the same time, DOE Labs should almost never be in the business of 
+providing production software; 
+nor should commercial uptake of every last bit of research software
+be the standard 
+by which success is measured. 
+Failure should always be an option. If there are no failures, 
 then the research is not nearly aggressive enough. 
 
 When FAST-OS started, the discussion was whether the DOE Labs would have any OS 
@@ -181,9 +231,12 @@ be answered at the end of {\em this} decade.
 \bibliography{all}
 
 \appendix
-\section{NIX}
-See attached document.
+\appendixpage
+\section*{NIX}
 This document will appear in Bell Labs Technical Journal and was the subject
 of a talk at a Bell Labs Technical Conference in Antwerp, Belgium, Oct. 2011. 
+\newpage
+\includepdf[pages=-]{bltj.pdf}
 
+\addappheadtotoc
 \end{document}
