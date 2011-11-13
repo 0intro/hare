@@ -6,7 +6,7 @@ activering.pdf: activering.pic
 	ps2pdf activering.ps activering.pdf
 	open activering.pdf
 
-finalreport.pdf: finalreport.tex all.bib ftq.tex commercial.tex os.tex activering.pdf
+finalreport.pdf: finalreport.tex all.bib ftq.tex commercial.tex os.tex activering.pdf netstuff.tex
 	pdflatex finalreport
 	bibtex finalreport
 	pdflatex finalreport
