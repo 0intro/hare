@@ -3,7 +3,11 @@
 \usepackage{appendix}
 \usepackage{pdfpages}
 \title{HARE: Final Report}
-\author{Sandia National Labs, IBM, Bell Labs, Vita Nuova}
+\author{Sandia National Labs, IBM, Bell Labs, Vita Nuova
+\thanks{\protect\includegraphics[height=0.3in]{thunderchicken}%
+}%
+\thanks{Sandia is a multiprogram laboratory operated by Sandia Corporation, a Lockheed Martin Company, for the United States Department of Energy’s National Nuclear Security Administration under contract DE­AC04­94AL85000. SAND- 2011-xxxxC.}  
+}
 \date{\today}
 
 \begin{document}
@@ -41,6 +45,10 @@ used for measuring operating systems impact on applications
 \item Demonstrated that, with proper modifications, a general purpose operating systems
 can provide communications up to 3 times as effective as user-level libraries
 \end{itemize}
+
+Open source was a key part of this work. The code developed for this project 
+is in wide use and available at many places. The core Blue Gene code is 
+available at https://bitbucket.org/ericvh/hare. 
 
 We describe details of these impacts in the following sections. The rest of this 
 report is organized as follows: first, we describe commercial impact; next, 
@@ -97,7 +105,8 @@ of a general purpose operating system is available on core nearby.
 We feel that NIX represents the shape of future operating systems
 on manycore systems that are being built now. 
 
-Further information on NIX can be found in Appendis A. 
+Further information on NIX can be found in Appendis A. The source 
+code is available at https://code.google.com/p/nix-os. 
 
 \chapter{Future Work}
 %Over the period of these two projects, we have shown that with appropriate 
