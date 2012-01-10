@@ -9,7 +9,7 @@ Both IBM and Cray have used it to help tune their operating system kernels for m
 FTQ results supported Cray's decision to move to Compute Node Linux, replacing the Catamount Light Weight Kernel originally delivered with those systems. Real 
 application results supported the initial results from FTQ. 
 
-The distinguishing feature of FTQ is that it measures work per fixed amount of time, rather than the more traditional time taken to do a fixed amount of work. The distinction is subtle but essential.  FTQ is written to carefully ensure that the time samples are for a fixed amount but also that the sampling interval is {\em stationary}. FTQ ensures this property by starting each sample interval at the correct point in team even if, due to interference, the previous sample interval took too long. For more discussion of how this is done the reader is referred to the original paper. 
+The distinguishing feature of FTQ is that it measures work per fixed amount of time, rather than the more traditional time taken to do a fixed amount of work. The distinction is subtle but essential.  FTQ is written to carefully ensure that the time samples are for a fixed amount but also that the sampling interval is {\em stationary}. FTQ ensures this property by starting each sample interval at the correct point in time even if, due to interference, the previous sample interval took too long. For more discussion of how this is done the reader is referred to the original paper. 
 
 As mentioned, FTQ allows users and vendors to use quantitative, rather than qualitative analysis.  As an example we will walk through real data taken on 
 Blue Gene/P on a very early implementation of Plan 9. 
